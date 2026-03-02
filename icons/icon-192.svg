@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
+  <rect width="192" height="192" rx="32" fill="#050508"/>
+  <rect x="8" y="8" width="176" height="176" rx="28" fill="none" stroke="#3b82f6" stroke-width="2" opacity="0.3"/>
+  <circle cx="96" cy="72" r="28" fill="none" stroke="#3b82f6" stroke-width="4"/>
+  <path d="M96 56 L96 88 M80 72 L112 72" stroke="#3b82f6" stroke-width="4" stroke-linecap="round"/>
+  <rect x="56" y="112" width="80" height="8" rx="4" fill="#3b82f6" opacity="0.6"/>
+  <rect x="64" y="128" width="64" height="6" rx="3" fill="#3b82f6" opacity="0.3"/>
+  <rect x="72" y="140" width="48" height="6" rx="3" fill="#3b82f6" opacity="0.2"/>
+  <text x="96" y="168" text-anchor="middle" font-family="sans-serif" font-weight="700" font-size="14" fill="#3b82f6">DiggAI</text>
+</svg>
