@@ -5,7 +5,7 @@ Ein DSGVO-konformes, Full-Stack-System für die digitale Patientenanamnese in Ar
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
 ![React](https://img.shields.io/badge/React-19-61DAFB)
 ![Express](https://img.shields.io/badge/Express-5-green)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-336791)
+![SQLite](https://img.shields.io/badge/SQLite-dateibasiert-003B57)
 
 ---
 
@@ -13,13 +13,18 @@ Ein DSGVO-konformes, Full-Stack-System für die digitale Patientenanamnese in Ar
 
 ### Patienten-Frontend
 - **10 Service-Flows**: Anamnese, Rezepte, AU, BG-Unfall (NEU!), Überweisung, Absage, Telefon, Befundanforderung, Dateien, Nachricht
-- **78+ medizinische Fragen** mit dynamischer Navigation
+- **270+ medizinische Fragen** mit dynamischer Navigation (13 Fachmodule + Sub-Chains)
 - **Strukturierte Medikamenten-Eingabe** (Wirkstoff + Dosierung + Schema)
 - **Schwangerschafts-Check** (automatisch für W, 15-50 Jahre)
 - **Red Flag System**: Vollbild-Notfall-Overlay bei CRITICAL Alerts (ACS, Suizid, SAH, Syncope)
 - **DSGVO-Einwilligungserklärung** vor dem Start
 - **PDF-Export** mit Unterschriftenfeld (Touch + Maus)
 - **Zurück-Navigation** und Sidebar-Verlauf
+- **10 Sprachen** (DE/EN/TR/AR/UK/ES/FA/IT/FR/PL) inkl. RTL
+- **Cookie-Consent-Banner** (TTDSG §25)
+- **Datenschutzerklärung** (Art. 13/14 DSGVO)
+- **Impressum** (§5 DDG)
+- **DatenschutzGame** – Interaktives Datenschutz-Quiz
 
 ### Backend (Express/Prisma)
 - **AES-256-GCM Verschlüsselung** für personenbezogene Daten
@@ -27,7 +32,7 @@ Ein DSGVO-konformes, Full-Stack-System für die digitale Patientenanamnese in Ar
 - **10 Triage-Regeln** (4 CRITICAL + 6 WARNING)
 - **Socket.io** für Live-Alerts an das Arzt-Dashboard
 - **HIPAA-konformes Audit Logging**
-- **Prisma ORM** mit PostgreSQL
+- **Prisma ORM** mit SQLite (dateibasiert)
 
 ### Arzt-Dashboard (`/arzt`)
 - Session-Übersicht mit Stats
@@ -41,7 +46,7 @@ Ein DSGVO-konformes, Full-Stack-System für die digitale Patientenanamnese in Ar
 
 ### Voraussetzungen
 - Node.js 20+
-- PostgreSQL 15+ (lokal oder Docker)
+- SQLite (dateibasiert – keine separate Installation nötig)
 
 ### 1. Installation
 
@@ -55,7 +60,7 @@ npm install
 Die `.env` Datei ist bereits mit Entwicklungswerten vorkonfiguriert. Für Produktion anpassen:
 
 ```env
-DATABASE_URL="postgresql://user:password@host:5432/anamnese_db"
+DATABASE_URL="file:./dev.db"
 JWT_SECRET="mindestens-32-zeichen-langes-geheimnis"
 ENCRYPTION_KEY="genau-32-zeichen-fuer-aes256-key"
 VITE_API_URL="https://dein-backend.example.com/api"
@@ -70,7 +75,7 @@ npm run db:generate
 # Migration ausführen (erstellt alle Tabellen)
 npm run db:migrate
 
-# Seed: 78 Fragen + Admin-Arzt einfügen
+# Seed: 270+ Fragen + Admin-Arzt einfügen
 npm run db:seed
 ```
 
@@ -93,6 +98,12 @@ npm run dev:all
 |:------|:------------|
 | `http://localhost:5173` | Patienten-Portal |
 | `http://localhost:5173/arzt` | Arzt-Dashboard |
+| `http://localhost:5173/mfa` | MFA-Dashboard |
+| `http://localhost:5173/admin` | Admin-Dashboard |
+| `http://localhost:5173/datenschutz` | Datenschutzerklärung |
+| `http://localhost:5173/impressum` | Impressum |
+| `http://localhost:5173/docs` | Dokumentation |
+| `http://localhost:5173/handbuch` | Handbuch |
 | `http://localhost:3001/api/health` | Backend Health-Check |
 
 ---
@@ -103,7 +114,7 @@ npm run dev:all
 anamnese-app/
 ├── prisma/
 │   ├── schema.prisma          # Datenbank-Schema (7 Models)
-│   └── seed.ts                # Seed-Daten (78 Fragen + Arzt)
+│   └── seed.ts                # Seed-Daten (270+ Fragen + Arzt)
 ├── server/
 │   ├── index.ts               # Express Server Entry Point
 │   ├── config.ts              # Environment Config
@@ -146,7 +157,7 @@ anamnese-app/
 │   ├── pages/
 │   │   └── ArztDashboard.tsx      # Arzt-Übersicht
 │   ├── data/
-│   │   └── questions.ts           # 78 Fragen-Definitionen
+│   │   └── questions.ts           # 270+ Fragen-Definitionen
 │   ├── utils/
 │   │   └── questionLogic.ts       # Frontend-Logik-Engine
 │   └── types/
@@ -179,13 +190,10 @@ anamnese-app/
 ### Docker Deployment (empfohlen)
 
 ```bash
-# PostgreSQL starten
-docker run -d --name anamnese-db \
-  -e POSTGRES_DB=anamnese_db \
-  -e POSTGRES_PASSWORD=sicheres_pw \
-  -p 5432:5432 postgres:15
+# SQLite benötigt keinen separaten DB-Container.
+# Die Datenbankdatei wird automatisch unter prisma/dev.db angelegt.
 
-# .env anpassen, dann:
+# .env anpassen (DATABASE_URL="file:./dev.db"), dann:
 npm run db:migrate
 npm run db:seed
 npm run build
@@ -209,13 +217,13 @@ Diese App wird auf Netlify als statische SPA deployed. Das Backend (Express/Pris
 
 ### Checkliste für Praxis-Einsatz
 
-- [ ] PostgreSQL einrichten (lokal oder Cloud)
+- [ ] SQLite-Datenbankdatei sicher speichern (z.B. /data/anamnese.db)
 - [ ] `.env` mit echten Secrets konfigurieren
 - [ ] `npm run db:migrate` + `npm run db:seed`
 - [ ] TLS/SSL Zertifikat (Let's Encrypt)
 - [ ] Arzt-Passwort ändern
 - [ ] Praxisname in DSGVOConsent anpassen
-- [ ] Backup-Strategie für PostgreSQL
+- [ ] Backup-Strategie für SQLite-Datei
 - [ ] Datenschutzbeauftragten benennen
 
 ---
@@ -241,7 +249,7 @@ Diese App wird auf Netlify als statische SPA deployed. Das Backend (Express/Pris
 
 **Frontend:** React 19, TypeScript (Strict), Vite, Tailwind CSS 4, Zustand, TanStack React Query, React Router DOM, Axios, Socket.io Client  
 **Backend:** Node.js, Express 5, TypeScript, Prisma ORM, JWT, bcryptjs, Socket.io  
-**Datenbank:** PostgreSQL 15+ mit JSONB  
+**Datenbank:** SQLite (dateibasiert) mit Prisma ORM  
 **Sicherheit:** AES-256-GCM, SHA-256, Helmet.js, Rate Limiting, HIPAA Audit Trail
 
 ---

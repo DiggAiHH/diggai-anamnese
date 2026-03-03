@@ -6,12 +6,15 @@ Diese Dokumentation beschreibt die Struktur, den technischen Aufbau und die klin
 
 ## 🚀 Technical Stack
 
-- **Framework**: React 18+ mit Vite
+- **Framework**: React 19.2 mit Vite
 - **Sprache**: TypeScript (Strict Mode)
-- **Styling**: Tailwind CSS (Modern Glassmorphism & Clinical Design)
+- **Styling**: Tailwind CSS 4 (Modern Glassmorphism & Clinical Design)
 - **Icons**: Lucide React
-- **State Management**: React Context API + `useReducer`
+- **State Management**: Zustand 5 + TanStack React Query
 - **Animationen**: CSS Transitions & Tailwind Animate
+- **Internationalisierung**: i18next (10 Sprachen: DE/EN/TR/AR/UK/ES/FA/IT/FR/PL)
+- **Sicherheit**: AES-256-GCM Verschlüsselung, JWT HS256 (gepinnt), JTI-Blacklist
+- **Datenbank**: SQLite (dateibasiert) via Prisma 6.19.2
 
 ---
 
@@ -19,15 +22,29 @@ Diese Dokumentation beschreibt die Struktur, den technischen Aufbau und die klin
 
 ```text
 src/
-├── components/          # UI-Komponenten
+├── components/          # UI-Komponenten (38+)
 │   ├── LandingPage      # Einstiegspunkt (Service-Auswahl)
 │   ├── Questionnaire    # Haupt-Container für den Fragen-Ablauf
 │   ├── HistorySidebar   # Permanente Verlaufsanzeige & Navigation
 │   ├── QuestionRenderer # Dynamische Darstellung der Fragentypen
 │   ├── AnswerSummary    # Strukturierter medizinischer Bericht
-│   └── ProgressBar      # Visueller Fortschrittsanzeiger
-├── context/
-│   └── QuestionnaireContext # Globaler State (Antworten, aktueller Pfad)
+│   ├── ProgressBar      # Visueller Fortschrittsanzeiger
+│   ├── CookieConsent    # TTDSG §25 Cookie-Einwilligungsbanner
+│   ├── DatenschutzGame  # Interaktives Datenschutz-Quiz
+│   ├── PatientWartezimmer # Digitale Warteschlange
+│   ├── StaffChat        # Interne Arzt-/MFA-Kommunikation
+│   ├── StaffTodoList    # Aufgabenverwaltung für Praxisteam
+│   └── ModeToggle       # Dark/Light Theme Umschalter
+├── pages/
+│   ├── ArztDashboard    # Arzt-Übersicht mit KI-Analyse
+│   ├── MFADashboard     # MFA-Warteschlange & Zuordnung
+│   ├── AdminDashboard   # Interaktive Systemdokumentation
+│   ├── DatenschutzPage  # Datenschutzerklärung (Art. 13/14 DSGVO)
+│   ├── ImpressumPage    # Impressum (§5 DDG)
+│   ├── DokumentationPage # Interaktive Produkt-Dokumentation
+│   └── HandbuchPage     # Benutzerhandbuch
+├── store/
+│   └── sessionStore     # Zustand State Management
 ├── data/
 │   └── questions.ts     # Definition aller >1000 klinischen Fragen & Logik
 ├── types/
@@ -101,3 +118,17 @@ Echtzeit-Überprüfung der Antworten gegen eine klinische Triage-Liste. Sofortig
 - **Build**: `npm run build` (Erzeugt `dist/` Ordner für Deployment)
 
 Die Anwendung ist so konzipiert, dass neue Dienste oder Fragen einfach in `questions.ts` hinzugefügt werden können, ohne den Code der UI anpassen zu müssen.
+
+---
+
+## 📄 DSGVO-Dokumentation (`docs/` Ordner)
+
+Im Verzeichnis `docs/` befinden sich sämtliche DSGVO- und Datenschutz-Dokumente:
+
+| Datei | Beschreibung |
+| :--- | :--- |
+| `AVV_TEMPLATE.md` | Auftragsverarbeitungsvertrag (Art. 28 DSGVO) |
+| `DSFA.md` | Datenschutz-Folgenabschätzung (Art. 35 DSGVO) |
+| `INCIDENT_RESPONSE_PLAN.md` | Incident-Response-Plan für Datenpannen |
+| `TOM_DOKUMENTATION.md` | Technisch-organisatorische Maßnahmen (Art. 32 DSGVO) |
+| `VERFAHRENSVERZEICHNIS.md` | Verfahrensverzeichnis (Art. 30 DSGVO) |

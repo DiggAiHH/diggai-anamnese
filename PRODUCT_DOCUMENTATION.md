@@ -1,6 +1,6 @@
 # DiggAI Anamnese App – Produkt- & Architekturdokumentation
 
-> Version 8.0 | Stand: März 2026 | Status: Produktion  
+> Version 14.0 | Stand: März 2026 | Status: Produktion  
 > URL: [https://diggai-drklaproth.netlify.app](https://diggai-drklaproth.netlify.app)
 
 ---
@@ -15,7 +15,7 @@ Die **DiggAI Anamnese App** ist ein DSGVO-konformes, vollständig digitales Pati
 | --- | --- | --- | --- |
 | Durchschnittliche Aufnahmezeit | 15–25 Min | 5–8 Min | **-65%** |
 | Datenübertragungsfehler | ~12% | 0% (direkt digital) | **-100%** |
-| Sprachbarrieren | Keine Lösung | 5 Sprachen (DE/EN/AR/TR/UK) | **+∞** |
+| Sprachbarrieren | Keine Lösung | 10 Sprachen (DE/EN/AR/TR/UK/ES/FA/IT/FR/PL) | **+∞** |
 | Arzt-Vorbereitungszeit | 5–10 Min Lesen | Sofortige KI-Zusammenfassung | **-90%** |
 | Notfall-Erkennung | Manuell (verzögert) | Echtzeit Triage (<2s) | **Lebensrettend** |
 | DSGVO-Konformität | Papierlagerung | AES-256-GCM + Audit Trail | **Vollständig** |
@@ -30,22 +30,22 @@ Die **DiggAI Anamnese App** ist ein DSGVO-konformes, vollständig digitales Pati
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    FRONTEND (SPA)                            │
-│  React 19 · TypeScript 5.9 · Vite 8 · Tailwind CSS 4       │
+│  React 19.2 · TypeScript 5.9 · Vite 8 · Tailwind CSS 4     │
 │  Zustand 5 · React Query 5 · Socket.io Client · i18next     │
 │  Lucide Icons · Tesseract.js (OCR) · html5-qrcode           │
 ├─────────────────────────────────────────────────────────────┤
 │                    BACKEND (API)                             │
-│  Express 5 · Prisma ORM · PostgreSQL                         │
+│  Express 5.2.1 · Prisma 6.19.2 · SQLite (dateibasiert)      │
 │  JWT Auth · AES-256-GCM · Helmet · Rate Limiting             │
 │  Socket.io · Multer (Uploads) · Audit Logging                │
 ├─────────────────────────────────────────────────────────────┤
 │                    INFRASTRUKTUR                              │
-│  Netlify (Frontend) · Node.js 20+ Server · PostgreSQL 15+    │
+│  Netlify (Frontend) · Node.js 20+ Server · SQLite            │
 │  TLS 1.3 · HIPAA Audit Trail · Automated Backups             │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 2.2 Datenbankmodell (Prisma/PostgreSQL)
+### 2.2 Datenbankmodell (Prisma/SQLite)
 
 ```
 Patient ──1:n── PatientSession ──1:n── Answer
@@ -61,16 +61,21 @@ AuditLog ──────── HIPAA-konformes Zugriffsprotokoll
 MedicalAtom ───── Fragen-Definitionen (Server-seitig)
 ```
 
-### 2.3 Komponentenarchitektur (22 Komponenten)
+### 2.3 Komponentenarchitektur (38+ Komponenten)
 
 ```
 App.tsx
 ├── /arzt ──────── ArztDashboard (Auth-geschützt)
 ├── /mfa ───────── MFADashboard (Auth-geschützt)
 ├── /admin ─────── AdminDashboard (NEU: Interaktive Dokumentation)
+├── /datenschutz ─ DatenschutzPage (Datenschutzerklärung)
+├── /impressum ─── ImpressumPage (§5 DDG)
+├── /docs ──────── DokumentationPage
+├── /handbuch ──── HandbuchPage
 └── /* ─────────── PatientApp
                    ├── LandingPage (10 Service-Cards)
                    │   └── DSGVOConsent (Einwilligungsdialog)
+                   │   └── CookieConsent (TTDSG §25)
                    └── Questionnaire
                        ├── HistorySidebar (Verlaufsnavigation)
                        ├── ProgressBar (Fortschrittsanzeige)
@@ -90,7 +95,13 @@ App.tsx
                        ├── AnswerSummary
                        ├── PDFExport (Signatur + Druck)
                        ├── CameraScanner (OCR)
-                       └── SubmittedPage
+                       ├── SubmittedPage
+                       ├── CookieConsent (TTDSG §25)
+                       ├── DatenschutzGame (Interaktiv)
+                       ├── PatientWartezimmer (Warteschlange)
+                       ├── StaffChat (Interne Kommunikation)
+                       ├── StaffTodoList (Aufgabenverwaltung)
+                       └── ModeToggle (Dark/Light Theme)
 ```
 
 ---
@@ -312,6 +323,8 @@ showIf: [
 | **RBAC** | 4 Rollen | PATIENT, ARZT, MFA, ADMIN |
 | **API-Schutz** | Helmet.js | Security Headers (CSP, HSTS, X-Frame) |
 | **Rate Limiting** | express-rate-limit | 100 Requests / 15 Min pro IP |
+| **JWT Pinning** | HS256 | Algorithmus explizit gepinnt |
+| **Token Blacklist** | JTI-basiert | In-Memory Blacklist für Token-Widerruf |
 | **Session** | Ownership Check | Nur eigene Session bearbeitbar |
 | **Audit** | HIPAA Logging | Jeder Zugriff wird protokolliert |
 
@@ -324,6 +337,9 @@ showIf: [
 - ✅ **Löschrecht** – Session-Ablauf nach 24h
 - ✅ **Audit Trail** – Vollständige Zugriffsdokumentation
 - ✅ **Datenportabilität** – Export als PDF/CSV/JSON
+- ✅ **Cookie-Consent-Banner** (TTDSG §25)
+- ✅ **Datenschutzerklärung** (Art. 13/14 DSGVO)
+- ✅ **Impressum** (§5 DDG)
 
 ---
 
@@ -433,7 +449,7 @@ GESAMT              33 Min      GESAMT               5.5 Min
 | **Vollständigkeit** | 100% aller Pflichtfelder ausgefüllt (Validierung) |
 | **Lesbarkeit** | Digitale Schrift statt Handschrift |
 | **Triage-Geschwindigkeit** | <2 Sekunden statt manueller Erkennung |
-| **Mehrsprachigkeit** | 5 Sprachen – keine Dolmetscher-Wartezeit |
+| **Mehrsprachigkeit** | 10 Sprachen – keine Dolmetscher-Wartezeit |
 | **Datensicherheit** | E2E-Verschlüsselung statt offener Papierakte |
 | **Nachhaltigkeit** | 0 Papierverbrauch |
 | **Fehlerreduktion** | Pflichtfelder + Plausibilitätsprüfung |
@@ -484,11 +500,16 @@ GESAMT              33 Min      GESAMT               5.5 Min
 
 | Sprache | Code | Status | Schlüssel |
 | --- | --- | --- | --- |
-| 🇩🇪 Deutsch | `de` | ✅ Vollständig | 1.433 |
-| 🇬🇧 English | `en` | ✅ Vollständig | 1.433 |
-| 🇹🇷 Türkçe | `tr` | ✅ Vollständig | 1.433 |
-| 🇸🇦 العربية | `ar` | ✅ Vollständig (RTL) | 1.433 |
-| 🇺🇦 Українська | `uk` | ✅ Vollständig | 1.433 |
+| 🇩🇪 Deutsch | `de` | ✅ Vollständig | ~1.812 |
+| 🇬🇧 English | `en` | ✅ Vollständig | ~1.812 |
+| 🇹🇷 Türkçe | `tr` | ✅ Vollständig | ~1.808 |
+| 🇸🇦 العربية | `ar` | ✅ Vollständig (RTL) | ~1.808 |
+| 🇺🇦 Українська | `uk` | ⚠️ 69 Schlüssel fehlen | ~1.743 |
+| 🇪🇸 Español | `es` | ✅ Vollständig | ~1.809 |
+| 🇮🇷 فارسی | `fa` | ✅ Vollständig (RTL) | ~1.812 |
+| 🇮🇹 Italiano | `it` | ✅ Vollständig | ~1.812 |
+| 🇫🇷 Français | `fr` | ✅ Vollständig | ~1.812 |
+| 🇵🇱 Polski | `pl` | ✅ Vollständig | ~1.812 |
 
 ---
 
@@ -529,7 +550,7 @@ npm run build        # TypeScript-Kompilierung + Vite-Build
 ### 12.3 Deployment
 
 - **Frontend**: Netlify (automatisch via `dist/` Ordner)
-- **Backend**: Node.js Server mit PostgreSQL
+- **Backend**: Node.js Server mit SQLite (dateibasiert)
 - **CI/CD**: Playwright E2E-Tests vor jedem Deploy
 
 ### 12.4 E2E-Tests (Playwright)
