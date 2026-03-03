@@ -1,0 +1,424 @@
+import { Router } from 'express';
+import type { Request, Response } from 'express';
+import { prisma } from '../db';
+import { createToken, requireAuth, requireSessionOwner } from '../middleware/auth';
+import { hashEmail, encrypt } from '../services/encryption';
+
+import * as jwt from 'jsonwebtoken';
+const { sign } = jwt;
+
+const router = Router();
+
+import { config as appConfig } from '../config';
+
+/**
+ * POST /api/sessions/qr-token
+ * MFA/Doctor generates a QR code token for a patient to start a session.
+ */
+router.post('/qr-token', requireAuth, (req: Request, res: Response) => {
+    try {
+        const { service } = req.body;
+        // Generate a fast token valid for 24 hours
+        const token = sign({
+            type: 'qr-start',
+            service: service || 'Termin / Anamnese',
+            createdBy: req.auth?.role,
+        }, appConfig.jwtSecret as jwt.Secret, { expiresIn: '24h' });
+
+        res.json({ token });
+    } catch (err) {
+        console.error('[QR Token] Error:', err);
+        res.status(500).json({ error: 'Fehler beim Generieren des Tokens' });
+    }
+});
+
+import { z } from 'zod';
+
+const createSessionSchema = z.object({
+    email: z.string().optional(),
+    isNewPatient: z.boolean().optional().default(true),
+    gender: z.string().optional(),
+    birthDate: z.string().optional(),
+    selectedService: z.string().min(1, 'Service ist erforderlich'),
+    insuranceType: z.string().optional(),
+    encryptedName: z.string().optional(),
+});
+
+/**
+ * POST /api/sessions
+ * Erstellt eine neue Patienten-Session
+ */
+router.post('/', async (req: Request, res: Response) => {
+    try {
+        const validatedData = createSessionSchema.parse(req.body);
+        const { email, isNewPatient, gender, birthDate, selectedService, insuranceType, encryptedName } = validatedData;
+
+        // 1. Finde oder erstelle einen "Anonymen" Patient, falls noch keine E-Mail vorliegt
+        const emailHash = email ? hashEmail(email) : `anonymous - ${Date.now()} -${Math.random()} `;
+        let patient = await prisma.patient.findUnique({ where: { hashedEmail: emailHash } });
+
+        if (!patient) {
+            patient = await prisma.patient.create({
+                data: { hashedEmail: emailHash },
+            });
+        }
+
+        // 2. Erstelle die Session (Demografische Daten dürfen anfangs null/leer sein!)
+        const session = await prisma.patientSession.create({
+            data: {
+                patientId: patient.id,
+                isNewPatient: isNewPatient ?? true,
+                gender: gender || null,
+                birthDate: birthDate ? new Date(birthDate) : null,
+                selectedService,
+                insuranceType: insuranceType || null,
+                encryptedName: encryptedName ? encrypt(encryptedName) : null,
+            },
+        });
+
+        const token = createToken({
+            sessionId: session.id,
+            role: 'patient',
+        });
+
+        res.status(201).json({
+            sessionId: session.id,
+            token,
+            nextAtomIds: ['0000'],
+        });
+    } catch (err: unknown) {
+        console.error('[Sessions] Fehler beim Erstellen:', err);
+        res.status(500).json({ error: 'Interner Serverfehler' });
+    }
+});
+
+/**
+ * GET /api/sessions/:id/state
+ */
+router.get('/:id/state', requireAuth, requireSessionOwner, async (req: Request, res: Response) => {
+    try {
+        const sessionId = req.params.id as string;
+        const session = await prisma.patientSession.findUnique({
+            where: { id: sessionId },
+        });
+
+        if (!session) {
+            res.status(404).json({ error: 'Session nicht gefunden' });
+            return;
+        }
+
+        const answers = await prisma.answer.findMany({
+            where: { sessionId },
+            orderBy: { answeredAt: 'asc' },
+        });
+
+        const triageEvents = await prisma.triageEvent.findMany({
+            where: { sessionId },
+            orderBy: { createdAt: 'desc' },
+        });
+
+        const answersMap: Record<string, { value: unknown; answeredAt: Date; timeSpentMs: number }> = {};
+        for (const answer of answers) {
+            answersMap[answer.atomId] = {
+                value: JSON.parse(answer.value),
+                answeredAt: answer.answeredAt,
+                timeSpentMs: answer.timeSpentMs,
+            };
+        }
+
+        res.json({
+            session: {
+                id: session.id,
+                isNewPatient: session.isNewPatient,
+                gender: session.gender,
+                birthDate: session.birthDate,
+                status: session.status,
+                selectedService: session.selectedService,
+                insuranceType: session.insuranceType,
+                createdAt: session.createdAt,
+                completedAt: session.completedAt,
+            },
+            answers: answersMap,
+            triageEvents: triageEvents.map((te) => ({
+                ...te,
+                triggerValues: JSON.parse(te.triggerValues),
+            })),
+            totalAnswers: answers.length,
+        });
+    } catch (err: unknown) {
+        console.error('[Sessions] Fehler beim Abrufen:', err);
+        res.status(500).json({ error: 'Interner Serverfehler' });
+    }
+});
+
+/**
+ * POST /api/sessions/:id/submit
+ */
+router.post('/:id/submit', requireAuth, requireSessionOwner, async (req: Request, res: Response) => {
+    try {
+        const sessionId = req.params.id as string;
+        const session = await prisma.patientSession.update({
+            where: { id: sessionId },
+            data: {
+                status: 'COMPLETED',
+                completedAt: new Date(),
+            },
+        });
+
+        const { emitSessionComplete } = await import('../socket');
+        emitSessionComplete(session.id, session.selectedService);
+
+        res.json({
+            success: true,
+            sessionId: session.id,
+            completedAt: session.completedAt,
+        });
+    } catch (err: unknown) {
+        console.error('[Sessions] Fehler beim Submit:', err);
+        res.status(500).json({ error: 'Interner Serverfehler' });
+    }
+});
+
+/**
+ * POST /api/sessions/:id/accident
+ */
+router.post('/:id/accident', requireAuth, requireSessionOwner, async (req: Request, res: Response) => {
+    try {
+        const sessionId = req.params.id as string;
+        const { bgName, accidentDate, accidentLocation, description, firstResponder, reportedToEmployer } = req.body;
+
+        if (!bgName || !accidentDate || !description) {
+            res.status(400).json({ error: 'Pflichtfelder fehlen (bgName, accidentDate, description)' });
+            return;
+        }
+
+        const accident = await prisma.accidentDetails.upsert({
+            where: { sessionId },
+            update: {
+                bgName,
+                accidentDate: new Date(accidentDate),
+                accidentLocation: accidentLocation || '',
+                description,
+                firstResponder: firstResponder || null,
+                reportedToEmployer: reportedToEmployer || false,
+            },
+            create: {
+                sessionId,
+                bgName,
+                accidentDate: new Date(accidentDate),
+                accidentLocation: accidentLocation || '',
+                description,
+                firstResponder: firstResponder || null,
+                reportedToEmployer: reportedToEmployer || false,
+            }
+        });
+
+        res.status(201).json({ success: true, accidentId: accident.id });
+    } catch (err: unknown) {
+        console.error('[Sessions/Accident] Fehler beim Speichern:', err);
+        res.status(500).json({ error: 'Interner Serverfehler' });
+    }
+});
+
+/**
+ * GET /api/sessions/:id/accident
+ */
+router.get('/:id/accident', requireAuth, async (req: Request, res: Response) => {
+    try {
+        const sessionId = req.params.id as string;
+        const accident = await prisma.accidentDetails.findUnique({
+            where: { sessionId }
+        });
+
+        if (!accident) {
+            res.status(200).json({ success: true, accident: null });
+            return;
+        }
+
+        res.json({ success: true, accident });
+    } catch (err: unknown) {
+        console.error('[Sessions/Accident] Fehler beim Abrufen:', err);
+        res.status(500).json({ error: 'Interner Serverfehler' });
+    }
+});
+/**
+ * POST /api/sessions/:id/medications
+ * Speichert Dauermedikation für den Patienten der Session
+ */
+router.post('/:id/medications', requireAuth, requireSessionOwner, async (req: Request, res: Response) => {
+    try {
+        const sessionId = req.params.id as string;
+        const medications = req.body.medications;
+
+        if (!Array.isArray(medications)) {
+            res.status(400).json({ error: 'medications muss ein Array sein' });
+            return;
+        }
+
+        const session = await prisma.patientSession.findUnique({
+            where: { id: sessionId },
+            select: { patientId: true }
+        });
+
+        if (!session || !session.patientId) {
+            res.status(404).json({ error: 'Session oder Patient nicht gefunden' });
+            return;
+        }
+
+        // Bulk-Replace
+        await prisma.patientMedication.deleteMany({
+            where: { patientId: session.patientId }
+        });
+
+        if (medications.length > 0) {
+            await prisma.patientMedication.createMany({
+                data: medications.map((m: any) => ({
+                    patientId: session.patientId!,
+                    name: m.name,
+                    dosage: m.dosage || '',
+                    frequency: m.frequency || '',
+                    notes: m.notes || null
+                }))
+            });
+        }
+
+        res.status(201).json({ success: true, count: medications.length });
+    } catch (err: unknown) {
+        console.error('[Sessions/Medications] Fehler beim Speichern:', err);
+        res.status(500).json({ error: 'Interner Serverfehler' });
+    }
+});
+
+/**
+ * GET /api/sessions/:id/medications
+ * Ruft die Dauermedikation des Patienten ab
+ */
+router.get('/:id/medications', requireAuth, async (req: Request, res: Response) => {
+    try {
+        const sessionId = req.params.id as string;
+
+        const session = await prisma.patientSession.findUnique({
+            where: { id: sessionId },
+            select: { patientId: true }
+        });
+
+        if (!session || !session.patientId) {
+            res.status(404).json({ error: 'Session oder Patient nicht gefunden' });
+            return;
+        }
+
+        const medications = await prisma.patientMedication.findMany({
+            where: { patientId: session.patientId },
+            orderBy: { createdAt: 'asc' }
+        });
+
+        res.json({ success: true, medications });
+    } catch (err: unknown) {
+        console.error('[Sessions/Medications] Fehler beim Abrufen:', err);
+        res.status(500).json({ error: 'Interner Serverfehler' });
+    }
+});
+
+/**
+ * POST /api/sessions/:id/surgeries
+ * Speichert OP-Historie für den Patienten
+ */
+router.post('/:id/surgeries', requireAuth, requireSessionOwner, async (req: Request, res: Response) => {
+    try {
+        const sessionId = req.params.id as string;
+        const surgeries = req.body.surgeries;
+
+        if (!Array.isArray(surgeries)) {
+            res.status(400).json({ error: 'surgeries muss ein Array sein' });
+            return;
+        }
+
+        const session = await prisma.patientSession.findUnique({
+            where: { id: sessionId },
+            select: { patientId: true }
+        });
+
+        if (!session || !session.patientId) {
+            res.status(404).json({ error: 'Session oder Patient nicht gefunden' });
+            return;
+        }
+
+        // Bulk-Replace
+        await prisma.patientSurgery.deleteMany({
+            where: { patientId: session.patientId }
+        });
+
+        if (surgeries.length > 0) {
+            await prisma.patientSurgery.createMany({
+                data: surgeries.map((s: any) => ({
+                    patientId: session.patientId!,
+                    surgeryName: s.surgeryName,
+                    date: s.date || null,
+                    complications: s.complications || null,
+                    notes: s.notes || null
+                }))
+            });
+        }
+
+        res.status(201).json({ success: true, count: surgeries.length });
+    } catch (err: unknown) {
+        console.error('[Sessions/Surgeries] Fehler beim Speichern:', err);
+        res.status(500).json({ error: 'Interner Serverfehler' });
+    }
+});
+
+/**
+ * GET /api/sessions/:id/surgeries
+ */
+router.get('/:id/surgeries', requireAuth, async (req: Request, res: Response) => {
+    try {
+        const sessionId = req.params.id as string;
+        const session = await prisma.patientSession.findUnique({
+            where: { id: sessionId },
+            select: { patientId: true }
+        });
+
+        if (!session || !session.patientId) {
+            res.status(404).json({ error: 'Session oder Patient nicht gefunden' });
+            return;
+        }
+
+        const surgeries = await prisma.patientSurgery.findMany({
+            where: { patientId: session.patientId },
+            orderBy: { createdAt: 'asc' }
+        });
+
+        res.json({ success: true, surgeries });
+    } catch (err: unknown) {
+        console.error('[Sessions/Surgeries] Fehler beim Abrufen:', err);
+        res.status(500).json({ error: 'Interner Serverfehler' });
+    }
+});
+
+/**
+ * POST /api/sessions/refresh-token
+ * Refreshes an expiring JWT by issuing a new one.
+ * Only valid if the current token hasn't fully expired yet (leeway: 5 minutes).
+ */
+router.post('/refresh-token', requireAuth, async (req: Request, res: Response) => {
+    try {
+        if (!req.auth) {
+            res.status(401).json({ error: 'Ungültiger Token' });
+            return;
+        }
+
+        // Re-create token with same payload but new expiry
+        const newToken = createToken({
+            sessionId: req.auth.sessionId,
+            userId: req.auth.userId,
+            role: req.auth.role,
+        });
+
+        res.json({ token: newToken });
+    } catch (err: unknown) {
+        console.error('[Sessions] Token-Refresh-Fehler:', err);
+        res.status(500).json({ error: 'Token konnte nicht erneuert werden' });
+    }
+});
+
+export default router;

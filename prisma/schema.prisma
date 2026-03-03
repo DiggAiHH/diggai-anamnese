@@ -1,0 +1,225 @@
+// Anamnese App – Prisma Schema
+// SQLite für einfache Einrichtung (kein externer DB-Server nötig)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./anamnese.db"
+}
+
+// ─── Patient (Pseudonymisiert) ──────────────────────────────
+
+model Patient {
+  id          String   @id @default(uuid())
+  hashedEmail String   @unique // SHA-256 für Wiedererkennung
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  sessions    PatientSession[]
+  medications PatientMedication[]
+  surgeries   PatientSurgery[]
+}
+
+// ─── Session (Eine Fragebogen-Sitzung) ──────────────────────
+
+model PatientSession {
+  id              String   @id @default(uuid())
+  patientId       String?
+  patient         Patient? @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  isNewPatient    Boolean?
+  gender          String?       // M / W / D
+  birthDate       DateTime?
+  encryptedName   String?       // AES-256-GCM verschlüsselt
+  status          String        @default("ACTIVE") // ACTIVE, COMPLETED, SUBMITTED, EXPIRED
+
+  // Kontext
+  selectedService String        // TERMIN, REZEPT, AU, UEBERWEISUNG, etc.
+  insuranceType   String?       // PKV, GKV, Selbstzahler
+
+  // Timestamps
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  completedAt     DateTime?
+  assignedArztId  String?
+  assignedArzt    ArztUser? @relation("ArztAssignedSessions", fields: [assignedArztId], references: [id])
+
+  // Beziehungen
+  answers         Answer[]
+  triageEvents    TriageEvent[]
+  chatMessages    ChatMessage[]
+  accidentDetails AccidentDetails?
+
+  @@index([patientId, createdAt])
+  @@index([status])
+}
+
+// ─── Accident Details (BG-Daten) ────────────────────────────
+
+model AccidentDetails {
+  id                String         @id @default(uuid())
+  sessionId         String         @unique
+  session           PatientSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  
+  bgName            String
+  accidentDate      DateTime
+  accidentLocation  String
+  description       String         // Kann in Zukunft bei SQLite auch @db.Text sein, Prisma SQLite ignoriert das
+  firstResponder    String?
+  reportedToEmployer Boolean       @default(false)
+  
+  @@index([sessionId])
+}
+
+// ─── Antwort (Ein einzelner beantworteter Atom) ─────────────
+
+model Answer {
+  id             String         @id @default(uuid())
+  sessionId      String
+  session        PatientSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  atomId         String         // Frage-ID, z.B. "0000", "RES-100"
+  value          String         // JSON string: { type: 'radio', data: 'ja' }
+  encryptedValue String?        // AES-256-GCM für PII-Freitexte
+
+  // UX Tracking
+  timeSpentMs    Int            @default(0)
+  answeredAt     DateTime       @default(now())
+
+  @@unique([sessionId, atomId])
+  @@index([sessionId])
+}
+
+// ─── Triage Event (Red Flag Auslöser) ───────────────────────
+
+model TriageEvent {
+  id             String         @id @default(uuid())
+  sessionId      String
+  session        PatientSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  level          String         // WARNING, CRITICAL
+  atomId         String         // Auslösende Frage
+  triggerValues  String         // JSON string
+  message        String
+
+  createdAt      DateTime       @default(now())
+  acknowledgedBy String?        // Arzt-ID wenn bestätigt
+  acknowledgedAt DateTime?
+
+  @@index([sessionId])
+  @@index([level, acknowledgedBy])
+}
+
+// ─── Fragen-Katalog (Master-Tabelle) ────────────────────────
+
+model MedicalAtom {
+  id              String   @id // z.B. "0000", "RES-100", "2080"
+  module          Int      // Gruppierung (0=Basis, 1=Beschwerden, 2=Enrollment, etc.)
+  category        Int      @default(0) // Unterkategorie
+  questionText    String
+  description     String?
+  answerType      String   // text, number, select, multiselect, radio, date, time, email, tel, textarea
+  section         String   // Logische Sektion (basis, beschwerden, rezepte, etc.)
+  orderIndex      Int      // Sortierung
+  placeholder     String?
+
+  // Optionen als JSON string
+  options         String?    // JSON: [{ value, label, followUpQuestions?, redFlagTrigger? }]
+  validationRules String?    // JSON: { required, min, max, pattern, ageOver, etc. }
+  branchingLogic  String?    // JSON: { next, conditional, showIf, triage }
+
+  // Flags
+  isRedFlag       Boolean  @default(false)
+  isPII           Boolean  @default(false) // Markiert Felder die verschlüsselt werden müssen
+  parentAtomId    String?  // Für hierarchische Follow-ups
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([module, orderIndex])
+  @@index([section])
+}
+
+// ─── Arzt-Benutzer ──────────────────────────────────────────
+
+model ArztUser {
+  id           String   @id @default(uuid())
+  username     String   @unique
+  passwordHash String   // bcrypt
+  displayName  String
+  role         String   @default("ARZT") // PATIENT, ARZT, MFA, ADMIN
+  createdAt    DateTime @default(now())
+
+  assignedSessions PatientSession[] @relation("ArztAssignedSessions")
+}
+
+// ─── Audit Log (HIPAA Compliance) ───────────────────────────
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?  // Wer hat die Aktion ausgeführt
+  action    String   // CREATE_SESSION, ANSWER_QUESTION, VIEW_SESSION, etc.
+  resource  String   // sessions/abc-123, answers/xyz-456
+  ipAddress String?
+  userAgent String?
+  metadata  String?  // JSON string: Zusätzliche Kontextdaten
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
+}
+
+// ─── Chat-Nachrichten (Kommunikations-Log) ──────────────────
+
+model ChatMessage {
+  id        String         @id @default(uuid())
+  sessionId String
+  session   PatientSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  
+  senderType String        // PATIENT, ARZT, MFA
+  senderId   String?       // Verweis auf ArztUser id, falls von Personal
+  
+  text      String
+  fromName  String         // z.B. "Dr. Schmidt", "MFA Team", "Patient"
+  timestamp DateTime       @default(now())
+
+  @@index([sessionId, timestamp])
+}
+
+// ─── Patient Medication (Dauermedikation) ───────────────────
+
+model PatientMedication {
+  id          String   @id @default(uuid())
+  patientId   String
+  patient     Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  name        String   // z.B. "Ramipril"
+  dosage      String   // z.B. "5mg"
+  frequency   String   // z.B. "1-0-1"
+  notes       String?  // Optionale Freitext-Notizen
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([patientId])
+}
+
+// ─── Patient Surgeries (OP-Historie) ─────────────────────────
+
+model PatientSurgery {
+  id            String   @id @default(uuid())
+  patientId     String
+  patient       Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  surgeryName   String   // z.B. "Blinddarm-OP"
+  date          String?  // z.B. "2015" oder "Juni 2022"
+  complications String?
+  notes         String?
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@index([patientId])
+}

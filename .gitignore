@@ -1,0 +1,49 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Environment variables (SENSITIVE!)
+.env
+.env.local
+.env.production
+server/.env
+**/.env
+
+# Prisma
+prisma/*.db
+prisma/migrations/
+
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Deploy/build log files
+*.txt
+!README.md
+deploy_out.json
+deploy_result.json
+netlify-api-deploy.json
+netlify-latest-deploy.json
+sites.json
+test-results.json
+test-final*.json
+.netlify/
+package-lock.json

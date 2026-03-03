@@ -1,0 +1,756 @@
+import { useEffect, useCallback, useState, useMemo, useRef } from 'react';
+import { useSessionStore } from '../store/sessionStore';
+import type { Answer } from '../types/question';
+import { useSubmitAnswer, useSubmitSession, useSubmitAccidentDetails, useSubmitMedications, useSubmitSurgeries } from '../hooks/useApi';
+import { questions as allQuestions } from '../data/questions';
+import { QuestionRenderer } from './QuestionRenderer';
+import { ProgressBar } from './ProgressBar';
+import {
+    validateAnswer,
+    shouldShowQuestion,
+    getActivePath,
+    estimateFullPath,
+    getTriageAlert
+} from '../utils/questionLogic';
+import { AnswerSummary } from './AnswerSummary';
+import { HistorySidebar } from './HistorySidebar';
+import { RedFlagOverlay, WarningBanner } from './RedFlagOverlay';
+import { MedicationManager } from './MedicationManager';
+import { SurgeryManager } from './SurgeryManager';
+import { SchwangerschaftCheck } from './SchwangerschaftCheck';
+import { PDFExport } from './PDFExport';
+import { exportAsEncryptedJSON, downloadBlob, type ExportPayload, type ExportableAnswer } from '../utils/exportUtils';
+import { SubmittedPage } from './SubmittedPage';
+import { PatientWartezimmer } from './PatientWartezimmer';
+import { CameraScanner } from './inputs/CameraScanner';
+import { IGelServices } from './IGelServices';
+import { ChatBubble } from './ChatBubble';
+import { LanguageSelector } from './LanguageSelector';
+import { ThemeToggle } from './ThemeToggle';
+import { ModeToggle } from './ModeToggle';
+import { FontSizeControl } from './FontSizeControl';
+import { CompletionCelebration } from './Celebrations';
+import { KioskToggle } from './KioskToggle';
+import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
+import { SessionTimeoutWarning } from './SessionTimeoutWarning';
+import { hapticTap, hapticSelect, hapticSuccess, hapticWarning } from '../utils/haptics';
+import {
+    ClipboardList,
+    FilePlus,
+    FileText,
+    Calendar,
+    Stethoscope,
+    AlertCircle,
+    Phone,
+    Home,
+    ArrowLeft,
+    ArrowRight,
+    Clock,
+    ShieldCheck,
+    History,
+    HardHat,
+    Camera
+} from 'lucide-react';
+
+interface ServiceTheme {
+    icon: React.ComponentType<{ className?: string }>;
+    colorClass: string;
+    bgClass: string;
+    borderClass: string;
+}
+
+const SERVICE_THEMES: Record<string, ServiceTheme> = {
+    'Termin / Anamnese': { icon: Stethoscope, colorClass: 'text-blue-400', bgClass: 'bg-blue-500/10', borderClass: 'border-blue-500/20' },
+    'Medikamente / Rezepte': { icon: ClipboardList, colorClass: 'text-emerald-400', bgClass: 'bg-emerald-500/10', borderClass: 'border-emerald-500/20' },
+    'Dateien / Befunde': { icon: FilePlus, colorClass: 'text-amber-400', bgClass: 'bg-amber-500/10', borderClass: 'border-amber-500/20' },
+    'AU (Krankschreibung)': { icon: FileText, colorClass: 'text-rose-400', bgClass: 'bg-rose-500/10', borderClass: 'border-rose-500/20' },
+    'Überweisung': { icon: Calendar, colorClass: 'text-indigo-400', bgClass: 'bg-indigo-500/10', borderClass: 'border-indigo-500/20' },
+    'Terminabsage': { icon: AlertCircle, colorClass: 'text-orange-400', bgClass: 'bg-orange-500/10', borderClass: 'border-orange-500/20' },
+    'Telefonanfrage': { icon: Phone, colorClass: 'text-cyan-400', bgClass: 'bg-cyan-500/10', borderClass: 'border-cyan-500/20' },
+    'Dokumente anfordern': { icon: ClipboardList, colorClass: 'text-purple-400', bgClass: 'bg-purple-500/10', borderClass: 'border-purple-500/20' },
+    'Nachricht schreiben': { icon: ClipboardList, colorClass: 'text-pink-400', bgClass: 'bg-pink-500/10', borderClass: 'border-pink-500/20' },
+    'Unfallmeldung (BG)': { icon: HardHat, colorClass: 'text-orange-400', bgClass: 'bg-orange-500/10', borderClass: 'border-orange-500/20' },
+};
+
+const ESTIMATED_TIME_NUMBERS: Record<string, string> = {
+    'Termin / Anamnese': '5-8',
+    'Medikamente / Rezepte': '2',
+    'Dateien / Befunde': '2',
+    'AU (Krankschreibung)': '3',
+    'Überweisung': '2',
+    'Terminabsage': '1',
+    'Telefonanfrage': '2',
+    'Dokumente anfordern': '2',
+    'Nachricht schreiben': '3',
+    'Unfallmeldung (BG)': '5',
+};
+
+import { useTranslation } from 'react-i18next';
+
+export function Questionnaire() {
+    const { t } = useTranslation();
+    const store = useSessionStore();
+    const { mutate: submitAnswer } = useSubmitAnswer();
+    const { mutate: submitSession } = useSubmitSession();
+    const { mutateAsync: submitMedicationsAsync } = useSubmitMedications();
+    const { mutateAsync: submitSurgeriesAsync } = useSubmitSurgeries();
+    const { mutate: submitAccident } = useSubmitAccidentDetails();
+
+    // Legacy mapping to store
+    const legacyAnswers = Object.fromEntries(
+        Object.entries(store.answers).map(([key, a]) => [key, { ...a, questionId: a.atomId }])
+    ) as Record<string, Answer & { questionId: string }>;
+
+    const state = {
+        answers: legacyAnswers,
+        currentQuestionId: store.currentAtomId,
+        questionHistory: store.atomHistory,
+        selectedReason: store.selectedService,
+    };
+    const dispatch = (action: { type: string; payload?: unknown; source?: string }) => {
+        if (action.type === 'SET_CURRENT_QUESTION') {
+            if (import.meta.env.DEV) console.log('DISPATCH [SET_CURRENT_QUESTION] payload:', action.payload, 'source:', action.source || 'manual');
+            store.navigateToAtom(action.payload as string);
+        }
+        if (action.type === 'ANSWER_QUESTION') {
+            const p = action.payload as { questionId: string; value: string | string[] | boolean | number | Record<string, unknown> | null; answeredAt: Date };
+            store.setAnswer(p.questionId, p.value);
+        }
+        if (action.type === 'GO_BACK') store.goBack();
+        if (action.type === 'RESET') store.clearSession();
+    };
+
+    const [localError, setLocalError] = useState<string | null>(null);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [triageAlert, setTriageAlert] = useState<{ level: 'warning' | 'critical'; message: string } | null>(null);
+    const [criticalOverlay, setCriticalOverlay] = useState<{ level: 'WARNING' | 'CRITICAL'; atomId: string; message: string; triggerValues: Record<string, unknown> | null } | null>(null);
+    const [showPDF, setShowPDF] = useState(false);
+    const [isSubmitted, setIsSubmitted] = useState(false);
+    const [medications, setMedications] = useState<{ id: string; name: string; dosage: string; frequency: string; sinceWhen: string }[]>([]);
+    const [surgeries, setSurgeries] = useState<{ id: string; surgeryName: string; date: string; complications: string; notes: string }[]>([]);
+    const [showCameraScanner, setShowCameraScanner] = useState(false);
+
+    // Guard: Skip SyncEffect during active user input to prevent race conditions
+    const isUserInteractingRef = useRef(false);
+    const interactionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    // Patient-Daten aus Antworten ableiten
+    const patientGender = state.answers['0002']?.value as string || '';
+    const patientBirthDate = state.answers['0003']?.value as string || '';
+    const patientName = useMemo(() => {
+        const nachname = state.answers['0001']?.value || '';
+        const vorname = state.answers['0011']?.value || '';
+        return nachname && vorname ? `${vorname} ${nachname}` : '';
+    }, [state.answers]);
+
+    // Alter berechnen
+    const patientAge = useMemo(() => {
+        if (!patientBirthDate) return null;
+        const birth = new Date(patientBirthDate);
+        const today = new Date();
+        let age = today.getFullYear() - birth.getFullYear();
+        const monthDiff = today.getMonth() - birth.getMonth();
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+            age--;
+        }
+        return age;
+    }, [patientBirthDate]);
+
+    // Alter berechnen (wird nicht mehr mit useMemo als State abgeleitet, reicht direkt als Konstante)
+
+    // Prüfe ob aktuelle Frage die Medikamenten-Frage ist
+    const isMedicationQuestion = state.currentQuestionId === '8900';
+
+    // Prüfe ob Schwangerschafts-Check angezeigt werden soll
+    const isSchwangerschaftQuestion = state.currentQuestionId === '8800';
+
+    // Synchronize current question visibility (debounced to prevent race conditions)
+    useEffect(() => {
+        if (!store.isHydrated) return;
+        if (!state.currentQuestionId) return;
+        // Skip during active user input to prevent losing focus/data
+        if (isUserInteractingRef.current) return;
+
+        const context = {
+            gender: patientGender,
+            age: patientAge,
+            selectedReason: state.selectedReason
+        };
+
+        const currentQuestion = allQuestions.find(q => q.id === state.currentQuestionId);
+        if (currentQuestion) {
+            const isVisible = shouldShowQuestion(currentQuestion, state.answers, context);
+            if (!isVisible) {
+                if (import.meta.env.DEV) console.log('SyncEffect: Question', state.currentQuestionId, 'is NOT visible. Recalculating path...');
+                const activePath = getActivePath(allQuestions, state.answers, context);
+                if (activePath.length > 0) {
+                    const targetId = activePath[activePath.length - 1];
+                    if (import.meta.env.DEV) console.log('SyncEffect: Navigating to', targetId);
+                    dispatch({ type: 'SET_CURRENT_QUESTION', payload: targetId, source: 'SyncEffect' });
+                }
+            } else {
+                // Keep it
+            }
+        }
+    }, [state.currentQuestionId, state.answers, state.selectedReason, patientGender, patientAge, dispatch]);
+
+    const handleAnswer = useCallback((questionId: string, value: string | string[] | boolean | number | Record<string, unknown> | null) => {
+        if (import.meta.env.DEV) console.log('handleAnswer:', questionId, value);
+        // Set interaction guard to prevent SyncEffect from re-navigating during input
+        isUserInteractingRef.current = true;
+        if (interactionTimerRef.current) clearTimeout(interactionTimerRef.current);
+        interactionTimerRef.current = setTimeout(() => { isUserInteractingRef.current = false; }, 500);
+
+        dispatch({ type: 'ANSWER_QUESTION', payload: { questionId, value, answeredAt: new Date() } });
+        setLocalError(null);
+
+        // API Call in background
+        submitAnswer({ atomId: questionId, value });
+
+        // Phase 7: Automatically route accident data
+        if (questionId === '2080' && value) {
+            submitAccident(value);
+        }
+
+        // Check for clinical triage local
+        const question = allQuestions.find(q => q.id === questionId);
+        if (question) {
+            const alert = getTriageAlert(question, { atomId: questionId, value, answeredAt: new Date() } as Answer);
+            if (alert) {
+                if (alert.level === 'critical') {
+                    // Zeige Vollbild-Overlay für CRITICAL
+                    setCriticalOverlay({
+                        level: 'CRITICAL',
+                        atomId: questionId,
+                        message: alert.message,
+                        triggerValues: typeof value === 'object' && value !== null && !Array.isArray(value) ? value : null,
+                    });
+                } else {
+                    setTriageAlert(alert);
+                }
+            } else {
+                setTriageAlert(null);
+            }
+        }
+    }, [dispatch, submitAnswer]);
+
+    const handleCameraScan = useCallback((data: { firstname?: string; lastname?: string; dob?: string; insurance?: string; num?: string }) => {
+        // Auto-fill answers based on OCR data
+        if (data.firstname) handleAnswer('0011', data.firstname);
+        if (data.lastname) handleAnswer('0001', data.lastname);
+        if (data.dob) handleAnswer('0003', data.dob);
+        if (data.num) {
+            handleAnswer('2000', 'GKV'); // Assuming GKV if KV-number found
+            handleAnswer('2001', data.num); // Versichertennummer auto-fill
+        }
+        if (data.insurance) {
+            // we could store it if we had a field, left as example
+        }
+    }, [handleAnswer]);
+
+    const handleNext = useCallback(async () => {
+        hapticTap();
+        const { currentAtomId, answers, selectedService } = useSessionStore.getState();
+        if (!currentAtomId) return;
+
+        const currentQuestion = allQuestions.find(q => q.id === currentAtomId);
+        if (!currentQuestion) {
+            if (import.meta.env.DEV) console.log('handleNext: No current question found for ID', currentAtomId);
+            return;
+        }
+
+        // Schwangerschafts-Check: Nach Beantwortung weiter zu Medikamente
+        if (currentAtomId === '8800') {
+            if (!state.answers['8800']) {
+                setLocalError(t('Bitte beantworten Sie die Frage'));
+                return;
+            }
+            dispatch({ type: 'SET_CURRENT_QUESTION', payload: '8900' });
+            setLocalError(null);
+            return;
+        }
+
+        // Medikamenten-Frage: Speichere strukturierte Daten
+        if (currentAtomId === '8900' && medications.length > 0) {
+            try {
+                // Sende an dedizierten Bulk-Endpoint
+                await submitMedicationsAsync(medications);
+                // Speichere in lokaler Queue für Kompatibilität mit AnswerSummary
+                dispatch({
+                    type: 'ANSWER_QUESTION',
+                    payload: {
+                        questionId: '8900',
+                        value: medications.map(m => `${m.name} ${m.dosage} (${m.frequency})`).join('; '),
+                        answeredAt: new Date()
+                    }
+                });
+            } catch (err) {
+                setLocalError(t('Fehler beim Speichern der Medikamente.'));
+                return;
+            }
+        }
+
+        // OP-Frage: Speichere strukturierte Daten
+        if (currentQuestion.type === 'surgery-form' && surgeries.length > 0) {
+            try {
+                await submitSurgeriesAsync(surgeries);
+                dispatch({
+                    type: 'ANSWER_QUESTION',
+                    payload: {
+                        questionId: currentQuestion.id,
+                        value: surgeries.map(s => `${s.surgeryName} (${s.date})`).join('; '),
+                        answeredAt: new Date()
+                    }
+                });
+            } catch (err) {
+                setLocalError(t('Fehler beim Speichern der OP-Historie.'));
+                return;
+            }
+        }
+
+        const answer = answers[currentAtomId];
+        if (import.meta.env.DEV) console.log('handleNext for', currentAtomId, 'Answer:', answer?.value);
+        const validationError = validateAnswer(currentQuestion, answer?.value, answers);
+
+        if (validationError) {
+            if (import.meta.env.DEV) console.log('handleNext validationError:', validationError);
+            setLocalError(validationError);
+            hapticWarning();
+            return;
+        }
+
+        // Wenn keine Antwort existiert (optionales Feld), als "null" speichern
+        if (!answer) {
+            dispatch({
+                type: 'ANSWER_QUESTION',
+                payload: { questionId: currentAtomId, value: null, answeredAt: new Date() }
+            });
+        }
+
+        // Letzte Frage → Absenden
+        if (currentAtomId === '9000') {
+            submitSession();
+
+            // Build encrypted export and auto-download
+            try {
+                const exportAnswers: ExportableAnswer[] = Object.entries(answers)
+                    .filter(([id]) => id !== '9000')
+                    .map(([id, a]) => {
+                        const q = allQuestions.find(q => q.id === id);
+                        return {
+                            questionId: id,
+                            questionText: q?.question || id,
+                            section: q?.section || 'unbekannt',
+                            value: Array.isArray(a?.value) ? a.value.join(', ') : String(a?.value ?? ''),
+                            answeredAt: a?.answeredAt ? new Date(a.answeredAt).toISOString() : new Date().toISOString(),
+                        };
+                    });
+
+                const payload: ExportPayload = {
+                    sessionId: useSessionStore.getState().sessionId || 'demo',
+                    exportedAt: new Date().toISOString(),
+                    patientName: patientName || undefined,
+                    answers: exportAnswers,
+                    metadata: { version: '2.0', format: 'json', encrypted: true },
+                };
+
+                const { blob } = await exportAsEncryptedJSON(payload);
+                const refCode = (useSessionStore.getState().sessionId || 'export').slice(0, 8).toUpperCase();
+                downloadBlob(blob, `anamnese-${refCode}-encrypted.json`);
+                if (import.meta.env.DEV) {
+                    // Encryption key logged in dev only – never in production
+                    // console.log('Encrypted export key (keep safe):', keyHex);
+                }
+            } catch (err) {
+                console.error('Encryption export failed:', err);
+            }
+
+            setIsSubmitted(true);
+            hapticSuccess();
+            setLocalError(null);
+            return;
+        }
+
+        // NEUE ARCHITEKTUR: Bestimme die komplette aktuelle Abfolge (inkl. Multiselect-Parallel-Zweige!)
+        // Wenn die aktuelle Frage noch nicht beantwortet wurde (optional!), injecten wir eine Dummy-Antwort für das Path-Routing.
+        const routingAnswers = {
+            ...answers,
+            [currentAtomId]: answer || { atomId: currentAtomId, value: null, answeredAt: new Date() }
+        };
+
+        const activePath = getActivePath(
+            allQuestions,
+            routingAnswers,
+            { selectedReason: selectedService, gender: patientGender, age: patientAge }
+        );
+
+        const currentIndex = activePath.indexOf(currentAtomId);
+        if (currentIndex !== -1 && currentIndex + 1 < activePath.length) {
+            const nextQuestionId = activePath[currentIndex + 1];
+            if (import.meta.env.DEV) console.log(`handleNext -> navigating to ${nextQuestionId} (Index ${currentIndex + 1} of ${activePath.length})`);
+            dispatch({ type: 'SET_CURRENT_QUESTION', payload: nextQuestionId });
+            setLocalError(null);
+            setTriageAlert(null);
+        } else {
+            if (import.meta.env.DEV) console.log('handleNext -> No next question found or end of path reached.');
+        }
+    }, [state.answers, state.selectedReason, dispatch, isMedicationQuestion, medications, submitMedicationsAsync, surgeries, submitSurgeriesAsync, patientGender, patientAge]);
+
+    const handleGoBack = useCallback(() => {
+        hapticSelect();
+        setLocalError(null);
+        setTriageAlert(null);
+        dispatch({ type: 'GO_BACK' });
+    }, [dispatch]);
+
+    const handleJumpToQuestion = useCallback((questionId: string) => {
+        setLocalError(null);
+        setTriageAlert(null);
+        dispatch({ type: 'SET_CURRENT_QUESTION', payload: questionId });
+        // Keep sidebar open so users can continue navigating
+    }, [dispatch]);
+
+    const handleReset = useCallback(() => {
+        dispatch({ type: 'RESET' });
+        setLocalError(null);
+        setTriageAlert(null);
+        setIsSubmitted(false);
+        setCriticalOverlay(null);
+        setMedications([]);
+    }, [dispatch]);
+
+    const handleEditQuestion = useCallback((questionId: string) => {
+        dispatch({ type: 'SET_CURRENT_QUESTION', payload: questionId });
+    }, [dispatch]);
+
+    // Keyboard shortcuts: Enter=next, Escape=back, 1-9=select option
+    useKeyboardShortcuts({
+        onNext: handleNext,
+        onBack: handleGoBack,
+        enabled: !isSubmitted && !showPDF && !showCameraScanner && !criticalOverlay,
+    });
+
+    const currentQuestion = allQuestions.find(q => q.id === state.currentQuestionId) || allQuestions[0];
+    const context = { selectedReason: state.selectedReason, gender: patientGender, age: patientAge };
+    const activePathIds = getActivePath(allQuestions, state.answers, context);
+    const estimatedPath = estimateFullPath(allQuestions, state.answers, context);
+    const totalAnswered = activePathIds.filter(id => state.answers[id]).length;
+    const totalEstimated = Math.max(estimatedPath.length, activePathIds.length, 1);
+    const progress = Math.min((totalAnswered / totalEstimated) * 100, 98);
+
+    const theme = (state.selectedReason && SERVICE_THEMES[state.selectedReason]) || SERVICE_THEMES['Termin / Anamnese'];
+    const estTimeNum = (state.selectedReason && ESTIMATED_TIME_NUMBERS[state.selectedReason]) || ESTIMATED_TIME_NUMBERS['Termin / Anamnese'];
+    const estTime = `${estTimeNum} ${t('time.min', 'Min.')}`;
+    const isLastQuestion = state.currentQuestionId === '9000';
+
+    // ─── Submitted ──────────────────────────────────────────
+    if (isSubmitted) {
+        return (
+            <>
+                <SubmittedPage
+                    sessionId={store.sessionId || undefined}
+                    patientName={patientName}
+                    selectedService={state.selectedReason || ''}
+                    onReset={handleReset}
+                    onPDF={() => setShowPDF(true)}
+                />
+                {/* Online Wartezimmer / Waiting Room */}
+                {store.sessionId && store.token && (
+                    <div className="fixed bottom-0 left-0 right-0 z-40 max-w-lg mx-auto px-4 pb-4">
+                        <PatientWartezimmer
+                            sessionId={store.sessionId}
+                            patientName={patientName || 'Patient'}
+                            service={state.selectedReason || ''}
+                            token={store.token}
+                        />
+                    </div>
+                )}
+                {showPDF && (
+                    <PDFExport
+                        questions={allQuestions}
+                        answers={state.answers}
+                        activePathIds={activePathIds}
+                        patientName={patientName}
+                        selectedService={state.selectedReason || ''}
+                        onClose={() => setShowPDF(false)}
+                    />
+                )}
+            </>
+        );
+    }
+
+    return (
+        <div className="flex h-screen bg-[var(--bg-primary)] overflow-hidden">
+            <HistorySidebar
+                questions={allQuestions}
+                answers={state.answers}
+                activePathIds={activePathIds}
+                currentQuestionId={state.currentQuestionId}
+                onJumpToQuestion={handleJumpToQuestion}
+                isOpen={isSidebarOpen}
+                onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
+            />
+
+            <main className="flex-1 relative flex flex-col min-w-0">
+                {/* Background effects */}
+                <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                    <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] rounded-full bg-blue-500/10 blur-[120px]" />
+                    <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] rounded-full bg-indigo-500/10 blur-[120px]" />
+                </div>
+
+                {/* Header */}
+                <header className="relative z-10 px-6 lg:px-12 py-6 flex items-center justify-between border-b border-[var(--border-primary)] backdrop-blur-md bg-[var(--bg-overlay)] text-[var(--text-primary)]">
+                    <div className="flex items-center gap-6">
+                        <button
+                            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                            aria-label={t('Verlauf anzeigen', 'Verlauf anzeigen')}
+                            aria-expanded={isSidebarOpen ? 'true' : 'false'}
+                            className="p-2.5 hover:bg-[var(--bg-card)] rounded-xl transition-colors border border-[var(--border-primary)] active:scale-95 shadow-lg shadow-blue-500/5 group"
+                        >
+                            <History className="w-5 h-5 text-blue-400 group-hover:scale-110 transition-transform" />
+                        </button>
+                        <div className="flex items-center gap-4">
+                            <div className={`p-2.5 ${theme.bgClass} rounded-xl border ${theme.borderClass} shadow-lg shadow-black/20`}>
+                                <theme.icon className={`w-6 h-6 ${theme.colorClass}`} />
+                            </div>
+                            <div>
+                                <h1 className="text-xl font-bold tracking-tight">{t(state.selectedReason || 'Anamnese')}</h1>
+                                <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">
+                                    {patientName ? `${patientName} – ` : ''}{t('Frage')} {totalAnswered + 1}/{totalEstimated}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-4">
+                        <div className="hidden sm:flex items-center gap-6 px-4 py-2 bg-[var(--bg-card)] rounded-full border border-[var(--border-primary)]">
+                            <div className="flex items-center gap-2">
+                                <Clock className="w-3.5 h-3.5 text-gray-500" />
+                                <span className="text-xs font-medium text-[var(--text-secondary)]">{t('Dauer')}: <span className="text-[var(--text-primary)]">{t(estTime)}</span></span>
+                            </div>
+                            <div className="w-px h-3 bg-[var(--border-primary)]" />
+                            <div className="flex items-center gap-2">
+                                <ShieldCheck className="w-3.5 h-3.5 text-green-500/70" />
+                                <span className="text-xs font-medium text-green-500/70 uppercase tracking-wider">{t('Sicher')}</span>
+                            </div>
+                        </div>
+                        <ModeToggle />
+                        <FontSizeControl />
+                        <LanguageSelector />
+                        <ThemeToggle />
+                        <KioskToggle />
+                        <button
+                            onClick={handleReset}
+                            className="p-2.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)] rounded-xl transition-all border border-transparent hover:border-[var(--border-primary)]"
+                            title={t('Abbrechen & Home')}
+                        >
+                            <Home className="w-5 h-5" />
+                        </button>
+                    </div>
+                </header>
+
+                {/* Main Content */}
+                <div className="flex-1 overflow-y-auto custom-scrollbar relative z-10 text-[var(--text-primary)]">
+                    <div className="max-w-3xl mx-auto px-6 lg:px-12 py-12">
+                        {/* Progress */}
+                        <div className="mb-12">
+                            <ProgressBar
+                                progress={progress}
+                                colorClass={theme.colorClass}
+                                currentStep={totalAnswered + 1}
+                                totalSteps={activePathIds.length}
+                            />
+                        </div>
+
+                        {/* Warning Banner (non-critical) */}
+                        {triageAlert && triageAlert.level !== 'critical' && (
+                            <WarningBanner
+                                alert={{
+                                    level: 'WARNING',
+                                    atomId: state.currentQuestionId || '',
+                                    message: triageAlert.message,
+                                    triggerValues: null,
+                                }}
+                                onDismiss={() => setTriageAlert(null)}
+                            />
+                        )}
+
+                        {/* Summary (letzte Frage) */}
+                        {isLastQuestion && (
+                            <div className="mb-8 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+                                <AnswerSummary
+                                    questions={allQuestions}
+                                    answers={state.answers}
+                                    activePathIds={activePathIds}
+                                    onEdit={handleEditQuestion}
+                                    colorClass={theme.colorClass}
+                                    bgClass={theme.bgClass}
+                                    borderClass={theme.borderClass}
+                                />
+                            </div>
+                        )}
+
+                        {/* Frage-Inhalt */}
+                        <div className="min-h-[400px]" aria-live="polite" aria-atomic="true">
+                            {/* Schwangerschafts-Check */}
+                            {isSchwangerschaftQuestion ? (
+                                <SchwangerschaftCheck
+                                    onAnswer={(value) => handleAnswer('8800', value)}
+                                    initialValue={state.answers['8800']?.value as string}
+                                />
+                            ) : isMedicationQuestion ? (
+                                /* Strukturierte Medikamenten-Eingabe */
+                                <div className="space-y-6">
+                                    <div>
+                                        <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-2">
+                                            {currentQuestion.question}
+                                        </h2>
+                                        <p className="text-sm text-[var(--text-muted)]">
+                                            {t('medInputHint', 'Bitte geben Sie alle aktuellen Medikamente strukturiert ein, oder nutzen Sie das Freitextfeld unten.')}
+                                        </p>
+                                    </div>
+                                    <MedicationManager
+                                        value={medications}
+                                        onChange={(meds) => {
+                                            setMedications(meds);
+                                            // Auch als Freitext-Antwort speichern
+                                            const text = meds.map(m => `${m.name} ${m.dosage} (${m.frequency})`).join('; ');
+                                            handleAnswer('8900', text || '');
+                                        }}
+                                    />
+                                    {/* Fallback Freitext */}
+                                    <div className="mt-4">
+                                        <label className="text-xs text-[var(--text-muted)] block mb-2">
+                                            {t('medFreetextLabel', 'Oder als Freitext eingeben:')}
+                                        </label>
+                                        <textarea
+                                            value={state.answers['8900']?.value as string || ''}
+                                            onChange={(e) => handleAnswer('8900', e.target.value)}
+                                            placeholder="z.B. Ramipril 5mg morgens, Metformin 850mg 2x täglich"
+                                            rows={3}
+                                            className="w-full px-4 py-3 bg-[var(--bg-input)] border border-[var(--border-primary)] rounded-xl text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-all resize-none"
+                                        />
+                                    </div>
+                                </div>
+                            ) : currentQuestion.type === 'surgery-form' ? (
+                                <div className="space-y-6">
+                                    <SurgeryManager
+                                        value={surgeries}
+                                        onChange={(surgs) => {
+                                            setSurgeries(surgs);
+                                            // Auch als Freitext speichern
+                                            const text = surgs.map(s => `${s.surgeryName} (${s.date})`).join('; ');
+                                            handleAnswer(currentQuestion.id, text || '');
+                                        }}
+                                    />
+                                </div>
+                            ) : state.currentQuestionId === '9999' ? (
+                                <IGelServices />
+                            ) : (
+                                /* Standard-Frage */
+                                <div>
+                                    {/* Optional Camera Scanner Button for demographics */}
+                                    {(currentQuestion.id === '0001' || currentQuestion.id === '0011' || currentQuestion.id === '0003' || currentQuestion.id === '2000') && (
+                                        <div className="mb-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-2xl">
+                                            <div className="flex items-start gap-3">
+                                                <button
+                                                    onClick={() => setShowCameraScanner(true)}
+                                                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-medium transition-all shadow-lg shadow-blue-500/20 shrink-0"
+                                                >
+                                                    <Camera className="w-4 h-4" />
+                                                    {t('Kamera')}
+                                                </button>
+                                                <div className="min-w-0">
+                                                    <p className="text-xs font-semibold text-blue-400 mb-1">{t('Kamera scannen')}</p>
+                                                    <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">
+                                                        {t('cameraExplanation', 'Scannen Sie Ihre elektronische Gesundheitskarte (eGK), um Name, Geburtsdatum und Versicherungsdaten automatisch einzulesen. Halten Sie die Karte einfach vor die Kamera.')}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                    <QuestionRenderer
+                                        question={currentQuestion}
+                                        value={state.answers[state.currentQuestionId!]?.value as string}
+                                        onAnswer={(value) => handleAnswer(currentQuestion.id, value as string | string[] | boolean | number | Record<string, unknown> | null)}
+                                        error={localError}
+                                    />
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Navigation Buttons – inline under question */}
+                        <div className="mt-8 flex items-center justify-between">
+                            <button
+                                onClick={handleGoBack}
+                                className={`flex items-center gap-3 px-6 py-3.5 rounded-2xl font-semibold transition-all
+                                    ${state.questionHistory.length === 0
+                                        ? 'opacity-0 pointer-events-none'
+                                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)] border border-[var(--border-primary)] hover:border-[var(--border-hover)]'
+                                    }`}
+                            >
+                                <ArrowLeft className="w-5 h-5" />
+                                <span>{t('Zurück')}</span>
+                            </button>
+
+                            <button
+                                onClick={handleNext}
+                                className="btn-primary group flex items-center gap-3 px-10 py-4 rounded-2xl font-bold transition-all shadow-lg hover:scale-[1.02] active:scale-[0.98]"
+                            >
+                                <span>{isLastQuestion ? t('Absenden') : t('Weiter')}</span>
+                                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                            </button>
+                        </div>
+
+                        {/* Privacy Reassurance */}
+                        {!isLastQuestion && (
+                            <div className="mt-8 p-4 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-primary)] flex items-center gap-4">
+                                <div className="p-2 bg-green-500/10 rounded-xl border border-green-500/20">
+                                    <ShieldCheck className="w-4 h-4 text-green-400" />
+                                </div>
+                                <p className="text-xs text-[var(--text-muted)] font-medium">{t('dataProtectionDetail', 'AES-256 verschlüsselt • DSGVO-konform • Ausschließlich medizinische Nutzung')}</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </main>
+
+            {/* CRITICAL Red Flag Overlay */}
+            {criticalOverlay && (
+                <RedFlagOverlay
+                    alert={criticalOverlay}
+                    onAcknowledge={() => setCriticalOverlay(null)}
+                />
+            )}
+
+            {/* Camera Scanner Modal */}
+            {showCameraScanner && (
+                <CameraScanner
+                    onScan={handleCameraScan}
+                    onClose={() => setShowCameraScanner(false)}
+                />
+            )}
+
+            {/* PDF Export Modal */}
+            {showPDF && (
+                <PDFExport
+                    questions={allQuestions}
+                    answers={state.answers}
+                    activePathIds={activePathIds}
+                    patientName={patientName}
+                    selectedService={state.selectedReason || ''}
+                    onClose={() => setShowPDF(false)}
+                />
+            )}
+            {store.sessionId && (
+                <ChatBubble sessionId={store.sessionId} />
+            )}
+
+            {/* Confetti celebration when completing the questionnaire */}
+            <CompletionCelebration show={isLastQuestion && progress >= 100} />
+
+            {/* Session timeout warning (15 min idle → 5 min countdown) */}
+            <SessionTimeoutWarning onTimeout={handleReset} />
+        </div>
+    );
+}
