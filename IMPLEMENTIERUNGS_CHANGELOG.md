@@ -1,9 +1,11 @@
-# Implementierungs-Changelog — Sicherheitsfixes
+# Implementierungs-Changelog — Sicherheitsfixes & DSGVO-Compliance
 
 ## Übersicht
 
 Alle kritischen (K-xx) und hohen (H-xx) Sicherheitslücken aus der Analyse wurden implementiert.  
 **22 Dateien betroffen, 14 Fixes durchgeführt.**
+
+Section 2 (DSGVO-konforme Einrichtung) vollständig implementiert: **15 Dateien, 10 Maßnahmen.**
 
 ---
 
@@ -193,3 +195,96 @@ Vollständige Liste ergänzt:
 | N-01 | Niedrig | CSS inline styles → externe CSS-Klassen |
 | N-02 | Niedrig | ARIA-Attribute korrigieren |
 | N-03 | Niedrig | `forceConsistentCasingInFileNames` in tsconfig |
+
+---
+
+## Section 2: DSGVO-konforme Einrichtung und Perfektionierung (Juli 2025)
+
+**Commit:** `1775fde` | **15 Dateien geändert/erstellt**
+
+### S2-01: Netlify Security Headers ✅
+
+- **Datei:** `netlify.toml`
+- HSTS: `max-age=31536000; includeSubDomains; preload` (BSI TR-02102)
+- CSP: `default-src 'self'; script-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'`
+- X-Frame-Options: DENY, X-Content-Type-Options: nosniff
+- Referrer-Policy: strict-origin-when-cross-origin
+- Permissions-Policy: camera=(self), microphone=(), geolocation=(), payment=()
+- COEP: require-corp, COOP: same-origin, CORP: same-origin
+- Cache-Control: immutable für Assets, no-cache für index.html
+
+### S2-02: Server Security Hardening ✅
+
+- **Datei:** `server/index.ts`
+- Helmet: HSTS 1yr+preload, referrerPolicy, frameguard DENY, COEP/COOP/CORP
+- CSP erweitert: `base-uri 'self'`, `form-action 'self'`, `frame-ancestors 'none'`
+- Permissions-Policy via Custom Middleware (Helmet unterstützt es nicht nativ)
+
+### S2-03: Enhanced Audit Logging ✅
+
+- **Datei:** `server/middleware/audit.ts`
+- Response-Status und Dauer werden jetzt erfasst (`res.on('finish')`)
+- Log-Sanitisierung: SENSITIVE_KEYS (token, password, secret, etc.) → `[REDACTED]`
+- User-Agent Sanitisierung gegen Log-Injection (Newlines/Steuerzeichen entfernt)
+- Retry-Logik: Bis zu 3 Versuche bei Schreibfehler (kein Fire-and-Forget mehr)
+- Lange URLs/Values auf 500 Zeichen gekürzt
+
+### S2-04: JWT Algorithm Pinning & Token-Blacklist ✅
+
+- **Datei:** `server/middleware/auth.ts`
+- `sign()`: `algorithm: 'HS256'` explizit gepinnt (BSI TR-02102)
+- `verify()`: `{ algorithms: ['HS256'] }` — verhindert Algorithm-Confusion-Attacken
+- JTI (JWT ID) in jedem Token via `crypto.randomUUID()`
+- In-Memory Token-Blacklist mit automatischem Cleanup (15-min Intervall)
+- `blacklistToken()` Export für Logout-Endpunkte
+
+### S2-05: Logout-Endpoint ✅
+
+- **Datei:** `server/routes/arzt.ts`
+- `POST /api/arzt/logout` — invalidiert Token via JTI-Blacklist
+- Import von `blacklistToken` hinzugefügt
+
+### S2-06: Cookie-Consent-Banner (TTDSG §25) ✅
+
+- **Datei:** `src/components/CookieConsent.tsx` (NEU, ~250 Zeilen)
+- Granulare Kategorien: Essenziell (immer aktiv), Funktional (Toggle), Statistiken (Toggle)
+- Versionierter Consent: Bei Änderung der Version → Re-Consent
+- `useCookieConsent()` Hook für Komponentenabfrage
+- Links zu /datenschutz und /impressum
+- Responsive, barrierefreies UI
+
+### S2-07: Datenschutzerklärung ✅
+
+- **Datei:** `src/pages/DatenschutzPage.tsx` (NEU, ~280 Zeilen)
+- 11 Abschnitte: Verantwortlicher, DSB, Zwecke & Rechtsgrundlagen (4 Unterkategorien),
+  Empfänger, Drittlandübermittlung, Speicherdauer-Tabelle, Betroffenenrechte (7 Rechte),
+  TOM, Cookies-Tabelle, Automatische Löschung, Änderungshinweis
+- Route: `/datenschutz` (lazy-loaded)
+
+### S2-08: Impressum ✅
+
+- **Datei:** `src/pages/ImpressumPage.tsx` (NEU, ~200 Zeilen)
+- 8 Abschnitte: Diensteanbieter, Kontakt, Berufsrechtliche Angaben (Ärztekammer, KV),
+  Aufsichtsbehörde, USt-ID, Online-Streitbeilegung, Haftungsausschluss, Technische Umsetzung
+- Route: `/impressum` (lazy-loaded)
+
+### S2-09: Routing & Footer Links ✅
+
+- **Datei:** `src/App.tsx`
+- Lazy-loaded Routes: `/datenschutz`, `/impressum`
+- `<CookieConsent />` global im App-Root eingebunden
+- **Datei:** `src/components/LandingPage.tsx`
+- Footer: "Datenschutz" und "Impressum" Links vor Dokumentation/Handbuch
+
+### S2-10: Rechtsdokumentation (Art. 30, 32, 35 DSGVO) ✅
+
+- **`docs/DSFA.md`** — Datenschutz-Folgenabschätzung (Art. 35): 5 Kapitel, Risikobewertung
+  mit 10 Risiken + Maßnahmen, TOM-Übersicht, Maßnahmenplan
+- **`docs/VERFAHRENSVERZEICHNIS.md`** — Verarbeitungsverzeichnis (Art. 30): 6 VVTs
+  (Anamnese, Auth, Chat, Audit, Consent, Wartezimmer)
+- **`docs/AVV_TEMPLATE.md`** — Auftragsverarbeitungsvertrag Muster (Art. 28): 9 Paragraphen,
+  TOM des AV und V, Drittlandübermittlung, Unterauftragsverarbeiter
+- **`docs/INCIDENT_RESPONSE_PLAN.md`** — Incident Response (Art. 33/34): 4-Stufen-Klassifikation,
+  5-Schritt-Prozess (Contain→Assess→Notify→Remediate→Document), Meldepflichten, Kontaktliste
+- **`docs/TOM_DOKUMENTATION.md`** — Technische & Organisatorische Maßnahmen (Art. 32):
+  7 Kategorien (Vertraulichkeit, Integrität, Verfügbarkeit, Verschlüsselung, Löschung, Consent)
