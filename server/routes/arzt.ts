@@ -2,7 +2,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { prisma } from '../db';
 import * as bcrypt from 'bcryptjs';
-import { createToken, requireAuth, requireRole } from '../middleware/auth';
+import { createToken, requireAuth, requireRole, blacklistToken } from '../middleware/auth';
 import { AIService } from '../services/aiService';
 import { decrypt, isPIIAtom } from '../services/encryption';
 import rateLimit from 'express-rate-limit';
@@ -64,6 +64,17 @@ router.post('/login', loginRateLimiter, async (req: Request, res: Response) => {
         console.error('[Arzt] Login-Fehler:', err);
         res.status(500).json({ error: 'Interner Serverfehler' });
     }
+});
+
+/**
+ * POST /api/arzt/logout — Token widerrufen (Blacklist)
+ */
+router.post('/logout', requireAuth, (req: Request, res: Response) => {
+    if (req.auth?.jti) {
+        // Token auf Blacklist setzen (24h Ablauf = maximale Token-Lebensdauer)
+        blacklistToken(req.auth.jti, 24 * 60 * 60 * 1000);
+    }
+    res.json({ message: 'Erfolgreich abgemeldet' });
 });
 
 /**

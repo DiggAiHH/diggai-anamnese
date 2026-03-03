@@ -9,6 +9,7 @@ import './index.css';
 import { useEffect, lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp';
+import { CookieConsent } from './components/CookieConsent';
 
 // Lazy-load heavy dashboard routes (code splitting → ~60% smaller initial bundle)
 const ArztDashboard = lazy(() => import('./pages/ArztDashboard').then(m => ({ default: m.ArztDashboard })));
@@ -16,6 +17,8 @@ const MFADashboard = lazy(() => import('./pages/MFADashboard').then(m => ({ defa
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
 const DokumentationPage = lazy(() => import('./pages/DokumentationPage').then(m => ({ default: m.DokumentationPage })));
 const HandbuchPage = lazy(() => import('./pages/HandbuchPage').then(m => ({ default: m.HandbuchPage })));
+const DatenschutzPage = lazy(() => import('./pages/DatenschutzPage').then(m => ({ default: m.DatenschutzPage })));
+const ImpressumPage = lazy(() => import('./pages/ImpressumPage').then(m => ({ default: m.ImpressumPage })));
 
 // Suspense fallback for lazy routes
 function DashboardLoading() {
@@ -94,6 +97,12 @@ function App() {
           {/* Bedienungsanleitung / Handbuch (lazy-loaded) */}
           <Route path="/handbuch" element={<Suspense fallback={<DashboardLoading />}><HandbuchPage /></Suspense>} />
 
+          {/* Datenschutzerklärung — DSGVO Art. 13/14 (lazy-loaded) */}
+          <Route path="/datenschutz" element={<Suspense fallback={<DashboardLoading />}><DatenschutzPage /></Suspense>} />
+
+          {/* Impressum — §5 DDG (lazy-loaded) */}
+          <Route path="/impressum" element={<Suspense fallback={<DashboardLoading />}><ImpressumPage /></Suspense>} />
+
           {/* Patient-Flow (Standard) */}
           <Route
             path="*"
@@ -101,6 +110,7 @@ function App() {
           />
           </Routes>
           <KeyboardShortcutsHelp />
+          <CookieConsent />
         </main>      </BrowserRouter>
     </QueryClientProvider>
   );

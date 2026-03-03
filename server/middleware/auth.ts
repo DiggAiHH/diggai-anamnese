@@ -8,6 +8,7 @@ export interface AuthPayload {
     sessionId?: string;
     userId?: string;
     role: 'patient' | 'arzt' | 'mfa' | 'admin';
+    jti?: string; // JWT ID für Token-Blacklist
 }
 
 declare global {
@@ -18,19 +19,42 @@ declare global {
     }
 }
 
+// ─── Token Blacklist (In-Memory + Cleanup) ──────────────────
+// Für Production: Redis oder DB-basierte Blacklist empfohlen
+const tokenBlacklist = new Map<string, number>(); // jti → expiry timestamp
+
+// Blacklist cleanup alle 15 Minuten
+setInterval(() => {
+    const now = Date.now();
+    for (const [jti, expiry] of tokenBlacklist.entries()) {
+        if (expiry < now) tokenBlacklist.delete(jti);
+    }
+}, 15 * 60 * 1000);
+
 /**
- * JWT-Token erstellen
+ * Token auf die Blacklist setzen (z.B. bei Logout)
+ */
+export function blacklistToken(jti: string, expiresInMs: number): void {
+    tokenBlacklist.set(jti, Date.now() + expiresInMs);
+}
+
+/**
+ * JWT-Token erstellen — mit Algorithm Pinning (HS256) und JTI
  */
 export function createToken(payload: AuthPayload): string {
+    const jti = crypto.randomUUID();
     return sign(
-        payload as object,
+        { ...payload, jti } as object,
         config.jwtSecret as Secret,
-        { expiresIn: config.jwtExpiresIn } as SignOptions
+        {
+            expiresIn: config.jwtExpiresIn,
+            algorithm: 'HS256', // BSI TR-02102: Algorithmus explizit pinnen
+        } as SignOptions
     );
 }
 
 /**
- * JWT-Validierung Middleware
+ * JWT-Validierung Middleware — mit Algorithm Pinning + Blacklist-Check
  */
 export function requireAuth(req: Request, res: Response, next: NextFunction): void {
     // Header-based auth (preferred)
@@ -49,7 +73,16 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
     }
 
     try {
-        const decoded = verify(token, config.jwtSecret as Secret) as AuthPayload;
+        const decoded = verify(token, config.jwtSecret as Secret, {
+            algorithms: ['HS256'], // Prevent algorithm confusion attacks
+        }) as AuthPayload;
+
+        // Check token blacklist (logout/revocation)
+        if (decoded.jti && tokenBlacklist.has(decoded.jti)) {
+            res.status(401).json({ error: 'Token wurde widerrufen' });
+            return;
+        }
+
         req.auth = decoded;
         next();
     } catch (_err) {

@@ -36,9 +36,32 @@ app.use(helmet({
             connectSrc: ["'self'", config.frontendUrl],
             frameSrc: ["'none'"],
             objectSrc: ["'none'"],
+            baseUri: ["'self'"],
+            formAction: ["'self'"],
+            frameAncestors: ["'none'"],
         },
     },
+    // HSTS — BSI TR-02102: 1 Jahr, includeSubDomains, preload
+    strictTransportSecurity: {
+        maxAge: 31536000,
+        includeSubDomains: true,
+        preload: true,
+    },
+    // Referrer-Policy — verhindert Datenleck über Referer
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+    // X-Frame-Options: DENY
+    frameguard: { action: 'deny' },
+    // Cross-Origin-Embedder/Opener/Resource-Policy
+    crossOriginEmbedderPolicy: { policy: 'require-corp' },
+    crossOriginOpenerPolicy: { policy: 'same-origin' },
+    crossOriginResourcePolicy: { policy: 'same-origin' },
 }));
+
+// Permissions-Policy Header (via custom middleware, Helmet doesn't support it)
+app.use((_req, res, next) => {
+    res.setHeader('Permissions-Policy', 'camera=(self), microphone=(), geolocation=(), payment=()');
+    next();
+});
 
 // CORS – Restricted to actual frontend domain (not '*')
 app.use(cors({

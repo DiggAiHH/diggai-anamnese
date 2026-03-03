@@ -260,6 +260,15 @@ export function LandingPage() {
                     </div>
 
                     <div className="flex items-center gap-4 flex-wrap justify-center">
+                        <Link to="/datenschutz" className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-primary)] backdrop-blur-md text-sm font-bold text-[var(--text-secondary)] hover:text-blue-400 hover:border-blue-500/30 transition-all duration-300">
+                            <ShieldCheck className="w-4 h-4" />
+                            {t('landing.datenschutz', 'Datenschutz')}
+                        </Link>
+                        <Link to="/impressum" className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-primary)] backdrop-blur-md text-sm font-bold text-[var(--text-secondary)] hover:text-blue-400 hover:border-blue-500/30 transition-all duration-300">
+                            <FileText className="w-4 h-4" />
+                            {t('landing.impressum', 'Impressum')}
+                        </Link>
+                        <span className="hidden lg:block w-px h-6 bg-[var(--border-primary)]" />
                         <Link to="/docs" className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-primary)] backdrop-blur-md text-sm font-bold text-[var(--text-secondary)] hover:text-blue-400 hover:border-blue-500/30 transition-all duration-300">
                             <BookOpen className="w-4 h-4" />
                             {t('landing.docs', 'Dokumentation')}
