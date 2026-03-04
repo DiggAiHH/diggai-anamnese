@@ -21,6 +21,7 @@ import uploadRoutes from './routes/upload';
 import queueRoutes from './routes/queue';
 import adminRoutes from './routes/admin';
 import patientRoutes from './routes/patients';
+import contentRoutes from './routes/content';
 
 const app = express();
 const httpServer = createServer(app);
@@ -110,6 +111,7 @@ app.use('/api/upload', uploadLimiter, uploadRoutes);
 app.use('/api/queue', queueRoutes);
 app.use('/api/admin', authLimiter, adminRoutes);
 app.use('/api/patients', patientRoutes);
+app.use('/api/content', contentRoutes);
 
 // Health Check — includes DB + Redis connectivity
 app.get('/api/health', async (_req, res) => {

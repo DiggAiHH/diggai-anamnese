@@ -681,6 +681,53 @@ export const api = {
         return response.data;
     },
 
+    queueFeedback: async (id: string, rating: number) => {
+        if (isDemoMode()) return { success: true };
+        const response = await apiClient.put(`/queue/${id}/feedback`, { rating });
+        return response.data;
+    },
+
+    queueFlowConfig: async (sessionId: string) => {
+        if (isDemoMode()) {
+            return { level: 0, breakFrequency: 999, breakDuration: 0, contentTypes: [], extraQuestionsEnabled: false };
+        }
+        const response = await apiClient.get(`/queue/flow-config/${sessionId}`);
+        return response.data;
+    },
+
+    // ─── Waiting Content ────────────────────────────────────────
+    getWaitingContent: async (params?: { lang?: string; waitMin?: number; exclude?: string; category?: string; limit?: number }) => {
+        if (isDemoMode()) {
+            return { items: [] };
+        }
+        const response = await apiClient.get('/content/waiting', { params });
+        return response.data;
+    },
+
+    trackContentView: async (contentId: string, sessionId: string, durationSec?: number) => {
+        if (isDemoMode()) return { success: true };
+        const response = await apiClient.post(`/content/waiting/${contentId}/view`, { sessionId, durationSec });
+        return response.data;
+    },
+
+    likeContent: async (contentId: string, sessionId: string) => {
+        if (isDemoMode()) return { success: true, newLikeCount: 1 };
+        const response = await apiClient.post(`/content/waiting/${contentId}/like`, { sessionId });
+        return response.data;
+    },
+
+    trackQuizAnswer: async (contentId: string, sessionId: string, selectedOption: number, correct: boolean) => {
+        if (isDemoMode()) return { success: true };
+        const response = await apiClient.post(`/content/waiting/quiz/${contentId}/answer`, { sessionId, selectedOption, correct });
+        return response.data;
+    },
+
+    getContentAnalytics: async (days?: number) => {
+        if (isDemoMode()) return { totalViews: 0, totalLikes: 0, quizAccuracy: null, topContent: [] };
+        const response = await apiClient.get('/content/waiting/analytics', { params: { days } });
+        return response.data;
+    },
+
     // ─── Patient Identification (Returning Patient Fast-Track) ──
 
     identifyPatient: async (data: { birthDate: string; insuranceNumber: string; patientNumber?: string }) => {

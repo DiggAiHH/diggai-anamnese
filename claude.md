@@ -153,6 +153,20 @@ npm run db:studio    # Prisma Studio GUI
 - **Backend:** Docker Compose on VPS (Express + PostgreSQL + Redis + Nginx)
 - **CI/CD:** GitHub Actions on push to master
 
+### Netlify Deploy (Guided, Secure)
+
+- **Netlify Site ID:** `d4c9bba2-71cc-48a1-81a4-14cb9ac5cb90`
+- **Status Badge:** `https://api.netlify.com/api/v1/badges/d4c9bba2-71cc-48a1-81a4-14cb9ac5cb90/deploy-status`
+- Use `npm run deploy` (guided script in `scripts/deploy-guided.mjs`)
+- The script supports:
+  - automatic build if `dist/` is missing
+  - production deploy (`npm run deploy` / `npm run deploy:prod`)
+  - preview deploy (`npm run deploy:preview`)
+  - token-based non-interactive deploy when `NETLIFY_AUTH_TOKEN` is set
+  - interactive fallback (`npx netlify login`) when no token is present
+
+> Security rule: Never store login passwords in repository files. Use environment variables (`NETLIFY_AUTH_TOKEN`) or interactive Netlify CLI login.
+
 ## Important Constraints
 
 - This is **NOT a DiGA** (Digital Health Application) — no CE marking required

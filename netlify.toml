@@ -5,6 +5,7 @@
 
 [build.environment]
   NODE_VERSION = "20"
+  NETLIFY_SITE_ID = "d4c9bba2-71cc-48a1-81a4-14cb9ac5cb90"
 
 # ─── DSGVO/BSI Security Headers (Section 2.2) ───────────────
 [[headers]]

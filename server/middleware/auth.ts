@@ -164,3 +164,67 @@ export function requireSessionOwner(req: Request, res: Response, next: NextFunct
 
     next();
 }
+
+/**
+ * Permission-basierte Zugriffskontrolle
+ * Prüft ob die Rolle des Users (oder individuelle Zusatz-Rechte) den angegebenen Permission-Code hat.
+ * Nutzt Prisma: RolePermission + ArztUser.customPermissions
+ */
+export function requirePermission(permissionCode: string) {
+    return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        if (!req.auth) {
+            res.status(401).json({ error: 'Nicht authentifiziert' });
+            return;
+        }
+
+        // Admins always have all permissions
+        if (req.auth.role === 'admin') {
+            next();
+            return;
+        }
+
+        try {
+            // Lazy import to avoid circular deps
+            const { prisma } = await import('../db');
+
+            const role = req.auth.role.toUpperCase(); // ARZT, MFA, etc.
+
+            // Check role-level permission
+            const rolePermission = await prisma.rolePermission.findFirst({
+                where: {
+                    role,
+                    permission: { code: permissionCode },
+                },
+            });
+
+            if (rolePermission) {
+                next();
+                return;
+            }
+
+            // Check individual user permissions (customPermissions JSON on ArztUser)
+            if (req.auth.userId) {
+                const user = await prisma.arztUser.findUnique({
+                    where: { id: req.auth.userId },
+                    select: { customPermissions: true },
+                });
+
+                if (user?.customPermissions) {
+                    try {
+                        const custom: string[] = JSON.parse(user.customPermissions);
+                        if (custom.includes(permissionCode)) {
+                            next();
+                            return;
+                        }
+                    } catch { /* invalid JSON, ignore */ }
+                }
+            }
+
+            res.status(403).json({ error: 'Fehlende Berechtigung', requiredPermission: permissionCode });
+        } catch (err) {
+            console.error('[Auth] Permission check error:', err);
+            // Fail-open for availability (matches existing pattern)
+            next();
+        }
+    };
+}

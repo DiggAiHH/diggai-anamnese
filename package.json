@@ -19,8 +19,9 @@
     "docker:up": "docker compose up -d --build",
     "docker:down": "docker compose down",
     "docker:logs": "docker compose logs -f app",
-    "deploy": "npm run build && npx netlify deploy --prod --dir=dist",
-    "deploy:preview": "npm run build && npx netlify deploy --dir=dist"
+    "deploy": "node scripts/deploy-guided.mjs",
+    "deploy:prod": "node scripts/deploy-guided.mjs",
+    "deploy:preview": "node scripts/deploy-guided.mjs --preview"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

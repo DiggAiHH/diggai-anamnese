@@ -199,6 +199,17 @@ export function setupSocketIO(httpServer: HttpServer): Server {
             socket.to('arzt').emit('staff:typing', { channel: data.channel, userName: data.userName });
         });
 
+        // ─── Queue: Mood Response from Patient ──────────────────
+        socket.on('queue:mood-response', (data: { sessionId: string; mood: string }) => {
+            console.log(`[Socket.io] Mood response from ${data.sessionId}: ${data.mood}`);
+            // Forward mood data to staff dashboard
+            io?.to('arzt').emit('queue:patient-mood', {
+                sessionId: data.sessionId,
+                mood: data.mood,
+                timestamp: new Date().toISOString(),
+            });
+        });
+
         socket.on('disconnect', () => {
             // Remove from online staff
             if (onlineStaff.has(socket.id)) {
@@ -251,5 +262,44 @@ export function emitSessionComplete(sessionId: string, service: string): void {
 export function emitPatientMessage(sessionId: string, message: { text: string; from: string; timestamp: string }): void {
     if (io) {
         io.to(`session:${sessionId}`).emit('patient:message', message);
+    }
+}
+
+/**
+ * Pushes entertainment content to a waiting patient
+ */
+export function emitQueueEntertainment(sessionId: string, content: any, reason: string): void {
+    if (io) {
+        io.to(`session:${sessionId}`).emit('queue:entertainment', { content, reason });
+    }
+}
+
+/**
+ * Sends a practice-wide announcement to all waiting patients
+ */
+export function emitQueueAnnouncement(title: string, body: string, type: 'info' | 'urgent'): void {
+    if (io) {
+        io.emit('queue:announcement', { title, body, type, timestamp: new Date().toISOString() });
+    }
+}
+
+/**
+ * Sends a mood check to a specific patient
+ */
+export function emitMoodCheck(sessionId: string): void {
+    if (io) {
+        io.to(`session:${sessionId}`).emit('queue:mood-check', {
+            question: 'Wie geht es Ihnen gerade?',
+            options: ['😊 Gut', '😐 Geht so', '😟 Ungeduldig', '😰 Besorgt'],
+        });
+    }
+}
+
+/**
+ * Triggers an InfoBreak in the questionnaire flow
+ */
+export function emitInfoBreak(sessionId: string, contentId: string, type: string, durationSec: number): void {
+    if (io) {
+        io.to(`session:${sessionId}`).emit('queue:infobreak-trigger', { contentId, type, durationSec });
     }
 }

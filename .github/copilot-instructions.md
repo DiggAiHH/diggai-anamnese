@@ -198,3 +198,19 @@ Active implementation streams:
 - Don't use `any` type — use proper TypeScript types
 - Don't add dependencies without checking bundle size impact
 - Don't bypass auth middleware on sensitive routes
+
+## Netlify Deploy (Secure)
+
+- Netlify Site ID: `d4c9bba2-71cc-48a1-81a4-14cb9ac5cb90`
+- Deploy status badge endpoint: `https://api.netlify.com/api/v1/badges/d4c9bba2-71cc-48a1-81a4-14cb9ac5cb90/deploy-status`
+- Preferred deploy commands:
+  - `npm run deploy` (guided production deploy)
+  - `npm run deploy:preview` (guided preview deploy)
+- Guided script: `scripts/deploy-guided.mjs`
+  - builds automatically when `dist/` is missing
+  - uses `NETLIFY_AUTH_TOKEN` for non-interactive deploy
+  - falls back to interactive login (`npx netlify login`) when token is not set
+
+Security requirement:
+- Never store Netlify account passwords in repository files.
+- Use environment variables (`NETLIFY_AUTH_TOKEN`) or local CLI login state.

@@ -61,6 +61,7 @@ model PatientSession {
   triageEvents    TriageEvent[]
   chatMessages    ChatMessage[]
   accidentDetails AccidentDetails?
+  queueEntry      QueueEntry?
 
   @@index([patientId, createdAt])
   @@index([status])
@@ -143,6 +144,7 @@ model MedicalAtom {
   // Flags
   isRedFlag       Boolean  @default(false)
   isPII           Boolean  @default(false) // Markiert Felder die verschlüsselt werden müssen
+  isActive        Boolean  @default(true)  // Frage aktiviert/deaktiviert (Admin)
   parentAtomId    String?  // Für hierarchische Follow-ups
 
   createdAt       DateTime @default(now())
@@ -162,6 +164,9 @@ model ArztUser {
   displayName  String
   role         String   @default("ARZT") // PATIENT, ARZT, MFA, ADMIN
   isActive     Boolean  @default(true)
+  customPermissions String?  // JSON: string[] — Zusätzliche Permission-Codes über Rolle hinaus
+  lastLoginAt       DateTime?
+  loginCount        Int      @default(0)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @default(now()) @updatedAt
 
@@ -272,4 +277,157 @@ model Appointment {
 
   @@index([date])
   @@index([arztId])
+}
+
+// ─── Queue Entry (Persistente Warteschlange) ────────────────
+
+model QueueEntry {
+  id                  String   @id @default(uuid())
+  sessionId           String   @unique
+  patientName         String   // AES-verschlüsselt
+  service             String
+  priority            String   @default("NORMAL") // NORMAL, URGENT, EMERGENCY
+  status              String   @default("WAITING") // WAITING, CALLED, IN_TREATMENT, DONE
+  position            Int      @default(0)
+  joinedAt            DateTime @default(now())
+  calledAt            DateTime?
+  treatmentStartedAt  DateTime?
+  completedAt         DateTime?
+  estimatedWaitMin    Int?
+  entertainmentMode   String   @default("AUTO") // AUTO, GAMES, READING, QUIET
+  contentHistory      String?  // JSON: string[] — IDs der bereits gesehenen Contents
+  deviceType          String?  // TABLET, MOBILE, DESKTOP
+  feedbackRating      Int?     // 1-5 Sterne nach Besuch
+
+  session             PatientSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([status, priority])
+  @@index([joinedAt])
+}
+
+// ─── Waiting Content (Wartezeit-Engagement Material) ────────
+
+model WaitingContent {
+  id                 String   @id @default(uuid())
+  type               String   // HEALTH_TIP, PRAXIS_NEWS, MINI_QUIZ, BREATHING_EXERCISE, FUN_FACT, SEASONAL_INFO
+  category           String   // "allgemein", "ernaehrung", "bewegung", "psyche", "saisonal", "praxis"
+  title              String
+  body               String   // Markdown-fähiger Inhalt
+  imageUrl           String?  // Optional: Illustrationslink
+  quizData           String?  // JSON: { question, options: [{text, correct}], explanation }
+  priority           Int      @default(0)  // Höher = wird bevorzugt angezeigt
+  isActive           Boolean  @default(true)
+  seasonal           String?  // "SPRING", "SUMMER", "AUTUMN", "WINTER" oder null für ganzjährig
+  language           String   @default("de") // ISO 639-1
+  minWaitMin         Int      @default(0)    // Zeige erst ab X Minuten Wartezeit
+  maxWaitMin         Int?     // Zeige nur bis X Minuten (null = unbegrenzt)
+  displayDurationSec Int      @default(30) // Wie lange der Content angezeigt wird
+  viewCount          Int      @default(0)
+  likeCount          Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([type, isActive, language])
+  @@index([seasonal, isActive])
+}
+
+// ─── Waiting Analytics (Engagement-Tracking) ────────────────
+
+model WaitingAnalytics {
+  id                  String   @id @default(uuid())
+  sessionId           String
+  contentId           String?  // FK zu WaitingContent (nullable für Flow-Events)
+  eventType           String   // CONTENT_VIEW, CONTENT_LIKE, QUIZ_ANSWER, GAME_START, GAME_COMPLETE, INFOBREAK_VIEW, INFOBREAK_SKIP
+  metadata            String?  // JSON: { quizCorrect?, gameScore?, durationSec?, skippedAfterSec? }
+  waitPositionAtEvent Int?     // Queue-Position als der Event stattfand
+  createdAt           DateTime @default(now())
+
+  @@index([sessionId, createdAt])
+  @@index([contentId, eventType])
+}
+
+// ─── Permission (Rechte-System) ─────────────────────────────
+
+model Permission {
+  id          String   @id @default(uuid())
+  code        String   @unique  // z.B. "patients.view", "queue.manage", "admin.content"
+  name        String   // Anzeigename: "Patienten ansehen"
+  description String?  // "Zugriff auf Patientenliste und Detailansicht"
+  category    String   // "patients", "queue", "admin", "export", "triage", "chat", "atoms"
+  createdAt   DateTime @default(now())
+
+  roles       RolePermission[]
+
+  @@index([category])
+}
+
+// ─── Role + Permission Zuordnung ────────────────────────────
+
+model RolePermission {
+  id           String     @id @default(uuid())
+  role         String     // "ARZT", "MFA", "ADMIN" — oder custom role
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  grantedAt    DateTime   @default(now())
+  grantedBy    String?    // userId des Admins
+
+  @@unique([role, permissionId])
+  @@index([role])
+}
+
+// ─── Wunschbox (Feature Requests) ───────────────────────────
+
+model WunschboxEntry {
+  id              String   @id @default(uuid())
+  submittedBy     String   // userId
+  originalText    String   // Freitext des Users
+  aiParsedChanges String?  // JSON: [{ area, description, priority, estimatedEffort }]
+  status          String   @default("PENDING") // PENDING, AI_PROCESSED, REVIEWED, APPROVED, REJECTED, IMPLEMENTED
+  adminNotes      String?
+  exportedSpec    String?  // JSON: Fertiges Spezifikations-Dokument
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  reviewedAt      DateTime?
+  reviewedBy      String?
+
+  @@index([status, createdAt])
+  @@index([submittedBy])
+}
+
+// ─── ROI Snapshot (Tagesbasierte Wirtschaftlichkeit) ────────
+
+model ROISnapshot {
+  id                    String   @id @default(uuid())
+  date                  DateTime @default(now()) @unique
+  patientsServed        Int
+  sessionsCompleted     Int
+  avgCompletionMinutes  Float
+  messagesCount         Int
+  mfaMinutesSaved       Float
+  estimatedCostSaving   Float
+
+  // Konfigurierbare Praxis-Parameter (bei Erstellung kopiert)
+  mfaHourlyCost         Float    @default(22.50)
+  avgManualIntakeMin    Float    @default(12.0)
+  monthlyLicenseCost    Float    @default(299.0)
+
+  @@index([date])
+}
+
+// ─── Atom Draft (Fragebogen-Entwürfe) ───────────────────────
+
+model AtomDraft {
+  id             String    @id @default(uuid())
+  atomId         String?   // null = neuer Atom, sonst = Bearbeitung bestehender
+  draftData      String    // JSON: Kompletter MedicalAtom als Draft
+  status         String    @default("DRAFT") // DRAFT, PENDING_REVIEW, APPROVED, PUBLISHED, REJECTED
+  createdBy      String    // userId
+  reviewedBy     String?
+  publishedAt    DateTime?
+  changeNote     String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([status])
+  @@index([atomId])
 }

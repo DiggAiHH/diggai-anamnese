@@ -1,6 +1,8 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import * as dotenv from 'dotenv';
+import { seedWaitingContent } from './seed-content';
+import { seedPermissions } from './seed-permissions';
 dotenv.config({ path: '../server/.env' });
 dotenv.config(); // Also check root .env
 
@@ -530,6 +532,11 @@ async function main() {
     }
 
     console.log(`\n✅ Seed abgeschlossen: ${LEGACY_QUESTIONS.length} Fragen + 1 Arzt-Account`);
+
+    // Modul 1+2 Seeds
+    await seedWaitingContent();
+    await seedPermissions();
+    console.log('✅ Modul 1+2 Seeds (WaitingContent + Permissions) abgeschlossen');
 }
 
 main()

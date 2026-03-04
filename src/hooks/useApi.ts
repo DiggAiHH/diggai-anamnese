@@ -379,3 +379,61 @@ export function useQueueRemove() {
         },
     });
 }
+
+export function useQueueFeedback() {
+    return useMutation({
+        mutationFn: ({ id, rating }: { id: string; rating: number }) =>
+            api.queueFeedback(id, rating),
+    });
+}
+
+export function useQueueFlowConfig(sessionId: string) {
+    return useQuery({
+        queryKey: ['queue', 'flow-config', sessionId],
+        queryFn: () => api.queueFlowConfig(sessionId),
+        enabled: !!sessionId,
+        refetchInterval: 30 * 1000, // Every 30s as per plan
+    });
+}
+
+// ─── Waiting Content Hooks ─────────────────────────────────
+
+export function useWaitingContent(params?: { lang?: string; waitMin?: number; exclude?: string; category?: string; limit?: number }) {
+    return useQuery({
+        queryKey: ['content', 'waiting', params],
+        queryFn: () => api.getWaitingContent(params),
+        refetchInterval: 60 * 1000, // Every 60s
+    });
+}
+
+export function useContentAnalytics(days?: number) {
+    return useQuery({
+        queryKey: ['content', 'analytics', days],
+        queryFn: () => api.getContentAnalytics(days),
+    });
+}
+
+export function useTrackContentView() {
+    return useMutation({
+        mutationFn: ({ contentId, sessionId, durationSec }: { contentId: string; sessionId: string; durationSec?: number }) =>
+            api.trackContentView(contentId, sessionId, durationSec),
+    });
+}
+
+export function useLikeContent() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ contentId, sessionId }: { contentId: string; sessionId: string }) =>
+            api.likeContent(contentId, sessionId),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['content', 'waiting'] });
+        },
+    });
+}
+
+export function useTrackQuizAnswer() {
+    return useMutation({
+        mutationFn: ({ contentId, sessionId, selectedOption, correct }: { contentId: string; sessionId: string; selectedOption: number; correct: boolean }) =>
+            api.trackQuizAnswer(contentId, sessionId, selectedOption, correct),
+    });
+}
