@@ -728,6 +728,255 @@ export const api = {
         return response.data;
     },
 
+    // ─── Admin Dashboard ─────────────────────────────────────────
+
+    adminStats: async () => {
+        if (isDemoMode()) {
+            return { totalPatients: 42, totalSessions: 156, activeSessions: 3, completedSessions: 148, sessionsToday: 8, completionRate: 95, avgCompletionMinutes: 7, unresolvedTriageEvents: 1, totalUsers: 5 };
+        }
+        const response = await apiClient.get('/admin/stats');
+        return response.data;
+    },
+
+    adminTimeline: async (days: number = 30) => {
+        if (isDemoMode()) {
+            return Array.from({ length: days }, (_, i) => {
+                const d = new Date(); d.setDate(d.getDate() - (days - 1 - i));
+                return { date: d.toISOString().split('T')[0], total: Math.floor(Math.random() * 12) + 2, completed: Math.floor(Math.random() * 10) + 1, active: Math.floor(Math.random() * 3) };
+            });
+        }
+        const response = await apiClient.get('/admin/sessions/timeline', { params: { days } });
+        return response.data;
+    },
+
+    adminServiceAnalytics: async () => {
+        if (isDemoMode()) {
+            return [{ service: 'Allgemeinmedizin', count: 45 }, { service: 'Orthopädie', count: 32 }, { service: 'Dermatologie', count: 18 }, { service: 'Kardiologie', count: 15 }];
+        }
+        const response = await apiClient.get('/admin/analytics/services');
+        return response.data;
+    },
+
+    adminTriageAnalytics: async (days: number = 30) => {
+        if (isDemoMode()) { return []; }
+        const response = await apiClient.get('/admin/analytics/triage', { params: { days } });
+        return response.data;
+    },
+
+    adminAuditLog: async (params?: { page?: number; limit?: number; action?: string; userId?: string; dateFrom?: string; dateTo?: string; search?: string }) => {
+        if (isDemoMode()) {
+            return { entries: [], pagination: { page: 1, limit: 25, total: 0, totalPages: 0 } };
+        }
+        const response = await apiClient.get('/admin/audit-log', { params });
+        return response.data;
+    },
+
+    // ─── Admin Users ────────────────────────────────────────────
+
+    adminUsers: async () => {
+        if (isDemoMode()) {
+            return [
+                { id: 'u1', username: 'admin', displayName: 'Dr. Admin', role: 'ADMIN', isActive: true, createdAt: new Date().toISOString(), _count: { assignedSessions: 0 } },
+                { id: 'u2', username: 'arzt1', displayName: 'Dr. Müller', role: 'ARZT', isActive: true, createdAt: new Date().toISOString(), _count: { assignedSessions: 12 } },
+                { id: 'u3', username: 'mfa1', displayName: 'Lisa Schmidt', role: 'MFA', isActive: true, createdAt: new Date().toISOString(), _count: { assignedSessions: 45 } },
+            ];
+        }
+        const response = await apiClient.get('/admin/users');
+        return response.data;
+    },
+
+    adminCreateUser: async (data: { username: string; password: string; displayName: string; role: string }) => {
+        if (isDemoMode()) return { id: 'demo-new', ...data, createdAt: new Date().toISOString() };
+        const response = await apiClient.post('/admin/users', data);
+        return response.data;
+    },
+
+    adminUpdateUser: async (id: string, data: { displayName?: string; role?: string; isActive?: boolean; password?: string; pin?: string }) => {
+        if (isDemoMode()) return { id, ...data };
+        const response = await apiClient.put(`/admin/users/${id}`, data);
+        return response.data;
+    },
+
+    adminDeleteUser: async (id: string) => {
+        if (isDemoMode()) return { success: true };
+        const response = await apiClient.delete(`/admin/users/${id}`);
+        return response.data;
+    },
+
+    // ─── Admin Permissions ──────────────────────────────────────
+
+    adminPermissions: async () => {
+        if (isDemoMode()) { return []; }
+        const response = await apiClient.get('/admin/permissions');
+        return response.data;
+    },
+
+    adminRolePermissions: async (role: string) => {
+        if (isDemoMode()) { return []; }
+        const response = await apiClient.get(`/admin/roles/${role}/permissions`);
+        return response.data;
+    },
+
+    adminSetRolePermissions: async (role: string, permissionIds: string[]) => {
+        if (isDemoMode()) return { success: true, count: permissionIds.length };
+        const response = await apiClient.put(`/admin/roles/${role}/permissions`, { permissionIds });
+        return response.data;
+    },
+
+    adminSetUserPermissions: async (userId: string, permissionCodes: string[]) => {
+        if (isDemoMode()) return { success: true };
+        const response = await apiClient.put(`/admin/users/${userId}/permissions`, { permissionCodes });
+        return response.data;
+    },
+
+    adminCheckPermission: async (code: string) => {
+        if (isDemoMode()) return { allowed: true };
+        const response = await apiClient.get('/admin/permissions/check', { params: { code } });
+        return response.data;
+    },
+
+    // ─── Admin Content CRUD ─────────────────────────────────────
+
+    adminContentList: async (params?: { type?: string; category?: string }) => {
+        if (isDemoMode()) { return []; }
+        const response = await apiClient.get('/admin/content', { params });
+        return response.data;
+    },
+
+    adminContentCreate: async (data: { type: string; category: string; title: string; body: string; quizData?: unknown; displayDurationSec?: number; priority?: number; isActive?: boolean; seasonal?: string; language?: string }) => {
+        if (isDemoMode()) return { id: 'demo-content', ...data, createdAt: new Date().toISOString() };
+        const response = await apiClient.post('/admin/content', data);
+        return response.data;
+    },
+
+    adminContentUpdate: async (id: string, data: Record<string, unknown>) => {
+        if (isDemoMode()) return { id, ...data };
+        const response = await apiClient.put(`/admin/content/${id}`, data);
+        return response.data;
+    },
+
+    adminContentDelete: async (id: string) => {
+        if (isDemoMode()) return { success: true };
+        const response = await apiClient.delete(`/admin/content/${id}`);
+        return response.data;
+    },
+
+    // ─── ROI ────────────────────────────────────────────────────
+
+    roiToday: async () => {
+        if (isDemoMode()) {
+            return { date: new Date().toISOString().split('T')[0], patientsServed: 8, sessionsCompleted: 8, avgCompletionMinutes: 7.2, mfaMinutesSaved: 96, costSaving: 36, licenseCostPerDay: 14.24, netROI: 21.76, cumulativeMonthROI: 435.2 };
+        }
+        const response = await apiClient.get('/roi/today');
+        return response.data;
+    },
+
+    roiHistory: async (period: 'week' | 'month' | 'year' = 'month') => {
+        if (isDemoMode()) { return { snapshots: [], summary: { avgDaily: 0, total: 0, trend: 0 } }; }
+        const response = await apiClient.get('/roi/history', { params: { period } });
+        return response.data;
+    },
+
+    roiConfig: async () => {
+        if (isDemoMode()) { return { mfaHourlyCost: 22.5, avgManualIntakeMin: 12, monthlyLicenseCost: 299, workdaysPerMonth: 21 }; }
+        const response = await apiClient.get('/roi/config');
+        return response.data;
+    },
+
+    roiUpdateConfig: async (data: { mfaHourlyCost?: number; avgManualIntakeMin?: number; monthlyLicenseCost?: number; workdaysPerMonth?: number }) => {
+        if (isDemoMode()) return data;
+        const response = await apiClient.put('/roi/config', data);
+        return response.data;
+    },
+
+    roiProjection: async (months: number = 12) => {
+        if (isDemoMode()) { return { monthly: [] }; }
+        const response = await apiClient.get('/roi/projection', { params: { months } });
+        return response.data;
+    },
+
+    // ─── Wunschbox ──────────────────────────────────────────────
+
+    wunschboxSubmit: async (text: string) => {
+        if (isDemoMode()) return { id: 'demo-wish', originalText: text, status: 'PENDING', createdAt: new Date().toISOString() };
+        const response = await apiClient.post('/wunschbox', { text });
+        return response.data;
+    },
+
+    wunschboxList: async (params?: { page?: number; limit?: number; status?: string }) => {
+        if (isDemoMode()) { return { entries: [], pagination: { page: 1, limit: 25, total: 0, totalPages: 0 } }; }
+        const response = await apiClient.get('/wunschbox', { params });
+        return response.data;
+    },
+
+    wunschboxMy: async () => {
+        if (isDemoMode()) { return []; }
+        const response = await apiClient.get('/wunschbox/my');
+        return response.data;
+    },
+
+    wunschboxProcess: async (id: string) => {
+        if (isDemoMode()) return { id, status: 'AI_PROCESSED', aiParsedChanges: [] };
+        const response = await apiClient.post(`/wunschbox/${id}/process`);
+        return response.data;
+    },
+
+    wunschboxReview: async (id: string, data: { status: string; adminNotes?: string }) => {
+        if (isDemoMode()) return { id, ...data };
+        const response = await apiClient.put(`/wunschbox/${id}/review`, data);
+        return response.data;
+    },
+
+    wunschboxExport: async (id: string) => {
+        if (isDemoMode()) return { spec: {} };
+        const response = await apiClient.post(`/wunschbox/${id}/export`);
+        return response.data;
+    },
+
+    // ─── Atoms Builder ──────────────────────────────────────────
+
+    atomSingle: async (id: string) => {
+        if (isDemoMode()) return { id, questionText: 'Demo Frage', answerType: 'text', isActive: true };
+        const response = await apiClient.get(`/atoms/${id}`);
+        return response.data;
+    },
+
+    atomsReorder: async (orders: Array<{ id: string; orderIndex: number }>) => {
+        if (isDemoMode()) return { success: true, updated: orders.length };
+        const response = await apiClient.put('/atoms/reorder', { orders });
+        return response.data;
+    },
+
+    atomToggle: async (id: string, isActive: boolean) => {
+        if (isDemoMode()) return { id, isActive };
+        const response = await apiClient.put(`/atoms/${id}/toggle`, { isActive });
+        return response.data;
+    },
+
+    atomDraftCreate: async (data: { atomId?: string; draftData: Record<string, unknown>; changeNote?: string }) => {
+        if (isDemoMode()) return { id: 'demo-draft', ...data, status: 'DRAFT', createdAt: new Date().toISOString() };
+        const response = await apiClient.post('/atoms/draft', data);
+        return response.data;
+    },
+
+    atomDraftsList: async (status: string = 'DRAFT') => {
+        if (isDemoMode()) { return { drafts: [] }; }
+        const response = await apiClient.get('/atoms/drafts', { params: { status } });
+        return response.data;
+    },
+
+    atomDraftPublish: async (id: string) => {
+        if (isDemoMode()) return { atom: {}, draft: { status: 'PUBLISHED' } };
+        const response = await apiClient.put(`/atoms/draft/${id}/publish`);
+        return response.data;
+    },
+
+    atomDraftDelete: async (id: string) => {
+        if (isDemoMode()) return { success: true };
+        const response = await apiClient.delete(`/atoms/draft/${id}`);
+        return response.data;
+    },
+
     // ─── Patient Identification (Returning Patient Fast-Track) ──
 
     identifyPatient: async (data: { birthDate: string; insuranceNumber: string; patientNumber?: string }) => {

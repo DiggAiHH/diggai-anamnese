@@ -22,6 +22,8 @@ import queueRoutes from './routes/queue';
 import adminRoutes from './routes/admin';
 import patientRoutes from './routes/patients';
 import contentRoutes from './routes/content';
+import roiRoutes from './routes/roi';
+import wunschboxRoutes from './routes/wunschbox';
 
 const app = express();
 const httpServer = createServer(app);
@@ -112,6 +114,8 @@ app.use('/api/queue', queueRoutes);
 app.use('/api/admin', authLimiter, adminRoutes);
 app.use('/api/patients', patientRoutes);
 app.use('/api/content', contentRoutes);
+app.use('/api/roi', roiRoutes);
+app.use('/api/wunschbox', wunschboxRoutes);
 
 // Health Check — includes DB + Redis connectivity
 app.get('/api/health', async (_req, res) => {
@@ -177,7 +181,9 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 // ─── Start ──────────────────────────────────────────────────
 
 import { startDatabaseCleanupJob } from './jobs/cleanup';
+import { startROISnapshotJob } from './jobs/roiSnapshot';
 startDatabaseCleanupJob();
+startROISnapshotJob();
 
 // Initialize Redis (non-blocking — graceful degradation)
 initRedis().catch(err => console.warn('[Server] Redis init skipped:', err.message));

@@ -437,3 +437,293 @@ export function useTrackQuizAnswer() {
             api.trackQuizAnswer(contentId, sessionId, selectedOption, correct),
     });
 }
+
+// ─── Admin Dashboard Hooks ──────────────────────────────────
+
+export function useAdminStats() {
+    return useQuery({
+        queryKey: ['admin', 'stats'],
+        queryFn: () => api.adminStats(),
+        refetchInterval: 30 * 1000,
+    });
+}
+
+export function useAdminTimeline(days: number = 30) {
+    return useQuery({
+        queryKey: ['admin', 'timeline', days],
+        queryFn: () => api.adminTimeline(days),
+    });
+}
+
+export function useAdminServiceAnalytics() {
+    return useQuery({
+        queryKey: ['admin', 'services'],
+        queryFn: () => api.adminServiceAnalytics(),
+    });
+}
+
+export function useAdminTriageAnalytics(days: number = 30) {
+    return useQuery({
+        queryKey: ['admin', 'triage', days],
+        queryFn: () => api.adminTriageAnalytics(days),
+    });
+}
+
+export function useAdminAuditLog(params?: { page?: number; limit?: number; action?: string; userId?: string; dateFrom?: string; dateTo?: string; search?: string }) {
+    return useQuery({
+        queryKey: ['admin', 'audit-log', params],
+        queryFn: () => api.adminAuditLog(params),
+    });
+}
+
+// ─── Admin User Hooks ───────────────────────────────────────
+
+export function useAdminUsers() {
+    return useQuery({
+        queryKey: ['admin', 'users'],
+        queryFn: () => api.adminUsers(),
+    });
+}
+
+export function useAdminCreateUser() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (data: { username: string; password: string; displayName: string; role: string }) =>
+            api.adminCreateUser(data),
+        onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['admin', 'users'] }); },
+    });
+}
+
+export function useAdminUpdateUser() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id, ...data }: { id: string; displayName?: string; role?: string; isActive?: boolean; password?: string; pin?: string }) =>
+            api.adminUpdateUser(id, data),
+        onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['admin', 'users'] }); },
+    });
+}
+
+export function useAdminDeleteUser() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (id: string) => api.adminDeleteUser(id),
+        onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['admin', 'users'] }); },
+    });
+}
+
+// ─── Permission Hooks ───────────────────────────────────────
+
+export function useAdminPermissions() {
+    return useQuery({
+        queryKey: ['admin', 'permissions'],
+        queryFn: () => api.adminPermissions(),
+    });
+}
+
+export function useAdminRolePermissions(role: string) {
+    return useQuery({
+        queryKey: ['admin', 'role-permissions', role],
+        queryFn: () => api.adminRolePermissions(role),
+        enabled: !!role,
+    });
+}
+
+export function useAdminSetRolePermissions() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ role, permissionIds }: { role: string; permissionIds: string[] }) =>
+            api.adminSetRolePermissions(role, permissionIds),
+        onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['admin', 'permissions'] }); queryClient.invalidateQueries({ queryKey: ['admin', 'role-permissions'] }); },
+    });
+}
+
+export function useAdminSetUserPermissions() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ userId, permissionCodes }: { userId: string; permissionCodes: string[] }) =>
+            api.adminSetUserPermissions(userId, permissionCodes),
+        onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['admin', 'users'] }); },
+    });
+}
+
+// ─── ROI Hooks ──────────────────────────────────────────────
+
+export function useROIToday() {
+    return useQuery({
+        queryKey: ['roi', 'today'],
+        queryFn: () => api.roiToday(),
+        refetchInterval: 60 * 1000,
+    });
+}
+
+export function useROIHistory(period: 'week' | 'month' | 'year' = 'month') {
+    return useQuery({
+        queryKey: ['roi', 'history', period],
+        queryFn: () => api.roiHistory(period),
+    });
+}
+
+export function useROIConfig() {
+    return useQuery({
+        queryKey: ['roi', 'config'],
+        queryFn: () => api.roiConfig(),
+    });
+}
+
+export function useROIUpdateConfig() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (data: { mfaHourlyCost?: number; avgManualIntakeMin?: number; monthlyLicenseCost?: number; workdaysPerMonth?: number }) =>
+            api.roiUpdateConfig(data),
+        onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['roi'] }); },
+    });
+}
+
+export function useROIProjection(months: number = 12) {
+    return useQuery({
+        queryKey: ['roi', 'projection', months],
+        queryFn: () => api.roiProjection(months),
+    });
+}
+
+// ─── Wunschbox Hooks ────────────────────────────────────────
+
+export function useWunschboxSubmit() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (text: string) => api.wunschboxSubmit(text),
+        onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['wunschbox'] }); },
+    });
+}
+
+export function useWunschboxList(params?: { page?: number; limit?: number; status?: string }) {
+    return useQuery({
+        queryKey: ['wunschbox', 'list', params],
+        queryFn: () => api.wunschboxList(params),
+    });
+}
+
+export function useWunschboxMy() {
+    return useQuery({
+        queryKey: ['wunschbox', 'my'],
+        queryFn: () => api.wunschboxMy(),
+    });
+}
+
+export function useWunschboxProcess() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (id: string) => api.wunschboxProcess(id),
+        onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['wunschbox'] }); },
+    });
+}
+
+export function useWunschboxReview() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id, ...data }: { id: string; status: string; adminNotes?: string }) =>
+            api.wunschboxReview(id, data),
+        onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['wunschbox'] }); },
+    });
+}
+
+export function useWunschboxExport() {
+    return useMutation({
+        mutationFn: (id: string) => api.wunschboxExport(id),
+    });
+}
+
+// ─── Admin Content Hooks ────────────────────────────────────
+
+export function useAdminContentList(params?: { type?: string; category?: string }) {
+    return useQuery({
+        queryKey: ['admin', 'content', params],
+        queryFn: () => api.adminContentList(params),
+    });
+}
+
+export function useAdminContentCreate() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (data: { type: string; category: string; title: string; body: string; quizData?: unknown; displayDurationSec?: number; priority?: number; isActive?: boolean; seasonal?: string; language?: string }) =>
+            api.adminContentCreate(data),
+        onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['admin', 'content'] }); },
+    });
+}
+
+export function useAdminContentUpdate() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id, ...data }: { id: string } & Record<string, unknown>) =>
+            api.adminContentUpdate(id, data),
+        onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['admin', 'content'] }); queryClient.invalidateQueries({ queryKey: ['content'] }); },
+    });
+}
+
+export function useAdminContentDelete() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (id: string) => api.adminContentDelete(id),
+        onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['admin', 'content'] }); queryClient.invalidateQueries({ queryKey: ['content'] }); },
+    });
+}
+
+// ─── Atoms Builder Hooks ────────────────────────────────────
+
+export function useAtomSingle(id: string) {
+    return useQuery({
+        queryKey: ['atoms', id],
+        queryFn: () => api.atomSingle(id),
+        enabled: !!id,
+    });
+}
+
+export function useAtomsReorder() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (orders: Array<{ id: string; orderIndex: number }>) =>
+            api.atomsReorder(orders),
+        onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['atoms'] }); },
+    });
+}
+
+export function useAtomToggle() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
+            api.atomToggle(id, isActive),
+        onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['atoms'] }); },
+    });
+}
+
+export function useAtomDraftCreate() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (data: { atomId?: string; draftData: Record<string, unknown>; changeNote?: string }) =>
+            api.atomDraftCreate(data),
+        onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['atoms', 'drafts'] }); },
+    });
+}
+
+export function useAtomDraftsList(status: string = 'DRAFT') {
+    return useQuery({
+        queryKey: ['atoms', 'drafts', status],
+        queryFn: () => api.atomDraftsList(status),
+    });
+}
+
+export function useAtomDraftPublish() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (id: string) => api.atomDraftPublish(id),
+        onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['atoms'] }); },
+    });
+}
+
+export function useAtomDraftDelete() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (id: string) => api.atomDraftDelete(id),
+        onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['atoms', 'drafts'] }); },
+    });
+}

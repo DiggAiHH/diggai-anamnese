@@ -7,12 +7,12 @@ import { requireAuth, requireRole } from '../middleware/auth';
 const router = Router();
 const prisma = new PrismaClient();
 
-// Alle Admin-Routen erfordern Admin-Rolle
-router.use(requireAuth, requireRole('admin'));
+// Alle Admin-Routen erfordern Admin-Rolle (except /permissions/check)
+router.use(requireAuth);
 
 // ─── Dashboard Stats ────────────────────────────────────────
 
-router.get('/stats', async (_req, res) => {
+router.get('/stats', requireRole('admin'), async (_req, res) => {
     try {
         const [
             totalPatients,
@@ -77,7 +77,7 @@ router.get('/stats', async (_req, res) => {
 
 // ─── Sessions Timeline (für Charts) ────────────────────────
 
-router.get('/sessions/timeline', async (req, res) => {
+router.get('/sessions/timeline', requireRole('admin'), async (req, res) => {
     try {
         const days = parseInt(req.query.days as string) || 30;
         const since = new Date();
@@ -108,7 +108,7 @@ router.get('/sessions/timeline', async (req, res) => {
 
 // ─── Service Analytics (Pie Chart) ──────────────────────────
 
-router.get('/analytics/services', async (_req, res) => {
+router.get('/analytics/services', requireRole('admin'), async (_req, res) => {
     try {
         const services = await prisma.patientSession.groupBy({
             by: ['selectedService'],
@@ -128,7 +128,7 @@ router.get('/analytics/services', async (_req, res) => {
 
 // ─── Triage Analytics ───────────────────────────────────────
 
-router.get('/analytics/triage', async (req, res) => {
+router.get('/analytics/triage', requireRole('admin'), async (req, res) => {
     try {
         const days = parseInt(req.query.days as string) || 30;
         const since = new Date();
@@ -169,7 +169,7 @@ const auditLogQuerySchema = z.object({
     search: z.string().optional(),
 });
 
-router.get('/audit-log', async (req, res) => {
+router.get('/audit-log', requireRole('admin'), async (req, res) => {
     try {
         const query = auditLogQuerySchema.parse(req.query);
         const where: any = {};
@@ -216,7 +216,7 @@ router.get('/audit-log', async (req, res) => {
 
 // ─── User Management (CRUD) ────────────────────────────────
 
-router.get('/users', async (_req, res) => {
+router.get('/users', requireRole('admin'), async (_req, res) => {
     try {
         const users = await prisma.arztUser.findMany({
             select: {
@@ -244,7 +244,7 @@ const createUserSchema = z.object({
     role: z.enum(['ARZT', 'MFA', 'ADMIN']),
 });
 
-router.post('/users', async (req, res) => {
+router.post('/users', requireRole('admin'), async (req, res) => {
     try {
         const data = createUserSchema.parse(req.body);
         const passwordHash = await bcrypt.hash(data.password, 12);
@@ -278,7 +278,7 @@ const updateUserSchema = z.object({
     pin: z.string().length(4).regex(/^\d{4}$/).optional(),
 });
 
-router.put('/users/:id', async (req, res) => {
+router.put('/users/:id', requireRole('admin'), async (req, res) => {
     try {
         const data = updateUserSchema.parse(req.body);
         const updateData: any = {};
@@ -306,7 +306,7 @@ router.put('/users/:id', async (req, res) => {
     }
 });
 
-router.delete('/users/:id', async (req, res) => {
+router.delete('/users/:id', requireRole('admin'), async (req, res) => {
     try {
         // Soft delete: deactivate instead of hard delete
         await prisma.arztUser.update({
@@ -321,6 +321,226 @@ router.delete('/users/:id', async (req, res) => {
         }
         console.error('[Admin] Delete user error:', err);
         res.status(500).json({ error: 'Benutzer konnte nicht deaktiviert werden' });
+    }
+});
+
+// ─── Permissions Management ─────────────────────────────────
+
+// GET /api/admin/permissions — All available permissions
+router.get('/permissions', requireRole('admin'), async (_req, res) => {
+    try {
+        const permissions = await prisma.permission.findMany({
+            orderBy: [{ category: 'asc' }, { code: 'asc' }],
+            include: { roles: { select: { role: true } } },
+        });
+        res.json(permissions);
+    } catch (err) {
+        console.error('[Admin] Permissions list error:', err);
+        res.status(500).json({ error: 'Berechtigungen konnten nicht geladen werden' });
+    }
+});
+
+// GET /api/admin/roles/:role/permissions — Permissions for a role
+router.get('/roles/:role/permissions', requireRole('admin'), async (req, res) => {
+    try {
+        const rolePerms = await prisma.rolePermission.findMany({
+            where: { role: req.params.role },
+            include: { permission: true },
+        });
+        res.json(rolePerms.map(rp => rp.permission));
+    } catch (err) {
+        console.error('[Admin] Role permissions error:', err);
+        res.status(500).json({ error: 'Rollen-Berechtigungen konnten nicht geladen werden' });
+    }
+});
+
+// PUT /api/admin/roles/:role/permissions — Set role permissions (replace all)
+const setRolePermsSchema = z.object({
+    permissionIds: z.array(z.string()).min(0),
+});
+
+router.put('/roles/:role/permissions', requireRole('admin'), async (req, res) => {
+    try {
+        const { permissionIds } = setRolePermsSchema.parse(req.body);
+        const role = req.params.role;
+        const userId = (req as any).user?.userId || 'unknown';
+
+        // Delete existing, then re-create
+        await prisma.$transaction([
+            prisma.rolePermission.deleteMany({ where: { role } }),
+            ...permissionIds.map(permissionId =>
+                prisma.rolePermission.create({
+                    data: { role, permissionId, grantedBy: userId },
+                })
+            ),
+        ]);
+
+        res.json({ success: true, count: permissionIds.length });
+    } catch (err) {
+        console.error('[Admin] Set role permissions error:', err);
+        res.status(400).json({ error: 'Berechtigungen konnten nicht gesetzt werden' });
+    }
+});
+
+// PUT /api/admin/users/:id/permissions — Individual custom permissions
+const setUserPermsSchema = z.object({
+    permissionCodes: z.array(z.string()),
+});
+
+router.put('/users/:id/permissions', requireRole('admin'), async (req, res) => {
+    try {
+        const { permissionCodes } = setUserPermsSchema.parse(req.body);
+
+        await prisma.arztUser.update({
+            where: { id: req.params.id },
+            data: { customPermissions: JSON.stringify(permissionCodes) },
+        });
+
+        res.json({ success: true });
+    } catch (err: any) {
+        if (err.code === 'P2025') {
+            res.status(404).json({ error: 'Benutzer nicht gefunden' });
+            return;
+        }
+        console.error('[Admin] Set user permissions error:', err);
+        res.status(400).json({ error: 'Berechtigungen konnten nicht gesetzt werden' });
+    }
+});
+
+// GET /api/admin/permissions/check — Check own permission (any authenticated role)
+router.get('/permissions/check', async (req, res) => {
+    try {
+        const code = req.query.code as string;
+        if (!code) { res.status(400).json({ error: 'code parameter required' }); return; }
+
+        const userRole = (req as any).user?.role;
+        const userId = (req as any).user?.userId;
+
+        if (userRole === 'admin') {
+            res.json({ allowed: true });
+            return;
+        }
+
+        // Check role permission
+        const rolePerm = await prisma.rolePermission.findFirst({
+            where: {
+                role: userRole,
+                permission: { code },
+            },
+        });
+
+        if (rolePerm) {
+            res.json({ allowed: true });
+            return;
+        }
+
+        // Check custom permissions
+        if (userId) {
+            const user = await prisma.arztUser.findUnique({
+                where: { id: userId },
+                select: { customPermissions: true },
+            });
+            if (user?.customPermissions) {
+                const customs: string[] = JSON.parse(user.customPermissions);
+                if (customs.includes(code)) {
+                    res.json({ allowed: true });
+                    return;
+                }
+            }
+        }
+
+        res.json({ allowed: false });
+    } catch (err) {
+        console.error('[Admin] Permission check error:', err);
+        res.json({ allowed: false });
+    }
+});
+
+// ─── Content Admin CRUD ─────────────────────────────────────
+
+// GET /api/admin/content — List all waiting content (admin view)
+router.get('/content', requireRole('admin'), async (req, res) => {
+    try {
+        const type = req.query.type as string;
+        const category = req.query.category as string;
+        const where: any = {};
+        if (type) where.type = type;
+        if (category) where.category = category;
+
+        const content = await prisma.waitingContent.findMany({
+            where,
+            orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
+        });
+        res.json(content.map(c => ({
+            ...c,
+            quizData: c.quizData ? JSON.parse(c.quizData) : null,
+        })));
+    } catch (err) {
+        console.error('[Admin] Content list error:', err);
+        res.status(500).json({ error: 'Content konnte nicht geladen werden' });
+    }
+});
+
+// POST /api/admin/content — Create content
+const createContentSchema = z.object({
+    type: z.enum(['HEALTH_TIP', 'FUN_FACT', 'MINI_QUIZ', 'BREATHING_EXERCISE', 'SEASONAL_INFO', 'PRAXIS_NEWS']),
+    category: z.string().max(50),
+    title: z.string().min(2).max(200),
+    body: z.string().min(5).max(5000),
+    quizData: z.any().optional(),
+    displayDurationSec: z.number().min(5).max(300).optional(),
+    priority: z.number().min(0).max(100).optional(),
+    isActive: z.boolean().optional(),
+    seasonal: z.string().max(20).optional(),
+    language: z.string().max(5).optional(),
+});
+
+router.post('/content', requireRole('admin'), async (req, res) => {
+    try {
+        const data = createContentSchema.parse(req.body);
+        const content = await prisma.waitingContent.create({
+            data: {
+                ...data,
+                quizData: data.quizData ? JSON.stringify(data.quizData) : null,
+            },
+        });
+        res.status(201).json({ ...content, quizData: content.quizData ? JSON.parse(content.quizData) : null });
+    } catch (err) {
+        console.error('[Admin] Content create error:', err);
+        res.status(400).json({ error: 'Content konnte nicht erstellt werden' });
+    }
+});
+
+// PUT /api/admin/content/:id — Update content
+router.put('/content/:id', requireRole('admin'), async (req, res) => {
+    try {
+        const data = createContentSchema.partial().parse(req.body);
+        const updateData: any = { ...data };
+        if (data.quizData !== undefined) {
+            updateData.quizData = data.quizData ? JSON.stringify(data.quizData) : null;
+        }
+
+        const content = await prisma.waitingContent.update({
+            where: { id: req.params.id },
+            data: updateData,
+        });
+        res.json({ ...content, quizData: content.quizData ? JSON.parse(content.quizData) : null });
+    } catch (err: any) {
+        if (err.code === 'P2025') { res.status(404).json({ error: 'Content nicht gefunden' }); return; }
+        console.error('[Admin] Content update error:', err);
+        res.status(400).json({ error: 'Content konnte nicht aktualisiert werden' });
+    }
+});
+
+// DELETE /api/admin/content/:id — Delete content
+router.delete('/content/:id', requireRole('admin'), async (req, res) => {
+    try {
+        await prisma.waitingContent.delete({ where: { id: req.params.id } });
+        res.json({ success: true });
+    } catch (err: any) {
+        if (err.code === 'P2025') { res.status(404).json({ error: 'Content nicht gefunden' }); return; }
+        console.error('[Admin] Content delete error:', err);
+        res.status(500).json({ error: 'Content konnte nicht gelöscht werden' });
     }
 });
 

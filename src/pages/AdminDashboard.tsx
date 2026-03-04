@@ -5,13 +5,22 @@ import {
   Lock, Eye, Server, Cpu, Users, Clock, TrendingUp, BarChart3,
   CheckCircle, AlertTriangle, Heart, Brain, ArrowRight, ChevronDown,
   ChevronRight, Layers, GitBranch, Box, Workflow, PieChart, History,
-  Rocket, Tag, Bug, Sparkles, Wrench
+  Rocket, Tag, Bug, Sparkles, Wrench, Lightbulb, BookOpen
 } from 'lucide-react';
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   PieChart as RechartsPie, Pie, Cell, RadarChart, Radar, PolarGrid,
   PolarAngleAxis, PolarRadiusAxis, AreaChart, Area, Legend
 } from 'recharts';
+
+// Admin Tab Components
+import { UserManagementTab } from '../components/admin/UserManagementTab';
+import { PermissionMatrix } from '../components/admin/PermissionMatrix';
+import { ROIDashboard } from '../components/admin/ROIDashboard';
+import { FragebogenBuilder } from '../components/admin/FragebogenBuilder';
+import { WunschboxTab } from '../components/admin/WunschboxTab';
+import { WaitingContentTab } from '../components/admin/WaitingContentTab';
+import { AuditLogTab } from '../components/admin/AuditLogTab';
 
 // ─── Types ─────────────────────────────────────────────
 interface FlowNode {
@@ -42,6 +51,13 @@ interface SecurityLayer {
 // ─── Data ──────────────────────────────────────────────
 const TABS = [
   { id: 'overview', label: 'Übersicht', icon: <LayoutDashboard size={18} /> },
+  { id: 'users', label: 'Mitarbeiter', icon: <Users size={18} /> },
+  { id: 'fragebogen', label: 'Fragebogen', icon: <Layers size={18} /> },
+  { id: 'roi', label: 'ROI', icon: <TrendingUp size={18} /> },
+  { id: 'wunschbox', label: 'Wunschbox', icon: <Lightbulb size={18} /> },
+  { id: 'content', label: 'Wartezeit-Content', icon: <BookOpen size={18} /> },
+  { id: 'permissions', label: 'Rechte', icon: <Lock size={18} /> },
+  { id: 'audit', label: 'Audit-Log', icon: <FileText size={18} /> },
   { id: 'flow', label: 'Patienten-Flow', icon: <Workflow size={18} /> },
   { id: 'security', label: 'Sicherheit', icon: <Shield size={18} /> },
   { id: 'export', label: 'Export & Berichte', icon: <FileText size={18} /> },
@@ -1315,6 +1331,13 @@ export function AdminDashboard() {
   const tabContent = useMemo(() => {
     switch (activeTab) {
       case 'overview': return <OverviewTab />;
+      case 'users': return <UserManagementTab />;
+      case 'fragebogen': return <FragebogenBuilder />;
+      case 'roi': return <ROIDashboard />;
+      case 'wunschbox': return <WunschboxTab />;
+      case 'content': return <WaitingContentTab />;
+      case 'permissions': return <PermissionMatrix />;
+      case 'audit': return <AuditLogTab />;
       case 'flow': return <FlowTab />;
       case 'security': return <SecurityTab />;
       case 'export': return <ExportTab />;
