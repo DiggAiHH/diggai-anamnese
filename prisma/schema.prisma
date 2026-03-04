@@ -29,6 +29,13 @@ model Patient {
   medications      PatientMedication[]
   surgeries        PatientSurgery[]
 
+  // Modul 3: PVS-Verknüpfung
+  pvsLinks         PvsPatientLink[]
+  versichertenNr   String?   // 10-stellig (KVNR)
+  versichertenArt  String?   // "GKV" | "PKV" | "BG" | "SZ"
+  kassennummer     String?   // IK-Nummer (9-stellig)
+  kassenname       String?
+
   @@index([insuranceNumHash, birthDate])
 }
 
@@ -62,6 +69,11 @@ model PatientSession {
   chatMessages    ChatMessage[]
   accidentDetails AccidentDetails?
   queueEntry      QueueEntry?
+
+  // Modul 3: PVS-Export-Status
+  pvsExported     Boolean   @default(false)
+  pvsExportedAt   DateTime?
+  pvsExportRef    String?   // Referenz-ID im PVS
 
   @@index([patientId, createdAt])
   @@index([status])
@@ -430,4 +442,169 @@ model AtomDraft {
 
   @@index([status])
   @@index([atomId])
+}
+
+// ─── Modul 3: PVS-Integration ───────────────────────────────
+
+enum PvsType {
+  CGM_M1
+  MEDATIXX
+  MEDISTAR
+  T2MED
+  X_ISYNET
+  DOCTOLIB
+  TURBOMED
+  FHIR_GENERIC
+}
+
+enum PvsProtocol {
+  GDT
+  BDT
+  FHIR
+  REST
+  KIM
+}
+
+enum TransferDirection {
+  IMPORT
+  EXPORT
+  BIDIRECTIONAL
+}
+
+enum TransferStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  RETRYING
+  CANCELLED
+}
+
+model PvsConnection {
+  id              String      @id @default(uuid())
+  praxisId        String      @unique
+  pvsType         PvsType
+  pvsVersion      String?
+  protocol        PvsProtocol @default(GDT)
+
+  // GDT-spezifisch
+  gdtImportDir    String?
+  gdtExportDir    String?
+  gdtFilePattern  String?     @default("*.gdt")
+  gdtEncoding     String?     @default("ISO-8859-15")
+  gdtSenderId     String?     // 8-stellig
+  gdtReceiverId   String?     // 8-stellig
+
+  // FHIR-spezifisch
+  fhirBaseUrl     String?
+  fhirAuthType    String?     // "basic" | "oauth2" | "apikey"
+  fhirCredentials String?     // AES-256-GCM verschlüsselt
+  fhirTenantId    String?
+
+  // KIM-spezifisch
+  kimAddress      String?
+  kimSmtpHost     String?
+  kimSmtpPort     Int?
+
+  // Connection-Status
+  isActive        Boolean     @default(true)
+  lastSyncAt      DateTime?
+  lastError       String?
+  syncIntervalSec Int         @default(30)
+  retryCount      Int         @default(3)
+
+  // Auto-Mapping
+  autoMapFields   Boolean     @default(true)
+  customMappings  Json?
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  transferLogs    PvsTransferLog[]
+  fieldMappings   PvsFieldMapping[]
+
+  @@index([pvsType])
+  @@index([isActive])
+}
+
+model PvsTransferLog {
+  id              String          @id @default(uuid())
+  connectionId    String
+  connection      PvsConnection   @relation(fields: [connectionId], references: [id])
+
+  direction       TransferDirection
+  protocol        PvsProtocol
+  status          TransferStatus  @default(PENDING)
+
+  entityType      String          // "Patient" | "PatientSession" | "Answer"
+  entityId        String
+
+  satzart         String?         // GDT Satzart
+  resourceType    String?         // FHIR Resource Type
+  rawPayload      String?         // AES-256-GCM verschlüsselt
+  transformedData Json?
+
+  pvsReferenceId  String?
+  errorMessage    String?
+  errorCode       String?
+  retryAttempt    Int             @default(0)
+  maxRetries      Int             @default(3)
+
+  startedAt       DateTime        @default(now())
+  completedAt     DateTime?
+  durationMs      Int?
+
+  initiatedBy     String?         // ArztUser.id oder "system"
+  createdAt       DateTime        @default(now())
+
+  @@index([connectionId, status])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@index([status])
+}
+
+model PvsFieldMapping {
+  id              String          @id @default(uuid())
+  connectionId    String
+  connection      PvsConnection   @relation(fields: [connectionId], references: [id])
+
+  diggaiModel     String          // "Patient" | "Answer" | "PatientSession"
+  diggaiField     String
+
+  pvsFieldId      String          // GDT: Feldkennung | FHIR: FHIRPath
+  pvsFieldName    String?
+
+  direction       TransferDirection @default(BIDIRECTIONAL)
+  transformRule   String?         // "direct" | "map:ja→1,nein→0" | "format:date:YYYYMMDD"
+  defaultValue    String?
+  isRequired      Boolean         @default(false)
+  isActive        Boolean         @default(true)
+  validationRule  String?
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@unique([connectionId, diggaiModel, diggaiField, pvsFieldId])
+  @@index([connectionId])
+}
+
+model PvsPatientLink {
+  id              String      @id @default(uuid())
+  patientId       String
+  patient         Patient     @relation(fields: [patientId], references: [id])
+
+  pvsType         PvsType
+  pvsPatientId    String
+  pvsPatientNr    String?
+
+  lastSyncAt      DateTime?
+  syncStatus      String      @default("linked") // linked | conflict | unlinked
+  conflictData    Json?
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@unique([patientId, pvsType])
+  @@unique([pvsType, pvsPatientId])
+  @@index([pvsPatientId])
 }

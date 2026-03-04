@@ -24,6 +24,7 @@ import patientRoutes from './routes/patients';
 import contentRoutes from './routes/content';
 import roiRoutes from './routes/roi';
 import wunschboxRoutes from './routes/wunschbox';
+import pvsRoutes from './routes/pvs';
 
 const app = express();
 const httpServer = createServer(app);
@@ -116,6 +117,7 @@ app.use('/api/patients', patientRoutes);
 app.use('/api/content', contentRoutes);
 app.use('/api/roi', roiRoutes);
 app.use('/api/wunschbox', wunschboxRoutes);
+app.use('/api/pvs', authLimiter, pvsRoutes);
 
 // Health Check — includes DB + Redis connectivity
 app.get('/api/health', async (_req, res) => {

@@ -727,3 +727,178 @@ export function useAtomDraftDelete() {
         onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['atoms', 'drafts'] }); },
     });
 }
+
+// ─── PVS / FHIR Integration Hooks ──────────────────────────
+
+export function usePvsConnections() {
+    return useQuery({
+        queryKey: ['pvs', 'connections'],
+        queryFn: () => api.pvsConnections(),
+    });
+}
+
+export function usePvsCapabilities(connectionId: string) {
+    return useQuery({
+        queryKey: ['pvs', 'capabilities', connectionId],
+        queryFn: () => api.pvsCapabilities(connectionId),
+        enabled: !!connectionId,
+    });
+}
+
+export function usePvsCreateConnection() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (data: { pvsType: string; protocol: string; name: string; config: Record<string, unknown> }) =>
+            api.pvsCreateConnection(data),
+        onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['pvs', 'connections'] }); },
+    });
+}
+
+export function usePvsUpdateConnection() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id, ...data }: { id: string } & Record<string, unknown>) =>
+            api.pvsUpdateConnection(id, data),
+        onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['pvs', 'connections'] }); },
+    });
+}
+
+export function usePvsTestConnection() {
+    return useMutation({
+        mutationFn: (id: string) => api.pvsTestConnection(id),
+    });
+}
+
+export function usePvsDeleteConnection() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (id: string) => api.pvsDeleteConnection(id),
+        onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['pvs', 'connections'] }); },
+    });
+}
+
+export function usePvsExportSession() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ sessionId, connectionId }: { sessionId: string; connectionId?: string }) =>
+            api.pvsExportSession(sessionId, connectionId),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['pvs', 'transfers'] });
+            queryClient.invalidateQueries({ queryKey: ['pvs', 'transfer-stats'] });
+        },
+    });
+}
+
+export function usePvsExportBatch() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ sessionIds, connectionId }: { sessionIds: string[]; connectionId?: string }) =>
+            api.pvsExportBatch(sessionIds, connectionId),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['pvs', 'transfers'] });
+            queryClient.invalidateQueries({ queryKey: ['pvs', 'transfer-stats'] });
+        },
+    });
+}
+
+export function usePvsImportPatient() {
+    return useMutation({
+        mutationFn: ({ externalId, connectionId }: { externalId: string; connectionId?: string }) =>
+            api.pvsImportPatient(externalId, connectionId),
+    });
+}
+
+export function usePvsPatientLinks(patientId: string) {
+    return useQuery({
+        queryKey: ['pvs', 'patient-links', patientId],
+        queryFn: () => api.pvsPatientLinks(patientId),
+        enabled: !!patientId,
+    });
+}
+
+export function usePvsCreatePatientLink() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (data: { patientId: string; connectionId: string; externalPatientId: string }) =>
+            api.pvsCreatePatientLink(data),
+        onSuccess: (_data, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['pvs', 'patient-links', variables.patientId] });
+        },
+    });
+}
+
+export function usePvsDeletePatientLink() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (id: string) => api.pvsDeletePatientLink(id),
+        onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['pvs', 'patient-links'] }); },
+    });
+}
+
+export function usePvsTransfers(params?: { page?: number; limit?: number; direction?: string; status?: string; connectionId?: string }) {
+    return useQuery({
+        queryKey: ['pvs', 'transfers', params],
+        queryFn: () => api.pvsTransfers(params),
+    });
+}
+
+export function usePvsTransferDetail(id: string) {
+    return useQuery({
+        queryKey: ['pvs', 'transfer', id],
+        queryFn: () => api.pvsTransferDetail(id),
+        enabled: !!id,
+    });
+}
+
+export function usePvsRetryTransfer() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (id: string) => api.pvsRetryTransfer(id),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['pvs', 'transfers'] });
+            queryClient.invalidateQueries({ queryKey: ['pvs', 'transfer-stats'] });
+        },
+    });
+}
+
+export function usePvsTransferStats() {
+    return useQuery({
+        queryKey: ['pvs', 'transfer-stats'],
+        queryFn: () => api.pvsTransferStats(),
+        refetchInterval: 30 * 1000,
+    });
+}
+
+export function usePvsMappings(connectionId: string) {
+    return useQuery({
+        queryKey: ['pvs', 'mappings', connectionId],
+        queryFn: () => api.pvsMappings(connectionId),
+        enabled: !!connectionId,
+    });
+}
+
+export function usePvsSaveMappings() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ connectionId, mappings }: { connectionId: string; mappings: Array<{ sourceField: string; targetField: string; transform?: string }> }) =>
+            api.pvsSaveMappings(connectionId, mappings),
+        onSuccess: (_data, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['pvs', 'mappings', variables.connectionId] });
+        },
+    });
+}
+
+export function usePvsResetMappings() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (connectionId: string) => api.pvsResetMappings(connectionId),
+        onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['pvs', 'mappings'] }); },
+    });
+}
+
+export function usePvsMappingPreview() {
+    return useMutation({
+        mutationFn: ({ connectionId, sessionId }: { connectionId: string; sessionId: string }) =>
+            api.pvsMappingPreview(connectionId, sessionId),
+    });
+}

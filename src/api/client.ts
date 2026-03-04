@@ -1030,6 +1030,132 @@ export const api = {
         const response = await apiClient.get(`/patients/${id}`);
         return response.data;
     },
+
+    // ─── PVS / FHIR Integration ──────────────────────────────────
+
+    pvsConnections: async () => {
+        if (isDemoMode()) {
+            return [
+                { id: 'pvs-demo-1', praxisId: 'praxis-1', pvsType: 'CGM_M1', protocol: 'GDT', name: 'CGM M1 PRO (Demo)', isActive: true, lastSyncAt: new Date().toISOString(), config: { importDir: 'C:\\PVS\\Import', exportDir: 'C:\\PVS\\Export' }, createdAt: new Date().toISOString() },
+            ];
+        }
+        const response = await apiClient.get('/pvs/connection');
+        return response.data;
+    },
+
+    pvsCreateConnection: async (data: { pvsType: string; protocol: string; name: string; config: Record<string, unknown> }) => {
+        if (isDemoMode()) return { id: demoId('pvs'), ...data, isActive: true, createdAt: new Date().toISOString(), testResult: { success: true, message: 'Demo-Verbindung OK' } };
+        const response = await apiClient.post('/pvs/connection', data);
+        return response.data;
+    },
+
+    pvsUpdateConnection: async (id: string, data: Record<string, unknown>) => {
+        if (isDemoMode()) return { id, ...data };
+        const response = await apiClient.put(`/pvs/connection/${id}`, data);
+        return response.data;
+    },
+
+    pvsTestConnection: async (id: string) => {
+        if (isDemoMode()) return { success: true, message: 'Demo-Verbindung erfolgreich', latencyMs: 42 };
+        const response = await apiClient.post(`/pvs/connection/${id}/test`);
+        return response.data;
+    },
+
+    pvsDeleteConnection: async (id: string) => {
+        if (isDemoMode()) return { success: true };
+        const response = await apiClient.delete(`/pvs/connection/${id}`);
+        return response.data;
+    },
+
+    pvsCapabilities: async (id: string) => {
+        if (isDemoMode()) return { canImportPatients: true, canExportResults: true, canReceiveOrders: true, canSearchPatients: true, supportedProtocol: 'GDT', pvsType: 'CGM_M1' };
+        const response = await apiClient.get(`/pvs/connection/${id}/capabilities`);
+        return response.data;
+    },
+
+    pvsExportSession: async (sessionId: string, connectionId?: string) => {
+        if (isDemoMode()) return { success: true, transferId: demoId('xfer'), direction: 'EXPORT', status: 'SUCCESS', recordCount: 12, message: 'Demo-Export erfolgreich' };
+        const response = await apiClient.post(`/pvs/export/session/${sessionId}`, connectionId ? { connectionId } : {});
+        return response.data;
+    },
+
+    pvsExportBatch: async (sessionIds: string[], connectionId?: string) => {
+        if (isDemoMode()) return { results: sessionIds.map(sid => ({ sessionId: sid, success: true, transferId: demoId('xfer') })), totalSuccess: sessionIds.length, totalFailed: 0 };
+        const response = await apiClient.post('/pvs/export/batch', { sessionIds, connectionId });
+        return response.data;
+    },
+
+    pvsImportPatient: async (externalId: string, connectionId?: string) => {
+        if (isDemoMode()) return { success: true, patient: { externalId, name: 'Demo Patient', birthDate: '1985-03-15', gender: 'M' } };
+        const response = await apiClient.post('/pvs/import/patient', { externalId, connectionId });
+        return response.data;
+    },
+
+    pvsPatientLinks: async (patientId: string) => {
+        if (isDemoMode()) return [];
+        const response = await apiClient.get(`/pvs/patient-link/${patientId}`);
+        return response.data;
+    },
+
+    pvsCreatePatientLink: async (data: { patientId: string; connectionId: string; externalPatientId: string }) => {
+        if (isDemoMode()) return { id: demoId('link'), ...data, createdAt: new Date().toISOString() };
+        const response = await apiClient.post('/pvs/patient-link', data);
+        return response.data;
+    },
+
+    pvsDeletePatientLink: async (id: string) => {
+        if (isDemoMode()) return { success: true };
+        const response = await apiClient.delete(`/pvs/patient-link/${id}`);
+        return response.data;
+    },
+
+    pvsTransfers: async (params?: { page?: number; limit?: number; direction?: string; status?: string; connectionId?: string }) => {
+        if (isDemoMode()) return { transfers: [], pagination: { page: 1, limit: 25, total: 0, totalPages: 0 } };
+        const response = await apiClient.get('/pvs/transfers', { params });
+        return response.data;
+    },
+
+    pvsTransferDetail: async (id: string) => {
+        if (isDemoMode()) return { id, direction: 'EXPORT', status: 'SUCCESS', recordCount: 12, createdAt: new Date().toISOString() };
+        const response = await apiClient.get(`/pvs/transfers/${id}`);
+        return response.data;
+    },
+
+    pvsRetryTransfer: async (id: string) => {
+        if (isDemoMode()) return { success: true, newTransferId: demoId('xfer') };
+        const response = await apiClient.post(`/pvs/transfers/${id}/retry`);
+        return response.data;
+    },
+
+    pvsTransferStats: async () => {
+        if (isDemoMode()) return { today: 0, successRate: 100, byStatus: { SUCCESS: 0, FAILED: 0, PENDING: 0 } };
+        const response = await apiClient.get('/pvs/transfers/stats');
+        return response.data;
+    },
+
+    pvsMappings: async (connectionId: string) => {
+        if (isDemoMode()) return [];
+        const response = await apiClient.get(`/pvs/mappings/${connectionId}`);
+        return response.data;
+    },
+
+    pvsSaveMappings: async (connectionId: string, mappings: Array<{ sourceField: string; targetField: string; transform?: string }>) => {
+        if (isDemoMode()) return { success: true, count: mappings.length };
+        const response = await apiClient.put(`/pvs/mappings/${connectionId}`, { mappings });
+        return response.data;
+    },
+
+    pvsResetMappings: async (connectionId: string) => {
+        if (isDemoMode()) return { success: true, count: 9 };
+        const response = await apiClient.post(`/pvs/mappings/${connectionId}/reset`);
+        return response.data;
+    },
+
+    pvsMappingPreview: async (connectionId: string, sessionId: string) => {
+        if (isDemoMode()) return { befundtext: ['Demo-Befundtext Zeile 1', 'Demo-Befundtext Zeile 2'], fieldCount: 12 };
+        const response = await apiClient.post('/pvs/mappings/preview', { connectionId, sessionId });
+        return response.data;
+    },
 };
 
 export default apiClient;
