@@ -78,12 +78,65 @@ services:
     networks:
       - diggai-network
 
+  # ─── Modul 6: Backup Service (scheduled pg_dump) ──────────
+  backup:
+    build: .
+    container_name: diggai-backup
+    profiles: ["backup"]
+    entrypoint: ["node", "dist/server/jobs/backupWorker.js"]
+    env_file: .env.production
+    environment:
+      - DATABASE_URL=postgresql://diggai:${POSTGRES_PASSWORD}@postgres:5432/anamnese_prod
+      - BACKUP_DIR=/backups
+      - BACKUP_ENCRYPTION_KEY=${BACKUP_ENCRYPTION_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - backups:/backups
+    restart: unless-stopped
+    networks:
+      - diggai-network
+
+  # ─── Modul 6: TI-Konnektor Reverse Proxy ──────────────────
+  ti-proxy:
+    image: nginx:1.27-alpine
+    container_name: diggai-ti-proxy
+    profiles: ["ti"]
+    ports:
+      - "8585:8585"
+    volumes:
+      - ./docker/ti-proxy.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./docker/ti-certs:/etc/nginx/ti-certs:ro
+    restart: unless-stopped
+    networks:
+      - diggai-network
+
+  # ─── Modul 6: Ollama Local LLM ────────────────────────────
+  ollama:
+    image: ollama/ollama:latest
+    container_name: diggai-ollama
+    profiles: ["llm"]
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    restart: unless-stopped
+    networks:
+      - diggai-network
+
 volumes:
   pgdata:
     driver: local
   redisdata:
     driver: local
   uploads:
+    driver: local
+  backups:
+    driver: local
+  ollama_data:
     driver: local
 
 networks:

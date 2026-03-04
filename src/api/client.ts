@@ -1469,6 +1469,137 @@ export const api = {
         const response = await apiClient.get('/pwa/profile');
         return response.data;
     },
+
+    // ─── Modul 6: System Management ─────────────────────────
+
+    systemDeployment: async () => {
+        if (isDemoMode()) return { mode: 'CLOUD', version: '3.0.0', features: { tiEnabled: false, epaEnabled: false, kimEnabled: false, localLlmEnabled: false, backupEnabled: false, pushEnabled: true, offlineModeEnabled: true }, environment: 'demo' };
+        const response = await apiClient.get('/system/deployment');
+        return response.data;
+    },
+    systemFeatures: async () => {
+        if (isDemoMode()) return { tiEnabled: false, epaEnabled: false, kimEnabled: false, localLlmEnabled: false, backupEnabled: false, pushEnabled: true, offlineModeEnabled: true };
+        const response = await apiClient.get('/system/features');
+        return response.data;
+    },
+    systemConfigs: async (category?: string) => {
+        if (isDemoMode()) return [];
+        const response = await apiClient.get('/system/config', { params: category ? { category } : {} });
+        return response.data;
+    },
+    systemUpdateConfig: async (key: string, value: string) => {
+        if (isDemoMode()) return { key, value };
+        const response = await apiClient.put('/system/config', { key, value });
+        return response.data;
+    },
+    systemInitConfigs: async () => {
+        if (isDemoMode()) return { success: true };
+        const response = await apiClient.post('/system/config/initialize');
+        return response.data;
+    },
+    systemBackups: async (params?: { status?: string; limit?: number }) => {
+        if (isDemoMode()) return [];
+        const response = await apiClient.get('/system/backups', { params });
+        return response.data;
+    },
+    systemCreateBackup: async (data?: { type?: string; tables?: string[] }) => {
+        if (isDemoMode()) return { id: 'demo-backup', filename: 'demo.sql', status: 'COMPLETED', fileSize: 1024 };
+        const response = await apiClient.post('/system/backups', data || {});
+        return response.data;
+    },
+    systemRestoreBackup: async (id: string, options?: { verifyChecksum?: boolean }) => {
+        if (isDemoMode()) return { success: true, message: 'Demo restore' };
+        const response = await apiClient.post(`/system/backups/${id}/restore`, options || {});
+        return response.data;
+    },
+    systemDeleteBackup: async (id: string) => {
+        if (isDemoMode()) return { success: true };
+        const response = await apiClient.delete(`/system/backups/${id}`);
+        return response.data;
+    },
+    systemBackupSchedule: async () => {
+        if (isDemoMode()) return { enabled: false, cronExpression: '0 2 * * *', type: 'full', retentionDays: 30, maxBackups: 10 };
+        const response = await apiClient.get('/system/backups/schedule');
+        return response.data;
+    },
+    systemNetwork: async () => {
+        if (isDemoMode()) return { database: { status: 'connected', latencyMs: 2 }, redis: { status: 'connected', latencyMs: 1 }, tiKonnektor: { status: 'disconnected' }, internet: { status: 'connected', latencyMs: 20 }, dns: { status: 'connected', latencyMs: 5 }, uptime: 86400, lastCheck: new Date().toISOString() };
+        const response = await apiClient.get('/system/network');
+        return response.data;
+    },
+    systemNetworkCached: async () => {
+        if (isDemoMode()) return null;
+        const response = await apiClient.get('/system/network/cached');
+        return response.data;
+    },
+    systemStartMonitor: async (intervalSec?: number) => {
+        if (isDemoMode()) return { success: true };
+        const response = await apiClient.post('/system/network/monitor/start', { intervalSec });
+        return response.data;
+    },
+    systemLogs: async (params?: { limit?: number; level?: string; service?: string }) => {
+        if (isDemoMode()) return [];
+        const response = await apiClient.get('/system/logs', { params });
+        return response.data;
+    },
+    systemInfo: async () => {
+        if (isDemoMode()) return { uptime: 86400, nodeVersion: 'v20.0.0', platform: 'linux', arch: 'x64', hostname: 'demo', totalMemory: 8589934592, freeMemory: 4294967296, cpuCount: 4 };
+        const response = await apiClient.get('/system/info');
+        return response.data;
+    },
+
+    // ─── Modul 6: TI (Telematik-Infrastruktur) ─────────────
+
+    tiStatus: async () => {
+        if (isDemoMode()) return { configured: false, message: 'TI nicht konfiguriert (Demo-Modus)' };
+        const response = await apiClient.get('/ti/status');
+        return response.data;
+    },
+    tiPing: async () => {
+        if (isDemoMode()) return { reachable: false, latencyMs: 0, errorMessage: 'Demo-Modus' };
+        const response = await apiClient.post('/ti/ping');
+        return response.data;
+    },
+    tiRefresh: async () => {
+        if (isDemoMode()) return { status: 'DISCONNECTED', cards: [], features: {} };
+        const response = await apiClient.post('/ti/refresh');
+        return response.data;
+    },
+    tiCards: async () => {
+        if (isDemoMode()) return { cards: [] };
+        const response = await apiClient.get('/ti/cards');
+        return response.data;
+    },
+    tiReadEGK: async () => {
+        if (isDemoMode()) return { success: false, errorCode: 'DEMO', errorMessage: 'eGK-Lesung im Demo-Modus nicht verfügbar' };
+        const response = await apiClient.post('/ti/egk/read');
+        return response.data;
+    },
+    tiConfig: async () => {
+        if (isDemoMode()) return { configured: false };
+        const response = await apiClient.get('/ti/config');
+        return response.data;
+    },
+    tiEpaStatus: async () => {
+        if (isDemoMode()) return { enabled: false, message: 'Demo-Modus' };
+        const response = await apiClient.get('/ti/epa/status');
+        return response.data;
+    },
+    tiEpaDocuments: async (kvnr: string) => {
+        if (isDemoMode()) return [];
+        const response = await apiClient.get('/ti/epa/documents', { params: { kvnr } });
+        return response.data;
+    },
+    tiKimStatus: async () => {
+        if (isDemoMode()) return { enabled: false, message: 'Demo-Modus' };
+        const response = await apiClient.get('/ti/kim/status');
+        return response.data;
+    },
+    tiKimMessages: async (params?: { status?: string; limit?: number }) => {
+        if (isDemoMode()) return [];
+        const response = await apiClient.get('/ti/kim/messages', { params });
+        return response.data;
+    },
 };
 
 export default apiClient;

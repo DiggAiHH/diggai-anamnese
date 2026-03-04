@@ -1085,3 +1085,74 @@ export function usePwaLogin() {
 export function usePwaRegister() {
     return useMutation({ mutationFn: (data: { patientNumber: string; birthDate: string; password: string; email?: string }) => api.pwaRegister(data) });
 }
+
+// ─── Modul 6: System Management Hooks ───────────────────────
+
+export function useSystemDeployment() {
+    return useQuery({ queryKey: ['system', 'deployment'], queryFn: () => api.systemDeployment() });
+}
+export function useSystemFeatures() {
+    return useQuery({ queryKey: ['system', 'features'], queryFn: () => api.systemFeatures() });
+}
+export function useSystemConfigs(category?: string) {
+    return useQuery({ queryKey: ['system', 'configs', category], queryFn: () => api.systemConfigs(category) });
+}
+export function useSystemUpdateConfig() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: ({ key, value }: { key: string; value: string }) => api.systemUpdateConfig(key, value), onSuccess: () => { qc.invalidateQueries({ queryKey: ['system', 'configs'] }); } });
+}
+export function useSystemBackups(params?: { status?: string }) {
+    return useQuery({ queryKey: ['system', 'backups', params], queryFn: () => api.systemBackups(params) });
+}
+export function useSystemCreateBackup() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: (data?: { type?: string; tables?: string[] }) => api.systemCreateBackup(data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['system', 'backups'] }); } });
+}
+export function useSystemRestoreBackup() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: ({ id, options }: { id: string; options?: { verifyChecksum?: boolean } }) => api.systemRestoreBackup(id, options), onSuccess: () => { qc.invalidateQueries({ queryKey: ['system'] }); } });
+}
+export function useSystemDeleteBackup() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: (id: string) => api.systemDeleteBackup(id), onSuccess: () => { qc.invalidateQueries({ queryKey: ['system', 'backups'] }); } });
+}
+export function useSystemBackupSchedule() {
+    return useQuery({ queryKey: ['system', 'backup-schedule'], queryFn: () => api.systemBackupSchedule() });
+}
+export function useSystemNetwork() {
+    return useQuery({ queryKey: ['system', 'network'], queryFn: () => api.systemNetwork(), refetchInterval: 60000 });
+}
+export function useSystemLogs(params?: { limit?: number; level?: string }) {
+    return useQuery({ queryKey: ['system', 'logs', params], queryFn: () => api.systemLogs(params) });
+}
+export function useSystemInfo() {
+    return useQuery({ queryKey: ['system', 'info'], queryFn: () => api.systemInfo() });
+}
+
+// ─── Modul 6: TI Hooks ─────────────────────────────────────
+
+export function useTIStatus() {
+    return useQuery({ queryKey: ['ti', 'status'], queryFn: () => api.tiStatus() });
+}
+export function useTIPing() {
+    return useMutation({ mutationFn: () => api.tiPing() });
+}
+export function useTIRefresh() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: () => api.tiRefresh(), onSuccess: () => { qc.invalidateQueries({ queryKey: ['ti'] }); } });
+}
+export function useTICards() {
+    return useQuery({ queryKey: ['ti', 'cards'], queryFn: () => api.tiCards() });
+}
+export function useTIReadEGK() {
+    return useMutation({ mutationFn: () => api.tiReadEGK() });
+}
+export function useTIConfig() {
+    return useQuery({ queryKey: ['ti', 'config'], queryFn: () => api.tiConfig() });
+}
+export function useTIEpaStatus() {
+    return useQuery({ queryKey: ['ti', 'epa', 'status'], queryFn: () => api.tiEpaStatus() });
+}
+export function useTIKimStatus() {
+    return useQuery({ queryKey: ['ti', 'kim', 'status'], queryFn: () => api.tiKimStatus() });
+}

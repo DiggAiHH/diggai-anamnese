@@ -12,6 +12,8 @@ import { useTranslation } from 'react-i18next';
 import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp';
 import { CookieConsent } from './components/CookieConsent';
 import { PWAShell } from './components/pwa/PWAShell';
+const SystemPanel = lazy(() => import('./pages/SystemPanel').then(m => ({ default: m.SystemPanel })));
+const TIStatusPanel = lazy(() => import('./pages/TIStatusPanel').then(m => ({ default: m.TIStatusPanel })));
 
 // Lazy-load heavy dashboard routes (code splitting → ~60% smaller initial bundle)
 const ArztDashboard = lazy(() => import('./pages/ArztDashboard').then(m => ({ default: m.ArztDashboard })));
@@ -116,6 +118,10 @@ function App() {
 
           {/* Impressum — §5 DDG (lazy-loaded) */}
           <Route path="/impressum" element={<Suspense fallback={<DashboardLoading />}><ImpressumPage /></Suspense>} />
+
+          {/* Modul 6: System & TI Admin Panels (lazy-loaded) */}
+          <Route path="/admin/system" element={<Suspense fallback={<DashboardLoading />}><SystemPanel /></Suspense>} />
+          <Route path="/admin/ti" element={<Suspense fallback={<DashboardLoading />}><TIStatusPanel /></Suspense>} />
 
           {/* PWA Patient Portal */}
           <Route path="/pwa/login" element={<Suspense fallback={<DashboardLoading />}><PwaLogin /></Suspense>} />

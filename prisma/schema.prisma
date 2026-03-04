@@ -1007,3 +1007,237 @@ model ProviderMessage {
   @@index([isRead])
   @@index([createdAt])
 }
+
+// ─── Modul 6: Lokaler Modus / gematik / ePA ────────────────
+
+enum DeploymentMode {
+  CLOUD
+  HYBRID
+  LOCAL
+}
+
+enum TIConnectionStatus {
+  DISCONNECTED
+  CONNECTING
+  CONNECTED
+  ERROR
+  MAINTENANCE
+}
+
+enum TICardType {
+  SMC_B
+  SMC_KT
+  EGK
+  HBA
+}
+
+enum BackupStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  RESTORING
+}
+
+enum EPADocumentType {
+  ANAMNESE
+  BEFUND
+  ARZTBRIEF
+  MEDIKATIONSPLAN
+  LABORBERICHT
+  BILDGEBUNG
+  SONSTIGES
+}
+
+enum KIMMessageStatus {
+  DRAFT
+  SENDING
+  SENT
+  DELIVERED
+  FAILED
+  RECEIVED
+  READ
+}
+
+model SystemConfig {
+  id              String          @id @default(uuid())
+
+  key             String          @unique
+  value           String
+  valueType       String          @default("string") // string, number, boolean, json
+  category        String          // deployment, backup, network, ti, epa, kim, llm, security
+  description     String?
+
+  isSecret        Boolean         @default(false) // Wert verschlüsselt speichern
+  isEditable      Boolean         @default(true)
+  lastModifiedBy  String?
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([category])
+  @@index([key])
+  @@map("system_configs")
+}
+
+model BackupRecord {
+  id              String          @id @default(uuid())
+
+  filename        String
+  filePath        String
+  fileSize        Int             // Bytes
+  checksum        String          // SHA-256
+  encryptionKey   String?         // AES key identifier (not the key itself)
+
+  status          BackupStatus    @default(PENDING)
+  type            String          @default("full") // full, incremental, schema_only
+  trigger         String          @default("manual") // manual, scheduled, pre_update
+
+  dbVersion       String?
+  appVersion      String?
+  tablesIncluded  String[]
+  recordCounts    Json?           // { "patients": 150, "sessions": 3200, ... }
+
+  startedAt       DateTime        @default(now())
+  completedAt     DateTime?
+  duration        Int?            // Sekunden
+  errorMessage    String?
+
+  restoredAt      DateTime?
+  restoredBy      String?
+
+  createdAt       DateTime        @default(now())
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("backup_records")
+}
+
+model TIConnection {
+  id              String              @id @default(uuid())
+
+  praxisId        String              @unique
+  konnektorUrl    String
+  konnektorVersion String?
+  mandantId       String
+  clientSystemId  String
+  workplaceId     String
+
+  // mTLS Zertifikate (Pfade, nicht Inhalte)
+  clientCertPath  String?
+  clientKeyPath   String?
+  caCertPath      String?
+
+  status          TIConnectionStatus  @default(DISCONNECTED)
+  lastPingAt      DateTime?
+  lastPingMs      Int?
+  lastError       String?
+
+  // Karten-Status
+  smcbInserted    Boolean             @default(false)
+  smcbExpiry      DateTime?
+  smcbIccsn       String?             // Karten-ID
+  hbaInserted     Boolean             @default(false)
+  hbaExpiry       DateTime?
+
+  // Feature-Flags
+  epaEnabled      Boolean             @default(false)
+  kimEnabled      Boolean             @default(false)
+  vsdmEnabled     Boolean             @default(true)
+  nfdmEnabled     Boolean             @default(false)
+
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  epaDocuments    EPADocument[]
+  kimMessages     KIMMessage[]
+
+  @@index([status])
+  @@map("ti_connections")
+}
+
+model EPADocument {
+  id              String          @id @default(uuid())
+  connectionId    String
+  connection      TIConnection    @relation(fields: [connectionId], references: [id])
+
+  patientKvnr     String          // 10-stellige KVNR
+  documentType    EPADocumentType
+  title           String
+  mimeType        String          @default("application/pdf")
+
+  // FHIR Referenzen
+  fhirDocumentId  String?         // DocumentReference.id in ePA
+  fhirBundleId    String?
+  loincCode       String?         // z.B. "34117-2" für Anamnese
+
+  // Status
+  uploadedToEpa   Boolean         @default(false)
+  uploadedAt      DateTime?
+  downloadedAt    DateTime?
+  errorMessage    String?
+
+  // Lokale Referenz
+  localFilePath   String?
+  fileSize        Int?
+  checksum        String?
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([connectionId])
+  @@index([patientKvnr])
+  @@index([documentType])
+  @@map("epa_documents")
+}
+
+model KIMMessage {
+  id              String            @id @default(uuid())
+  connectionId    String
+  connection      TIConnection      @relation(fields: [connectionId], references: [id])
+
+  // Absender/Empfänger (KIM-Adressen)
+  fromAddress     String            // z.B. "praxis.mueller@kim.telematik"
+  toAddresses     String[]          // Mehrere Empfänger möglich
+  ccAddresses     String[]
+  replyToAddress  String?
+
+  subject         String
+  body            String
+  bodyHtml        String?
+
+  // S/MIME
+  isEncrypted     Boolean           @default(true)
+  isSigned        Boolean           @default(true)
+  smimeStatus     String?           // verified, invalid, unknown
+
+  // Anhänge
+  hasAttachments  Boolean           @default(false)
+  attachmentCount Int               @default(0)
+  attachmentPaths String[]
+
+  // Status
+  status          KIMMessageStatus  @default(DRAFT)
+  sentAt          DateTime?
+  deliveredAt     DateTime?
+  readAt          DateTime?
+  errorMessage    String?
+
+  // VZD-Referenz
+  recipientNames  String[]
+  recipientOids   String[]          // Telematik-OIDs
+
+  // Verknüpfung
+  patientId       String?
+  sessionId       String?
+  messageId       String?           // SMTP Message-ID
+
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([connectionId])
+  @@index([status])
+  @@index([fromAddress])
+  @@index([patientId])
+  @@map("kim_messages")
+}
