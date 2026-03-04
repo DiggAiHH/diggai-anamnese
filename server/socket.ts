@@ -4,6 +4,7 @@ import * as jwt from 'jsonwebtoken';
 import { config } from './config';
 import { prisma } from './db';
 import type { AuthPayload } from './middleware/auth';
+import { sanitizeText } from './services/sanitize';
 
 let io: Server | null = null;
 
@@ -88,9 +89,10 @@ export function setupSocketIO(httpServer: HttpServer): Server {
             console.log(`[Socket.io] Client beigetreten: ${sessionId} (${auth.role})`);
         });
 
-        // Nachricht von Arzt an Patient
+        // Nachricht von Arzt an Patient — K-06 FIX: sanitizeText
         socket.on('arzt:message', async (data: { sessionId: string, message: string, userId?: string }) => {
-            console.log(`[Socket.io] Nachricht von Arzt für Session ${data.sessionId}: ${data.message}`);
+            const sanitizedMessage = sanitizeText(data.message || '');
+            console.log(`[Socket.io] Nachricht von Arzt für Session ${data.sessionId}`);
 
             // Persistenz
             try {
@@ -99,7 +101,7 @@ export function setupSocketIO(httpServer: HttpServer): Server {
                         sessionId: data.sessionId,
                         senderType: 'ARZT',
                         senderId: data.userId,
-                        text: data.message,
+                        text: sanitizedMessage,
                         fromName: 'Praxis-Team'
                     }
                 });
@@ -108,15 +110,16 @@ export function setupSocketIO(httpServer: HttpServer): Server {
             }
 
             io?.to(`session:${data.sessionId}`).emit('patient:message', {
-                text: data.message,
+                text: sanitizedMessage,
                 from: 'Praxis-Team',
                 timestamp: new Date().toISOString()
             });
         });
 
-        // Nachricht von Patient an Arzt
+        // Nachricht von Patient an Arzt — K-06 FIX: sanitizeText
         socket.on('patient:send_message', async (data: { sessionId: string, message: string }) => {
-            console.log(`[Socket.io] Nachricht von Patient in Session ${data.sessionId}: ${data.message}`);
+            const sanitizedMsg = sanitizeText(data.message || '');
+            console.log(`[Socket.io] Nachricht von Patient in Session ${data.sessionId}`);
 
             // Persistenz
             try {
@@ -124,7 +127,7 @@ export function setupSocketIO(httpServer: HttpServer): Server {
                     data: {
                         sessionId: data.sessionId,
                         senderType: 'PATIENT',
-                        text: data.message,
+                        text: sanitizedMsg,
                         fromName: 'Patient'
                     }
                 });
@@ -135,7 +138,7 @@ export function setupSocketIO(httpServer: HttpServer): Server {
             // Relais an Arzt-Dashboard (Raum "arzt")
             io?.to('arzt').emit('arzt:received_message', {
                 sessionId: data.sessionId,
-                text: data.message,
+                text: sanitizedMsg,
                 from: 'Patient',
                 timestamp: new Date().toISOString()
             });

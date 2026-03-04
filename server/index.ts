@@ -6,6 +6,7 @@ import { createServer } from 'http';
 import { config } from './config';
 import { setupSocketIO } from './socket';
 import { auditLogger } from './middleware/audit';
+import { initRedis, getRedisClient, closeRedis } from './redis';
 
 // Routes
 import sessionRoutes from './routes/sessions';
@@ -18,6 +19,8 @@ import paymentsRoutes from './routes/payments';
 import exportRoutes from './routes/export';
 import uploadRoutes from './routes/upload';
 import queueRoutes from './routes/queue';
+import adminRoutes from './routes/admin';
+import patientRoutes from './routes/patients';
 
 const app = express();
 const httpServer = createServer(app);
@@ -86,6 +89,10 @@ const uploadLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 30, message: { 
 // Body Parser
 app.use(express.json({ limit: '10mb' }));
 
+// K-05/K-06 FIX: Globale Input-Sanitization — entfernt HTML-Tags aus allen User-Inputs
+import { sanitizeBody } from './services/sanitize';
+app.use(sanitizeBody);
+
 // HIPAA Audit Logging
 app.use(auditLogger);
 
@@ -101,14 +108,44 @@ app.use('/api/payments', paymentsRoutes);
 app.use('/api/export', exportRoutes);
 app.use('/api/upload', uploadLimiter, uploadRoutes);
 app.use('/api/queue', queueRoutes);
+app.use('/api/admin', authLimiter, adminRoutes);
+app.use('/api/patients', patientRoutes);
 
-// Health Check
-app.get('/api/health', (_req, res) => {
+// Health Check — includes DB + Redis connectivity
+app.get('/api/health', async (_req, res) => {
+    const redis = getRedisClient();
+    let dbStatus = 'unknown';
+    let redisStatus = 'disconnected';
+
+    // Check DB connectivity
+    try {
+        const { PrismaClient } = await import('@prisma/client');
+        const prisma = new PrismaClient();
+        await prisma.$queryRaw`SELECT 1`;
+        await prisma.$disconnect();
+        dbStatus = 'connected';
+    } catch {
+        dbStatus = 'error';
+    }
+
+    // Check Redis connectivity
+    if (redis?.isReady) {
+        try {
+            await redis.ping();
+            redisStatus = 'connected';
+        } catch {
+            redisStatus = 'error';
+        }
+    }
+
     res.json({
-        status: 'ok',
-        version: '2.0.0',
+        status: dbStatus === 'connected' ? 'ok' : 'degraded',
+        version: '3.0.0',
         timestamp: new Date().toISOString(),
         environment: config.nodeEnv,
+        db: dbStatus,
+        redis: redisStatus,
+        uptime: Math.floor(process.uptime()),
     });
 });
 
@@ -139,6 +176,16 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 
 import { startDatabaseCleanupJob } from './jobs/cleanup';
 startDatabaseCleanupJob();
+
+// Initialize Redis (non-blocking — graceful degradation)
+initRedis().catch(err => console.warn('[Server] Redis init skipped:', err.message));
+
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+    console.log('[Server] SIGTERM received, shutting down gracefully...');
+    await closeRedis();
+    httpServer.close(() => process.exit(0));
+});
 
 httpServer.listen(config.port, () => {
     console.log(`

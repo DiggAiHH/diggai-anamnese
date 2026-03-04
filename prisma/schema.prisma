@@ -1,25 +1,35 @@
 // Anamnese App – Prisma Schema
-// SQLite für einfache Einrichtung (kein externer DB-Server nötig)
+// PostgreSQL für Produktion (Docker Compose mit VPS)
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./anamnese.db"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 // ─── Patient (Pseudonymisiert) ──────────────────────────────
 
 model Patient {
-  id          String   @id @default(uuid())
-  hashedEmail String   @unique // SHA-256 für Wiedererkennung
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  sessions    PatientSession[]
-  medications PatientMedication[]
-  surgeries   PatientSurgery[]
+  id               String    @id @default(uuid())
+  hashedEmail      String    @unique // SHA-256 für Wiedererkennung
+  patientNumber    String?   @unique // Fortlaufende PID (z.B. "P-10001")
+  insuranceNumHash String?   // SHA-256 der Versicherungsnummer
+  birthDate        DateTime? // Für schnelle Wiedererkennung
+  gender           String?   // M / W / D (gespeichert für Fast-Track)
+  encryptedName    String?   // AES-256-GCM verschlüsselt
+  securityPattern  String?   // bcrypt-Hash der Muster-Sequenz
+  verifiedAt       DateTime? // MFA-Zertifizierung Zeitpunkt
+  verifiedBy       String?   // ArztUser.id der MFA-Kraft
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  sessions         PatientSession[]
+  medications      PatientMedication[]
+  surgeries        PatientSurgery[]
+
+  @@index([insuranceNumHash, birthDate])
 }
 
 // ─── Session (Eine Fragebogen-Sitzung) ──────────────────────
@@ -148,11 +158,15 @@ model ArztUser {
   id           String   @id @default(uuid())
   username     String   @unique
   passwordHash String   // bcrypt
+  pinHash      String?  // bcrypt 4-digit PIN für Quick-Login (Kiosk)
   displayName  String
   role         String   @default("ARZT") // PATIENT, ARZT, MFA, ADMIN
+  isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
 
   assignedSessions PatientSession[] @relation("ArztAssignedSessions")
+  appointments     Appointment[]    @relation("ArztAppointments")
 }
 
 // ─── Audit Log (HIPAA Compliance) ───────────────────────────
@@ -222,4 +236,40 @@ model PatientSurgery {
   updatedAt     DateTime @updatedAt
   
   @@index([patientId])
+}
+
+// ─── Chat Analytics (Bot-Interaktionen) ─────────────────────
+
+model ChatAnalytics {
+  id            String   @id @default(uuid())
+  sessionId     String?
+  queryText     String
+  matchedIntent String?
+  confidence    Float    @default(0)
+  wasEscalated  Boolean  @default(false)
+  language      String   @default("de")
+  createdAt     DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([matchedIntent])
+}
+
+// ─── Appointment (Terminplanung) ────────────────────────────
+
+model Appointment {
+  id          String   @id @default(uuid())
+  patientName String
+  sessionId   String?
+  arztId      String?
+  arzt        ArztUser? @relation("ArztAppointments", fields: [arztId], references: [id])
+  service     String
+  date        DateTime
+  duration    Int      @default(30) // Minuten
+  status      String   @default("SCHEDULED") // SCHEDULED, CONFIRMED, CANCELLED, COMPLETED
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([date])
+  @@index([arztId])
 }

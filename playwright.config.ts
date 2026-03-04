@@ -8,18 +8,23 @@ export default defineConfig({
     },
     fullyParallel: false,
     retries: 0,
-    workers: 1,
-    reporter: 'html',
+    workers: process.env.CI ? 1 : 2,
+    reporter: [['html'], ['json', { outputFile: 'test-results.json' }]],
     use: {
         baseURL: 'http://localhost:5173',
-        trace: 'off',
+        trace: 'on-first-retry',
         locale: 'de-DE',
         viewport: { width: 1280, height: 720 },
+        screenshot: 'only-on-failure',
     },
     projects: [
         {
             name: 'chromium',
             use: { ...devices['Desktop Chrome'] },
+        },
+        {
+            name: 'mobile-chrome',
+            use: { ...devices['Pixel 7'] },
         },
     ],
     webServer: {

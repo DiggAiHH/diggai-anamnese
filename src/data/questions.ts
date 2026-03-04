@@ -75,21 +75,20 @@ export const questions: Question[] = [
             next: ['2000'], // Default to enrollment for new patients
             conditional: [
                 {
-                    when: '0000', equals: 'ja', then: ['0004']
+                    when: '0000', equals: 'ja', then: ['RPT-ID']
                 },
                 { when: '0000', equals: 'nein', then: ['2000'] }
             ]
         }
     },
-    // PID-Feld (nur für Bestandspatienten sichtbar)
+    // ─── Returning Patient Fast-Track Identification ─────────
     {
-        id: '0004',
-        type: 'text',
-        question: 'Patienten-ID (PID)',
-        description: 'Falls Ihnen Ihre Patienten-ID bekannt ist, können Sie diese hier eingeben.',
+        id: 'RPT-ID',
+        type: 'patient-identify',
+        question: 'Patienten-Identifikation',
+        description: 'Als bestehender Patient benötigen wir nur wenige Daten zur schnellen Identifikation.',
         section: 'basis',
         order: 5.5,
-        placeholder: 'z.B. 12345',
         validation: { required: false },
         logic: {
             showIf: [
@@ -106,7 +105,25 @@ export const questions: Question[] = [
                 { context: 'selectedReason', equals: 'Nachricht schreiben', then: 'MS-100' },
                 { context: 'selectedReason', equals: 'Termin / Anamnese', then: 'TERM-100' },
                 { context: 'selectedReason', equals: 'Unfallmeldung (BG)', then: '2080' }
-            ]
+            ],
+            next: ['0001']
+        }
+    },
+    // Legacy PID field (hidden in new flow, kept for backward compat)
+    {
+        id: '0004',
+        type: 'text',
+        question: 'Patienten-ID (PID)',
+        description: 'Falls Ihnen Ihre Patienten-ID bekannt ist, können Sie diese hier eingeben.',
+        section: 'basis',
+        order: 5.6,
+        placeholder: 'z.B. 12345',
+        validation: { required: false },
+        logic: {
+            showIf: [
+                { questionId: 'RPT-ID', operator: 'equals', value: 'fallback' }
+            ],
+            next: ['TERM-100']
         }
     },
 

@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  ShieldCheck, Lock, Eye, Trash2, FileText, Server, Key, Users,
+  ShieldCheck, Lock, Eye, FileText, Server, Key, Users,
   CheckCircle, XCircle, ChevronRight, Award, Star, Sparkles,
-  ArrowRight, RotateCcw, Trophy, Heart, AlertTriangle, Info
+  ArrowRight, Trophy, Heart, Info
 } from 'lucide-react';
 
 // ─── Types ──────────────────────────────────────────────────
@@ -45,7 +45,7 @@ export const DatenschutzGame: React.FC<DatenschutzGameProps> = ({
   const [phase, setPhase] = useState<GamePhase>('intro');
   const [currentConsentIndex, setCurrentConsentIndex] = useState(0);
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
-  const [consentChecked, setConsentChecked] = useState<Record<string, boolean>>({});
+  const [, setConsentChecked] = useState<Record<string, boolean>>({});
   const [quizAnswers, setQuizAnswers] = useState<Record<string, number | null>>({});
   const [quizFeedback, setQuizFeedback] = useState<Record<string, 'correct' | 'wrong' | null>>({});
   const [score, setScore] = useState(0);
@@ -216,10 +216,6 @@ export const DatenschutzGame: React.FC<DatenschutzGameProps> = ({
   ];
 
   const totalQuestions = consentItems.reduce((acc, c) => acc + c.quizQuestions.length, 0);
-  const allConsentsChecked = consentItems.every(c => consentChecked[c.id]);
-  const allQuizAnswered = consentItems.every(c =>
-    c.quizQuestions.every(q => quizAnswers[q.id] !== undefined && quizAnswers[q.id] !== null)
-  );
   const progress = completedSections.length / consentItems.length;
 
   // ─── Handle quiz answer ──────────────────────────────────

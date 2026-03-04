@@ -182,34 +182,39 @@ router.post('/:id/submit', requireAuth, requireSessionOwner, async (req: Request
 /**
  * POST /api/sessions/:id/accident
  */
+
+const accidentSchema = z.object({
+    bgName: z.string().min(1, 'BG-Name ist erforderlich'),
+    accidentDate: z.string().min(1, 'Unfalldatum ist erforderlich'),
+    accidentLocation: z.string().optional().default(''),
+    description: z.string().min(1, 'Beschreibung ist erforderlich'),
+    firstResponder: z.string().optional().nullable(),
+    reportedToEmployer: z.boolean().optional().default(false),
+});
+
 router.post('/:id/accident', requireAuth, requireSessionOwner, async (req: Request, res: Response) => {
     try {
         const sessionId = req.params.id as string;
-        const { bgName, accidentDate, accidentLocation, description, firstResponder, reportedToEmployer } = req.body;
-
-        if (!bgName || !accidentDate || !description) {
-            res.status(400).json({ error: 'Pflichtfelder fehlen (bgName, accidentDate, description)' });
-            return;
-        }
+        const data = accidentSchema.parse(req.body);
 
         const accident = await prisma.accidentDetails.upsert({
             where: { sessionId },
             update: {
-                bgName,
-                accidentDate: new Date(accidentDate),
-                accidentLocation: accidentLocation || '',
-                description,
-                firstResponder: firstResponder || null,
-                reportedToEmployer: reportedToEmployer || false,
+                bgName: data.bgName,
+                accidentDate: new Date(data.accidentDate),
+                accidentLocation: data.accidentLocation,
+                description: data.description,
+                firstResponder: data.firstResponder || null,
+                reportedToEmployer: data.reportedToEmployer,
             },
             create: {
                 sessionId,
-                bgName,
-                accidentDate: new Date(accidentDate),
-                accidentLocation: accidentLocation || '',
-                description,
-                firstResponder: firstResponder || null,
-                reportedToEmployer: reportedToEmployer || false,
+                bgName: data.bgName,
+                accidentDate: new Date(data.accidentDate),
+                accidentLocation: data.accidentLocation,
+                description: data.description,
+                firstResponder: data.firstResponder || null,
+                reportedToEmployer: data.reportedToEmployer,
             }
         });
 
@@ -245,15 +250,22 @@ router.get('/:id/accident', requireAuth, async (req: Request, res: Response) => 
  * POST /api/sessions/:id/medications
  * Speichert Dauermedikation für den Patienten der Session
  */
+
+const medicationSchema = z.object({
+    name: z.string().min(1),
+    dosage: z.string().optional().default(''),
+    frequency: z.string().optional().default(''),
+    notes: z.string().optional().nullable(),
+});
+
+const medicationsBodySchema = z.object({
+    medications: z.array(medicationSchema),
+});
+
 router.post('/:id/medications', requireAuth, requireSessionOwner, async (req: Request, res: Response) => {
     try {
         const sessionId = req.params.id as string;
-        const medications = req.body.medications;
-
-        if (!Array.isArray(medications)) {
-            res.status(400).json({ error: 'medications muss ein Array sein' });
-            return;
-        }
+        const { medications } = medicationsBodySchema.parse(req.body);
 
         const session = await prisma.patientSession.findUnique({
             where: { id: sessionId },
@@ -272,7 +284,7 @@ router.post('/:id/medications', requireAuth, requireSessionOwner, async (req: Re
 
         if (medications.length > 0) {
             await prisma.patientMedication.createMany({
-                data: medications.map((m: any) => ({
+                data: medications.map((m) => ({
                     patientId: session.patientId!,
                     name: m.name,
                     dosage: m.dosage || '',
@@ -323,15 +335,22 @@ router.get('/:id/medications', requireAuth, async (req: Request, res: Response) 
  * POST /api/sessions/:id/surgeries
  * Speichert OP-Historie für den Patienten
  */
+
+const surgerySchema = z.object({
+    surgeryName: z.string().min(1),
+    date: z.string().optional().nullable(),
+    complications: z.string().optional().nullable(),
+    notes: z.string().optional().nullable(),
+});
+
+const surgeriesBodySchema = z.object({
+    surgeries: z.array(surgerySchema),
+});
+
 router.post('/:id/surgeries', requireAuth, requireSessionOwner, async (req: Request, res: Response) => {
     try {
         const sessionId = req.params.id as string;
-        const surgeries = req.body.surgeries;
-
-        if (!Array.isArray(surgeries)) {
-            res.status(400).json({ error: 'surgeries muss ein Array sein' });
-            return;
-        }
+        const { surgeries } = surgeriesBodySchema.parse(req.body);
 
         const session = await prisma.patientSession.findUnique({
             where: { id: sessionId },
@@ -350,7 +369,7 @@ router.post('/:id/surgeries', requireAuth, requireSessionOwner, async (req: Requ
 
         if (surgeries.length > 0) {
             await prisma.patientSurgery.createMany({
-                data: surgeries.map((s: any) => ({
+                data: surgeries.map((s) => ({
                     patientId: session.patientId!,
                     surgeryName: s.surgeryName,
                     date: s.date || null,

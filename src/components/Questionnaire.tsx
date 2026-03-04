@@ -22,6 +22,7 @@ import { PDFExport } from './PDFExport';
 import { exportAsEncryptedJSON, downloadBlob, type ExportPayload, type ExportableAnswer } from '../utils/exportUtils';
 import { SubmittedPage } from './SubmittedPage';
 import { PatientWartezimmer } from './PatientWartezimmer';
+import { PatientIdentify } from './inputs/PatientIdentify';
 import { CameraScanner } from './inputs/CameraScanner';
 import { IGelServices } from './IGelServices';
 import { ChatBubble } from './ChatBubble';
@@ -644,6 +645,24 @@ export function Questionnaire() {
                                         }}
                                     />
                                 </div>
+                            ) : currentQuestion.type === 'patient-identify' ? (
+                                <PatientIdentify
+                                    onIdentified={(patient) => {
+                                        // Store patient data and advance
+                                        handleAnswer(currentQuestion.id, JSON.stringify({
+                                            patientId: patient.patientId,
+                                            patientNumber: patient.patientNumber,
+                                            name: patient.name,
+                                        }));
+                                    }}
+                                    onFallback={() => {
+                                        // Patient not found → mark as fallback and go to manual flow
+                                        handleAnswer(currentQuestion.id, 'fallback');
+                                    }}
+                                    onError={(msg) => {
+                                        console.error('Patient identify error:', msg);
+                                    }}
+                                />
                             ) : state.currentQuestionId === '9999' ? (
                                 <IGelServices />
                             ) : (

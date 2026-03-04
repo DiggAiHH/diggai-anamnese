@@ -5,6 +5,7 @@ import { useThemeStore } from './store/themeStore';
 import { LandingPage } from './components/LandingPage';
 import { Questionnaire } from './components/Questionnaire';
 import { SessionRecoveryDialog } from './components/SessionRecoveryDialog';
+import { HomeScreen } from './components/HomeScreen';
 import './index.css';
 import { useEffect, lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -82,6 +83,12 @@ function App() {
         </a>
         <main id="main-content">
           <Routes>
+          {/* HomeScreen — Shared Tablet Entry Point */}
+          <Route path="/" element={<HomeScreen />} />
+
+          {/* Patient-Flow */}
+          <Route path="/patient" element={<PatientApp />} />
+
           {/* Arzt-Dashboard (lazy-loaded) */}
           <Route path="/arzt" element={<Suspense fallback={<DashboardLoading />}><ArztDashboard /></Suspense>} />
 
@@ -103,11 +110,8 @@ function App() {
           {/* Impressum — §5 DDG (lazy-loaded) */}
           <Route path="/impressum" element={<Suspense fallback={<DashboardLoading />}><ImpressumPage /></Suspense>} />
 
-          {/* Patient-Flow (Standard) */}
-          <Route
-            path="*"
-            element={<PatientApp />}
-          />
+          {/* Fallback: redirect unknown routes to HomeScreen */}
+          <Route path="*" element={<HomeScreen />} />
           </Routes>
           <KeyboardShortcutsHelp />
           <CookieConsent />

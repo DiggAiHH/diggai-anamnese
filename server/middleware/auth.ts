@@ -3,6 +3,7 @@ import * as jwt from 'jsonwebtoken';
 const { sign, verify } = jwt;
 import type { Secret, SignOptions } from 'jsonwebtoken';
 import { config } from '../config';
+import { getRedisClient } from '../redis';
 
 export interface AuthPayload {
     sessionId?: string;
@@ -19,23 +20,49 @@ declare global {
     }
 }
 
-// ─── Token Blacklist (In-Memory + Cleanup) ──────────────────
-// Für Production: Redis oder DB-basierte Blacklist empfohlen
-const tokenBlacklist = new Map<string, number>(); // jti → expiry timestamp
+// ─── Token Blacklist (Redis + In-Memory Fallback) ───────────
+const tokenBlacklistFallback = new Map<string, number>(); // jti → expiry timestamp
 
-// Blacklist cleanup alle 15 Minuten
+// Fallback cleanup alle 15 Minuten
 setInterval(() => {
     const now = Date.now();
-    for (const [jti, expiry] of tokenBlacklist.entries()) {
-        if (expiry < now) tokenBlacklist.delete(jti);
+    for (const [jti, expiry] of tokenBlacklistFallback.entries()) {
+        if (expiry < now) tokenBlacklistFallback.delete(jti);
     }
 }, 15 * 60 * 1000);
 
 /**
  * Token auf die Blacklist setzen (z.B. bei Logout)
+ * Nutzt Redis wenn verfügbar, sonst In-Memory Fallback
  */
-export function blacklistToken(jti: string, expiresInMs: number): void {
-    tokenBlacklist.set(jti, Date.now() + expiresInMs);
+export async function blacklistToken(jti: string, expiresInMs: number): Promise<void> {
+    const redis = getRedisClient();
+    if (redis?.isReady) {
+        try {
+            await redis.set(`bl:${jti}`, '1', { EX: Math.ceil(expiresInMs / 1000) });
+            return;
+        } catch (err) {
+            console.warn('[Auth] Redis blacklist write failed, using fallback:', err);
+        }
+    }
+    // Fallback: In-Memory
+    tokenBlacklistFallback.set(jti, Date.now() + expiresInMs);
+}
+
+/**
+ * Prüfe ob Token auf der Blacklist steht
+ */
+async function isTokenBlacklisted(jti: string): Promise<boolean> {
+    const redis = getRedisClient();
+    if (redis?.isReady) {
+        try {
+            const result = await redis.get(`bl:${jti}`);
+            return result !== null;
+        } catch (err) {
+            console.warn('[Auth] Redis blacklist read failed, using fallback:', err);
+        }
+    }
+    return tokenBlacklistFallback.has(jti);
 }
 
 /**
@@ -54,7 +81,7 @@ export function createToken(payload: AuthPayload): string {
 }
 
 /**
- * JWT-Validierung Middleware — mit Algorithm Pinning + Blacklist-Check
+ * JWT-Validierung Middleware — mit Algorithm Pinning + Blacklist-Check (Redis)
  */
 export function requireAuth(req: Request, res: Response, next: NextFunction): void {
     // Header-based auth (preferred)
@@ -77,14 +104,24 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
             algorithms: ['HS256'], // Prevent algorithm confusion attacks
         }) as AuthPayload;
 
-        // Check token blacklist (logout/revocation)
-        if (decoded.jti && tokenBlacklist.has(decoded.jti)) {
-            res.status(401).json({ error: 'Token wurde widerrufen' });
-            return;
+        // Check token blacklist (async — Redis or fallback)
+        if (decoded.jti) {
+            isTokenBlacklisted(decoded.jti).then(blacklisted => {
+                if (blacklisted) {
+                    res.status(401).json({ error: 'Token wurde widerrufen' });
+                    return;
+                }
+                req.auth = decoded;
+                next();
+            }).catch(() => {
+                // If blacklist check fails, allow through (fail-open for availability)
+                req.auth = decoded;
+                next();
+            });
+        } else {
+            req.auth = decoded;
+            next();
         }
-
-        req.auth = decoded;
-        next();
     } catch (_err) {
         res.status(401).json({ error: 'Ungültiger oder abgelaufener Token' });
     }

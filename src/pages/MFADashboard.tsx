@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { WartezimmerPanel } from '../components/WartezimmerPanel';
 import { StaffChat } from '../components/StaffChat';
 import { StaffTodoList } from '../components/StaffTodoList';
+import { CertificationModal } from '../components/CertificationModal';
 
 /**
  * MFA-Dashboard – Route /mfa
@@ -60,7 +61,8 @@ export const MFADashboard: React.FC = () => {
     const [token, setToken] = useState<string | null>(localStorage.getItem('mfa_token'));
     const [activeChatId, setActiveChatId] = useState<string | null>(null);
     const [showQRModal, setShowQRModal] = useState(false);
-    const [activeTab, setActiveTab] = useState<'sessions' | 'chat' | 'todo'>('sessions');
+    const [activeTab, setActiveTab] = useState<'sessions' | 'chat' | 'todo' | 'certify'>('sessions');
+    const [certifySession, setCertifySession] = useState<{ sessionId: string; patientName: string; gender?: string; birthDate?: string } | null>(null);
     const queryClient = useQueryClient();
 
     React.useEffect(() => {
@@ -134,6 +136,7 @@ export const MFADashboard: React.FC = () => {
                     <div className="flex gap-2 border-b border-white/10 pb-0">
                         {([
                             { key: 'sessions' as const, label: t('mfa.currentRequests', 'Anfragen'), icon: ClipboardList },
+                            { key: 'certify' as const, label: t('mfa.certify', 'Zertifizierung'), icon: Shield },
                             { key: 'chat' as const, label: t('mfa.teamChat', 'Team-Chat'), icon: MessageSquare },
                             { key: 'todo' as const, label: t('mfa.todoList', 'Aufgaben'), icon: CheckCircle },
                         ]).map(tab => (
@@ -191,6 +194,30 @@ export const MFADashboard: React.FC = () => {
                             currentUser={{ id: 'mfa-user', displayName: 'MFA', role: 'mfa' }}
                         />
                     )}
+
+                    {activeTab === 'certify' && (
+                        <div className="space-y-6">
+                            <div className="flex items-center gap-3">
+                                <Shield className="w-6 h-6 text-purple-400" />
+                                <h2 className="text-2xl font-bold">{t('mfa.certifyTitle', 'Patienten-Zertifizierung')}</h2>
+                            </div>
+                            <p className="text-sm text-white/50">
+                                {t('mfa.certifyDesc', 'Hier können neue Patienten nach Ausweisprüfung zertifiziert werden. Wählen Sie eine aktive Sitzung aus der Anfragen-Liste und klicken Sie auf "Zertifizieren".')}
+                            </p>
+                            <div className="p-8 bg-white/5 border border-white/10 rounded-2xl text-center space-y-4">
+                                <Shield className="w-16 h-16 text-purple-500/30 mx-auto" />
+                                <p className="text-white/40 text-sm">
+                                    {t('mfa.certifyHint', 'Wählen Sie eine Sitzung in der Anfragen-Tab, um die Zertifizierung zu starten.')}
+                                </p>
+                                <button
+                                    onClick={() => setActiveTab('sessions')}
+                                    className="px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-purple-500/20"
+                                >
+                                    {t('mfa.goToSessions', 'Zu den Anfragen')}
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </main>
 
@@ -201,6 +228,21 @@ export const MFADashboard: React.FC = () => {
 
             {showQRModal && (
                 <MfaQrModal onClose={() => setShowQRModal(false)} />
+            )}
+
+            {certifySession && (
+                <CertificationModal
+                    sessionId={certifySession.sessionId}
+                    patientName={certifySession.patientName}
+                    patientGender={certifySession.gender}
+                    patientBirthDate={certifySession.birthDate}
+                    onClose={() => setCertifySession(null)}
+                    onCertified={(data) => {
+                        console.log('Patient certified:', data);
+                        setCertifySession(null);
+                        queryClient.invalidateQueries({ queryKey: ['mfa'] });
+                    }}
+                />
             )}
         </div>
     );

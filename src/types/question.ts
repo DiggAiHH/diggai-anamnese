@@ -11,7 +11,8 @@ export type QuestionType =
   | 'textarea'
   | 'file'
   | 'bg-form'
-  | 'surgery-form';
+  | 'surgery-form'
+  | 'patient-identify';
 
 export interface Question {
   id: string;

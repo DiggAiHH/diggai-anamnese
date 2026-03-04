@@ -1,0 +1,71 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  # ─── Build & Test ──────────────────────────────────────────
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: anamnese-app/package-lock.json
+
+      - name: Install dependencies
+        working-directory: anamnese-app
+        run: npm ci
+
+      - name: TypeScript check
+        working-directory: anamnese-app
+        run: npx tsc -b
+
+      - name: Build frontend
+        working-directory: anamnese-app
+        run: npm run build
+
+      - name: Lint
+        working-directory: anamnese-app
+        run: npm run lint || true
+
+  # ─── Deploy to VPS ─────────────────────────────────────────
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master'
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_SSH_PORT || 22 }}
+          script: |
+            set -e
+            cd /opt/diggai/anamnese-app
+
+            echo "📥 Pulling latest changes..."
+            git pull origin master
+
+            echo "🐳 Building and starting containers..."
+            docker compose pull
+            docker compose up -d --build
+
+            echo "🗄️ Running database migrations..."
+            docker compose exec -T app npx prisma migrate deploy
+
+            echo "🏥 Health check..."
+            sleep 5
+            curl -sf http://localhost:3001/api/health || (echo "❌ Health check failed!" && exit 1)
+
+            echo "✅ Deployment successful!"

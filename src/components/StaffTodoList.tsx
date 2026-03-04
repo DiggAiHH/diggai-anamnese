@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   CheckSquare, Square, Plus, Trash2, AlertTriangle, Clock,
-  User, ChevronDown, ChevronRight, Edit3, X, Check
+  User, Edit3, X, Check
 } from 'lucide-react';
 
 // ─── Types ──────────────────────────────────────────────────

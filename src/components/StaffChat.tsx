@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  MessageSquare, Send, X, Users, User, Stethoscope,
-  Hash, Circle, ChevronDown, Search, Bell, BellOff, Phone
+  MessageSquare, Send, X, Users, User,
+  Hash, Circle, ChevronDown, Search, Bell, BellOff
 } from 'lucide-react';
 import { io, Socket } from 'socket.io-client';
 import { SOCKET_BASE_URL, getAuthToken } from '../api/client';

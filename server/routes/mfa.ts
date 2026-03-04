@@ -2,6 +2,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { prisma } from '../db';
 import { requireAuth, requireRole } from '../middleware/auth';
+import { z } from 'zod';
 
 const router = Router();
 
@@ -76,12 +77,13 @@ router.get('/doctors', requireAuth, requireRole('mfa', 'admin'), async (_req: Re
 router.post('/sessions/:id/assign', requireAuth, requireRole('mfa', 'admin'), async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
-        const { arztId } = req.body;
-
-        if (!arztId) {
-            res.status(400).json({ error: 'ArztId erforderlich' });
+        const assignSchema = z.object({ arztId: z.string().uuid() });
+        const parseResult = assignSchema.safeParse(req.body);
+        if (!parseResult.success) {
+            res.status(400).json({ error: 'Gültige ArztId (UUID) erforderlich' });
             return;
         }
+        const { arztId } = parseResult.data;
 
         const session = await prisma.patientSession.update({
             where: { id: id as string },

@@ -680,6 +680,60 @@ export const api = {
         const response = await apiClient.delete(`/queue/${id}`);
         return response.data;
     },
+
+    // ─── Patient Identification (Returning Patient Fast-Track) ──
+
+    identifyPatient: async (data: { birthDate: string; insuranceNumber: string; patientNumber?: string }) => {
+        if (isDemoMode()) {
+            // Demo: simulate a found patient
+            return {
+                found: true,
+                patient: {
+                    id: 'demo-patient-1',
+                    patientNumber: 'P-10001',
+                    name: 'Max Mustermann',
+                    gender: 'M',
+                    birthDate: data.birthDate,
+                    requiresPattern: false,
+                    isVerified: true,
+                },
+            };
+        }
+        const response = await apiClient.post('/patients/identify', data);
+        return response.data;
+    },
+
+    verifyPattern: async (data: { patientId: string; patternHash: string }) => {
+        if (isDemoMode()) {
+            return { verified: true };
+        }
+        const response = await apiClient.post('/patients/verify-pattern', data);
+        return response.data;
+    },
+
+    setPattern: async (patientId: string, patternHash: string) => {
+        if (isDemoMode()) {
+            return { success: true };
+        }
+        const response = await apiClient.post(`/patients/${patientId}/pattern`, { patternHash });
+        return response.data;
+    },
+
+    certifyPatient: async (sessionId: string, data: { insuranceNumber: string; birthDate: string; patientName?: string; gender?: string }) => {
+        if (isDemoMode()) {
+            return { success: true, patientNumber: 'P-10001', patientId: 'demo-patient-1' };
+        }
+        const response = await apiClient.post(`/patients/${sessionId}/certify`, data);
+        return response.data;
+    },
+
+    getPatient: async (id: string) => {
+        if (isDemoMode()) {
+            return { id, patientNumber: 'P-10001', gender: 'M', birthDate: '1985-03-15', verifiedAt: new Date().toISOString(), _count: { sessions: 3 } };
+        }
+        const response = await apiClient.get(`/patients/${id}`);
+        return response.data;
+    },
 };
 
 export default apiClient;

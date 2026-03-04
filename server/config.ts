@@ -28,6 +28,9 @@ export const config = {
     // CORS
     frontendUrl: requireEnv('FRONTEND_URL', 'Fehlende Frontend-Verbindung in .env (FRONTEND_URL)'),
 
+    // Redis (Token Blacklist + Queue Persistence)
+    redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
+
     // Rate Limiting
     rateLimitWindowMs: 15 * 60 * 1000, // 15 Minuten
     rateLimitMax: 200, // H-03 FIX: Von 1000 auf 200 reduziert (Produktions-Limit)

@@ -250,7 +250,13 @@ router.put('/triage/:id/ack', requireAuth, requireRole('arzt', 'admin'), async (
 router.put('/sessions/:id/status', requireAuth, requireRole('arzt', 'admin', 'mfa'), async (req: Request, res: Response) => {
     try {
         const sessionId = req.params.id as string;
-        const { status } = req.body;
+        const statusSchema = z.enum(['ACTIVE', 'COMPLETED', 'SUBMITTED', 'EXPIRED', 'TRIAGE']);
+        const parseResult = statusSchema.safeParse(req.body.status);
+        if (!parseResult.success) {
+            res.status(400).json({ error: 'Ungültiger Status', allowed: statusSchema.options });
+            return;
+        }
+        const status = parseResult.data;
 
         const session = await prisma.patientSession.findUnique({
             where: { id: sessionId },
