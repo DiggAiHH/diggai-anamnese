@@ -24,6 +24,8 @@ const TreatmentFlowBuilder = lazy(() => import('./pages/flows/TreatmentFlowBuild
 const DataDeletionConfirm = lazy(() => import('./pages/checkout/DataDeletionConfirm').then(m => ({ default: m.DataDeletionConfirm })));
 const VideoRoom = lazy(() => import('./pages/telemedizin/VideoRoom').then(m => ({ default: m.VideoRoom })));
 const TelemedizinScheduler = lazy(() => import('./pages/telemedizin/TelemedizinScheduler').then(m => ({ default: m.TelemedizinScheduler })));
+const FormBuilderPage = lazy(() => import('./pages/forms/FormBuilderPage').then(m => ({ default: m.FormBuilderPage })));
+const FormRunnerPage = lazy(() => import('./pages/forms/FormRunnerPage').then(m => ({ default: m.FormRunnerPage })));
 
 // Lazy-load heavy dashboard routes (code splitting → ~60% smaller initial bundle)
 const ArztDashboard = lazy(() => import('./pages/ArztDashboard').then(m => ({ default: m.ArztDashboard })));
@@ -148,6 +150,11 @@ function App() {
           {/* Modul 9: Telemedizin */}
           <Route path="/telemedizin" element={<Suspense fallback={<DashboardLoading />}><TelemedizinScheduler /></Suspense>} />
           <Route path="/telemedizin/room/:sessionId" element={<Suspense fallback={<DashboardLoading />}><VideoRoom /></Suspense>} />
+
+          {/* Modul 10: Forms */}
+          <Route path="/forms/builder" element={<Suspense fallback={<DashboardLoading />}><FormBuilderPage /></Suspense>} />
+          <Route path="/forms/builder/:formId" element={<Suspense fallback={<DashboardLoading />}><FormBuilderPage /></Suspense>} />
+          <Route path="/forms/run/:formId" element={<Suspense fallback={<DashboardLoading />}><FormRunnerPage /></Suspense>} />
 
           {/* PWA Patient Portal */}
           <Route path="/pwa/login" element={<Suspense fallback={<DashboardLoading />}><PwaLogin /></Suspense>} />

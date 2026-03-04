@@ -1521,3 +1521,52 @@ model TelemedicineSession {
   @@index([scheduledAt])
   @@map("telemedicine_sessions")
 }
+
+// ─── Modul 10: Gamification & Forms ─────────────────────────
+
+model StaffAchievement {
+  id          String   @id @default(cuid())
+  staffId     String
+  type        String   // TASK_COMPLETED|PATIENT_RATING|SPEED_BONUS|ZERO_WAIT_DAY|STREAK_7|STREAK_30
+  points      Int
+  description String
+  earnedAt    DateTime @default(now())
+
+  @@index([staffId, earnedAt])
+  @@map("staff_achievements")
+}
+
+model StaffLeaderboard {
+  id           String   @id @default(cuid())
+  praxisId     String
+  period       String   // DAILY|WEEKLY|MONTHLY
+  staffId      String
+  totalPoints  Int
+  rank         Int
+  calculatedAt DateTime @default(now())
+
+  @@index([praxisId, period, calculatedAt])
+  @@map("staff_leaderboards")
+}
+
+model CustomForm {
+  id           String   @id @default(cuid())
+  praxisId     String
+  createdBy    String
+  name         String
+  description  String?
+  aiGenerated  Boolean  @default(false)
+  aiPrompt     String?
+  logic        Json     @default("{}")
+  questions    Json     @default("[]")
+  tags         String[]
+  ageRange     Json?
+  usageCount   Int      @default(0)
+  isActive     Boolean  @default(true)
+  version      Int      @default(1)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([praxisId, isActive])
+  @@map("custom_forms")
+}

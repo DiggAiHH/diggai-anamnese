@@ -1359,3 +1359,59 @@ export function useTelemedizinFollowUp() {
     const qc = useQueryClient();
     return useMutation({ mutationFn: ({ id, ...data }: { id: string; followUpDate: string; notes?: string }) => api.telemedizinFollowUp(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['telemedizin'] }); } });
 }
+
+// ─── Gamification ──────────────────────────────────────────
+export function useGamificationStaffAchievements(staffId: string) {
+    return useQuery({ queryKey: ['gamification', 'achievements', staffId], queryFn: () => api.gamificationStaffAchievements(staffId), enabled: !!staffId });
+}
+export function useGamificationLeaderboard(params: { praxisId: string; period?: string; limit?: number }) {
+    return useQuery({ queryKey: ['gamification', 'leaderboard', params], queryFn: () => api.gamificationLeaderboard(params), enabled: !!params.praxisId });
+}
+export function useGamificationStaffPoints(staffId: string) {
+    return useQuery({ queryKey: ['gamification', 'points', staffId], queryFn: () => api.gamificationStaffPoints(staffId), enabled: !!staffId });
+}
+export function useGamificationStats(praxisId: string) {
+    return useQuery({ queryKey: ['gamification', 'stats', praxisId], queryFn: () => api.gamificationStats(praxisId), enabled: !!praxisId });
+}
+export function useGamificationAward() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: (data: { staffId: string; type: string; points?: number; description: string }) => api.gamificationAward(data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['gamification'] }); } });
+}
+export function useGamificationRecalculate() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: (data: { praxisId: string; period: string }) => api.gamificationRecalculate(data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['gamification'] }); } });
+}
+
+// ─── Forms ─────────────────────────────────────────────────
+export function useFormGet(id: string) {
+    return useQuery({ queryKey: ['forms', id], queryFn: () => api.formGet(id), enabled: !!id });
+}
+export function useFormList(params: { praxisId: string; isActive?: boolean; tag?: string }) {
+    return useQuery({ queryKey: ['forms', 'list', params], queryFn: () => api.formList(params), enabled: !!params.praxisId });
+}
+export function useFormStats(praxisId: string) {
+    return useQuery({ queryKey: ['forms', 'stats', praxisId], queryFn: () => api.formStats(praxisId), enabled: !!praxisId });
+}
+export function useFormCreate() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: (data: { praxisId: string; createdBy: string; name: string; description?: string; questions: any[]; logic?: any; tags?: string[]; ageRange?: any }) => api.formCreate(data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['forms'] }); } });
+}
+export function useFormUpdate() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: ({ id, ...data }: { id: string; [key: string]: any }) => api.formUpdate(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['forms'] }); } });
+}
+export function useFormDelete() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: (id: string) => api.formDelete(id), onSuccess: () => { qc.invalidateQueries({ queryKey: ['forms'] }); } });
+}
+export function useFormAiGenerate() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: (data: { praxisId: string; createdBy: string; prompt: string; language?: string }) => api.formAiGenerate(data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['forms'] }); } });
+}
+export function useFormPublish() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: (id: string) => api.formPublish(id), onSuccess: () => { qc.invalidateQueries({ queryKey: ['forms'] }); } });
+}
+export function useFormUsage() {
+    return useMutation({ mutationFn: (id: string) => api.formUsage(id) });
+}

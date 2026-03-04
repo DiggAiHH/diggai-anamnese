@@ -1910,6 +1910,85 @@ export const api = {
         const response = await apiClient.get('/telemedizin/stats');
         return response.data;
     },
+
+    // ─── Gamification ──────────────────────────────────────────
+    gamificationAward: async (data: { staffId: string; type: string; points?: number; description: string }) => {
+        if (isDemoMode()) return { id: 'ach-' + Date.now(), ...data, points: data.points || 10, earnedAt: new Date().toISOString() };
+        const response = await apiClient.post('/gamification/achievement', data);
+        return response.data;
+    },
+    gamificationStaffAchievements: async (staffId: string) => {
+        if (isDemoMode()) return [{ id: 'ach-1', staffId, type: 'TASK_COMPLETED', points: 10, description: 'Aufgabe erledigt', earnedAt: new Date().toISOString() }];
+        const response = await apiClient.get(`/gamification/staff/${staffId}`);
+        return response.data;
+    },
+    gamificationLeaderboard: async (params: { praxisId: string; period?: string; limit?: number }) => {
+        if (isDemoMode()) return [{ staffId: 's1', totalPoints: 150, rank: 1 }, { staffId: 's2', totalPoints: 120, rank: 2 }];
+        const response = await apiClient.get('/gamification/leaderboard', { params });
+        return response.data;
+    },
+    gamificationRecalculate: async (data: { praxisId: string; period: string }) => {
+        if (isDemoMode()) return { recalculated: true };
+        const response = await apiClient.post('/gamification/leaderboard/recalculate', data);
+        return response.data;
+    },
+    gamificationStaffPoints: async (staffId: string) => {
+        if (isDemoMode()) return { staffId, totalPoints: 250 };
+        const response = await apiClient.get(`/gamification/staff/${staffId}/points`);
+        return response.data;
+    },
+    gamificationStats: async (praxisId: string) => {
+        if (isDemoMode()) return { totalAchievements: 128, topAchiever: 's1', averagePoints: 45 };
+        const response = await apiClient.get('/gamification/stats', { params: { praxisId } });
+        return response.data;
+    },
+
+    // ─── Forms ─────────────────────────────────────────────────
+    formCreate: async (data: { praxisId: string; createdBy: string; name: string; description?: string; questions: any[]; logic?: any; tags?: string[]; ageRange?: any }) => {
+        if (isDemoMode()) return { id: 'form-' + Date.now(), ...data, version: 1, isActive: false, usageCount: 0, createdAt: new Date().toISOString() };
+        const response = await apiClient.post('/forms', data);
+        return response.data;
+    },
+    formGet: async (id: string) => {
+        if (isDemoMode()) return { id, name: 'Demo-Formular', questions: [], version: 1, isActive: true };
+        const response = await apiClient.get(`/forms/${id}`);
+        return response.data;
+    },
+    formList: async (params: { praxisId: string; isActive?: boolean; tag?: string }) => {
+        if (isDemoMode()) return [];
+        const response = await apiClient.get('/forms', { params });
+        return response.data;
+    },
+    formUpdate: async (id: string, data: any) => {
+        if (isDemoMode()) return { id, ...data, version: 2 };
+        const response = await apiClient.patch(`/forms/${id}`, data);
+        return response.data;
+    },
+    formDelete: async (id: string) => {
+        if (isDemoMode()) return { id, isActive: false };
+        const response = await apiClient.delete(`/forms/${id}`);
+        return response.data;
+    },
+    formAiGenerate: async (data: { praxisId: string; createdBy: string; prompt: string; language?: string }) => {
+        if (isDemoMode()) return { id: 'form-ai-' + Date.now(), name: 'KI-Formular', aiGenerated: true, questions: [{ id: 'q1', type: 'TEXT', label: 'Beschreiben Sie Ihre Beschwerden', required: true }] };
+        const response = await apiClient.post('/forms/ai-generate', data);
+        return response.data;
+    },
+    formPublish: async (id: string) => {
+        if (isDemoMode()) return { id, isActive: true };
+        const response = await apiClient.post(`/forms/${id}/publish`);
+        return response.data;
+    },
+    formUsage: async (id: string) => {
+        if (isDemoMode()) return { id, usageCount: 1 };
+        const response = await apiClient.post(`/forms/${id}/usage`);
+        return response.data;
+    },
+    formStats: async (praxisId: string) => {
+        if (isDemoMode()) return { totalForms: 12, activeForms: 8, aiGenerated: 3, totalUsage: 456 };
+        const response = await apiClient.get('/forms/stats', { params: { praxisId } });
+        return response.data;
+    },
 };
 
 export default apiClient;
