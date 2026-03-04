@@ -1306,6 +1306,169 @@ export const api = {
         const response = await apiClient.post(`/therapy/plans/${planId}/export-pvs`);
         return response.data;
     },
+
+    // ─── Patient Portal (PWA) ───────────────────────────────────
+
+    pwaRegister: async (data: { patientNumber: string; birthDate: string; password: string; email?: string; phone?: string; pin?: string }) => {
+        if (isDemoMode()) return { accountId: demoId('pacc'), patientId: demoId('pat'), token: 'demo-pwa-token' };
+        const response = await apiClient.post('/pwa/auth/register', data);
+        return response.data;
+    },
+    pwaLogin: async (identifier: string, password: string) => {
+        if (isDemoMode()) return { accountId: 'demo-acc', patientId: 'demo-pat', token: 'demo-pwa-token' };
+        const response = await apiClient.post('/pwa/auth/login', { identifier, password });
+        return response.data;
+    },
+    pwaPinLogin: async (patientId: string, pin: string) => {
+        if (isDemoMode()) return { accountId: 'demo-acc', patientId: 'demo-pat', token: 'demo-pwa-token' };
+        const response = await apiClient.post('/pwa/auth/pin-login', { patientId, pin });
+        return response.data;
+    },
+    pwaRefresh: async () => {
+        if (isDemoMode()) return { token: 'demo-pwa-token-refreshed' };
+        const response = await apiClient.post('/pwa/auth/refresh');
+        return response.data;
+    },
+    pwaDashboard: async () => {
+        if (isDemoMode()) return { activeMeasures: [], unreadMessages: 0, recentDiary: [], alerts: [] };
+        const response = await apiClient.get('/pwa/dashboard');
+        return response.data;
+    },
+    pwaDiaryList: async (params?: { page?: number; limit?: number; from?: string; to?: string }) => {
+        if (isDemoMode()) return { entries: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 0 } };
+        const response = await apiClient.get('/pwa/diary', { params });
+        return response.data;
+    },
+    pwaDiaryGet: async (id: string) => {
+        if (isDemoMode()) return { id, mood: 'GOOD', painLevel: 2, date: new Date().toISOString() };
+        const response = await apiClient.get(`/pwa/diary/${id}`);
+        return response.data;
+    },
+    pwaDiaryCreate: async (data: Record<string, unknown>) => {
+        if (isDemoMode()) return { id: demoId('diary'), ...data, createdAt: new Date().toISOString() };
+        const response = await apiClient.post('/pwa/diary', data);
+        return response.data;
+    },
+    pwaDiaryUpdate: async (id: string, data: Record<string, unknown>) => {
+        if (isDemoMode()) return { id, ...data };
+        const response = await apiClient.put(`/pwa/diary/${id}`, data);
+        return response.data;
+    },
+    pwaDiaryDelete: async (id: string) => {
+        if (isDemoMode()) return { success: true };
+        const response = await apiClient.delete(`/pwa/diary/${id}`);
+        return response.data;
+    },
+    pwaMeasures: async () => {
+        if (isDemoMode()) return [];
+        const response = await apiClient.get('/pwa/measures');
+        return response.data;
+    },
+    pwaMeasureTrackings: async (params?: { measureId?: string; page?: number; limit?: number }) => {
+        if (isDemoMode()) return { trackings: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 0 } };
+        const response = await apiClient.get('/pwa/measures/tracking', { params });
+        return response.data;
+    },
+    pwaMeasureTrackingCreate: async (data: Record<string, unknown>) => {
+        if (isDemoMode()) return { id: demoId('track'), ...data };
+        const response = await apiClient.post('/pwa/measures/tracking', data);
+        return response.data;
+    },
+    pwaMeasureComplete: async (measureId: string) => {
+        if (isDemoMode()) return { id: demoId('track'), completedDate: new Date().toISOString() };
+        const response = await apiClient.post(`/pwa/measures/${measureId}/complete`);
+        return response.data;
+    },
+    pwaMeasureSkip: async (measureId: string, reason?: string) => {
+        if (isDemoMode()) return { id: demoId('track'), skippedDate: new Date().toISOString() };
+        const response = await apiClient.post(`/pwa/measures/${measureId}/skip`, { reason });
+        return response.data;
+    },
+    pwaMessages: async (params?: { page?: number; limit?: number }) => {
+        if (isDemoMode()) return { messages: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 0 } };
+        const response = await apiClient.get('/pwa/messages', { params });
+        return response.data;
+    },
+    pwaUnreadCount: async () => {
+        if (isDemoMode()) return { count: 0 };
+        const response = await apiClient.get('/pwa/messages/unread-count');
+        return response.data;
+    },
+    pwaMessageGet: async (id: string) => {
+        if (isDemoMode()) return { id, body: 'Demo-Nachricht', direction: 'SYSTEM', isRead: true };
+        const response = await apiClient.get(`/pwa/messages/${id}`);
+        return response.data;
+    },
+    pwaMessageSend: async (data: { subject?: string; body: string }) => {
+        if (isDemoMode()) return { id: demoId('msg'), ...data, direction: 'PATIENT_TO_PROVIDER', createdAt: new Date().toISOString() };
+        const response = await apiClient.post('/pwa/messages', data);
+        return response.data;
+    },
+    pwaMessageRead: async (id: string) => {
+        if (isDemoMode()) return { id, isRead: true };
+        const response = await apiClient.put(`/pwa/messages/${id}/read`);
+        return response.data;
+    },
+    pwaConsents: async () => {
+        if (isDemoMode()) return [];
+        const response = await apiClient.get('/pwa/consents');
+        return response.data;
+    },
+    pwaUpdateConsents: async (consents: Array<{ type: string; granted: boolean }>) => {
+        if (isDemoMode()) return { success: true };
+        const response = await apiClient.put('/pwa/consents', { consents });
+        return response.data;
+    },
+    pwaDevices: async () => {
+        if (isDemoMode()) return [];
+        const response = await apiClient.get('/pwa/devices');
+        return response.data;
+    },
+    pwaRegisterDevice: async (data: { deviceName: string; deviceType: string; pushToken?: string }) => {
+        if (isDemoMode()) return { id: demoId('dev'), ...data };
+        const response = await apiClient.post('/pwa/devices', data);
+        return response.data;
+    },
+    pwaRemoveDevice: async (id: string) => {
+        if (isDemoMode()) return { success: true };
+        const response = await apiClient.delete(`/pwa/devices/${id}`);
+        return response.data;
+    },
+    pwaSettings: async () => {
+        if (isDemoMode()) return { locale: 'de', notifyEmail: true, notifyPush: false, notifySms: false };
+        const response = await apiClient.get('/pwa/settings');
+        return response.data;
+    },
+    pwaUpdateSettings: async (data: Record<string, unknown>) => {
+        if (isDemoMode()) return { ...data };
+        const response = await apiClient.put('/pwa/settings', data);
+        return response.data;
+    },
+    pwaChangePassword: async (oldPassword: string, newPassword: string) => {
+        if (isDemoMode()) return { success: true };
+        const response = await apiClient.put('/pwa/settings/password', { oldPassword, newPassword });
+        return response.data;
+    },
+    pwaSetPin: async (pin: string) => {
+        if (isDemoMode()) return { success: true };
+        const response = await apiClient.put('/pwa/settings/pin', { pin });
+        return response.data;
+    },
+    pwaSync: async (payload: { diaryEntries?: any[]; measureTrackings?: any[]; lastSyncAt?: string }) => {
+        if (isDemoMode()) return { synced: 0, conflicts: 0, serverTimestamp: new Date().toISOString() };
+        const response = await apiClient.post('/pwa/sync', payload);
+        return response.data;
+    },
+    pwaSyncChanges: async (since: string) => {
+        if (isDemoMode()) return { diary: [], trackings: [], messages: [], consents: [], serverTimestamp: new Date().toISOString() };
+        const response = await apiClient.get('/pwa/sync/changes', { params: { since } });
+        return response.data;
+    },
+    pwaProfile: async () => {
+        if (isDemoMode()) return { accountId: 'demo', patientNumber: 'P-10001', email: 'demo@example.com', isVerified: true };
+        const response = await apiClient.get('/pwa/profile');
+        return response.data;
+    },
 };
 
 export default apiClient;

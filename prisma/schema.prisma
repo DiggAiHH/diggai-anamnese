@@ -41,6 +41,9 @@ model Patient {
   clinicalAlerts   ClinicalAlert[]
   anonId           AnonPatientId?
 
+  // Modul 5: Patienten-Portal PWA
+  account          PatientAccount?
+
   @@index([insuranceNumHash, birthDate])
 }
 
@@ -824,4 +827,183 @@ model AnonPatientId {
   createdAt       DateTime        @default(now())
 
   @@index([pseudonym])
+}
+
+// ─── Modul 5: Patienten-Portal PWA ──────────────────────────
+
+enum ConsentType {
+  DATA_PROCESSING
+  EMERGENCY_CONTACT
+  MEDICATION_REMINDER
+  PUSH_NOTIFICATIONS
+  DATA_SHARING
+}
+
+enum MessageDirection {
+  PATIENT_TO_PROVIDER
+  PROVIDER_TO_PATIENT
+  SYSTEM
+}
+
+enum DiaryMood {
+  VERY_BAD
+  BAD
+  NEUTRAL
+  GOOD
+  VERY_GOOD
+}
+
+model PatientAccount {
+  id              String            @id @default(uuid())
+  patientId       String            @unique
+  patient         Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  
+  email           String?           @unique
+  phone           String?
+  passwordHash    String
+  pinHash         String?
+  
+  isActive        Boolean           @default(true)
+  isVerified      Boolean           @default(false)
+  verifiedAt      DateTime?
+  lastLoginAt     DateTime?
+  loginCount      Int               @default(0)
+  
+  locale          String            @default("de")
+  notifyEmail     Boolean           @default(true)
+  notifyPush      Boolean           @default(false)
+  notifySms       Boolean           @default(false)
+  
+  devices         PatientDevice[]
+  consents        PatientConsent[]
+  diaryEntries    DiaryEntry[]
+  measureTrackings MeasureTracking[]
+  messages        ProviderMessage[]
+  
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  
+  @@index([email])
+  @@index([phone])
+}
+
+model PatientDevice {
+  id              String            @id @default(uuid())
+  accountId       String
+  account         PatientAccount    @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  
+  deviceName      String
+  deviceType      String            // ios, android, web
+  pushToken       String?
+  pushEndpoint    String?
+  userAgent       String?
+  
+  isActive        Boolean           @default(true)
+  lastSeenAt      DateTime          @default(now())
+  
+  createdAt       DateTime          @default(now())
+  
+  @@index([accountId])
+  @@index([pushToken])
+}
+
+model PatientConsent {
+  id              String            @id @default(uuid())
+  accountId       String
+  account         PatientAccount    @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  
+  type            ConsentType
+  granted         Boolean           @default(false)
+  grantedAt       DateTime?
+  revokedAt       DateTime?
+  ipAddress       String?
+  
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  
+  @@unique([accountId, type])
+  @@index([accountId])
+}
+
+model DiaryEntry {
+  id              String            @id @default(uuid())
+  accountId       String
+  account         PatientAccount    @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  patientId       String
+  
+  date            DateTime          @default(now())
+  mood            DiaryMood?
+  painLevel       Int?              // 0-10
+  sleepQuality    Int?              // 0-10
+  sleepHours      Float?
+  symptoms        String[]
+  notes           String?
+  
+  vitalBp         String?           // "120/80"
+  vitalPulse      Int?
+  vitalTemp       Float?
+  vitalWeight     Float?
+  vitalBloodSugar Float?
+  
+  offlineCreated  Boolean           @default(false)
+  syncedAt        DateTime?
+  
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  
+  @@index([accountId])
+  @@index([patientId])
+  @@index([date])
+}
+
+model MeasureTracking {
+  id              String            @id @default(uuid())
+  accountId       String
+  account         PatientAccount    @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  measureId       String
+  
+  scheduledDate   DateTime
+  completedDate   DateTime?
+  skippedDate     DateTime?
+  skippedReason   String?
+  
+  dose            String?
+  notes           String?
+  sideEffects     String[]
+  
+  offlineCreated  Boolean           @default(false)
+  syncedAt        DateTime?
+  
+  createdAt       DateTime          @default(now())
+  
+  @@index([accountId])
+  @@index([measureId])
+  @@index([scheduledDate])
+}
+
+model ProviderMessage {
+  id              String            @id @default(uuid())
+  accountId       String
+  account         PatientAccount    @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  patientId       String
+  
+  direction       MessageDirection
+  subject         String?
+  body            String
+  
+  senderName      String?
+  senderRole      String?           // arzt, mfa, system
+  
+  isRead          Boolean           @default(false)
+  readAt          DateTime?
+  
+  attachmentUrl   String?
+  attachmentName  String?
+  
+  createdAt       DateTime          @default(now())
+  
+  @@index([accountId])
+  @@index([patientId])
+  @@index([isRead])
+  @@index([createdAt])
 }

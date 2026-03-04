@@ -11,12 +11,19 @@ import { useEffect, lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp';
 import { CookieConsent } from './components/CookieConsent';
+import { PWAShell } from './components/pwa/PWAShell';
 
 // Lazy-load heavy dashboard routes (code splitting → ~60% smaller initial bundle)
 const ArztDashboard = lazy(() => import('./pages/ArztDashboard').then(m => ({ default: m.ArztDashboard })));
 const MFADashboard = lazy(() => import('./pages/MFADashboard').then(m => ({ default: m.MFADashboard })));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
 const DokumentationPage = lazy(() => import('./pages/DokumentationPage').then(m => ({ default: m.DokumentationPage })));
+const PwaLogin = lazy(() => import('./pages/pwa/PwaLogin'));
+const PwaDashboard = lazy(() => import('./pages/pwa/PwaDashboard'));
+const PwaDiary = lazy(() => import('./pages/pwa/PwaDiary'));
+const PwaMeasures = lazy(() => import('./pages/pwa/PwaMeasures'));
+const PwaMessages = lazy(() => import('./pages/pwa/PwaMessages'));
+const PwaSettings = lazy(() => import('./pages/pwa/PwaSettings'));
 const HandbuchPage = lazy(() => import('./pages/HandbuchPage').then(m => ({ default: m.HandbuchPage })));
 const DatenschutzPage = lazy(() => import('./pages/DatenschutzPage').then(m => ({ default: m.DatenschutzPage })));
 const ImpressumPage = lazy(() => import('./pages/ImpressumPage').then(m => ({ default: m.ImpressumPage })));
@@ -109,6 +116,17 @@ function App() {
 
           {/* Impressum — §5 DDG (lazy-loaded) */}
           <Route path="/impressum" element={<Suspense fallback={<DashboardLoading />}><ImpressumPage /></Suspense>} />
+
+          {/* PWA Patient Portal */}
+          <Route path="/pwa/login" element={<Suspense fallback={<DashboardLoading />}><PwaLogin /></Suspense>} />
+          <Route path="/pwa" element={<PWAShell />}>
+            <Route path="dashboard" element={<Suspense fallback={<DashboardLoading />}><PwaDashboard /></Suspense>} />
+            <Route path="diary" element={<Suspense fallback={<DashboardLoading />}><PwaDiary /></Suspense>} />
+            <Route path="measures" element={<Suspense fallback={<DashboardLoading />}><PwaMeasures /></Suspense>} />
+            <Route path="messages" element={<Suspense fallback={<DashboardLoading />}><PwaMessages /></Suspense>} />
+            <Route path="settings" element={<Suspense fallback={<DashboardLoading />}><PwaSettings /></Suspense>} />
+            <Route index element={<Suspense fallback={<DashboardLoading />}><PwaDashboard /></Suspense>} />
+          </Route>
 
           {/* Fallback: redirect unknown routes to HomeScreen */}
           <Route path="*" element={<HomeScreen />} />

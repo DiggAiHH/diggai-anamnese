@@ -997,3 +997,91 @@ export function useTherapyExportPvs() {
     const qc = useQueryClient();
     return useMutation({ mutationFn: (planId: string) => api.therapyExportPvs(planId), onSuccess: () => { qc.invalidateQueries({ queryKey: ['therapy'] }); } });
 }
+
+// ─── Patient Portal (PWA) Hooks ─────────────────────────────
+
+export function usePwaDashboard() {
+    return useQuery({ queryKey: ['pwa', 'dashboard'], queryFn: () => api.pwaDashboard() });
+}
+export function usePwaDiaryList(params?: { page?: number; limit?: number; from?: string; to?: string }) {
+    return useQuery({ queryKey: ['pwa', 'diary', params], queryFn: () => api.pwaDiaryList(params) });
+}
+export function usePwaDiaryGet(id: string) {
+    return useQuery({ queryKey: ['pwa', 'diary', id], queryFn: () => api.pwaDiaryGet(id), enabled: !!id });
+}
+export function usePwaDiaryCreate() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: (data: Record<string, unknown>) => api.pwaDiaryCreate(data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['pwa', 'diary'] }); qc.invalidateQueries({ queryKey: ['pwa', 'dashboard'] }); } });
+}
+export function usePwaDiaryUpdate() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: ({ id, ...data }: { id: string } & Record<string, unknown>) => api.pwaDiaryUpdate(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['pwa', 'diary'] }); } });
+}
+export function usePwaDiaryDelete() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: (id: string) => api.pwaDiaryDelete(id), onSuccess: () => { qc.invalidateQueries({ queryKey: ['pwa', 'diary'] }); } });
+}
+export function usePwaMeasures() {
+    return useQuery({ queryKey: ['pwa', 'measures'], queryFn: () => api.pwaMeasures() });
+}
+export function usePwaMeasureTrackings(params?: { measureId?: string }) {
+    return useQuery({ queryKey: ['pwa', 'trackings', params], queryFn: () => api.pwaMeasureTrackings(params) });
+}
+export function usePwaMeasureComplete() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: (measureId: string) => api.pwaMeasureComplete(measureId), onSuccess: () => { qc.invalidateQueries({ queryKey: ['pwa'] }); } });
+}
+export function usePwaMeasureSkip() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: ({ measureId, reason }: { measureId: string; reason?: string }) => api.pwaMeasureSkip(measureId, reason), onSuccess: () => { qc.invalidateQueries({ queryKey: ['pwa'] }); } });
+}
+export function usePwaMessages(params?: { page?: number }) {
+    return useQuery({ queryKey: ['pwa', 'messages', params], queryFn: () => api.pwaMessages(params) });
+}
+export function usePwaUnreadCount() {
+    return useQuery({ queryKey: ['pwa', 'unread'], queryFn: () => api.pwaUnreadCount(), refetchInterval: 30000 });
+}
+export function usePwaMessageSend() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: (data: { subject?: string; body: string }) => api.pwaMessageSend(data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['pwa', 'messages'] }); qc.invalidateQueries({ queryKey: ['pwa', 'unread'] }); } });
+}
+export function usePwaConsents() {
+    return useQuery({ queryKey: ['pwa', 'consents'], queryFn: () => api.pwaConsents() });
+}
+export function usePwaUpdateConsents() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: (consents: Array<{ type: string; granted: boolean }>) => api.pwaUpdateConsents(consents), onSuccess: () => { qc.invalidateQueries({ queryKey: ['pwa', 'consents'] }); } });
+}
+export function usePwaDevices() {
+    return useQuery({ queryKey: ['pwa', 'devices'], queryFn: () => api.pwaDevices() });
+}
+export function usePwaRegisterDevice() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: (data: { deviceName: string; deviceType: string; pushToken?: string }) => api.pwaRegisterDevice(data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['pwa', 'devices'] }); } });
+}
+export function usePwaSettings() {
+    return useQuery({ queryKey: ['pwa', 'settings'], queryFn: () => api.pwaSettings() });
+}
+export function usePwaUpdateSettings() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: (data: Record<string, unknown>) => api.pwaUpdateSettings(data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['pwa', 'settings'] }); } });
+}
+export function usePwaChangePassword() {
+    return useMutation({ mutationFn: ({ oldPassword, newPassword }: { oldPassword: string; newPassword: string }) => api.pwaChangePassword(oldPassword, newPassword) });
+}
+export function usePwaSetPin() {
+    return useMutation({ mutationFn: (pin: string) => api.pwaSetPin(pin) });
+}
+export function usePwaSync() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: (payload: { diaryEntries?: any[]; measureTrackings?: any[]; lastSyncAt?: string }) => api.pwaSync(payload), onSuccess: () => { qc.invalidateQueries({ queryKey: ['pwa'] }); } });
+}
+export function usePwaProfile() {
+    return useQuery({ queryKey: ['pwa', 'profile'], queryFn: () => api.pwaProfile() });
+}
+export function usePwaLogin() {
+    return useMutation({ mutationFn: ({ identifier, password }: { identifier: string; password: string }) => api.pwaLogin(identifier, password) });
+}
+export function usePwaRegister() {
+    return useMutation({ mutationFn: (data: { patientNumber: string; birthDate: string; password: string; email?: string }) => api.pwaRegister(data) });
+}
