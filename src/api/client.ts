@@ -1989,6 +1989,58 @@ export const api = {
         const response = await apiClient.get('/forms/stats', { params: { praxisId } });
         return response.data;
     },
+
+    // ─── Private ePA ─────────────────────────────────────────
+    epaGet: async (patientId: string) => {
+        if (isDemoMode()) return { id: 'epa-1', patientId, consentVersion: '1.0', consentSignedAt: new Date().toISOString(), documents: [], shares: [] };
+        const response = await apiClient.get(`/epa/${patientId}`);
+        return response.data;
+    },
+    epaAddDocument: async (patientId: string, data: { type: string; title: string; content?: string; fileUrl?: string; createdBy: string }) => {
+        if (isDemoMode()) return { id: 'doc-' + Date.now(), epaId: 'epa-1', ...data, createdAt: new Date().toISOString() };
+        const response = await apiClient.post(`/epa/${patientId}/documents`, data);
+        return response.data;
+    },
+    epaGetDocuments: async (patientId: string, type?: string) => {
+        if (isDemoMode()) return [{ id: 'doc-1', type: 'ANAMNESE', title: 'Erstanamnese', createdAt: new Date().toISOString() }];
+        const response = await apiClient.get(`/epa/${patientId}/documents`, { params: type ? { type } : {} });
+        return response.data;
+    },
+    epaDeleteDocument: async (docId: string) => {
+        if (isDemoMode()) return { success: true };
+        const response = await apiClient.delete(`/epa/document/${docId}`);
+        return response.data;
+    },
+    epaCreateShare: async (patientId: string, data: { sharedWith: string; accessScope: string[]; expiresInHours?: number }) => {
+        if (isDemoMode()) return { id: 'share-' + Date.now(), accessToken: 'demo-token-' + Date.now(), expiresAt: new Date(Date.now() + 72 * 3600000).toISOString() };
+        const response = await apiClient.post(`/epa/${patientId}/shares`, data);
+        return response.data;
+    },
+    epaGetShares: async (patientId: string) => {
+        if (isDemoMode()) return [];
+        const response = await apiClient.get(`/epa/${patientId}/shares`);
+        return response.data;
+    },
+    epaRevokeShare: async (shareId: string) => {
+        if (isDemoMode()) return { revokedAt: new Date().toISOString() };
+        const response = await apiClient.post(`/epa/share/${shareId}/revoke`);
+        return response.data;
+    },
+    epaAccessByToken: async (token: string) => {
+        if (isDemoMode()) return { epa: { id: 'epa-1' }, documents: [{ id: 'doc-1', type: 'ANAMNESE', title: 'Erstanamnese', content: 'Demo Inhalt' }], expiresAt: new Date(Date.now() + 48 * 3600000).toISOString() };
+        const response = await apiClient.get(`/epa/access/${token}`);
+        return response.data;
+    },
+    epaCreateExport: async (data: { patientId: string; exportType: string; format?: string }) => {
+        if (isDemoMode()) return { id: 'exp-' + Date.now(), content: '# Anonymisierter Export\n\nPatient: [anonymisiert]', hash: 'demo-hash', expiresAt: new Date(Date.now() + 30 * 86400000).toISOString() };
+        const response = await apiClient.post('/epa/export/anonymized', data);
+        return response.data;
+    },
+    epaGetExport: async (exportId: string) => {
+        if (isDemoMode()) return { id: exportId, content: '# Export', hash: 'demo', exportType: 'FULL_HISTORY' };
+        const response = await apiClient.get(`/epa/export/${exportId}`);
+        return response.data;
+    },
 };
 
 export default apiClient;

@@ -1415,3 +1415,40 @@ export function useFormPublish() {
 export function useFormUsage() {
     return useMutation({ mutationFn: (id: string) => api.formUsage(id) });
 }
+
+// ─── Private ePA ─────────────────────────────────────────
+export function useEpaGet(patientId: string) {
+    return useQuery({ queryKey: ['epa', patientId], queryFn: () => api.epaGet(patientId), enabled: !!patientId });
+}
+export function useEpaDocuments(patientId: string, type?: string) {
+    return useQuery({ queryKey: ['epa', 'documents', patientId, type], queryFn: () => api.epaGetDocuments(patientId, type), enabled: !!patientId });
+}
+export function useEpaShares(patientId: string) {
+    return useQuery({ queryKey: ['epa', 'shares', patientId], queryFn: () => api.epaGetShares(patientId), enabled: !!patientId });
+}
+export function useEpaAccessByToken(token: string) {
+    return useQuery({ queryKey: ['epa', 'access', token], queryFn: () => api.epaAccessByToken(token), enabled: !!token });
+}
+export function useEpaExport(exportId: string) {
+    return useQuery({ queryKey: ['epa', 'export', exportId], queryFn: () => api.epaGetExport(exportId), enabled: !!exportId });
+}
+export function useEpaAddDocument() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: ({ patientId, ...data }: { patientId: string; type: string; title: string; content?: string; fileUrl?: string; createdBy: string }) => api.epaAddDocument(patientId, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['epa'] }); } });
+}
+export function useEpaDeleteDocument() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: (docId: string) => api.epaDeleteDocument(docId), onSuccess: () => { qc.invalidateQueries({ queryKey: ['epa'] }); } });
+}
+export function useEpaCreateShare() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: ({ patientId, ...data }: { patientId: string; sharedWith: string; accessScope: string[]; expiresInHours?: number }) => api.epaCreateShare(patientId, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['epa'] }); } });
+}
+export function useEpaRevokeShare() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: (shareId: string) => api.epaRevokeShare(shareId), onSuccess: () => { qc.invalidateQueries({ queryKey: ['epa'] }); } });
+}
+export function useEpaCreateExport() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: (data: { patientId: string; exportType: string; format?: string }) => api.epaCreateExport(data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['epa'] }); } });
+}

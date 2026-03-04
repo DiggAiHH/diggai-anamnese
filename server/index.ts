@@ -38,6 +38,7 @@ import avatarRoutes from './routes/avatar';
 import telemedizinRoutes from './routes/telemedizin';
 import gamificationRoutes from './routes/gamification';
 import formsRoutes from './routes/forms';
+import epaRoutes from './routes/epa';
 
 const app = express();
 const httpServer = createServer(app);
@@ -144,6 +145,7 @@ app.use('/api/avatar', authLimiter, avatarRoutes);
 app.use('/api/telemedizin', authLimiter, telemedizinRoutes);
 app.use('/api/gamification', authLimiter, gamificationRoutes);
 app.use('/api/forms', authLimiter, formsRoutes);
+app.use('/api/epa', authLimiter, epaRoutes);
 
 // Health Check — includes DB + Redis connectivity
 app.get('/api/health', async (_req, res) => {

@@ -1570,3 +1570,63 @@ model CustomForm {
   @@index([praxisId, isActive])
   @@map("custom_forms")
 }
+
+// ─── Modul 11: Private ePA & Anonymized Export ────────
+
+model PrivateEPA {
+  id              String        @id @default(cuid())
+  patientId       String        @unique
+  consentSignedAt DateTime?
+  consentVersion  String
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  documents       EpaDocument[]
+  shares          EpaShare[]
+
+  @@map("private_epas")
+}
+
+model EpaDocument {
+  id          String      @id @default(cuid())
+  epaId       String
+  epa         PrivateEPA  @relation(fields: [epaId], references: [id], onDelete: Cascade)
+  type        String      // ANAMNESE|BEFUND|LABOR|BILD|OP_BERICHT
+  title       String
+  content     String?
+  fileUrl     String?
+  createdBy   String
+  createdAt   DateTime    @default(now())
+  validUntil  DateTime?
+
+  @@index([epaId, createdAt])
+  @@map("epa_documents")
+}
+
+model EpaShare {
+  id            String      @id @default(cuid())
+  epaId         String
+  epa           PrivateEPA  @relation(fields: [epaId], references: [id], onDelete: Cascade)
+  sharedWith    String
+  accessScope   String[]
+  accessToken   String      @unique
+  expiresAt     DateTime
+  createdAt     DateTime    @default(now())
+  revokedAt     DateTime?
+
+  @@index([epaId, expiresAt])
+  @@map("epa_shares")
+}
+
+model AnonymizedExport {
+  id          String   @id @default(cuid())
+  patientId   String
+  exportType  String   // FULL_HISTORY|LAST_VISIT|MEDICATION_PLAN
+  content     String
+  hash        String
+  createdAt   DateTime @default(now())
+  expiresAt   DateTime
+
+  @@index([patientId, createdAt])
+  @@map("anonymized_exports")
+}
