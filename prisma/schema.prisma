@@ -1241,3 +1241,174 @@ model KIMMessage {
   @@index([patientId])
   @@map("kim_messages")
 }
+
+// ═══════════════════════════════════════════════════════════════
+// Modul 7: NFC-Praxis-Ökosystem & TreatmentFlows
+// ═══════════════════════════════════════════════════════════════
+
+enum NfcCheckpointType {
+  ENTRANCE
+  WAITING
+  ROOM
+  LAB
+  EKG
+  CHECKOUT
+}
+
+enum NfcScanStatus {
+  ACCEPTED
+  REJECTED
+  REPLAY_BLOCKED
+}
+
+enum FlowStepType {
+  WAITING
+  REGISTRATION
+  LAB
+  EKG
+  CONSULTATION
+  CHECKOUT
+  PAYMENT
+}
+
+enum FlowProgressStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+enum FeedbackEscalation {
+  NONE
+  REVIEW
+  PRAXIS_LEITUNG
+  EXTERNAL
+}
+
+model NfcCheckpoint {
+  id           String             @id @default(uuid())
+  locationId   String             @unique
+  praxisId     String
+  type         NfcCheckpointType
+  roomName     String?
+  coordinates  Json?
+  nfcUid       String             @unique
+  secretRef    String?
+  isActive     Boolean            @default(true)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  scans        NfcScan[]
+
+  @@index([praxisId, type])
+  @@map("nfc_checkpoints")
+}
+
+model NfcScan {
+  id            String         @id @default(uuid())
+  checkpointId  String
+  checkpoint    NfcCheckpoint  @relation(fields: [checkpointId], references: [id])
+  sessionId     String?
+  scannedAt     DateTime       @default(now())
+  deviceInfo    String?
+  ipHash        String?
+  scanStatus    NfcScanStatus  @default(ACCEPTED)
+  rejectReason  String?
+
+  @@index([sessionId, scannedAt])
+  @@index([checkpointId, scannedAt])
+  @@map("nfc_scans")
+}
+
+model TreatmentFlow {
+  id            String   @id @default(uuid())
+  praxisId      String
+  name          String
+  description   String?
+  serviceType   String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  steps         FlowStep[]
+  progressItems PatientFlowProgress[]
+
+  @@index([praxisId, isActive])
+  @@map("treatment_flows")
+}
+
+model FlowStep {
+  id               String        @id @default(uuid())
+  flowId           String
+  flow             TreatmentFlow @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  order            Int
+  type             FlowStepType
+  roomType         String?
+  specificRoomId   String?
+  estimatedMinutes Int           @default(15)
+  bufferMinutes    Int           @default(5)
+  requiredStaff    String[]
+  instructions     Json
+  preparationVideo String?
+  nfcCheckpointId  String?
+  condition        String?
+  isSkippable      Boolean       @default(true)
+
+  @@index([flowId, order])
+  @@map("flow_steps")
+}
+
+model PatientFlowProgress {
+  id                  String             @id @default(uuid())
+  sessionId           String             @unique
+  flowId              String
+  flow                TreatmentFlow      @relation(fields: [flowId], references: [id])
+  currentStep         Int                @default(0)
+  status              FlowProgressStatus @default(ACTIVE)
+  stepHistory         Json[]
+  estimatedCompletion DateTime?
+  actualCompletion    DateTime?
+  delayMinutes        Int                @default(0)
+  delayReason         String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  @@index([status])
+  @@map("patient_flow_progress")
+}
+
+model AnonymousFeedback {
+  id               String              @id @default(uuid())
+  praxisId         String
+  sessionId        String?
+  rating           Int
+  text             String?
+  categories       String[]
+  containsThreats  Boolean             @default(false)
+  threatKeywords   String[]
+  escalationStatus FeedbackEscalation  @default(NONE)
+  reviewedBy       String?
+  reviewedAt       DateTime?
+  createdAt        DateTime            @default(now())
+
+  @@index([praxisId, createdAt])
+  @@index([containsThreats, escalationStatus])
+  @@map("anonymous_feedback")
+}
+
+model PraxisChatMessage {
+  id           String   @id @default(uuid())
+  sessionId    String
+  senderType   String
+  senderId     String?
+  contentType  String   @default("TEXT")
+  content      String
+  isTemplate   Boolean  @default(false)
+  templateId   String?
+  readAt       DateTime?
+  createdAt    DateTime @default(now())
+
+  @@index([sessionId, createdAt])
+  @@index([senderType, createdAt])
+  @@map("praxis_chat_messages")
+}

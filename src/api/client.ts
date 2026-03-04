@@ -1600,6 +1600,129 @@ export const api = {
         const response = await apiClient.get('/ti/kim/messages', { params });
         return response.data;
     },
+
+    // ─── Modul 7: NFC Checkpoints ──────────────────────────────
+
+    nfcScan: async (data: { locationId: string; praxisId: string; timestamp: number; signature: string; sessionHint?: string; deviceInfo?: string }) => {
+        if (isDemoMode()) return { accepted: true, scanId: 'demo-scan-1', checkpointType: 'ENTRANCE', roomName: 'Eingang' };
+        const response = await apiClient.post('/nfc/scan', data);
+        return response.data;
+    },
+    nfcListCheckpoints: async (praxisId?: string) => {
+        if (isDemoMode()) return [
+            { id: '1', locationId: 'eingang', praxisId: 'demo', type: 'ENTRANCE', roomName: 'Eingang', isActive: true, nfcUid: 'NFC-001' },
+            { id: '2', locationId: 'wartezimmer', praxisId: 'demo', type: 'WAITING', roomName: 'Wartezimmer 1', isActive: true, nfcUid: 'NFC-002' },
+            { id: '3', locationId: 'labor-1', praxisId: 'demo', type: 'LAB', roomName: 'Labor 1', isActive: true, nfcUid: 'NFC-003' },
+            { id: '4', locationId: 'ausgang', praxisId: 'demo', type: 'CHECKOUT', roomName: 'Ausgang', isActive: true, nfcUid: 'NFC-004' },
+        ];
+        const response = await apiClient.get('/nfc/checkpoints', { params: praxisId ? { praxisId } : {} });
+        return response.data;
+    },
+    nfcCreateCheckpoint: async (data: { locationId: string; praxisId: string; type: string; roomName?: string; nfcUid: string; coordinates?: any; secretRef?: string }) => {
+        if (isDemoMode()) return { id: 'demo-cp-new', ...data, isActive: true, createdAt: new Date().toISOString() };
+        const response = await apiClient.post('/nfc/checkpoints', data);
+        return response.data;
+    },
+    nfcUpdateCheckpoint: async (id: string, data: any) => {
+        if (isDemoMode()) return { id, ...data, updatedAt: new Date().toISOString() };
+        const response = await apiClient.put(`/nfc/checkpoints/${id}`, data);
+        return response.data;
+    },
+    nfcDeleteCheckpoint: async (id: string) => {
+        if (isDemoMode()) return { success: true };
+        const response = await apiClient.delete(`/nfc/checkpoints/${id}`);
+        return response.data;
+    },
+    nfcCheckpointScans: async (checkpointId: string, limit?: number) => {
+        if (isDemoMode()) return [
+            { id: 's1', checkpointId, scanStatus: 'ACCEPTED', scannedAt: new Date().toISOString(), deviceInfo: 'iPhone 15' },
+        ];
+        const response = await apiClient.get(`/nfc/checkpoints/${checkpointId}/scans`, { params: limit ? { limit } : {} });
+        return response.data;
+    },
+
+    // ─── Modul 7: TreatmentFlows ───────────────────────────────
+
+    flowList: async (praxisId?: string, activeOnly?: boolean) => {
+        if (isDemoMode()) return [
+            { id: 'f1', praxisId: 'demo', name: 'Allgemeinuntersuchung', description: 'Standard-Flow', isActive: true, steps: [
+                { id: 's1', order: 0, type: 'WAITING', estimatedMinutes: 10, instructions: { de: 'Bitte nehmen Sie Platz' } },
+                { id: 's2', order: 1, type: 'LAB', estimatedMinutes: 15, instructions: { de: 'Blutabnahme' } },
+                { id: 's3', order: 2, type: 'CONSULTATION', estimatedMinutes: 20, instructions: { de: 'Arztgespräch' } },
+                { id: 's4', order: 3, type: 'CHECKOUT', estimatedMinutes: 5, instructions: { de: 'Auschecken' } },
+            ]},
+        ];
+        const params: any = {};
+        if (praxisId) params.praxisId = praxisId;
+        if (activeOnly !== undefined) params.active = activeOnly;
+        const response = await apiClient.get('/flows', { params });
+        return response.data;
+    },
+    flowGet: async (id: string) => {
+        if (isDemoMode()) return { id, name: 'Demo-Flow', steps: [], isActive: true };
+        const response = await apiClient.get(`/flows/${id}`);
+        return response.data;
+    },
+    flowCreate: async (data: { praxisId: string; name: string; description?: string; serviceType?: string; steps: any[] }) => {
+        if (isDemoMode()) return { id: 'demo-flow-new', ...data, isActive: true, createdAt: new Date().toISOString() };
+        const response = await apiClient.post('/flows', data);
+        return response.data;
+    },
+    flowUpdate: async (id: string, data: any) => {
+        if (isDemoMode()) return { id, ...data, updatedAt: new Date().toISOString() };
+        const response = await apiClient.put(`/flows/${id}`, data);
+        return response.data;
+    },
+    flowGetProgress: async (flowId: string, sessionId: string) => {
+        if (isDemoMode()) return { sessionId, flowId, currentStep: 1, status: 'ACTIVE', stepHistory: [], delayMinutes: 0 };
+        const response = await apiClient.get(`/flows/${flowId}/progress/${sessionId}`);
+        return response.data;
+    },
+    flowStart: async (sessionId: string, flowId: string) => {
+        if (isDemoMode()) return { sessionId, flowId, currentStep: 0, status: 'ACTIVE', stepHistory: [] };
+        const response = await apiClient.post('/flows/start', { sessionId, flowId });
+        return response.data;
+    },
+    flowAdvance: async (data: { sessionId: string; fromStep: number; toStep: number; reason?: string; triggeredBy?: string }) => {
+        if (isDemoMode()) return { sessionId: data.sessionId, currentStep: data.toStep, status: 'ACTIVE' };
+        const response = await apiClient.post('/flows/advance', data);
+        return response.data;
+    },
+    flowDelay: async (data: { sessionId: string; delayMinutes: number; reason: string }) => {
+        if (isDemoMode()) return { sessionId: data.sessionId, delayMinutes: data.delayMinutes };
+        const response = await apiClient.post('/flows/delay', data);
+        return response.data;
+    },
+
+    // ─── Modul 7: Feedback & Checkout ───────────────────────────
+
+    feedbackSubmit: async (data: { praxisId: string; sessionId?: string; rating: number; text?: string; categories?: string[] }) => {
+        if (isDemoMode()) return { id: 'demo-fb-1', acknowledged: true, escalated: false };
+        const response = await apiClient.post('/feedback/anonymous', data);
+        return response.data;
+    },
+    feedbackList: async (params?: { praxisId?: string; escalated?: boolean; limit?: number }) => {
+        if (isDemoMode()) return [
+            { id: 'fb1', praxisId: 'demo', rating: 4, text: 'Sehr freundlich', categories: ['Kommunikation'], containsThreats: false, escalationStatus: 'NONE', createdAt: new Date().toISOString() },
+        ];
+        const response = await apiClient.get('/feedback', { params });
+        return response.data;
+    },
+    feedbackStats: async (praxisId: string) => {
+        if (isDemoMode()) return { total: 42, averageRating: 4.2, escalatedCount: 1, categories: [{ name: 'Wartezeit', count: 15, avgRating: 3.5 }, { name: 'Kommunikation', count: 20, avgRating: 4.5 }] };
+        const response = await apiClient.get('/feedback/stats', { params: { praxisId } });
+        return response.data;
+    },
+    feedbackEscalate: async (id: string, escalationStatus: string) => {
+        if (isDemoMode()) return { id, escalationStatus };
+        const response = await apiClient.post(`/feedback/${id}/escalate`, { escalationStatus });
+        return response.data;
+    },
+    checkoutSession: async (sessionId: string, action: 'keep' | 'export' | 'delete') => {
+        if (isDemoMode()) return { sessionId, action, message: `Demo: ${action}` };
+        const response = await apiClient.post(`/feedback/checkout/${sessionId}`, { action });
+        return response.data;
+    },
 };
 
 export default apiClient;

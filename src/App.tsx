@@ -14,6 +14,11 @@ import { CookieConsent } from './components/CookieConsent';
 import { PWAShell } from './components/pwa/PWAShell';
 const SystemPanel = lazy(() => import('./pages/SystemPanel').then(m => ({ default: m.SystemPanel })));
 const TIStatusPanel = lazy(() => import('./pages/TIStatusPanel').then(m => ({ default: m.TIStatusPanel })));
+const NfcLanding = lazy(() => import('./pages/nfc/NfcLanding').then(m => ({ default: m.NfcLanding })));
+const NfcStepView = lazy(() => import('./pages/nfc/NfcStepView'));
+const PatientFlowLiveBoard = lazy(() => import('./pages/flows/PatientFlowLiveBoard').then(m => ({ default: m.PatientFlowLiveBoard })));
+const CheckoutWizard = lazy(() => import('./pages/checkout/CheckoutWizard').then(m => ({ default: m.CheckoutWizard })));
+const AnonymousFeedbackForm = lazy(() => import('./pages/checkout/AnonymousFeedbackForm').then(m => ({ default: m.AnonymousFeedbackForm })));
 
 // Lazy-load heavy dashboard routes (code splitting → ~60% smaller initial bundle)
 const ArztDashboard = lazy(() => import('./pages/ArztDashboard').then(m => ({ default: m.ArztDashboard })));
@@ -122,6 +127,12 @@ function App() {
           {/* Modul 6: System & TI Admin Panels (lazy-loaded) */}
           <Route path="/admin/system" element={<Suspense fallback={<DashboardLoading />}><SystemPanel /></Suspense>} />
           <Route path="/admin/ti" element={<Suspense fallback={<DashboardLoading />}><TIStatusPanel /></Suspense>} />
+
+          {/* Modul 7: NFC & Flow Routes */}
+          <Route path="/nfc" element={<Suspense fallback={<DashboardLoading />}><NfcLanding /></Suspense>} />
+          <Route path="/flows/live" element={<Suspense fallback={<DashboardLoading />}><PatientFlowLiveBoard /></Suspense>} />
+          <Route path="/checkout/:sessionId" element={<Suspense fallback={<DashboardLoading />}><CheckoutWizard sessionId="" /></Suspense>} />
+          <Route path="/feedback" element={<Suspense fallback={<DashboardLoading />}><AnonymousFeedbackForm praxisId="default" /></Suspense>} />
 
           {/* PWA Patient Portal */}
           <Route path="/pwa/login" element={<Suspense fallback={<DashboardLoading />}><PwaLogin /></Suspense>} />

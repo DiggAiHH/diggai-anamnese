@@ -1156,3 +1156,78 @@ export function useTIEpaStatus() {
 export function useTIKimStatus() {
     return useQuery({ queryKey: ['ti', 'kim', 'status'], queryFn: () => api.tiKimStatus() });
 }
+
+// ─── Modul 7: NFC Hooks ────────────────────────────────────
+
+export function useNfcScan() {
+    return useMutation({ mutationFn: (data: { locationId: string; praxisId: string; timestamp: number; signature: string; sessionHint?: string; deviceInfo?: string }) => api.nfcScan(data) });
+}
+export function useNfcCheckpoints(praxisId?: string) {
+    return useQuery({ queryKey: ['nfc', 'checkpoints', praxisId], queryFn: () => api.nfcListCheckpoints(praxisId) });
+}
+export function useNfcCreateCheckpoint() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: (data: any) => api.nfcCreateCheckpoint(data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['nfc', 'checkpoints'] }); } });
+}
+export function useNfcUpdateCheckpoint() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: ({ id, data }: { id: string; data: any }) => api.nfcUpdateCheckpoint(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['nfc', 'checkpoints'] }); } });
+}
+export function useNfcDeleteCheckpoint() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: (id: string) => api.nfcDeleteCheckpoint(id), onSuccess: () => { qc.invalidateQueries({ queryKey: ['nfc', 'checkpoints'] }); } });
+}
+export function useNfcCheckpointScans(checkpointId: string, limit?: number) {
+    return useQuery({ queryKey: ['nfc', 'scans', checkpointId], queryFn: () => api.nfcCheckpointScans(checkpointId, limit), enabled: !!checkpointId });
+}
+
+// ─── Modul 7: Flow Hooks ───────────────────────────────────
+
+export function useFlowList(praxisId?: string) {
+    return useQuery({ queryKey: ['flows', praxisId], queryFn: () => api.flowList(praxisId) });
+}
+export function useFlowGet(id: string) {
+    return useQuery({ queryKey: ['flows', id], queryFn: () => api.flowGet(id), enabled: !!id });
+}
+export function useFlowCreate() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: (data: any) => api.flowCreate(data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['flows'] }); } });
+}
+export function useFlowUpdate() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: ({ id, data }: { id: string; data: any }) => api.flowUpdate(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['flows'] }); } });
+}
+export function useFlowProgress(flowId: string, sessionId: string) {
+    return useQuery({ queryKey: ['flows', flowId, 'progress', sessionId], queryFn: () => api.flowGetProgress(flowId, sessionId), enabled: !!flowId && !!sessionId, refetchInterval: 10000 });
+}
+export function useFlowStart() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: ({ sessionId, flowId }: { sessionId: string; flowId: string }) => api.flowStart(sessionId, flowId), onSuccess: () => { qc.invalidateQueries({ queryKey: ['flows'] }); } });
+}
+export function useFlowAdvance() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: (data: { sessionId: string; fromStep: number; toStep: number; reason?: string; triggeredBy?: string }) => api.flowAdvance(data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['flows'] }); } });
+}
+export function useFlowDelay() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: (data: { sessionId: string; delayMinutes: number; reason: string }) => api.flowDelay(data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['flows'] }); } });
+}
+
+// ─── Modul 7: Feedback Hooks ───────────────────────────────
+
+export function useFeedbackSubmit() {
+    return useMutation({ mutationFn: (data: { praxisId: string; sessionId?: string; rating: number; text?: string; categories?: string[] }) => api.feedbackSubmit(data) });
+}
+export function useFeedbackList(params?: { praxisId?: string; escalated?: boolean; limit?: number }) {
+    return useQuery({ queryKey: ['feedback', params], queryFn: () => api.feedbackList(params) });
+}
+export function useFeedbackStats(praxisId: string) {
+    return useQuery({ queryKey: ['feedback', 'stats', praxisId], queryFn: () => api.feedbackStats(praxisId), enabled: !!praxisId });
+}
+export function useFeedbackEscalate() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: ({ id, status }: { id: string; status: string }) => api.feedbackEscalate(id, status), onSuccess: () => { qc.invalidateQueries({ queryKey: ['feedback'] }); } });
+}
+export function useCheckoutSession() {
+    return useMutation({ mutationFn: ({ sessionId, action }: { sessionId: string; action: 'keep' | 'export' | 'delete' }) => api.checkoutSession(sessionId, action) });
+}

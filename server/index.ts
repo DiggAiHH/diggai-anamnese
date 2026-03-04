@@ -29,6 +29,9 @@ import therapyRoutes from './routes/therapy';
 import pwaRoutes from './routes/pwa';
 import systemRoutes from './routes/system';
 import tiRoutes from './routes/ti';
+import nfcRoutes from './routes/nfc';
+import flowRoutes from './routes/flows';
+import feedbackRoutes from './routes/feedback';
 
 const app = express();
 const httpServer = createServer(app);
@@ -126,6 +129,9 @@ app.use('/api/therapy', authLimiter, therapyRoutes);
 app.use('/api/pwa', pwaRoutes);
 app.use('/api/system', authLimiter, systemRoutes);
 app.use('/api/ti', authLimiter, tiRoutes);
+app.use('/api/nfc', nfcRoutes);
+app.use('/api/flows', authLimiter, flowRoutes);
+app.use('/api/feedback', feedbackRoutes);
 
 // Health Check — includes DB + Redis connectivity
 app.get('/api/health', async (_req, res) => {
