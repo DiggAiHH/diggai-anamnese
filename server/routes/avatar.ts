@@ -42,7 +42,7 @@ router.get('/list', async (req: Request, res: Response) => {
 // GET /api/avatar/:staffId — Get avatar for a staff member
 router.get('/:staffId', async (req: Request, res: Response) => {
   try {
-    const avatar = await getAvatar(req.params.staffId);
+    const avatar = await getAvatar(req.params.staffId as string);
     if (!avatar) {
       res.status(404).json({ error: 'Avatar nicht gefunden' });
       return;
@@ -76,7 +76,7 @@ router.put('/:staffId', async (req: Request, res: Response) => {
     });
 
     const data = schema.parse(req.body);
-    const avatar = await upsertAvatar(req.params.staffId, data);
+    const avatar = await upsertAvatar(req.params.staffId as string, data as any);
     res.json(avatar);
   } catch (err: any) {
     res.status(400).json({ error: err.message });
@@ -86,7 +86,7 @@ router.put('/:staffId', async (req: Request, res: Response) => {
 // POST /api/avatar/:staffId/consent — Sign consent for voice features
 router.post('/:staffId/consent', async (req: Request, res: Response) => {
   try {
-    const result = await signConsent(req.params.staffId);
+    const result = await signConsent(req.params.staffId as string);
     res.json(result);
   } catch (err: any) {
     res.status(400).json({ error: err.message });
@@ -96,7 +96,7 @@ router.post('/:staffId/consent', async (req: Request, res: Response) => {
 // DELETE /api/avatar/:staffId/consent — Revoke consent (DSGVO Widerruf)
 router.delete('/:staffId/consent', async (req: Request, res: Response) => {
   try {
-    const result = await revokeConsent(req.params.staffId);
+    const result = await revokeConsent(req.params.staffId as string);
     res.json(result);
   } catch (err: any) {
     res.status(400).json({ error: err.message });
@@ -143,7 +143,7 @@ router.post('/clone/start', async (req: Request, res: Response) => {
 // GET /api/avatar/clone/:staffId — Get clone status
 router.get('/clone/:staffId', async (req: Request, res: Response) => {
   try {
-    const result = await getCloneStatus(req.params.staffId);
+    const result = await getCloneStatus(req.params.staffId as string);
     res.json(result);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -153,7 +153,7 @@ router.get('/clone/:staffId', async (req: Request, res: Response) => {
 // DELETE /api/avatar/:staffId — Delete avatar entirely
 router.delete('/:staffId', async (req: Request, res: Response) => {
   try {
-    const result = await deleteAvatar(req.params.staffId);
+    const result = await deleteAvatar(req.params.staffId as string);
     res.json(result);
   } catch (err: any) {
     res.status(400).json({ error: err.message });

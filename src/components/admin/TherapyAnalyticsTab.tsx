@@ -1,4 +1,3 @@
-import React from 'react';
 import { Heart, BarChart3, AlertTriangle, Brain, TrendingUp, Activity } from 'lucide-react';
 import { useTherapyAnalytics } from '../../hooks/useApi';
 import { ClinicalAlertList } from '../therapy/ClinicalAlertBanner';

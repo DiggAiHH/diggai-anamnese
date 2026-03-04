@@ -5,7 +5,7 @@ import { requireAuth, requireRole } from '../middleware/auth';
 import { processWunschboxEntry, generateExportSpec } from '../services/wunschboxService';
 
 const router = Router();
-const prisma = new PrismaClient();
+const prisma: any = new PrismaClient();
 
 // ─── POST /api/wunschbox — Submit a wish ────────────────────
 
@@ -51,7 +51,7 @@ router.get('/', requireAuth, requireRole('admin'), async (req, res) => {
         ]);
 
         res.json({
-            entries: entries.map(e => ({
+            entries: entries.map((e: any) => ({
                 ...e,
                 aiParsedChanges: e.aiParsedChanges ? JSON.parse(e.aiParsedChanges) : null,
             })),
@@ -77,7 +77,7 @@ router.get('/my', requireAuth, requireRole('admin', 'arzt', 'mfa'), async (req, 
             where: { submittedBy: userId },
             orderBy: { createdAt: 'desc' },
         });
-        res.json(entries.map(e => ({
+        res.json(entries.map((e: any) => ({
             ...e,
             aiParsedChanges: e.aiParsedChanges ? JSON.parse(e.aiParsedChanges) : null,
         })));
@@ -91,7 +91,7 @@ router.get('/my', requireAuth, requireRole('admin', 'arzt', 'mfa'), async (req, 
 
 router.post('/:id/process', requireAuth, requireRole('admin'), async (req, res) => {
     try {
-        const parsed = await processWunschboxEntry(req.params.id);
+        const parsed = await processWunschboxEntry(req.params.id as string);
         const entry = await prisma.wunschboxEntry.findUnique({ where: { id: req.params.id } });
         res.json({ ...entry, aiParsedChanges: parsed });
     } catch (err: any) {
@@ -140,7 +140,7 @@ router.put('/:id/review', requireAuth, requireRole('admin'), async (req, res) =>
 
 router.post('/:id/export', requireAuth, requireRole('admin'), async (req, res) => {
     try {
-        const spec = await generateExportSpec(req.params.id);
+        const spec = await generateExportSpec(req.params.id as string);
         res.json({ spec: JSON.parse(spec) });
     } catch (err: any) {
         if (err.message?.includes('nicht gefunden')) {

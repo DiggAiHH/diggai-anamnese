@@ -47,7 +47,7 @@ const STEP_COLORS: Record<string, string> = {
 
 export function NfcStepView({ progress }: { progress: FlowProgress }) {
   const { t, i18n } = useTranslation();
-  const [elapsed, setElapsed] = useState(0);
+  const [, setElapsed] = useState(0);
 
   const currentStepData = progress.flow.steps[progress.currentStep];
   const totalSteps = progress.flow.steps.length;

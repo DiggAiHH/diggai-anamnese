@@ -35,8 +35,8 @@ export function KioskDashboard() {
     isOnline: navigator.onLine,
   currentTime: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
   });
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
-  const clockRef = useRef<ReturnType<typeof setInterval>>();
+  const timerRef = useRef<ReturnType<typeof setTimeout>>(null);
+  const clockRef = useRef<ReturnType<typeof setInterval>>(null);
 
   // Auto-reset on inactivity
   const resetTimer = useCallback(() => {

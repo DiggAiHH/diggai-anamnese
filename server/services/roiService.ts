@@ -1,6 +1,4 @@
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+const db = (globalThis as any).__prisma as any;
 
 // ─── ROI Configuration ─────────────────────────────────────
 
@@ -51,15 +49,15 @@ export async function calculateTodayROI(): Promise<DailyROI> {
     tomorrow.setDate(tomorrow.getDate() + 1);
 
     const [sessionsCompleted, completedWithTime, monthSnapshots] = await Promise.all([
-        prisma.patientSession.count({
+        db.patientSession.count({
             where: { status: 'COMPLETED', completedAt: { gte: today, lt: tomorrow } },
         }),
-        prisma.patientSession.findMany({
+        db.patientSession.findMany({
             where: { status: 'COMPLETED', completedAt: { gte: today, lt: tomorrow, not: null } },
             select: { createdAt: true, completedAt: true },
         }),
         // Get month's existing snapshots for cumulative
-        prisma.rOISnapshot.findMany({
+        db.rOISnapshot.findMany({
             where: {
                 date: {
                     gte: new Date(today.getFullYear(), today.getMonth(), 1),
@@ -72,7 +70,7 @@ export async function calculateTodayROI(): Promise<DailyROI> {
 
     const patientsServed = sessionsCompleted;
     const avgCompletionMinutes = completedWithTime.length > 0
-        ? completedWithTime.reduce((sum, s) => {
+        ? completedWithTime.reduce((sum: any, s: any) => {
             const diff = (s.completedAt!.getTime() - s.createdAt.getTime()) / 60000;
             return sum + diff;
         }, 0) / completedWithTime.length
@@ -84,7 +82,7 @@ export async function calculateTodayROI(): Promise<DailyROI> {
     const netROI = costSaving - licenseCostPerDay;
 
     // Cumulative month ROI from stored snapshots + today's live
-    const previousMonthROI = monthSnapshots.reduce((sum, s) => {
+    const previousMonthROI = monthSnapshots.reduce((sum: any, s: any) => {
         const snapLicPerDay = s.monthlyLicenseCost / currentConfig.workdaysPerMonth;
         return sum + (s.estimatedCostSaving - snapLicPerDay);
     }, 0);
@@ -111,21 +109,21 @@ export async function getROIHistory(period: 'week' | 'month' | 'year' = 'month')
     else if (period === 'month') since.setDate(since.getDate() - 30);
     else since.setFullYear(since.getFullYear() - 1);
 
-    const snapshots = await prisma.rOISnapshot.findMany({
+    const snapshots = await db.rOISnapshot.findMany({
         where: { date: { gte: since } },
         orderBy: { date: 'asc' },
     });
 
     const avgDaily = snapshots.length > 0
-        ? snapshots.reduce((sum, s) => sum + s.estimatedCostSaving, 0) / snapshots.length
+        ? snapshots.reduce((sum: any, s: any) => sum + s.estimatedCostSaving, 0) / snapshots.length
         : 0;
-    const total = snapshots.reduce((sum, s) => sum + s.estimatedCostSaving, 0);
+    const total = snapshots.reduce((sum: any, s: any) => sum + s.estimatedCostSaving, 0);
 
     // Trend: compare last 7 days vs previous 7 days
     const last7 = snapshots.slice(-7);
     const prev7 = snapshots.slice(-14, -7);
-    const last7Avg = last7.length > 0 ? last7.reduce((s, x) => s + x.estimatedCostSaving, 0) / last7.length : 0;
-    const prev7Avg = prev7.length > 0 ? prev7.reduce((s, x) => s + x.estimatedCostSaving, 0) / prev7.length : 0;
+    const last7Avg = last7.length > 0 ? last7.reduce((s: any, x: any) => s + x.estimatedCostSaving, 0) / last7.length : 0;
+    const prev7Avg = prev7.length > 0 ? prev7.reduce((s: any, x: any) => s + x.estimatedCostSaving, 0) / prev7.length : 0;
     const trend = prev7Avg > 0 ? ((last7Avg - prev7Avg) / prev7Avg) * 100 : 0;
 
     return {
@@ -144,7 +142,7 @@ export async function getROIProjection(months: number = 12) {
     // Base projection on last 30 days average
     const history = await getROIHistory('month');
     const avgDailyPatients = history.snapshots.length > 0
-        ? history.snapshots.reduce((s, x) => s + x.patientsServed, 0) / history.snapshots.length
+        ? history.snapshots.reduce((s: any, x: any) => s + x.patientsServed, 0) / history.snapshots.length
         : 5; // minimum assumption
 
     const monthly: Array<{
@@ -189,10 +187,10 @@ export async function createDailySnapshot(): Promise<void> {
     tomorrow.setDate(tomorrow.getDate() + 1);
 
     const [sessionsCompleted, completedWithTime] = await Promise.all([
-        prisma.patientSession.count({
+        db.patientSession.count({
             where: { status: 'COMPLETED', completedAt: { gte: today, lt: tomorrow } },
         }),
-        prisma.patientSession.findMany({
+        db.patientSession.findMany({
             where: { status: 'COMPLETED', completedAt: { gte: today, lt: tomorrow, not: null } },
             select: { createdAt: true, completedAt: true },
         }),
@@ -200,7 +198,7 @@ export async function createDailySnapshot(): Promise<void> {
 
     const patientsServed = sessionsCompleted;
     const avgCompletionMinutes = completedWithTime.length > 0
-        ? completedWithTime.reduce((sum, s) => {
+        ? completedWithTime.reduce((sum: any, s: any) => {
             const diff = (s.completedAt!.getTime() - s.createdAt.getTime()) / 60000;
             return sum + diff;
         }, 0) / completedWithTime.length
@@ -209,7 +207,7 @@ export async function createDailySnapshot(): Promise<void> {
     const mfaMinutesSaved = patientsServed * currentConfig.avgManualIntakeMin;
     const estimatedCostSaving = (mfaMinutesSaved / 60) * currentConfig.mfaHourlyCost;
 
-    await prisma.rOISnapshot.upsert({
+    await db.rOISnapshot.upsert({
         where: { date: today },
         update: {
             patientsServed,

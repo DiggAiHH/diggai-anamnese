@@ -229,7 +229,7 @@ export async function getBackupSchedule(): Promise<BackupSchedule> {
 
   try {
     const configs = await db.systemConfig.findMany({ where: { category: 'backup' } });
-    const map = new Map(configs.map((c: any) => [c.key, c.value]));
+    const map = new Map<string, string>(configs.map((c: any) => [c.key, c.value]));
     return {
       enabled: map.get('backup.schedule.enabled') === 'true',
       cronExpression: map.get('backup.schedule.cron') || defaults.cronExpression,

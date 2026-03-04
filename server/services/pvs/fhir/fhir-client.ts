@@ -132,7 +132,7 @@ export class FhirClient {
     return this.request<T>('GET', `/${resourceType}/${id}`);
   }
 
-  async search<T extends FhirResource>(
+  async search<_T extends FhirResource>(
     resourceType: string,
     params: Record<string, string>,
   ): Promise<FhirBundle> {

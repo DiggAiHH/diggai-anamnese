@@ -45,7 +45,7 @@ export function TelemedizinScheduler() {
   const [sessions] = useState<ScheduledSession[]>(DEMO_SESSIONS);
   const [filter, setFilter] = useState<SessionStatus | 'ALL'>('ALL');
   const [search, setSearch] = useState('');
-  const [showNewDialog, setShowNewDialog] = useState(false);
+  const [, setShowNewDialog] = useState(false);
   const [selectedDate] = useState(new Date());
 
   const filteredSessions = sessions.filter(s => {

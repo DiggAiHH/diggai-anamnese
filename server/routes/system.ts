@@ -113,7 +113,7 @@ router.post('/backups/:id/restore', async (req: Request, res: Response) => {
   try {
     const { verifyChecksum, targetTables } = req.body;
     const result = await restoreBackup({
-      backupId: req.params.id,
+      backupId: req.params.id as string,
       verifyChecksum: verifyChecksum !== false,
       targetTables,
     });
@@ -126,7 +126,7 @@ router.post('/backups/:id/restore', async (req: Request, res: Response) => {
 // DELETE /api/system/backups/:id — Delete a backup
 router.delete('/backups/:id', async (req: Request, res: Response) => {
   try {
-    await deleteBackup(req.params.id);
+    await deleteBackup(req.params.id as string);
     res.json({ success: true });
   } catch (error: any) {
     res.status(500).json({ error: error.message });

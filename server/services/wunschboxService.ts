@@ -1,6 +1,4 @@
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+const db = (globalThis as any).__prisma as any;
 
 /**
  * Wunschbox KI-Service
@@ -133,13 +131,13 @@ export function parseWishRuleBased(text: string): ParsedChange[] {
  * Process a WunschboxEntry: parse and store AI results
  */
 export async function processWunschboxEntry(entryId: string): Promise<ParsedChange[]> {
-    const entry = await prisma.wunschboxEntry.findUnique({ where: { id: entryId } });
+    const entry = await db.wunschboxEntry.findUnique({ where: { id: entryId } });
     if (!entry) throw new Error('Wunschbox-Eintrag nicht gefunden');
 
     // Phase 1: Rule-based parsing
     const parsed = parseWishRuleBased(entry.originalText);
 
-    await prisma.wunschboxEntry.update({
+    await db.wunschboxEntry.update({
         where: { id: entryId },
         data: {
             aiParsedChanges: JSON.stringify(parsed),
@@ -154,7 +152,7 @@ export async function processWunschboxEntry(entryId: string): Promise<ParsedChan
  * Generate export spec from a reviewed Wunschbox entry
  */
 export async function generateExportSpec(entryId: string): Promise<string> {
-    const entry = await prisma.wunschboxEntry.findUnique({ where: { id: entryId } });
+    const entry = await db.wunschboxEntry.findUnique({ where: { id: entryId } });
     if (!entry) throw new Error('Wunschbox-Eintrag nicht gefunden');
 
     const changes: ParsedChange[] = entry.aiParsedChanges ? JSON.parse(entry.aiParsedChanges) : [];
@@ -177,7 +175,7 @@ export async function generateExportSpec(entryId: string): Promise<string> {
 
     const specJson = JSON.stringify(spec, null, 2);
 
-    await prisma.wunschboxEntry.update({
+    await db.wunschboxEntry.update({
         where: { id: entryId },
         data: { exportedSpec: specJson },
     });

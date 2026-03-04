@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Lightbulb, Send, Cpu, Eye, Check, X, FileDown } from 'lucide-react';
+import { useState } from 'react';
+import { Lightbulb, Send, Cpu, Check, X, FileDown } from 'lucide-react';
 import { useWunschboxList, useWunschboxSubmit, useWunschboxProcess, useWunschboxReview, useWunschboxExport } from '../../hooks/useApi';
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
@@ -15,7 +15,7 @@ export function WunschboxTab() {
     const [statusFilter, setStatusFilter] = useState('');
     const [newWish, setNewWish] = useState('');
     const [selectedId, setSelectedId] = useState<string | null>(null);
-    const [page, setPage] = useState(1);
+    const [page] = useState(1);
 
     const { data, isLoading } = useWunschboxList({ page, limit: 20, status: statusFilter || undefined });
     const submit = useWunschboxSubmit();

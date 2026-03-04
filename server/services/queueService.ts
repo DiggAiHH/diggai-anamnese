@@ -2,8 +2,26 @@
  * Queue Service — Persistent queue management using Prisma
  * Replaces the old in-memory queue array with database-backed operations.
  */
-import { prisma } from '../db';
-import type { QueueEntry } from '@prisma/client';
+// QueueEntry local interface (avoids prisma generate dependency)
+interface QueueEntry {
+  id: string;
+  sessionId: string;
+  patientName: string;
+  service: string;
+  priority: string;
+  status: string;
+  position: number | null;
+  estimatedWaitMin: number | null;
+  entertainmentMode: string | null;
+  deviceType: string | null;
+  joinedAt: Date;
+  calledAt: Date | null;
+  treatmentStartedAt: Date | null;
+  completedAt: Date | null;
+  feedbackRating: number | null;
+}
+
+const db = (globalThis as any).__prisma as any;
 
 // Priority sort order
 const PRIORITY_ORDER: Record<string, number> = { EMERGENCY: 0, URGENT: 1, NORMAL: 2 };
@@ -30,21 +48,21 @@ export interface QueueState {
  * Sorts by priority (EMERGENCY > URGENT > NORMAL), then FIFO.
  */
 export async function recalcPositions(): Promise<void> {
-    const waiting = await prisma.queueEntry.findMany({
+    const waiting = await db.queueEntry.findMany({
         where: { status: 'WAITING' },
         orderBy: [{ joinedAt: 'asc' }],
     });
 
     // Sort by priority then joinedAt
-    waiting.sort((a, b) => {
+    waiting.sort((a: any, b: any) => {
         const diff = (PRIORITY_ORDER[a.priority] ?? 2) - (PRIORITY_ORDER[b.priority] ?? 2);
         if (diff !== 0) return diff;
         return a.joinedAt.getTime() - b.joinedAt.getTime();
     });
 
     // Batch update positions and wait estimates
-    const updates = waiting.map((entry, idx) =>
-        prisma.queueEntry.update({
+    const updates = waiting.map((entry: any, idx: number) =>
+        db.queueEntry.update({
             where: { id: entry.id },
             data: {
                 position: idx + 1,
@@ -54,7 +72,7 @@ export async function recalcPositions(): Promise<void> {
     );
 
     if (updates.length > 0) {
-        await prisma.$transaction(updates);
+        await db.$transaction(updates);
     }
 }
 
@@ -62,14 +80,14 @@ export async function recalcPositions(): Promise<void> {
  * Get complete queue state for the arzt/admin dashboard
  */
 export async function getQueueState(): Promise<QueueState> {
-    const entries = await prisma.queueEntry.findMany({
+    const entries = await db.queueEntry.findMany({
         where: { status: { not: 'DONE' } },
         orderBy: [{ position: 'asc' }],
     });
 
     const now = new Date();
-    const waitingEntries = entries.filter(e => e.status === 'WAITING');
-    const waitMinutes = waitingEntries.map(e =>
+    const waitingEntries = entries.filter((e: any) => e.status === 'WAITING');
+    const waitMinutes = waitingEntries.map((e: any) =>
         Math.floor((now.getTime() - e.joinedAt.getTime()) / 60000)
     );
 
@@ -77,11 +95,11 @@ export async function getQueueState(): Promise<QueueState> {
         queue: entries,
         stats: {
             waiting: waitingEntries.length,
-            called: entries.filter(e => e.status === 'CALLED').length,
-            inTreatment: entries.filter(e => e.status === 'IN_TREATMENT').length,
+            called: entries.filter((e: any) => e.status === 'CALLED').length,
+            inTreatment: entries.filter((e: any) => e.status === 'IN_TREATMENT').length,
             total: entries.length,
             avgWaitMin: waitMinutes.length > 0
-                ? Math.round(waitMinutes.reduce((a, b) => a + b, 0) / waitMinutes.length)
+                ? Math.round(waitMinutes.reduce((a: any, b: any) => a + b, 0) / waitMinutes.length)
                 : 0,
             longestWaitMin: waitMinutes.length > 0 ? Math.max(...waitMinutes) : 0,
         },
@@ -100,7 +118,7 @@ export async function joinQueue(data: {
     deviceType?: string;
 }): Promise<QueueEntry> {
     // Check for existing WAITING entry (prevent duplicates)
-    const existing = await prisma.queueEntry.findFirst({
+    const existing = await db.queueEntry.findFirst({
         where: {
             sessionId: data.sessionId,
             status: 'WAITING',
@@ -108,7 +126,7 @@ export async function joinQueue(data: {
     });
     if (existing) return existing;
 
-    const entry = await prisma.queueEntry.create({
+    const entry = await db.queueEntry.create({
         data: {
             sessionId: data.sessionId,
             patientName: data.patientName,
@@ -128,19 +146,19 @@ export async function joinQueue(data: {
  * Get a single queue entry by ID
  */
 export async function getEntryById(id: string): Promise<QueueEntry | null> {
-    return prisma.queueEntry.findUnique({ where: { id } });
+    return db.queueEntry.findUnique({ where: { id } });
 }
 
 /**
  * Get queue position for a specific session
  */
 export async function getPositionBySession(sessionId: string) {
-    const entry = await prisma.queueEntry.findFirst({
+    const entry = await db.queueEntry.findFirst({
         where: { sessionId, status: { not: 'DONE' } },
     });
     if (!entry) return { position: null, status: null, estimatedWaitMin: null, queueLength: 0 };
 
-    const queueLength = await prisma.queueEntry.count({
+    const queueLength = await db.queueEntry.count({
         where: { status: 'WAITING' },
     });
 
@@ -156,7 +174,7 @@ export async function getPositionBySession(sessionId: string) {
  * Call a patient — transition from WAITING to CALLED
  */
 export async function callEntry(id: string): Promise<QueueEntry> {
-    const entry = await prisma.queueEntry.update({
+    const entry = await db.queueEntry.update({
         where: { id },
         data: {
             status: 'CALLED',
@@ -171,7 +189,7 @@ export async function callEntry(id: string): Promise<QueueEntry> {
  * Start treatment — transition from CALLED to IN_TREATMENT
  */
 export async function treatEntry(id: string): Promise<QueueEntry> {
-    const entry = await prisma.queueEntry.update({
+    const entry = await db.queueEntry.update({
         where: { id },
         data: {
             status: 'IN_TREATMENT',
@@ -186,7 +204,7 @@ export async function treatEntry(id: string): Promise<QueueEntry> {
  * Complete treatment — transition to DONE
  */
 export async function doneEntry(id: string): Promise<QueueEntry> {
-    const entry = await prisma.queueEntry.update({
+    const entry = await db.queueEntry.update({
         where: { id },
         data: {
             status: 'DONE',
@@ -201,7 +219,7 @@ export async function doneEntry(id: string): Promise<QueueEntry> {
  * Remove a queue entry entirely
  */
 export async function removeEntry(id: string): Promise<void> {
-    await prisma.queueEntry.delete({ where: { id } });
+    await db.queueEntry.delete({ where: { id } });
     await recalcPositions();
 }
 
@@ -209,7 +227,7 @@ export async function removeEntry(id: string): Promise<void> {
  * Submit feedback rating for a completed visit
  */
 export async function submitFeedback(id: string, rating: number): Promise<QueueEntry> {
-    return prisma.queueEntry.update({
+    return db.queueEntry.update({
         where: { id },
         data: { feedbackRating: Math.min(5, Math.max(1, rating)) },
     });
@@ -219,7 +237,7 @@ export async function submitFeedback(id: string, rating: number): Promise<QueueE
  * Get adaptive flow config for a session based on wait time and queue length
  */
 export async function getFlowConfig(sessionId: string) {
-    const entry = await prisma.queueEntry.findFirst({
+    const entry = await db.queueEntry.findFirst({
         where: { sessionId, status: 'WAITING' },
     });
 
@@ -228,7 +246,7 @@ export async function getFlowConfig(sessionId: string) {
     }
 
     const waitMin = Math.floor((Date.now() - entry.joinedAt.getTime()) / 60000);
-    const queueLength = await prisma.queueEntry.count({ where: { status: 'WAITING' } });
+    const queueLength = await db.queueEntry.count({ where: { status: 'WAITING' } });
 
     const level = getAdaptiveLevel(waitMin, queueLength);
 
@@ -254,7 +272,7 @@ function getAdaptiveLevel(waitMinutes: number, queueLength: number): 0 | 1 | 2 |
  */
 export async function cleanupOldEntries(): Promise<number> {
     const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const result = await prisma.queueEntry.deleteMany({
+    const result = await db.queueEntry.deleteMany({
         where: {
             status: 'DONE',
             completedAt: { lt: cutoff },

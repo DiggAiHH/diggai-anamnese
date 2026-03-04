@@ -1,7 +1,7 @@
 // ─── Telemedizin Consent Banner ────────────────────────────
 // Modul 8: DSGVO consent banner before joining video calls
 
-import { Shield, Video, Mic, HardDrive, AlertTriangle, X } from 'lucide-react';
+import { Shield, Video, Mic, HardDrive, X } from 'lucide-react';
 
 interface ConsentBannerProps {
   onAccept: () => void;

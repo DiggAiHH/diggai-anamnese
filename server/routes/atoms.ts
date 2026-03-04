@@ -1,8 +1,10 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
-import { prisma } from '../db';
+import { prisma as _prisma } from '../db';
 import { requireAuth, requireRole } from '../middleware/auth';
+
+const prisma: any = _prisma;
 
 const router = Router();
 
@@ -119,7 +121,7 @@ router.put('/:id/toggle', requireAuth, requireRole('admin'), async (req: Request
 
 const draftSchema = z.object({
     atomId: z.string().optional(),
-    draftData: z.record(z.unknown()), // JSON object for the full atom
+    draftData: z.record(z.string(), z.unknown()), // JSON object for the full atom
     changeNote: z.string().max(500).optional(),
 });
 
@@ -154,7 +156,7 @@ router.get('/drafts', requireAuth, requireRole('admin'), async (req: Request, re
             orderBy: { createdAt: 'desc' },
         });
         res.json({
-            drafts: drafts.map(d => ({
+            drafts: drafts.map((d: any) => ({
                 ...d,
                 draftData: JSON.parse(d.draftData),
             })),

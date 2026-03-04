@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import { Users, Plus, Edit, Trash2, Shield, CheckCircle, XCircle } from 'lucide-react';
+import { useState } from 'react';
+import { Users, Plus, Trash2, Shield, CheckCircle, XCircle } from 'lucide-react';
 import { useAdminUsers, useAdminCreateUser, useAdminUpdateUser, useAdminDeleteUser } from '../../hooks/useApi';
 
 interface UserForm {
@@ -11,14 +10,12 @@ interface UserForm {
 }
 
 export function UserManagementTab() {
-    const { t } = useTranslation();
     const { data: users, isLoading } = useAdminUsers();
     const createUser = useAdminCreateUser();
     const updateUser = useAdminUpdateUser();
     const deleteUser = useAdminDeleteUser();
 
     const [showCreate, setShowCreate] = useState(false);
-    const [editingId, setEditingId] = useState<string | null>(null);
     const [form, setForm] = useState<UserForm>({ username: '', password: '', displayName: '', role: 'MFA' });
 
     const handleCreate = () => {

@@ -15,7 +15,6 @@ import { PWAShell } from './components/pwa/PWAShell';
 const SystemPanel = lazy(() => import('./pages/SystemPanel').then(m => ({ default: m.SystemPanel })));
 const TIStatusPanel = lazy(() => import('./pages/TIStatusPanel').then(m => ({ default: m.TIStatusPanel })));
 const NfcLanding = lazy(() => import('./pages/nfc/NfcLanding').then(m => ({ default: m.NfcLanding })));
-const NfcStepView = lazy(() => import('./pages/nfc/NfcStepView'));
 const PatientFlowLiveBoard = lazy(() => import('./pages/flows/PatientFlowLiveBoard').then(m => ({ default: m.PatientFlowLiveBoard })));
 const CheckoutWizard = lazy(() => import('./pages/checkout/CheckoutWizard').then(m => ({ default: m.CheckoutWizard })));
 const AnonymousFeedbackForm = lazy(() => import('./pages/checkout/AnonymousFeedbackForm').then(m => ({ default: m.AnonymousFeedbackForm })));

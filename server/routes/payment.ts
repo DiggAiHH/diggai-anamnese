@@ -24,7 +24,7 @@ router.post('/intent', async (req: Request, res: Response) => {
       currency: z.string().default('EUR'),
       type: z.enum(['SELBSTZAHLER', 'IGEL', 'PRIVAT', 'COPAYMENT']),
       description: z.string().optional(),
-      metadata: z.record(z.unknown()).optional(),
+      metadata: z.record(z.string(), z.unknown()).optional(),
     });
 
     const data = schema.parse(req.body);
@@ -83,7 +83,7 @@ router.post('/webhook', async (req: Request, res: Response) => {
 // GET /api/payment/receipt/:id — Get payment receipt
 router.get('/receipt/:id', async (req: Request, res: Response) => {
   try {
-    const receipt = await getReceipt(req.params.id);
+    const receipt = await getReceipt(req.params.id as string);
     if (!receipt) {
       res.status(404).json({ error: 'Quittung nicht gefunden' });
       return;
@@ -111,7 +111,7 @@ router.get('/stats', async (req: Request, res: Response) => {
 router.post('/refund/:id', async (req: Request, res: Response) => {
   try {
     const reason = req.body.reason as string | undefined;
-    const result = await refundTransaction(req.params.id, reason);
+    const result = await refundTransaction(req.params.id as string, reason);
     res.json(result);
   } catch (err: any) {
     console.error('[Payment] Refund error:', err.message);

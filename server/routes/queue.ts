@@ -71,7 +71,7 @@ router.get('/', requireAuth, requireRole('arzt', 'admin', 'mfa'), async (_req, r
 // ─── GET /api/queue/position/:sessionId ─────────────────────
 router.get('/position/:sessionId', requireAuth, async (req, res) => {
     try {
-        const data = await queueService.getPositionBySession(req.params.sessionId);
+        const data = await queueService.getPositionBySession(req.params.sessionId as string);
         res.json(data);
     } catch (err: any) {
         console.error('[Queue] Position error:', err);
@@ -82,7 +82,7 @@ router.get('/position/:sessionId', requireAuth, async (req, res) => {
 // ─── GET /api/queue/flow-config/:sessionId ──────────────────
 router.get('/flow-config/:sessionId', requireAuth, async (req, res) => {
     try {
-        const config = await queueService.getFlowConfig(req.params.sessionId);
+        const config = await queueService.getFlowConfig(req.params.sessionId as string);
         res.json(config);
     } catch (err: any) {
         console.error('[Queue] Flow config error:', err);
@@ -93,7 +93,7 @@ router.get('/flow-config/:sessionId', requireAuth, async (req, res) => {
 // ─── PUT /api/queue/:id/call ────────────────────────────────
 router.put('/:id/call', requireAuth, requireRole('mfa', 'admin', 'arzt'), async (req, res) => {
     try {
-        const entry = await queueService.callEntry(req.params.id);
+        const entry = await queueService.callEntry(req.params.id as string);
         await broadcastQueue();
 
         // Notify patient they are being called
@@ -118,7 +118,7 @@ router.put('/:id/call', requireAuth, requireRole('mfa', 'admin', 'arzt'), async 
 // ─── PUT /api/queue/:id/treat ───────────────────────────────
 router.put('/:id/treat', requireAuth, requireRole('mfa', 'admin', 'arzt'), async (req, res) => {
     try {
-        const entry = await queueService.treatEntry(req.params.id);
+        const entry = await queueService.treatEntry(req.params.id as string);
         await broadcastQueue();
         res.json({ entry });
     } catch (err: any) {
@@ -134,7 +134,7 @@ router.put('/:id/treat', requireAuth, requireRole('mfa', 'admin', 'arzt'), async
 // ─── PUT /api/queue/:id/done ────────────────────────────────
 router.put('/:id/done', requireAuth, requireRole('mfa', 'admin', 'arzt'), async (req, res) => {
     try {
-        const entry = await queueService.doneEntry(req.params.id);
+        const entry = await queueService.doneEntry(req.params.id as string);
         await broadcastQueue();
         res.json({ entry });
     } catch (err: any) {
@@ -156,7 +156,7 @@ router.put('/:id/feedback', requireAuth, async (req, res) => {
     }
 
     try {
-        const entry = await queueService.submitFeedback(req.params.id, parsed.data.rating);
+        const entry = await queueService.submitFeedback(req.params.id as string, parsed.data.rating);
         res.json({ success: true, entry });
     } catch (err: any) {
         if (err.code === 'P2025') {
@@ -171,7 +171,7 @@ router.put('/:id/feedback', requireAuth, async (req, res) => {
 // ─── DELETE /api/queue/:id ──────────────────────────────────
 router.delete('/:id', requireAuth, requireRole('mfa', 'admin'), async (req, res) => {
     try {
-        await queueService.removeEntry(req.params.id);
+        await queueService.removeEntry(req.params.id as string);
         await broadcastQueue();
         res.json({ success: true });
     } catch (err: any) {

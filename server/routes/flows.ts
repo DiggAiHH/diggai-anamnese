@@ -33,7 +33,7 @@ router.get('/', requireAuth, async (req: Request, res: Response) => {
 // GET /api/flows/:id — Get single flow
 router.get('/:id', requireAuth, async (req: Request, res: Response) => {
   try {
-    const flow = await getFlow(req.params.id);
+    const flow = await getFlow(req.params.id as string);
     if (!flow) { res.status(404).json({ error: 'Flow nicht gefunden' }); return; }
     res.json(flow);
   } catch (err: any) {
@@ -63,7 +63,7 @@ router.post('/', requireAuth, requireRole('ADMIN'), async (req: Request, res: Re
 // PUT /api/flows/:id — Update flow metadata (admin)
 router.put('/:id', requireAuth, requireRole('ADMIN'), async (req: Request, res: Response) => {
   try {
-    const flow = await updateFlow(req.params.id, req.body);
+    const flow = await updateFlow(req.params.id as string, req.body);
     res.json(flow);
   } catch (err: any) {
     console.error('[Flow] Update error:', err);
@@ -74,7 +74,7 @@ router.put('/:id', requireAuth, requireRole('ADMIN'), async (req: Request, res: 
 // GET /api/flows/:id/progress/:sessionId — Get patient flow progress
 router.get('/:id/progress/:sessionId', requireAuth, async (req: Request, res: Response) => {
   try {
-    const progress = await getProgress(req.params.sessionId);
+    const progress = await getProgress(req.params.sessionId as string);
     if (!progress) { res.status(404).json({ error: 'Kein aktiver Flow für diese Session' }); return; }
     res.json(progress);
   } catch (err: any) {

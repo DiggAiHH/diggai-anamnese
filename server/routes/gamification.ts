@@ -66,7 +66,7 @@ router.post('/achievement', async (req: Request, res: Response) => {
     res.status(201).json(record);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      res.status(400).json({ error: 'Validation failed', details: error.errors });
+      res.status(400).json({ error: 'Validation failed', details: error.issues });
       return;
     }
     res.status(500).json({
@@ -78,7 +78,7 @@ router.post('/achievement', async (req: Request, res: Response) => {
 // GET /staff/:staffId — get staff achievements
 router.get('/staff/:staffId', async (req: Request, res: Response) => {
   try {
-    const { staffId } = req.params;
+    const staffId = req.params.staffId as string;
     const records = await getStaffAchievements(staffId);
     res.json(records);
   } catch (error) {
@@ -100,7 +100,7 @@ router.get('/leaderboard', async (req: Request, res: Response) => {
     res.json(entries);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      res.status(400).json({ error: 'Validation failed', details: error.errors });
+      res.status(400).json({ error: 'Validation failed', details: error.issues });
       return;
     }
     res.status(500).json({
@@ -120,7 +120,7 @@ router.post('/leaderboard/recalculate', async (req: Request, res: Response) => {
     res.json(entries);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      res.status(400).json({ error: 'Validation failed', details: error.errors });
+      res.status(400).json({ error: 'Validation failed', details: error.issues });
       return;
     }
     res.status(500).json({
@@ -132,7 +132,7 @@ router.post('/leaderboard/recalculate', async (req: Request, res: Response) => {
 // GET /staff/:staffId/points — get total points
 router.get('/staff/:staffId/points', async (req: Request, res: Response) => {
   try {
-    const { staffId } = req.params;
+    const staffId = req.params.staffId as string;
     const totalPoints = await getStaffPoints(staffId);
     res.json({ staffId, totalPoints });
   } catch (error) {
@@ -150,7 +150,7 @@ router.get('/stats', async (req: Request, res: Response) => {
     res.json(stats);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      res.status(400).json({ error: 'Validation failed', details: error.errors });
+      res.status(400).json({ error: 'Validation failed', details: error.issues });
       return;
     }
     res.status(500).json({

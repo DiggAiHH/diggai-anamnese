@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { Lock, Check, X } from 'lucide-react';
 import { useAdminPermissions, useAdminRolePermissions, useAdminSetRolePermissions } from '../../hooks/useApi';
 
@@ -28,7 +28,7 @@ export function PermissionMatrix() {
         const newIds = rolePermIds.has(permId)
             ? currentIds.filter(id => id !== permId)
             : [...currentIds, permId];
-        setRolePerms.mutate({ role: selectedRole, permissionIds: newIds });
+        setRolePerms.mutate({ role: selectedRole, permissionIds: newIds as string[] });
     };
 
     if (loadingPerms) return <div className="animate-pulse p-8">Lade Berechtigungen...</div>;

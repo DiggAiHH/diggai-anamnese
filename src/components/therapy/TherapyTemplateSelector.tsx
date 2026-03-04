@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { BookTemplate, Search, Loader2 } from 'lucide-react';
 import { useTherapyTemplates, useTherapyApplyTemplate } from '../../hooks/useApi';
 

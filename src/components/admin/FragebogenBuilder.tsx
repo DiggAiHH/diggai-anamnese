@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
-import { Layers, GripVertical, ToggleLeft, ToggleRight, Plus, FileEdit, Trash2, Upload } from 'lucide-react';
+import { useState } from 'react';
+import { Layers, GripVertical, ToggleLeft, ToggleRight, FileEdit, Trash2, Upload } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../api/client';
-import { useAtomsReorder, useAtomToggle, useAtomDraftCreate, useAtomDraftsList, useAtomDraftPublish, useAtomDraftDelete } from '../../hooks/useApi';
+import { useAtomToggle, useAtomDraftCreate, useAtomDraftsList, useAtomDraftPublish, useAtomDraftDelete } from '../../hooks/useApi';
 
 export function FragebogenBuilder() {
     const { data: atomsData, isLoading } = useQuery({
@@ -11,7 +11,6 @@ export function FragebogenBuilder() {
     });
     const { data: draftsData } = useAtomDraftsList('DRAFT');
 
-    const reorder = useAtomsReorder();
     const toggle = useAtomToggle();
     const createDraft = useAtomDraftCreate();
     const publishDraft = useAtomDraftPublish();

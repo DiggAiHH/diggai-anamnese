@@ -83,7 +83,7 @@ router.post('/checkpoints', requireAuth, requireRole('ADMIN'), async (req: Reque
 // PUT /api/nfc/checkpoints/:id — Update checkpoint (admin)
 router.put('/checkpoints/:id', requireAuth, requireRole('ADMIN'), async (req: Request, res: Response) => {
   try {
-    const checkpoint = await updateCheckpoint(req.params.id, req.body);
+    const checkpoint = await updateCheckpoint(req.params.id as string, req.body);
     res.json(checkpoint);
   } catch (err: any) {
     console.error('[NFC] Update checkpoint error:', err);
@@ -94,7 +94,7 @@ router.put('/checkpoints/:id', requireAuth, requireRole('ADMIN'), async (req: Re
 // DELETE /api/nfc/checkpoints/:id — Soft-delete checkpoint (admin)
 router.delete('/checkpoints/:id', requireAuth, requireRole('ADMIN'), async (req: Request, res: Response) => {
   try {
-    await deleteCheckpoint(req.params.id);
+    await deleteCheckpoint(req.params.id as string);
     res.json({ success: true });
   } catch (err: any) {
     console.error('[NFC] Delete checkpoint error:', err);
@@ -106,7 +106,7 @@ router.delete('/checkpoints/:id', requireAuth, requireRole('ADMIN'), async (req:
 router.get('/checkpoints/:id/scans', requireAuth, async (req: Request, res: Response) => {
   try {
     const limit = req.query.limit ? Number(req.query.limit) : 50;
-    const scans = await getCheckpointScans(req.params.id, limit);
+    const scans = await getCheckpointScans(req.params.id as string, limit);
     res.json(scans);
   } catch (err: any) {
     console.error('[NFC] Get scans error:', err);

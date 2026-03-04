@@ -12,7 +12,7 @@ import { countExportFields } from '../services/pvs/mapping-engine.js';
 import type { PvsConnectionData, PatientSessionFull } from '../services/pvs/types.js';
 
 const router = Router();
-const prisma = new PrismaClient();
+const prisma: any = new PrismaClient();
 
 // â”€â”€â”€ 1-6: PVS Connection CRUD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -195,13 +195,13 @@ router.post('/export/session/:sessionId', requireAuth, async (req, res) => {
       insuranceType: session.insuranceType,
       createdAt: session.createdAt,
       completedAt: session.completedAt,
-      answers: session.answers.map(a => ({
+      answers: session.answers.map((a: any) => ({
         id: a.id,
         atomId: a.atomId,
         value: a.value,
         encryptedValue: a.encryptedValue,
       })),
-      triageEvents: session.triageEvents.map(t => ({
+      triageEvents: session.triageEvents.map((t: any) => ({
         id: t.id,
         level: t.level,
         atomId: t.atomId,
@@ -300,8 +300,8 @@ router.post('/export/batch', requireAuth, requireRole('admin'), async (req, res)
           insuranceType: session.insuranceType,
           createdAt: session.createdAt,
           completedAt: session.completedAt,
-          answers: session.answers.map(a => ({ id: a.id, atomId: a.atomId, value: a.value, encryptedValue: a.encryptedValue })),
-          triageEvents: session.triageEvents.map(t => ({ id: t.id, level: t.level, atomId: t.atomId, triggerValues: t.triggerValues, message: t.message })),
+          answers: session.answers.map((a: any) => ({ id: a.id, atomId: a.atomId, value: a.value, encryptedValue: a.encryptedValue })),
+          triageEvents: session.triageEvents.map((t: any) => ({ id: t.id, level: t.level, atomId: t.atomId, triggerValues: t.triggerValues, message: t.message })),
         };
 
         const result = await pvsRouter.exportAnamnese(connData, sessionFull);
@@ -494,8 +494,8 @@ router.post('/transfers/:id/retry', requireAuth, requireRole('admin'), async (re
         insuranceType: session.insuranceType,
         createdAt: session.createdAt,
         completedAt: session.completedAt,
-        answers: session.answers.map(a => ({ id: a.id, atomId: a.atomId, value: a.value, encryptedValue: a.encryptedValue })),
-        triageEvents: session.triageEvents.map(t => ({ id: t.id, level: t.level, atomId: t.atomId, triggerValues: t.triggerValues, message: t.message })),
+        answers: session.answers.map((a: any) => ({ id: a.id, atomId: a.atomId, value: a.value, encryptedValue: a.encryptedValue })),
+        triageEvents: session.triageEvents.map((t: any) => ({ id: t.id, level: t.level, atomId: t.atomId, triggerValues: t.triggerValues, message: t.message })),
       };
 
       const result = await pvsRouter.exportAnamnese(connData, sessionFull);
@@ -544,7 +544,7 @@ router.get('/transfers/stats', requireAuth, requireRole('admin'), async (_req, r
       today: todayCount,
       failed,
       successRate,
-      byStatus: byStatus.reduce((acc, s) => {
+      byStatus: byStatus.reduce((acc: any, s: any) => {
         acc[s.status] = s._count;
         return acc;
       }, {} as Record<string, number>),
@@ -688,8 +688,8 @@ router.post('/mappings/preview', requireAuth, requireRole('admin'), async (req, 
       insuranceType: session.insuranceType,
       createdAt: session.createdAt,
       completedAt: session.completedAt,
-      answers: session.answers.map(a => ({ id: a.id, atomId: a.atomId, value: a.value, encryptedValue: a.encryptedValue })),
-      triageEvents: session.triageEvents.map(t => ({ id: t.id, level: t.level, atomId: t.atomId, triggerValues: t.triggerValues, message: t.message })),
+      answers: session.answers.map((a: any) => ({ id: a.id, atomId: a.atomId, value: a.value, encryptedValue: a.encryptedValue })),
+      triageEvents: session.triageEvents.map((t: any) => ({ id: t.id, level: t.level, atomId: t.atomId, triggerValues: t.triggerValues, message: t.message })),
     };
 
     const befundtext = buildBefundtext(sessionFull, {

@@ -51,13 +51,13 @@ export function VoiceCloneSettings({
     provider: 'azure',
   });
   const [showConsentDialog, setShowConsentDialog] = useState(false);
-  const [audioSamples, setAudioSamples] = useState<string[]>([]);
+  const [audioSamples] = useState<string[]>([]);
 
-  const cloneStatus: CloneStatus = currentAvatar?.voiceCloneId
+  const cloneStatus = (currentAvatar?.voiceCloneId
     ? 'ready'
     : currentAvatar?.consentSignedAt
     ? 'consented'
-    : 'none';
+    : 'none') as CloneStatus;
 
   const handleVoiceUpdate = useCallback((key: string, value: number | string) => {
     const updated = { ...voiceSettings, [key]: value };

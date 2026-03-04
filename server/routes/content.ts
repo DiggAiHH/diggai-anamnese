@@ -8,8 +8,10 @@
  */
 import { Router } from 'express';
 import { z } from 'zod';
-import { prisma } from '../db';
+import { prisma as _prisma } from '../db';
 import { requireAuth, requireRole } from '../middleware/auth';
+
+const prisma: any = _prisma;
 
 const router = Router();
 

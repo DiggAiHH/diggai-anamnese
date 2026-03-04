@@ -5,7 +5,7 @@ import bcrypt from 'bcryptjs';
 import { requireAuth, requireRole } from '../middleware/auth';
 
 const router = Router();
-const prisma = new PrismaClient();
+const prisma: any = new PrismaClient();
 
 // Alle Admin-Routen erfordern Admin-Rolle (except /permissions/check)
 router.use(requireAuth);
@@ -44,7 +44,7 @@ router.get('/stats', requireRole('admin'), async (_req, res) => {
 
         const avgCompletionMinutes = completedWithTime.length > 0
             ? Math.round(
-                completedWithTime.reduce((sum, s) => {
+                completedWithTime.reduce((sum: any, s: any) => {
                     const diff = (s.completedAt!.getTime() - s.createdAt.getTime()) / 60000;
                     return sum + diff;
                 }, 0) / completedWithTime.length
@@ -116,7 +116,7 @@ router.get('/analytics/services', requireRole('admin'), async (_req, res) => {
             orderBy: { _count: { id: 'desc' } },
         });
 
-        res.json(services.map(s => ({
+        res.json(services.map((s: any) => ({
             service: s.selectedService,
             count: s._count.id,
         })));
@@ -347,7 +347,7 @@ router.get('/roles/:role/permissions', requireRole('admin'), async (req, res) =>
             where: { role: req.params.role },
             include: { permission: true },
         });
-        res.json(rolePerms.map(rp => rp.permission));
+        res.json(rolePerms.map((rp: any) => rp.permission));
     } catch (err) {
         console.error('[Admin] Role permissions error:', err);
         res.status(500).json({ error: 'Rollen-Berechtigungen konnten nicht geladen werden' });
@@ -471,7 +471,7 @@ router.get('/content', requireRole('admin'), async (req, res) => {
             where,
             orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
         });
-        res.json(content.map(c => ({
+        res.json(content.map((c: any) => ({
             ...c,
             quizData: c.quizData ? JSON.parse(c.quizData) : null,
         })));

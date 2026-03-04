@@ -185,7 +185,8 @@ export function requirePermission(permissionCode: string) {
 
         try {
             // Lazy import to avoid circular deps
-            const { prisma } = await import('../db');
+            const { prisma: _p } = await import('../db');
+            const prisma = _p as any;
 
             const role = req.auth.role.toUpperCase(); // ARZT, MFA, etc.
 

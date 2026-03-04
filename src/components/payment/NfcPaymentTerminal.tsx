@@ -18,8 +18,8 @@ interface NfcPaymentTerminalProps {
 }
 
 export function NfcPaymentTerminal({
-  sessionId,
-  patientId,
+  sessionId: _sessionId,
+  patientId: _patientId,
   amount,
   type,
   description,

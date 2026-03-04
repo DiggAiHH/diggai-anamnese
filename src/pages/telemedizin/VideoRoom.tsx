@@ -4,10 +4,10 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  Video, VideoOff, Mic, MicOff, Phone, PhoneOff,
+  Video, VideoOff, Mic, MicOff, PhoneOff,
   Monitor, MonitorOff, MessageSquare, FileText,
   Clock, Shield, Maximize2, Minimize2, Settings,
-  AlertTriangle, CheckCircle2, Users
+  AlertTriangle, Users
 } from 'lucide-react';
 
 type ConnectionState = 'connecting' | 'connected' | 'reconnecting' | 'disconnected' | 'failed';
@@ -30,7 +30,7 @@ export function VideoRoom() {
   const navigate = useNavigate();
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
-  const timerRef = useRef<ReturnType<typeof setInterval>>();
+  const timerRef = useRef<ReturnType<typeof setInterval>>(null);
 
   const [state, setState] = useState<VideoRoomState>({
     connectionState: 'connecting',

@@ -12,7 +12,7 @@ interface CheckoutWizardProps {
   onComplete?: (action: CheckoutAction) => void;
 }
 
-export function CheckoutWizard({ sessionId, onComplete }: CheckoutWizardProps) {
+export function CheckoutWizard({ sessionId: _sessionId, onComplete }: CheckoutWizardProps) {
   const { t } = useTranslation();
   const [step, setStep] = useState<'choose' | 'confirm' | 'done'>('choose');
   const [selectedAction, setSelectedAction] = useState<CheckoutAction | null>(null);

@@ -95,7 +95,7 @@ export class PvsRouter {
    * Shutdown all active adapters.
    */
   async shutdown(): Promise<void> {
-    for (const [id, adapter] of this.activeAdapters) {
+    for (const [, adapter] of this.activeAdapters) {
       await adapter.disconnect();
     }
     this.activeAdapters.clear();

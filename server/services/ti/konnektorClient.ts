@@ -1,5 +1,5 @@
 // Modul 6: TI-Konnektor Client — SOAP mTLS stub (requires actual Konnektor hardware)
-import type { TIConnectionConfig, TIPingResult, TIConnectionStatus, TICardStatus, EGKReadResult, VSDData } from './types';
+import type { TIConnectionConfig, TIPingResult, TIConnectionStatus, TICardStatus, EGKReadResult } from './types';
 
 const prisma = () => (globalThis as any).__prisma;
 

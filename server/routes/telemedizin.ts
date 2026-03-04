@@ -41,7 +41,7 @@ router.post('/session', async (req: Request, res: Response) => {
 // GET /api/telemedizin/session/:id — Get session details
 router.get('/session/:id', async (req: Request, res: Response) => {
   try {
-    const session = await getSession(req.params.id);
+    const session = await getSession(req.params.id as string);
     if (!session) {
       res.status(404).json({ error: 'Sitzung nicht gefunden' });
       return;
@@ -63,7 +63,7 @@ router.post('/session/:id/join', async (req: Request, res: Response) => {
 
     const data = schema.parse(req.body);
     const result = await joinSession({
-      sessionId: req.params.id,
+      sessionId: req.params.id as string,
       ...data,
     });
     res.json(result);
@@ -76,7 +76,7 @@ router.post('/session/:id/join', async (req: Request, res: Response) => {
 router.post('/session/:id/end', async (req: Request, res: Response) => {
   try {
     const notes = req.body.notes as string | undefined;
-    const session = await endSession(req.params.id, notes);
+    const session = await endSession(req.params.id as string, notes);
     res.json(session);
   } catch (err: any) {
     res.status(400).json({ error: err.message });
@@ -87,7 +87,7 @@ router.post('/session/:id/end', async (req: Request, res: Response) => {
 router.post('/session/:id/cancel', async (req: Request, res: Response) => {
   try {
     const reason = req.body.reason as string | undefined;
-    const session = await cancelSession(req.params.id, reason);
+    const session = await cancelSession(req.params.id as string, reason);
     res.json(session);
   } catch (err: any) {
     res.status(400).json({ error: err.message });
@@ -97,7 +97,7 @@ router.post('/session/:id/cancel', async (req: Request, res: Response) => {
 // POST /api/telemedizin/session/:id/no-show — Mark as no-show
 router.post('/session/:id/no-show', async (req: Request, res: Response) => {
   try {
-    const session = await markNoShow(req.params.id);
+    const session = await markNoShow(req.params.id as string);
     res.json(session);
   } catch (err: any) {
     res.status(400).json({ error: err.message });
@@ -111,7 +111,7 @@ router.post('/session/:id/prescription', async (req: Request, res: Response) => 
       prescription: z.string().min(1).max(1000),
     });
     const { prescription } = schema.parse(req.body);
-    const result = await addPrescription(req.params.id, prescription);
+    const result = await addPrescription(req.params.id as string, prescription);
     res.json(result);
   } catch (err: any) {
     res.status(400).json({ error: err.message });
@@ -125,7 +125,7 @@ router.post('/session/:id/follow-up', async (req: Request, res: Response) => {
       followUpDate: z.string().datetime(),
     });
     const { followUpDate } = schema.parse(req.body);
-    const result = await setFollowUp(req.params.id, followUpDate);
+    const result = await setFollowUp(req.params.id as string, followUpDate);
     res.json(result);
   } catch (err: any) {
     res.status(400).json({ error: err.message });

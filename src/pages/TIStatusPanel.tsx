@@ -1,4 +1,3 @@
-import React from 'react';
 import { Shield, CreditCard, Wifi, WifiOff, RefreshCw, Radio, FileText, Mail, Settings, Zap, AlertTriangle, CheckCircle, XCircle, Clock } from 'lucide-react';
 import {
   useTIStatus,

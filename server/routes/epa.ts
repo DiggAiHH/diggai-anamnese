@@ -63,7 +63,7 @@ const ConsentQuerySchema = z.object({
 
 function handleError(res: Response, err: unknown) {
   if (err instanceof z.ZodError) {
-    return res.status(400).json({ error: 'Validation failed', details: err.errors });
+    return res.status(400).json({ error: 'Validation failed', details: err.issues });
   }
   const message = err instanceof Error ? err.message : 'Internal server error';
   return res.status(500).json({ error: message });
@@ -74,7 +74,7 @@ function handleError(res: Response, err: unknown) {
 router.get('/:patientId', async (req: Request, res: Response) => {
   try {
     const { consentVersion } = ConsentQuerySchema.parse(req.query);
-    const epa = await getOrCreateEPA(req.params.patientId, consentVersion);
+    const epa = await getOrCreateEPA(req.params.patientId as string, consentVersion);
     res.json(epa);
   } catch (err) {
     handleError(res, err);
@@ -85,7 +85,7 @@ router.get('/:patientId', async (req: Request, res: Response) => {
 
 router.post('/:patientId/documents', async (req: Request, res: Response) => {
   try {
-    const epa = await getOrCreateEPA(req.params.patientId, '1.0');
+    const epa = await getOrCreateEPA(req.params.patientId as string, '1.0');
     const body = CreateDocumentSchema.parse(req.body);
     const doc = await addDocument({ ...body, epaId: epa.id });
     res.status(201).json(doc);
@@ -96,7 +96,7 @@ router.post('/:patientId/documents', async (req: Request, res: Response) => {
 
 router.get('/:patientId/documents', async (req: Request, res: Response) => {
   try {
-    const epa = await getOrCreateEPA(req.params.patientId, '1.0');
+    const epa = await getOrCreateEPA(req.params.patientId as string, '1.0');
     const type = req.query.type
       ? DocumentTypeEnum.parse(req.query.type)
       : undefined;
@@ -109,7 +109,7 @@ router.get('/:patientId/documents', async (req: Request, res: Response) => {
 
 router.get('/document/:docId', async (req: Request, res: Response) => {
   try {
-    const doc = await getDocument(req.params.docId);
+    const doc = await getDocument(req.params.docId as string);
     if (!doc) return res.status(404).json({ error: 'Document not found' });
     res.json(doc);
   } catch (err) {
@@ -119,7 +119,7 @@ router.get('/document/:docId', async (req: Request, res: Response) => {
 
 router.delete('/document/:docId', async (req: Request, res: Response) => {
   try {
-    await deleteDocument(req.params.docId);
+    await deleteDocument(req.params.docId as string);
     res.status(204).end();
   } catch (err) {
     handleError(res, err);
@@ -130,7 +130,7 @@ router.delete('/document/:docId', async (req: Request, res: Response) => {
 
 router.post('/:patientId/shares', async (req: Request, res: Response) => {
   try {
-    const epa = await getOrCreateEPA(req.params.patientId, '1.0');
+    const epa = await getOrCreateEPA(req.params.patientId as string, '1.0');
     const body = CreateShareSchema.parse(req.body);
     const share = await createShare({ ...body, epaId: epa.id });
     res.status(201).json(share);
@@ -141,7 +141,7 @@ router.post('/:patientId/shares', async (req: Request, res: Response) => {
 
 router.get('/:patientId/shares', async (req: Request, res: Response) => {
   try {
-    const epa = await getOrCreateEPA(req.params.patientId, '1.0');
+    const epa = await getOrCreateEPA(req.params.patientId as string, '1.0');
     const shares = await getShares(epa.id);
     res.json(shares);
   } catch (err) {
@@ -151,7 +151,7 @@ router.get('/:patientId/shares', async (req: Request, res: Response) => {
 
 router.post('/share/:shareId/revoke', async (req: Request, res: Response) => {
   try {
-    const share = await revokeShare(req.params.shareId);
+    const share = await revokeShare(req.params.shareId as string);
     res.json(share);
   } catch (err) {
     handleError(res, err);
@@ -162,7 +162,7 @@ router.post('/share/:shareId/revoke', async (req: Request, res: Response) => {
 
 router.get('/access/:token', async (req: Request, res: Response) => {
   try {
-    const result = await accessByToken(req.params.token);
+    const result = await accessByToken(req.params.token as string);
     if (!result) return res.status(404).json({ error: 'Invalid or expired token' });
     res.json(result);
   } catch (err) {
@@ -184,7 +184,7 @@ router.post('/export/anonymized', async (req: Request, res: Response) => {
 
 router.get('/export/:exportId', async (req: Request, res: Response) => {
   try {
-    const exp = await getExport(req.params.exportId);
+    const exp = await getExport(req.params.exportId as string);
     if (!exp) return res.status(404).json({ error: 'Export not found or expired' });
     res.json(exp);
   } catch (err) {

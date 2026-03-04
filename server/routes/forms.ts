@@ -30,7 +30,7 @@ const FormQuestionSchema = z.object({
   required: z.boolean(),
   options: z.array(z.string()).optional(),
   placeholder: z.string().optional(),
-  validation: z.record(z.any()).optional(),
+  validation: z.record(z.string(), z.any()).optional(),
   conditionalOn: z.object({
     questionId: z.string(),
     value: z.any(),
@@ -48,7 +48,7 @@ const CreateFormSchema = z.object({
   name: z.string().min(1),
   description: z.string().optional(),
   questions: z.array(FormQuestionSchema).min(1),
-  logic: z.record(z.any()).optional(),
+  logic: z.record(z.string(), z.any()).optional(),
   tags: z.array(z.string()).optional(),
   ageRange: AgeRangeSchema,
 });
@@ -57,7 +57,7 @@ const UpdateFormSchema = z.object({
   name: z.string().min(1).optional(),
   description: z.string().optional(),
   questions: z.array(FormQuestionSchema).optional(),
-  logic: z.record(z.any()).optional(),
+  logic: z.record(z.string(), z.any()).optional(),
   tags: z.array(z.string()).optional(),
   ageRange: AgeRangeSchema,
   isActive: z.boolean().optional(),
@@ -117,7 +117,7 @@ router.post(
 router.get(
   '/:id',
   wrap(async (req, res) => {
-    const form = await getForm(req.params.id);
+    const form = await getForm(req.params.id as string);
     res.json(form);
   }),
 );
@@ -142,7 +142,7 @@ router.patch(
   '/:id',
   wrap(async (req, res) => {
     const data = UpdateFormSchema.parse(req.body);
-    const form = await updateForm(req.params.id, data);
+    const form = await updateForm(req.params.id as string, data);
     res.json(form);
   }),
 );
@@ -151,7 +151,7 @@ router.patch(
 router.delete(
   '/:id',
   wrap(async (req, res) => {
-    const form = await deleteForm(req.params.id);
+    const form = await deleteForm(req.params.id as string);
     res.json(form);
   }),
 );
@@ -160,7 +160,7 @@ router.delete(
 router.post(
   '/:id/publish',
   wrap(async (req, res) => {
-    const form = await publishForm(req.params.id);
+    const form = await publishForm(req.params.id as string);
     res.json(form);
   }),
 );
@@ -169,7 +169,7 @@ router.post(
 router.post(
   '/:id/usage',
   wrap(async (req, res) => {
-    const form = await incrementUsage(req.params.id);
+    const form = await incrementUsage(req.params.id as string);
     res.json(form);
   }),
 );

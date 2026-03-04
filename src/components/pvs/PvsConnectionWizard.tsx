@@ -50,7 +50,6 @@ export function PvsConnectionWizard({ onClose }: { onClose?: () => void }) {
     const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
     const createConn = usePvsCreateConnection();
-    const testConn = usePvsTestConnection();
 
     const selectedType = PVS_TYPES.find(t => t.value === config.pvsType);
     const isGdt = selectedType?.protocol === 'GDT';
@@ -93,12 +92,6 @@ export function PvsConnectionWizard({ onClose }: { onClose?: () => void }) {
                 setTestResult(data.testResult || { success: true, message: 'Verbindung erstellt' });
                 setStep('test');
             },
-        });
-    };
-
-    const handleTest = (connId: string) => {
-        testConn.mutate(connId, {
-            onSuccess: (result) => setTestResult(result),
         });
     };
 

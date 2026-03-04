@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { Plus, Save, FileText, Loader2, ChevronDown, BookTemplate } from 'lucide-react';
-import { useTherapyCreatePlan, useTherapyAddMeasure, useTherapyUpdatePlan } from '../../hooks/useApi';
+import { useState } from 'react';
+import { Plus, Save, FileText, Loader2, BookTemplate } from 'lucide-react';
+import { useTherapyCreatePlan, useTherapyAddMeasure } from '../../hooks/useApi';
 import { TherapyMeasureCard } from './TherapyMeasureCard';
 import { TherapyTemplateSelector } from './TherapyTemplateSelector';
 
@@ -42,7 +42,6 @@ export function TherapyPlanBuilder({ sessionId, patientId, onCreated }: TherapyP
 
     const createPlan = useTherapyCreatePlan();
     const addMeasure = useTherapyAddMeasure();
-    const updatePlan = useTherapyUpdatePlan();
 
     const handleCreatePlan = () => {
         const codes = icdCodes.split(',').map(c => c.trim()).filter(Boolean);
@@ -91,7 +90,7 @@ export function TherapyPlanBuilder({ sessionId, patientId, onCreated }: TherapyP
         setShowMeasureForm(false);
     };
 
-    const handleTemplateApplied = (result: { addedMeasures: number }) => {
+    const handleTemplateApplied = (_result: { addedMeasures: number }) => {
         setStep('measures');
     };
 

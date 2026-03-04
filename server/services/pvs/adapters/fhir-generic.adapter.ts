@@ -25,11 +25,9 @@ export class FhirGenericAdapter implements PvsAdapter {
   readonly type: PvsType = 'FHIR_GENERIC';
   readonly supportedProtocols: PvsProtocol[] = ['FHIR'];
 
-  private connection: PvsConnectionData | null = null;
   private client: FhirClient | null = null;
 
   async initialize(connection: PvsConnectionData): Promise<void> {
-    this.connection = connection;
 
     if (!connection.fhirBaseUrl) {
       throw new Error('FHIR Base URL nicht konfiguriert');
@@ -63,7 +61,6 @@ export class FhirGenericAdapter implements PvsAdapter {
   }
 
   async disconnect(): Promise<void> {
-    this.connection = null;
     this.client = null;
   }
 

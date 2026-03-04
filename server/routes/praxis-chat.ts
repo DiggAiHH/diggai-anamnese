@@ -21,7 +21,7 @@ router.get('/:sessionId', async (req: Request, res: Response) => {
   try {
     const limit = parseInt(req.query.limit as string) || 50;
     const before = req.query.before as string | undefined;
-    const messages = await getSessionMessages(req.params.sessionId, limit, before);
+    const messages = await getSessionMessages(req.params.sessionId as string, limit, before);
     res.json(messages);
   } catch (err: any) {
     console.error('[PraxisChat] Get messages error:', err.message);
@@ -81,7 +81,7 @@ router.post('/:sessionId/read', async (req: Request, res: Response) => {
     });
 
     const data = schema.parse(req.body);
-    const count = await markAsRead(req.params.sessionId, data.readerId, data.readerType);
+    const count = await markAsRead(req.params.sessionId as string, data.readerId, data.readerType);
     res.json({ markedAsRead: count });
   } catch (err: any) {
     console.error('[PraxisChat] Mark read error:', err.message);
@@ -93,7 +93,7 @@ router.post('/:sessionId/read', async (req: Request, res: Response) => {
 router.get('/:sessionId/unread', async (req: Request, res: Response) => {
   try {
     const viewerType = req.query.viewerType as string || 'PATIENT';
-    const count = await getUnreadCount(req.params.sessionId, viewerType);
+    const count = await getUnreadCount(req.params.sessionId as string, viewerType);
     res.json({ unreadCount: count });
   } catch (err: any) {
     console.error('[PraxisChat] Unread count error:', err.message);
@@ -127,7 +127,7 @@ router.get('/stats/overview', async (req: Request, res: Response) => {
 // DELETE /api/praxis-chat/:sessionId — Delete chat history (checkout/DSGVO)
 router.delete('/:sessionId', async (req: Request, res: Response) => {
   try {
-    const count = await deleteSessionChat(req.params.sessionId);
+    const count = await deleteSessionChat(req.params.sessionId as string);
     res.json({ deleted: count });
   } catch (err: any) {
     console.error('[PraxisChat] Delete error:', err.message);

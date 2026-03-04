@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { FileText, Search, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useState } from 'react';
+import { FileText, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAdminAuditLog } from '../../hooks/useApi';
 
 export function AuditLogTab() {

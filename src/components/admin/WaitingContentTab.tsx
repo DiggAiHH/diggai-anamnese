@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { BookOpen, Plus, Edit, Trash2, Eye, EyeOff } from 'lucide-react';
 import { useAdminContentList, useAdminContentCreate, useAdminContentUpdate, useAdminContentDelete } from '../../hooks/useApi';
 

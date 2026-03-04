@@ -1,8 +1,8 @@
-import React from 'react';
-import { AlertTriangle, AlertCircle, Info, ShieldAlert, Bell, X, Check, MessageSquare } from 'lucide-react';
+import { useState, type ReactNode } from 'react';
+import { AlertTriangle, AlertCircle, Info, ShieldAlert, X, Check, MessageSquare } from 'lucide-react';
 import { useTherapyAlertsByPatient, useTherapyAlertRead, useTherapyAlertDismiss, useTherapyAlertAction, useTherapyAlerts } from '../../hooks/useApi';
 
-const SEVERITY_CONFIG: Record<string, { icon: React.ReactNode; color: string; bg: string; border: string }> = {
+const SEVERITY_CONFIG: Record<string, { icon: ReactNode; color: string; bg: string; border: string }> = {
     EMERGENCY: { icon: <ShieldAlert className="w-5 h-5" />, color: 'text-red-700 dark:text-red-300', bg: 'bg-red-50 dark:bg-red-950', border: 'border-red-500' },
     CRITICAL: { icon: <AlertTriangle className="w-5 h-5" />, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-950', border: 'border-red-400' },
     WARNING: { icon: <AlertCircle className="w-5 h-5" />, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-950', border: 'border-amber-400' },
@@ -69,8 +69,8 @@ export function ClinicalAlertList({ patientId }: { patientId?: string }) {
     const alerts = patientId ? (patientAlerts.data || []) : (allAlerts.data?.alerts || []);
     const isLoading = patientId ? patientAlerts.isLoading : allAlerts.isLoading;
 
-    const [actionId, setActionId] = React.useState<string | null>(null);
-    const [actionText, setActionText] = React.useState('');
+    const [actionId, setActionId] = useState<string | null>(null);
+    const [actionText, setActionText] = useState('');
 
     if (isLoading) return <div className="animate-pulse p-4 text-gray-400">Lade Alerts...</div>;
     if (alerts.length === 0) return <div className="text-center py-8 text-gray-400 text-sm">Keine klinischen Alerts</div>;

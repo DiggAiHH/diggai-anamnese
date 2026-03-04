@@ -3,8 +3,8 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import {
-  Send, Mic, MicOff, Paperclip, MessageSquare, Users, Clock,
-  ChevronDown, CheckCheck, Check, Megaphone, FileText, X
+  Send, Mic, MicOff, Paperclip, MessageSquare,
+  CheckCheck, Check, Megaphone, FileText, X
 } from 'lucide-react';
 
 type SenderType = 'PATIENT' | 'MFA' | 'ARZT' | 'SYSTEM';
