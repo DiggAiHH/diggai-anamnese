@@ -36,6 +36,11 @@ model Patient {
   kassennummer     String?   // IK-Nummer (9-stellig)
   kassenname       String?
 
+  // Modul 4: Therapieplan & Alerts
+  therapyPlans     TherapyPlan[]
+  clinicalAlerts   ClinicalAlert[]
+  anonId           AnonPatientId?
+
   @@index([insuranceNumHash, birthDate])
 }
 
@@ -74,6 +79,10 @@ model PatientSession {
   pvsExported     Boolean   @default(false)
   pvsExportedAt   DateTime?
   pvsExportRef    String?   // Referenz-ID im PVS
+
+  // Modul 4: Therapieplan & Alerts
+  therapyPlans    TherapyPlan[]
+  clinicalAlerts  ClinicalAlert[]
 
   @@index([patientId, createdAt])
   @@index([status])
@@ -184,6 +193,9 @@ model ArztUser {
 
   assignedSessions PatientSession[] @relation("ArztAssignedSessions")
   appointments     Appointment[]    @relation("ArztAppointments")
+
+  // Modul 4: Therapieplan-Erstellung
+  createdTherapyPlans TherapyPlan[] @relation("TherapyPlanCreator")
 }
 
 // ─── Audit Log (HIPAA Compliance) ───────────────────────────
@@ -607,4 +619,209 @@ model PvsPatientLink {
   @@unique([patientId, pvsType])
   @@unique([pvsType, pvsPatientId])
   @@index([pvsPatientId])
+}
+
+// ─── Modul 4: Therapieplan & Arzt-Assistenz ─────────────────
+
+enum TherapyStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+enum MeasureStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+  OVERDUE
+}
+
+enum MeasureType {
+  MEDICATION
+  PROCEDURE
+  REFERRAL
+  LAB_ORDER
+  IMAGING
+  LIFESTYLE
+  FOLLOW_UP
+  DOCUMENTATION
+  CUSTOM
+}
+
+enum AlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+  EMERGENCY
+}
+
+enum AlertCategory {
+  VITAL_SIGN
+  DRUG_INTERACTION
+  ALLERGY_CONFLICT
+  TRIAGE_ESCALATION
+  SYMPTOM_PATTERN
+  AGE_RISK
+  CUSTOM
+}
+
+model TherapyPlan {
+  id              String          @id @default(uuid())
+  sessionId       String
+  session         PatientSession  @relation(fields: [sessionId], references: [id])
+  patientId       String
+  patient         Patient         @relation(fields: [patientId], references: [id])
+  createdById     String
+  createdBy       ArztUser        @relation("TherapyPlanCreator", fields: [createdById], references: [id])
+
+  title           String
+  status          TherapyStatus   @default(DRAFT)
+  diagnosis       String?
+  icdCodes        String[]
+  summary         String?
+
+  aiGenerated     Boolean         @default(false)
+  aiModel         String?
+  aiConfidence    Float?
+  aiPromptHash    String?
+
+  startDate       DateTime        @default(now())
+  targetEndDate   DateTime?
+  actualEndDate   DateTime?
+
+  lastReviewedAt  DateTime?
+  lastReviewedBy  String?
+  nextReviewDate  DateTime?
+
+  pvsExported     Boolean         @default(false)
+  pvsExportedAt   DateTime?
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  measures        TherapyMeasure[]
+  alerts          ClinicalAlert[]
+
+  @@index([patientId])
+  @@index([sessionId])
+  @@index([status])
+  @@index([createdById])
+}
+
+model TherapyMeasure {
+  id              String          @id @default(uuid())
+  planId          String
+  plan            TherapyPlan     @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  type            MeasureType
+  title           String
+  description     String?
+  status          MeasureStatus   @default(PLANNED)
+  priority        Int             @default(0)
+
+  medicationName  String?
+  dosage          String?
+  duration        String?
+  pzn             String?
+  atcCode         String?
+
+  referralTo      String?
+  referralReason  String?
+  referralUrgency String?
+
+  labParameters   String[]
+
+  scheduledDate   DateTime?
+  completedDate   DateTime?
+  dueDate         DateTime?
+
+  aiSuggested     Boolean         @default(false)
+  aiConfidence    Float?
+  arztApproved    Boolean         @default(false)
+  arztModified    Boolean         @default(false)
+
+  notes           String?
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([planId, priority])
+  @@index([status])
+}
+
+model ClinicalAlert {
+  id              String          @id @default(uuid())
+
+  sessionId       String?
+  session         PatientSession? @relation(fields: [sessionId], references: [id])
+  planId          String?
+  plan            TherapyPlan?    @relation(fields: [planId], references: [id])
+  patientId       String
+  patient         Patient         @relation(fields: [patientId], references: [id])
+
+  severity        AlertSeverity
+  category        AlertCategory
+  title           String
+  message         String
+
+  triggerField    String?
+  triggerValue    String?
+  triggerRule     String?
+
+  isRead          Boolean         @default(false)
+  readAt          DateTime?
+  readBy          String?
+  isDismissed     Boolean         @default(false)
+  dismissedAt     DateTime?
+  dismissedBy     String?
+  dismissReason   String?
+
+  actionTaken     String?
+  actionTakenAt   DateTime?
+  actionTakenBy   String?
+
+  createdAt       DateTime        @default(now())
+
+  @@index([patientId, severity])
+  @@index([sessionId])
+  @@index([isRead, severity])
+  @@index([createdAt])
+}
+
+model TherapyTemplate {
+  id              String          @id @default(uuid())
+
+  name            String
+  description     String?
+  category        String
+  icdCodes        String[]
+
+  measures        Json
+  defaultDuration String?
+
+  isDefault       Boolean         @default(false)
+  createdById     String?
+  usageCount      Int             @default(0)
+  isActive        Boolean         @default(true)
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([category])
+  @@index([isActive])
+}
+
+model AnonPatientId {
+  id              String          @id @default(uuid())
+  patientId       String          @unique
+  patient         Patient         @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  pseudonym       String          @unique
+
+  createdAt       DateTime        @default(now())
+
+  @@index([pseudonym])
 }

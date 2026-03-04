@@ -902,3 +902,98 @@ export function usePvsMappingPreview() {
             api.pvsMappingPreview(connectionId, sessionId),
     });
 }
+
+// ─── Therapy / Therapieplan Hooks ───────────────────────────
+
+export function useTherapyPlansBySession(sessionId: string) {
+    return useQuery({ queryKey: ['therapy', 'plans', 'session', sessionId], queryFn: () => api.therapyPlansBySession(sessionId), enabled: !!sessionId });
+}
+export function useTherapyPlansByPatient(patientId: string) {
+    return useQuery({ queryKey: ['therapy', 'plans', 'patient', patientId], queryFn: () => api.therapyPlansByPatient(patientId), enabled: !!patientId });
+}
+export function useTherapyPlan(id: string) {
+    return useQuery({ queryKey: ['therapy', 'plan', id], queryFn: () => api.therapyGetPlan(id), enabled: !!id });
+}
+export function useTherapyCreatePlan() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: (data: { sessionId: string; patientId: string; title: string; diagnosis?: string; icdCodes?: string[]; summary?: string; templateId?: string }) => api.therapyCreatePlan(data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['therapy', 'plans'] }); } });
+}
+export function useTherapyUpdatePlan() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: ({ id, ...data }: { id: string } & Record<string, unknown>) => api.therapyUpdatePlan(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['therapy'] }); } });
+}
+export function useTherapyDeletePlan() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: (id: string) => api.therapyDeletePlan(id), onSuccess: () => { qc.invalidateQueries({ queryKey: ['therapy', 'plans'] }); } });
+}
+export function useTherapyUpdateStatus() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: ({ id, status }: { id: string; status: string }) => api.therapyUpdateStatus(id, status), onSuccess: () => { qc.invalidateQueries({ queryKey: ['therapy'] }); } });
+}
+
+// Measures
+export function useTherapyAddMeasure() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: ({ planId, ...data }: { planId: string } & Record<string, unknown>) => api.therapyAddMeasure(planId, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['therapy'] }); } });
+}
+export function useTherapyUpdateMeasure() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: ({ id, ...data }: { id: string } & Record<string, unknown>) => api.therapyUpdateMeasure(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['therapy'] }); } });
+}
+export function useTherapyDeleteMeasure() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: (id: string) => api.therapyDeleteMeasure(id), onSuccess: () => { qc.invalidateQueries({ queryKey: ['therapy'] }); } });
+}
+export function useTherapyUpdateMeasureStatus() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: ({ id, status }: { id: string; status: string }) => api.therapyUpdateMeasureStatus(id, status), onSuccess: () => { qc.invalidateQueries({ queryKey: ['therapy'] }); } });
+}
+export function useTherapyReorderMeasures() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: ({ planId, measureIds }: { planId: string; measureIds: string[] }) => api.therapyReorderMeasures(planId, measureIds), onSuccess: () => { qc.invalidateQueries({ queryKey: ['therapy'] }); } });
+}
+
+// Templates
+export function useTherapyTemplates(category?: string) {
+    return useQuery({ queryKey: ['therapy', 'templates', category], queryFn: () => api.therapyTemplates(category) });
+}
+export function useTherapyApplyTemplate() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: ({ templateId, planId }: { templateId: string; planId: string }) => api.therapyApplyTemplate(templateId, planId), onSuccess: () => { qc.invalidateQueries({ queryKey: ['therapy'] }); } });
+}
+
+// Alerts
+export function useTherapyAlerts(params?: { page?: number; severity?: string; unreadOnly?: boolean }) {
+    return useQuery({ queryKey: ['therapy', 'alerts', params], queryFn: () => api.therapyAlerts(params) });
+}
+export function useTherapyAlertsByPatient(patientId: string) {
+    return useQuery({ queryKey: ['therapy', 'alerts', 'patient', patientId], queryFn: () => api.therapyAlertsByPatient(patientId), enabled: !!patientId });
+}
+export function useTherapyAlertRead() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: (id: string) => api.therapyAlertRead(id), onSuccess: () => { qc.invalidateQueries({ queryKey: ['therapy', 'alerts'] }); } });
+}
+export function useTherapyAlertDismiss() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: ({ id, reason }: { id: string; reason?: string }) => api.therapyAlertDismiss(id, reason), onSuccess: () => { qc.invalidateQueries({ queryKey: ['therapy', 'alerts'] }); } });
+}
+export function useTherapyAlertAction() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: ({ id, action }: { id: string; action: string }) => api.therapyAlertAction(id, action), onSuccess: () => { qc.invalidateQueries({ queryKey: ['therapy', 'alerts'] }); } });
+}
+export function useTherapyEvaluateAlerts() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: (data: { sessionId: string; patientId: string; planId?: string }) => api.therapyEvaluateAlerts(data.sessionId, data.patientId, data.planId), onSuccess: () => { qc.invalidateQueries({ queryKey: ['therapy', 'alerts'] }); } });
+}
+
+// Analytics + Anon
+export function useTherapyAnalytics(days?: number) {
+    return useQuery({ queryKey: ['therapy', 'analytics', days], queryFn: () => api.therapyAnalytics(days) });
+}
+export function useTherapyAnon(patientId: string) {
+    return useQuery({ queryKey: ['therapy', 'anon', patientId], queryFn: () => api.therapyAnon(patientId), enabled: !!patientId });
+}
+export function useTherapyExportPvs() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: (planId: string) => api.therapyExportPvs(planId), onSuccess: () => { qc.invalidateQueries({ queryKey: ['therapy'] }); } });
+}

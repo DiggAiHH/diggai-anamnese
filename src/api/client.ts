@@ -1156,6 +1156,156 @@ export const api = {
         const response = await apiClient.post('/pvs/mappings/preview', { connectionId, sessionId });
         return response.data;
     },
+
+    // ─── Therapy / Therapieplan ─────────────────────────────────
+
+    therapyCreatePlan: async (data: { sessionId: string; patientId: string; title: string; diagnosis?: string; icdCodes?: string[]; summary?: string; templateId?: string; startDate?: string; targetEndDate?: string }) => {
+        if (isDemoMode()) return { id: demoId('tplan'), ...data, status: 'DRAFT', icdCodes: data.icdCodes || [], aiGenerated: false, measures: [], alerts: [], createdAt: new Date().toISOString() };
+        const response = await apiClient.post('/therapy/plans', data);
+        return response.data;
+    },
+    therapyGetPlan: async (id: string) => {
+        if (isDemoMode()) return { id, title: 'Demo-Therapieplan', status: 'DRAFT', diagnosis: 'J06.9', icdCodes: ['J06.9'], measures: [], alerts: [], patient: { patientNumber: 'P-10001' }, createdAt: new Date().toISOString() };
+        const response = await apiClient.get(`/therapy/plans/${id}`);
+        return response.data;
+    },
+    therapyUpdatePlan: async (id: string, data: Record<string, unknown>) => {
+        if (isDemoMode()) return { id, ...data };
+        const response = await apiClient.put(`/therapy/plans/${id}`, data);
+        return response.data;
+    },
+    therapyDeletePlan: async (id: string) => {
+        if (isDemoMode()) return { success: true };
+        const response = await apiClient.delete(`/therapy/plans/${id}`);
+        return response.data;
+    },
+    therapyPlansByPatient: async (patientId: string) => {
+        if (isDemoMode()) return [];
+        const response = await apiClient.get(`/therapy/plans/patient/${patientId}`);
+        return response.data;
+    },
+    therapyPlansBySession: async (sessionId: string) => {
+        if (isDemoMode()) return [];
+        const response = await apiClient.get(`/therapy/plans/session/${sessionId}`);
+        return response.data;
+    },
+    therapyUpdateStatus: async (id: string, status: string) => {
+        if (isDemoMode()) return { id, status };
+        const response = await apiClient.put(`/therapy/plans/${id}/status`, { status });
+        return response.data;
+    },
+
+    // Measures
+    therapyAddMeasure: async (planId: string, data: Record<string, unknown>) => {
+        if (isDemoMode()) return { id: demoId('meas'), planId, ...data, status: 'PLANNED', createdAt: new Date().toISOString() };
+        const response = await apiClient.post(`/therapy/plans/${planId}/measures`, data);
+        return response.data;
+    },
+    therapyUpdateMeasure: async (id: string, data: Record<string, unknown>) => {
+        if (isDemoMode()) return { id, ...data };
+        const response = await apiClient.put(`/therapy/measures/${id}`, data);
+        return response.data;
+    },
+    therapyDeleteMeasure: async (id: string) => {
+        if (isDemoMode()) return { success: true };
+        const response = await apiClient.delete(`/therapy/measures/${id}`);
+        return response.data;
+    },
+    therapyUpdateMeasureStatus: async (id: string, status: string) => {
+        if (isDemoMode()) return { id, status };
+        const response = await apiClient.put(`/therapy/measures/${id}/status`, { status });
+        return response.data;
+    },
+    therapyReorderMeasures: async (planId: string, measureIds: string[]) => {
+        if (isDemoMode()) return { success: true };
+        const response = await apiClient.put(`/therapy/plans/${planId}/measures/reorder`, { measureIds });
+        return response.data;
+    },
+
+    // Templates
+    therapyTemplates: async (category?: string) => {
+        if (isDemoMode()) return [
+            { id: 'tpl-1', name: 'Akuter Infekt', category: 'Allgemeinmedizin', icdCodes: ['J06.9'], measures: [{ type: 'MEDICATION', title: 'Ibuprofen 400mg', priority: 0 }], usageCount: 12, isDefault: true },
+            { id: 'tpl-2', name: 'Rückenschmerzen', category: 'Orthopädie', icdCodes: ['M54.5'], measures: [{ type: 'REFERRAL', title: 'Physiotherapie', priority: 0 }], usageCount: 8, isDefault: false },
+        ];
+        const response = await apiClient.get('/therapy/templates', { params: category ? { category } : {} });
+        return response.data;
+    },
+    therapyGetTemplate: async (id: string) => {
+        if (isDemoMode()) return { id, name: 'Demo-Template', measures: [] };
+        const response = await apiClient.get(`/therapy/templates/${id}`);
+        return response.data;
+    },
+    therapyCreateTemplate: async (data: Record<string, unknown>) => {
+        if (isDemoMode()) return { id: demoId('tpl'), ...data, usageCount: 0, isActive: true };
+        const response = await apiClient.post('/therapy/templates', data);
+        return response.data;
+    },
+    therapyApplyTemplate: async (templateId: string, planId: string) => {
+        if (isDemoMode()) return { success: true, addedMeasures: 3 };
+        const response = await apiClient.post(`/therapy/templates/${templateId}/apply`, { planId });
+        return response.data;
+    },
+
+    // Alerts
+    therapyAlerts: async (params?: { page?: number; severity?: string; unreadOnly?: boolean }) => {
+        if (isDemoMode()) return { alerts: [], pagination: { page: 1, limit: 25, total: 0, totalPages: 0 } };
+        const response = await apiClient.get('/therapy/alerts', { params });
+        return response.data;
+    },
+    therapyAlertsByPatient: async (patientId: string) => {
+        if (isDemoMode()) return [];
+        const response = await apiClient.get(`/therapy/alerts/patient/${patientId}`);
+        return response.data;
+    },
+    therapyAlertRead: async (id: string) => {
+        if (isDemoMode()) return { id, isRead: true };
+        const response = await apiClient.put(`/therapy/alerts/${id}/read`);
+        return response.data;
+    },
+    therapyAlertDismiss: async (id: string, reason?: string) => {
+        if (isDemoMode()) return { id, isDismissed: true };
+        const response = await apiClient.put(`/therapy/alerts/${id}/dismiss`, { reason });
+        return response.data;
+    },
+    therapyAlertAction: async (id: string, action: string) => {
+        if (isDemoMode()) return { id, actionTaken: action };
+        const response = await apiClient.put(`/therapy/alerts/${id}/action`, { action });
+        return response.data;
+    },
+    therapyEvaluateAlerts: async (sessionId: string, patientId: string, planId?: string) => {
+        if (isDemoMode()) return { evaluated: 0, created: 0, alerts: [] };
+        const response = await apiClient.post('/therapy/alerts/evaluate', { sessionId, patientId, planId });
+        return response.data;
+    },
+
+    // Anonymization
+    therapyAnon: async (patientId: string) => {
+        if (isDemoMode()) return { id: demoId('anon'), patientId, pseudonym: 'PAT-DEMO-X1Y2' };
+        const response = await apiClient.get(`/therapy/anon/${patientId}`);
+        return response.data;
+    },
+
+    // Analytics
+    therapyAnalytics: async (days?: number) => {
+        if (isDemoMode()) return { period: '30 Tage', totalPlans: 0, statusDistribution: {}, topDiagnoses: [], measureTypes: {}, avgMeasuresPerPlan: 0, avgPlanDurationDays: 0, aiUsage: { aiGeneratedPlans: 0, avgAiConfidence: 0, arztModificationRate: 0 }, alertStats: { total: 0, bySeverity: {}, avgResponseTimeMinutes: 0, dismissRate: 0 } };
+        const response = await apiClient.get('/therapy/analytics', { params: days ? { days } : {} });
+        return response.data;
+    },
+
+    // AI stubs
+    therapyAiStatus: async () => {
+        if (isDemoMode()) return { status: 'not_configured', model: null, available: false };
+        const response = await apiClient.get('/therapy/ai/status');
+        return response.data;
+    },
+
+    // PVS export
+    therapyExportPvs: async (planId: string) => {
+        if (isDemoMode()) return { success: true, message: 'Demo-Export', planId };
+        const response = await apiClient.post(`/therapy/plans/${planId}/export-pvs`);
+        return response.data;
+    },
 };
 
 export default apiClient;

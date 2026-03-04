@@ -22,6 +22,7 @@ import { WunschboxTab } from '../components/admin/WunschboxTab';
 import { WaitingContentTab } from '../components/admin/WaitingContentTab';
 import { AuditLogTab } from '../components/admin/AuditLogTab';
 import { PvsAdminPanel } from '../components/admin/PvsAdminPanel';
+import { TherapyAnalyticsTab } from '../components/admin/TherapyAnalyticsTab';
 
 // ─── Types ─────────────────────────────────────────────
 interface FlowNode {
@@ -60,6 +61,7 @@ const TABS = [
   { id: 'permissions', label: 'Rechte', icon: <Lock size={18} /> },
   { id: 'audit', label: 'Audit-Log', icon: <FileText size={18} /> },
   { id: 'pvs', label: 'PVS-Integration', icon: <Server size={18} /> },
+  { id: 'therapy', label: 'Therapie', icon: <Heart size={18} /> },
   { id: 'flow', label: 'Patienten-Flow', icon: <Workflow size={18} /> },
   { id: 'security', label: 'Sicherheit', icon: <Shield size={18} /> },
   { id: 'export', label: 'Export & Berichte', icon: <FileText size={18} /> },
@@ -1341,6 +1343,7 @@ export function AdminDashboard() {
       case 'permissions': return <PermissionMatrix />;
       case 'audit': return <AuditLogTab />;
       case 'pvs': return <PvsAdminPanel />;
+      case 'therapy': return <TherapyAnalyticsTab />;
       case 'flow': return <FlowTab />;
       case 'security': return <SecurityTab />;
       case 'export': return <ExportTab />;
