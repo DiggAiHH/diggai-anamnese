@@ -1805,6 +1805,59 @@ export const api = {
         const response = await apiClient.delete(`/praxis-chat/${sessionId}`);
         return response.data;
     },
+
+    // ─── Modul 8: Avatar + Voice ────────────────────────────────
+
+    avatarGet: async (staffId: string) => {
+        if (isDemoMode()) return { id: 'av-1', staffId, avatarType: '2D', avatarUrl: null, voiceSettings: { pitch: 0, speed: 1, volume: 0.8, style: 'professional', provider: 'azure' }, supportedLanguages: ['de-DE'], isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+        const response = await apiClient.get(`/avatar/${staffId}`);
+        return response.data;
+    },
+    avatarUpdate: async (staffId: string, data: any) => {
+        if (isDemoMode()) return { id: 'av-1', staffId, ...data, updatedAt: new Date().toISOString() };
+        const response = await apiClient.put(`/avatar/${staffId}`, data);
+        return response.data;
+    },
+    avatarList: async (activeOnly?: boolean) => {
+        if (isDemoMode()) return [{ id: 'av-1', staffId: 'staff-1', avatarType: '2D', supportedLanguages: ['de-DE'], isActive: true }];
+        const response = await apiClient.get('/avatar/list', { params: { activeOnly } });
+        return response.data;
+    },
+    avatarSpeak: async (data: { staffId: string; text: string; language?: string; ssml?: boolean; format?: string }) => {
+        if (isDemoMode()) return { audioUrl: '/demo-audio.mp3', duration: 5, language: data.language || 'de-DE', cached: false };
+        const response = await apiClient.post('/avatar/speak', data);
+        return response.data;
+    },
+    avatarConsent: async (staffId: string) => {
+        if (isDemoMode()) return { consentSignedAt: new Date().toISOString() };
+        const response = await apiClient.post(`/avatar/${staffId}/consent`);
+        return response.data;
+    },
+    avatarRevokeConsent: async (staffId: string) => {
+        if (isDemoMode()) return { revoked: true };
+        const response = await apiClient.delete(`/avatar/${staffId}/consent`);
+        return response.data;
+    },
+    avatarCloneStart: async (data: { staffId: string; audioSamples: string[]; consentToken: string; language?: string }) => {
+        if (isDemoMode()) return { voiceCloneId: 'vc_demo', status: 'PROCESSING', estimatedReadyAt: new Date(Date.now() + 1800000).toISOString() };
+        const response = await apiClient.post('/avatar/clone/start', data);
+        return response.data;
+    },
+    avatarCloneStatus: async (staffId: string) => {
+        if (isDemoMode()) return { voiceCloneId: null, status: 'NONE' };
+        const response = await apiClient.get(`/avatar/clone/${staffId}`);
+        return response.data;
+    },
+    avatarDelete: async (staffId: string) => {
+        if (isDemoMode()) return { deleted: true };
+        const response = await apiClient.delete(`/avatar/${staffId}`);
+        return response.data;
+    },
+    avatarLanguages: async () => {
+        if (isDemoMode()) return [{ code: 'de-DE', label: 'Deutsch' }, { code: 'en-US', label: 'English' }, { code: 'tr-TR', label: 'Türkçe' }];
+        const response = await apiClient.get('/avatar/languages');
+        return response.data;
+    },
 };
 
 export default apiClient;

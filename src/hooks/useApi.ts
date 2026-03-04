@@ -1283,3 +1283,41 @@ export function usePraxisChatDelete() {
     const qc = useQueryClient();
     return useMutation({ mutationFn: (sessionId: string) => api.praxisChatDelete(sessionId), onSuccess: () => { qc.invalidateQueries({ queryKey: ['praxis-chat'] }); } });
 }
+
+// ─── Modul 8: Avatar + Voice Hooks ─────────────────────────
+
+export function useAvatarGet(staffId: string) {
+    return useQuery({ queryKey: ['avatar', staffId], queryFn: () => api.avatarGet(staffId), enabled: !!staffId });
+}
+export function useAvatarUpdate() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: ({ staffId, data }: { staffId: string; data: any }) => api.avatarUpdate(staffId, data), onSuccess: (_d: any, vars: any) => { qc.invalidateQueries({ queryKey: ['avatar', vars.staffId] }); } });
+}
+export function useAvatarList(activeOnly?: boolean) {
+    return useQuery({ queryKey: ['avatar', 'list', activeOnly], queryFn: () => api.avatarList(activeOnly) });
+}
+export function useAvatarSpeak() {
+    return useMutation({ mutationFn: (data: { staffId: string; text: string; language?: string; ssml?: boolean; format?: string }) => api.avatarSpeak(data) });
+}
+export function useAvatarConsent() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: (staffId: string) => api.avatarConsent(staffId), onSuccess: (_d: any, staffId: string) => { qc.invalidateQueries({ queryKey: ['avatar', staffId] }); } });
+}
+export function useAvatarRevokeConsent() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: (staffId: string) => api.avatarRevokeConsent(staffId), onSuccess: (_d: any, staffId: string) => { qc.invalidateQueries({ queryKey: ['avatar', staffId] }); } });
+}
+export function useAvatarCloneStart() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: (data: { staffId: string; audioSamples: string[]; consentToken: string; language?: string }) => api.avatarCloneStart(data), onSuccess: (_d: any, vars: any) => { qc.invalidateQueries({ queryKey: ['avatar', vars.staffId] }); } });
+}
+export function useAvatarCloneStatus(staffId: string) {
+    return useQuery({ queryKey: ['avatar', 'clone', staffId], queryFn: () => api.avatarCloneStatus(staffId), enabled: !!staffId });
+}
+export function useAvatarDelete() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: (staffId: string) => api.avatarDelete(staffId), onSuccess: () => { qc.invalidateQueries({ queryKey: ['avatar'] }); } });
+}
+export function useAvatarLanguages() {
+    return useQuery({ queryKey: ['avatar', 'languages'], queryFn: () => api.avatarLanguages() });
+}

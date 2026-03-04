@@ -1451,3 +1451,26 @@ model PaymentTransaction {
   @@index([patientId, createdAt])
   @@map("payment_transactions")
 }
+
+enum AvatarType {
+  TWO_D     @map("2D")
+  THREE_D   @map("3D")
+  REAL_PHOTO
+}
+
+model StaffAvatar {
+  id                 String     @id @default(uuid())
+  staffId            String     @unique
+  voiceCloneId       String?
+  voiceSettings      Json?
+  avatarUrl          String?
+  avatarType         String     @default("2D")
+  supportedLanguages String[]
+  accentSettings     Json?
+  consentSignedAt    DateTime?
+  isActive           Boolean    @default(true)
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  @@map("staff_avatars")
+}

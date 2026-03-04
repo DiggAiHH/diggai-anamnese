@@ -34,6 +34,7 @@ import flowRoutes from './routes/flows';
 import feedbackRoutes from './routes/feedback';
 import paymentRoutes from './routes/payment';
 import praxisChatRoutes from './routes/praxis-chat';
+import avatarRoutes from './routes/avatar';
 
 const app = express();
 const httpServer = createServer(app);
@@ -136,6 +137,7 @@ app.use('/api/flows', authLimiter, flowRoutes);
 app.use('/api/feedback', feedbackRoutes);
 app.use('/api/payment', authLimiter, paymentRoutes);
 app.use('/api/praxis-chat', praxisChatRoutes);
+app.use('/api/avatar', authLimiter, avatarRoutes);
 
 // Health Check — includes DB + Redis connectivity
 app.get('/api/health', async (_req, res) => {
