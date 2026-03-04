@@ -1723,6 +1723,88 @@ export const api = {
         const response = await apiClient.post(`/feedback/checkout/${sessionId}`, { action });
         return response.data;
     },
+
+    // ─── Modul 7/8: Payment ─────────────────────────────────────
+
+    paymentCreateIntent: async (data: { sessionId: string; patientId: string; amount: number; currency?: string; type: string; description?: string }) => {
+        if (isDemoMode()) return { id: 'demo-pi-1', sessionId: data.sessionId, amount: data.amount, status: 'PENDING', providerIntentId: 'pi_demo', clientSecret: 'cs_demo' };
+        const response = await apiClient.post('/payment/intent', data);
+        return response.data;
+    },
+    paymentNfcCharge: async (data: { sessionId: string; patientId: string; amount: number; type: string; nfcCardToken: string; description?: string }) => {
+        if (isDemoMode()) return { id: 'demo-nfc-1', status: 'COMPLETED', amount: data.amount, receiptUrl: '/demo-receipt' };
+        const response = await apiClient.post('/payment/nfc-charge', data);
+        return response.data;
+    },
+    paymentReceipt: async (id: string) => {
+        if (isDemoMode()) return { id, transactionId: id, amount: 25.00, currency: 'EUR', type: 'SELBSTZAHLER', status: 'COMPLETED', createdAt: new Date().toISOString() };
+        const response = await apiClient.get(`/payment/receipt/${id}`);
+        return response.data;
+    },
+    paymentStats: async (praxisId?: string) => {
+        if (isDemoMode()) return { totalRevenue: 1250.00, transactionCount: 48, averageAmount: 26.04, byType: [{ type: 'SELBSTZAHLER', count: 30, total: 780 }], byStatus: [{ status: 'COMPLETED', count: 45 }], recentTransactions: [] };
+        const response = await apiClient.get('/payment/stats', { params: { praxisId } });
+        return response.data;
+    },
+    paymentRefund: async (id: string, reason?: string) => {
+        if (isDemoMode()) return { id, status: 'REFUNDED', amount: 25.00 };
+        const response = await apiClient.post(`/payment/refund/${id}`, { reason });
+        return response.data;
+    },
+    paymentSessionList: async (sessionId: string) => {
+        if (isDemoMode()) return [{ id: 'tx-1', sessionId, amount: 25.00, currency: 'EUR', type: 'SELBSTZAHLER', status: 'COMPLETED', createdAt: new Date().toISOString() }];
+        const response = await apiClient.get(`/payment/session/${sessionId}`);
+        return response.data;
+    },
+
+    // ─── Modul 7/8: Praxis Chat ─────────────────────────────────
+
+    praxisChatMessages: async (sessionId: string, limit?: number, before?: string) => {
+        if (isDemoMode()) return [
+            { id: 'msg-1', sessionId, senderType: 'MFA', content: 'Willkommen! Bitte nehmen Sie Platz.', contentType: 'TEXT', isTemplate: false, createdAt: new Date(Date.now() - 300000).toISOString() },
+            { id: 'msg-2', sessionId, senderType: 'PATIENT', content: 'Danke!', contentType: 'TEXT', isTemplate: false, createdAt: new Date(Date.now() - 240000).toISOString() },
+        ];
+        const response = await apiClient.get(`/praxis-chat/${sessionId}`, { params: { limit, before } });
+        return response.data;
+    },
+    praxisChatSend: async (data: { sessionId: string; senderType: string; senderId?: string; contentType?: string; content: string; isTemplate?: boolean; templateId?: string }) => {
+        if (isDemoMode()) return { id: `msg-${Date.now()}`, ...data, createdAt: new Date().toISOString() };
+        const response = await apiClient.post('/praxis-chat/send', data);
+        return response.data;
+    },
+    praxisChatBroadcast: async (data: { praxisId: string; senderId: string; senderType: string; content: string; target: 'waiting' | 'all' | 'room'; roomFilter?: string }) => {
+        if (isDemoMode()) return { sentTo: 5, messageIds: ['msg-b1', 'msg-b2'] };
+        const response = await apiClient.post('/praxis-chat/broadcast', data);
+        return response.data;
+    },
+    praxisChatMarkRead: async (sessionId: string, readerId: string, readerType: string) => {
+        if (isDemoMode()) return { markedAsRead: 3 };
+        const response = await apiClient.post(`/praxis-chat/${sessionId}/read`, { readerId, readerType });
+        return response.data;
+    },
+    praxisChatUnread: async (sessionId: string, viewerType?: string) => {
+        if (isDemoMode()) return { unreadCount: 2 };
+        const response = await apiClient.get(`/praxis-chat/${sessionId}/unread`, { params: { viewerType } });
+        return response.data;
+    },
+    praxisChatTemplates: async () => {
+        if (isDemoMode()) return [
+            { id: 'tpl-1', name: 'Wartezeit-Info', content: 'Geschätzte Wartezeit: {{minutes}} Minuten.', category: 'info', language: 'de', variables: ['minutes'] },
+            { id: 'tpl-2', name: 'Aufruf ins Zimmer', content: 'Bitte begeben Sie sich zu {{room}}.', category: 'call', language: 'de', variables: ['room'] },
+        ];
+        const response = await apiClient.get('/praxis-chat/templates/list');
+        return response.data;
+    },
+    praxisChatStats: async (praxisId?: string) => {
+        if (isDemoMode()) return { totalMessages: 150, unreadCount: 8, avgResponseTime: 45, messagesByType: [{ type: 'TEXT', count: 130 }] };
+        const response = await apiClient.get('/praxis-chat/stats/overview', { params: { praxisId } });
+        return response.data;
+    },
+    praxisChatDelete: async (sessionId: string) => {
+        if (isDemoMode()) return { deleted: 12 };
+        const response = await apiClient.delete(`/praxis-chat/${sessionId}`);
+        return response.data;
+    },
 };
 
 export default apiClient;

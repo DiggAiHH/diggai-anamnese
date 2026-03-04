@@ -1412,3 +1412,42 @@ model PraxisChatMessage {
   @@index([senderType, createdAt])
   @@map("praxis_chat_messages")
 }
+
+enum PaymentType {
+  SELBSTZAHLER
+  IGEL
+  PRIVAT
+  COPAYMENT
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REFUNDED
+  CANCELLED
+}
+
+model PaymentTransaction {
+  id               String        @id @default(uuid())
+  sessionId        String
+  patientId        String
+  amount           Float
+  currency         String        @default("EUR")
+  type             PaymentType   @default(SELBSTZAHLER)
+  status           PaymentStatus @default(PENDING)
+  paymentProvider  String        @default("stripe")
+  providerIntentId String?
+  nfcCardToken     String?
+  receiptUrl       String?
+  description      String?
+  metadata         Json?
+  createdAt        DateTime      @default(now())
+  completedAt      DateTime?
+  refundedAt       DateTime?
+
+  @@index([sessionId, status])
+  @@index([patientId, createdAt])
+  @@map("payment_transactions")
+}

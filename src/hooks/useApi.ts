@@ -1231,3 +1231,55 @@ export function useFeedbackEscalate() {
 export function useCheckoutSession() {
     return useMutation({ mutationFn: ({ sessionId, action }: { sessionId: string; action: 'keep' | 'export' | 'delete' }) => api.checkoutSession(sessionId, action) });
 }
+
+// ─── Modul 7/8: Payment Hooks ──────────────────────────────
+
+export function usePaymentCreateIntent() {
+    return useMutation({ mutationFn: (data: { sessionId: string; patientId: string; amount: number; currency?: string; type: string; description?: string }) => api.paymentCreateIntent(data) });
+}
+export function usePaymentNfcCharge() {
+    return useMutation({ mutationFn: (data: { sessionId: string; patientId: string; amount: number; type: string; nfcCardToken: string; description?: string }) => api.paymentNfcCharge(data) });
+}
+export function usePaymentReceipt(id: string) {
+    return useQuery({ queryKey: ['payment', 'receipt', id], queryFn: () => api.paymentReceipt(id), enabled: !!id });
+}
+export function usePaymentStats(praxisId?: string) {
+    return useQuery({ queryKey: ['payment', 'stats', praxisId], queryFn: () => api.paymentStats(praxisId) });
+}
+export function usePaymentRefund() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: ({ id, reason }: { id: string; reason?: string }) => api.paymentRefund(id, reason), onSuccess: () => { qc.invalidateQueries({ queryKey: ['payment'] }); } });
+}
+export function usePaymentSessionList(sessionId: string) {
+    return useQuery({ queryKey: ['payment', 'session', sessionId], queryFn: () => api.paymentSessionList(sessionId), enabled: !!sessionId });
+}
+
+// ─── Modul 7/8: Praxis Chat Hooks ─────────────────────────
+
+export function usePraxisChatMessages(sessionId: string, limit?: number) {
+    return useQuery({ queryKey: ['praxis-chat', sessionId], queryFn: () => api.praxisChatMessages(sessionId, limit), enabled: !!sessionId, refetchInterval: 5000 });
+}
+export function usePraxisChatSend() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: (data: { sessionId: string; senderType: string; senderId?: string; contentType?: string; content: string; isTemplate?: boolean; templateId?: string }) => api.praxisChatSend(data), onSuccess: (_d, vars) => { qc.invalidateQueries({ queryKey: ['praxis-chat', vars.sessionId] }); } });
+}
+export function usePraxisChatBroadcast() {
+    return useMutation({ mutationFn: (data: { praxisId: string; senderId: string; senderType: string; content: string; target: 'waiting' | 'all' | 'room'; roomFilter?: string }) => api.praxisChatBroadcast(data) });
+}
+export function usePraxisChatMarkRead() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: ({ sessionId, readerId, readerType }: { sessionId: string; readerId: string; readerType: string }) => api.praxisChatMarkRead(sessionId, readerId, readerType), onSuccess: (_d, vars) => { qc.invalidateQueries({ queryKey: ['praxis-chat', vars.sessionId] }); } });
+}
+export function usePraxisChatUnread(sessionId: string, viewerType?: string) {
+    return useQuery({ queryKey: ['praxis-chat', 'unread', sessionId], queryFn: () => api.praxisChatUnread(sessionId, viewerType), enabled: !!sessionId, refetchInterval: 10000 });
+}
+export function usePraxisChatTemplates() {
+    return useQuery({ queryKey: ['praxis-chat', 'templates'], queryFn: () => api.praxisChatTemplates() });
+}
+export function usePraxisChatStats(praxisId?: string) {
+    return useQuery({ queryKey: ['praxis-chat', 'stats', praxisId], queryFn: () => api.praxisChatStats(praxisId) });
+}
+export function usePraxisChatDelete() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: (sessionId: string) => api.praxisChatDelete(sessionId), onSuccess: () => { qc.invalidateQueries({ queryKey: ['praxis-chat'] }); } });
+}

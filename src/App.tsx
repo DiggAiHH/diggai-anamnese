@@ -19,6 +19,9 @@ const NfcStepView = lazy(() => import('./pages/nfc/NfcStepView'));
 const PatientFlowLiveBoard = lazy(() => import('./pages/flows/PatientFlowLiveBoard').then(m => ({ default: m.PatientFlowLiveBoard })));
 const CheckoutWizard = lazy(() => import('./pages/checkout/CheckoutWizard').then(m => ({ default: m.CheckoutWizard })));
 const AnonymousFeedbackForm = lazy(() => import('./pages/checkout/AnonymousFeedbackForm').then(m => ({ default: m.AnonymousFeedbackForm })));
+const KioskDashboard = lazy(() => import('./pages/kiosk/KioskDashboard').then(m => ({ default: m.KioskDashboard })));
+const TreatmentFlowBuilder = lazy(() => import('./pages/flows/TreatmentFlowBuilder').then(m => ({ default: m.TreatmentFlowBuilder })));
+const DataDeletionConfirm = lazy(() => import('./pages/checkout/DataDeletionConfirm').then(m => ({ default: m.DataDeletionConfirm })));
 
 // Lazy-load heavy dashboard routes (code splitting → ~60% smaller initial bundle)
 const ArztDashboard = lazy(() => import('./pages/ArztDashboard').then(m => ({ default: m.ArztDashboard })));
@@ -133,6 +136,12 @@ function App() {
           <Route path="/flows/live" element={<Suspense fallback={<DashboardLoading />}><PatientFlowLiveBoard /></Suspense>} />
           <Route path="/checkout/:sessionId" element={<Suspense fallback={<DashboardLoading />}><CheckoutWizard sessionId="" /></Suspense>} />
           <Route path="/feedback" element={<Suspense fallback={<DashboardLoading />}><AnonymousFeedbackForm praxisId="default" /></Suspense>} />
+
+          {/* Modul 7/8: Kiosk + Payment + Flow Builder */}
+          <Route path="/kiosk" element={<Suspense fallback={<DashboardLoading />}><KioskDashboard /></Suspense>} />
+          <Route path="/flows/builder" element={<Suspense fallback={<DashboardLoading />}><TreatmentFlowBuilder /></Suspense>} />
+          <Route path="/flows/builder/:flowId" element={<Suspense fallback={<DashboardLoading />}><TreatmentFlowBuilder /></Suspense>} />
+          <Route path="/checkout/:sessionId/delete" element={<Suspense fallback={<DashboardLoading />}><DataDeletionConfirm sessionId="" onConfirm={() => {}} onCancel={() => {}} /></Suspense>} />
 
           {/* PWA Patient Portal */}
           <Route path="/pwa/login" element={<Suspense fallback={<DashboardLoading />}><PwaLogin /></Suspense>} />
