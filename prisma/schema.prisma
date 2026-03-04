@@ -1474,3 +1474,50 @@ model StaffAvatar {
 
   @@map("staff_avatars")
 }
+
+// ─── Modul 9: Telemedizin ─────────────────────────────────
+
+enum TelemedicineStatus {
+  SCHEDULED
+  WAITING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum TelemedicineType {
+  VIDEO
+  AUDIO
+  CHAT
+}
+
+model TelemedicineSession {
+  id              String              @id @default(cuid())
+  patientId       String
+  doctorId        String
+  type            TelemedicineType    @default(VIDEO)
+  status          TelemedicineStatus  @default(SCHEDULED)
+  scheduledAt     DateTime
+  startedAt       DateTime?
+  endedAt         DateTime?
+  duration        Int?                // seconds
+  roomToken       String?             @unique
+  iceServers      Json?
+  notes           String?
+  diagnosis       String?
+  prescription    Json?
+  followUpDate    DateTime?
+  consentGiven    Boolean             @default(false)
+  consentAt       DateTime?
+  recordingUrl    String?
+  metadata        Json?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@index([patientId])
+  @@index([doctorId])
+  @@index([status])
+  @@index([scheduledAt])
+  @@map("telemedicine_sessions")
+}

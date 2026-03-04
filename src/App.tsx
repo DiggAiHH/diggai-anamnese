@@ -22,6 +22,8 @@ const AnonymousFeedbackForm = lazy(() => import('./pages/checkout/AnonymousFeedb
 const KioskDashboard = lazy(() => import('./pages/kiosk/KioskDashboard').then(m => ({ default: m.KioskDashboard })));
 const TreatmentFlowBuilder = lazy(() => import('./pages/flows/TreatmentFlowBuilder').then(m => ({ default: m.TreatmentFlowBuilder })));
 const DataDeletionConfirm = lazy(() => import('./pages/checkout/DataDeletionConfirm').then(m => ({ default: m.DataDeletionConfirm })));
+const VideoRoom = lazy(() => import('./pages/telemedizin/VideoRoom').then(m => ({ default: m.VideoRoom })));
+const TelemedizinScheduler = lazy(() => import('./pages/telemedizin/TelemedizinScheduler').then(m => ({ default: m.TelemedizinScheduler })));
 
 // Lazy-load heavy dashboard routes (code splitting → ~60% smaller initial bundle)
 const ArztDashboard = lazy(() => import('./pages/ArztDashboard').then(m => ({ default: m.ArztDashboard })));
@@ -142,6 +144,10 @@ function App() {
           <Route path="/flows/builder" element={<Suspense fallback={<DashboardLoading />}><TreatmentFlowBuilder /></Suspense>} />
           <Route path="/flows/builder/:flowId" element={<Suspense fallback={<DashboardLoading />}><TreatmentFlowBuilder /></Suspense>} />
           <Route path="/checkout/:sessionId/delete" element={<Suspense fallback={<DashboardLoading />}><DataDeletionConfirm sessionId="" onConfirm={() => {}} onCancel={() => {}} /></Suspense>} />
+
+          {/* Modul 9: Telemedizin */}
+          <Route path="/telemedizin" element={<Suspense fallback={<DashboardLoading />}><TelemedizinScheduler /></Suspense>} />
+          <Route path="/telemedizin/room/:sessionId" element={<Suspense fallback={<DashboardLoading />}><VideoRoom /></Suspense>} />
 
           {/* PWA Patient Portal */}
           <Route path="/pwa/login" element={<Suspense fallback={<DashboardLoading />}><PwaLogin /></Suspense>} />

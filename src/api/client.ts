@@ -1858,6 +1858,58 @@ export const api = {
         const response = await apiClient.get('/avatar/languages');
         return response.data;
     },
+
+    // ─── Telemedizin ────────────────────────────────────────
+    telemedizinCreate: async (data: { patientId: string; doctorId: string; type?: string; scheduledAt: string; notes?: string }) => {
+        if (isDemoMode()) return { id: 'tele-' + Date.now(), ...data, status: 'SCHEDULED', roomToken: 'demo-room-token', createdAt: new Date().toISOString() };
+        const response = await apiClient.post('/telemedizin/session', data);
+        return response.data;
+    },
+    telemedizinGet: async (id: string) => {
+        if (isDemoMode()) return { id, patientId: 'p1', doctorId: 'd1', type: 'VIDEO', status: 'SCHEDULED', scheduledAt: new Date().toISOString(), roomToken: 'demo-room' };
+        const response = await apiClient.get(`/telemedizin/session/${id}`);
+        return response.data;
+    },
+    telemedizinList: async (params?: { status?: string; from?: string; to?: string }) => {
+        if (isDemoMode()) return [];
+        const response = await apiClient.get('/telemedizin/sessions', { params });
+        return response.data;
+    },
+    telemedizinJoin: async (id: string, data: { participantId: string; role: string }) => {
+        if (isDemoMode()) return { roomToken: 'demo-room-token', iceServers: [] };
+        const response = await apiClient.post(`/telemedizin/session/${id}/join`, data);
+        return response.data;
+    },
+    telemedizinEnd: async (id: string, data?: { notes?: string; diagnosis?: string }) => {
+        if (isDemoMode()) return { id, status: 'COMPLETED' };
+        const response = await apiClient.post(`/telemedizin/session/${id}/end`, data);
+        return response.data;
+    },
+    telemedizinCancel: async (id: string) => {
+        if (isDemoMode()) return { id, status: 'CANCELLED' };
+        const response = await apiClient.post(`/telemedizin/session/${id}/cancel`);
+        return response.data;
+    },
+    telemedizinNoShow: async (id: string) => {
+        if (isDemoMode()) return { id, status: 'NO_SHOW' };
+        const response = await apiClient.post(`/telemedizin/session/${id}/no-show`);
+        return response.data;
+    },
+    telemedizinPrescription: async (id: string, data: { medication: string; dosage: string; instructions?: string }) => {
+        if (isDemoMode()) return { id, prescription: data };
+        const response = await apiClient.post(`/telemedizin/session/${id}/prescription`, data);
+        return response.data;
+    },
+    telemedizinFollowUp: async (id: string, data: { followUpDate: string; notes?: string }) => {
+        if (isDemoMode()) return { id, followUpDate: data.followUpDate };
+        const response = await apiClient.post(`/telemedizin/session/${id}/follow-up`, data);
+        return response.data;
+    },
+    telemedizinStats: async () => {
+        if (isDemoMode()) return { total: 42, completed: 38, cancelled: 3, noShow: 1, avgDuration: 920 };
+        const response = await apiClient.get('/telemedizin/stats');
+        return response.data;
+    },
 };
 
 export default apiClient;

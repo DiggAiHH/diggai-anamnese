@@ -35,6 +35,7 @@ import feedbackRoutes from './routes/feedback';
 import paymentRoutes from './routes/payment';
 import praxisChatRoutes from './routes/praxis-chat';
 import avatarRoutes from './routes/avatar';
+import telemedizinRoutes from './routes/telemedizin';
 
 const app = express();
 const httpServer = createServer(app);
@@ -138,6 +139,7 @@ app.use('/api/feedback', feedbackRoutes);
 app.use('/api/payment', authLimiter, paymentRoutes);
 app.use('/api/praxis-chat', praxisChatRoutes);
 app.use('/api/avatar', authLimiter, avatarRoutes);
+app.use('/api/telemedizin', authLimiter, telemedizinRoutes);
 
 // Health Check — includes DB + Redis connectivity
 app.get('/api/health', async (_req, res) => {

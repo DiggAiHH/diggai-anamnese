@@ -1321,3 +1321,41 @@ export function useAvatarDelete() {
 export function useAvatarLanguages() {
     return useQuery({ queryKey: ['avatar', 'languages'], queryFn: () => api.avatarLanguages() });
 }
+
+// ─── Telemedizin ────────────────────────────────────────
+export function useTelemedizinList(params?: { status?: string; from?: string; to?: string }) {
+    return useQuery({ queryKey: ['telemedizin', 'sessions', params], queryFn: () => api.telemedizinList(params) });
+}
+export function useTelemedizinGet(id: string) {
+    return useQuery({ queryKey: ['telemedizin', 'session', id], queryFn: () => api.telemedizinGet(id), enabled: !!id });
+}
+export function useTelemedizinStats() {
+    return useQuery({ queryKey: ['telemedizin', 'stats'], queryFn: () => api.telemedizinStats() });
+}
+export function useTelemedizinCreate() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: (data: { patientId: string; doctorId: string; type?: string; scheduledAt: string; notes?: string }) => api.telemedizinCreate(data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['telemedizin'] }); } });
+}
+export function useTelemedizinJoin() {
+    return useMutation({ mutationFn: ({ id, ...data }: { id: string; participantId: string; role: string }) => api.telemedizinJoin(id, data) });
+}
+export function useTelemedizinEnd() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: ({ id, ...data }: { id: string; notes?: string; diagnosis?: string }) => api.telemedizinEnd(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['telemedizin'] }); } });
+}
+export function useTelemedizinCancel() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: (id: string) => api.telemedizinCancel(id), onSuccess: () => { qc.invalidateQueries({ queryKey: ['telemedizin'] }); } });
+}
+export function useTelemedizinNoShow() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: (id: string) => api.telemedizinNoShow(id), onSuccess: () => { qc.invalidateQueries({ queryKey: ['telemedizin'] }); } });
+}
+export function useTelemedizinPrescription() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: ({ id, ...data }: { id: string; medication: string; dosage: string; instructions?: string }) => api.telemedizinPrescription(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['telemedizin'] }); } });
+}
+export function useTelemedizinFollowUp() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: ({ id, ...data }: { id: string; followUpDate: string; notes?: string }) => api.telemedizinFollowUp(id, data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['telemedizin'] }); } });
+}
