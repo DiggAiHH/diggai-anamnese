@@ -12,6 +12,7 @@ import { useTranslation } from 'react-i18next';
 import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp';
 import { CookieConsent } from './components/CookieConsent';
 import { PWAShell } from './components/pwa/PWAShell';
+import { ProtectedRoute } from './components/auth/ProtectedRoute';
 const SystemPanel = lazy(() => import('./pages/SystemPanel').then(m => ({ default: m.SystemPanel })));
 const TIStatusPanel = lazy(() => import('./pages/TIStatusPanel').then(m => ({ default: m.TIStatusPanel })));
 const NfcLanding = lazy(() => import('./pages/nfc/NfcLanding').then(m => ({ default: m.NfcLanding })));
@@ -111,14 +112,14 @@ function App() {
           {/* Patient-Flow */}
           <Route path="/patient" element={<PatientApp />} />
 
-          {/* Arzt-Dashboard (lazy-loaded) */}
-          <Route path="/arzt" element={<Suspense fallback={<DashboardLoading />}><ArztDashboard /></Suspense>} />
+          {/* Arzt-Dashboard (lazy-loaded, role-protected) */}
+          <Route path="/arzt" element={<ProtectedRoute allowedRoles={['arzt', 'admin']}><Suspense fallback={<DashboardLoading />}><ArztDashboard /></Suspense></ProtectedRoute>} />
 
-          {/* MFA-Dashboard (lazy-loaded) */}
-          <Route path="/mfa" element={<Suspense fallback={<DashboardLoading />}><MFADashboard /></Suspense>} />
+          {/* MFA-Dashboard (lazy-loaded, role-protected) */}
+          <Route path="/mfa" element={<ProtectedRoute allowedRoles={['mfa', 'admin']}><Suspense fallback={<DashboardLoading />}><MFADashboard /></Suspense></ProtectedRoute>} />
 
-          {/* Admin-Dashboard (lazy-loaded) */}
-          <Route path="/admin" element={<Suspense fallback={<DashboardLoading />}><AdminDashboard /></Suspense>} />
+          {/* Admin-Dashboard (lazy-loaded, role-protected) */}
+          <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin']}><Suspense fallback={<DashboardLoading />}><AdminDashboard /></Suspense></ProtectedRoute>} />
 
           {/* Dokumentation (lazy-loaded) */}
           <Route path="/docs" element={<Suspense fallback={<DashboardLoading />}><DokumentationPage /></Suspense>} />
@@ -132,9 +133,9 @@ function App() {
           {/* Impressum — §5 DDG (lazy-loaded) */}
           <Route path="/impressum" element={<Suspense fallback={<DashboardLoading />}><ImpressumPage /></Suspense>} />
 
-          {/* Modul 6: System & TI Admin Panels (lazy-loaded) */}
-          <Route path="/admin/system" element={<Suspense fallback={<DashboardLoading />}><SystemPanel /></Suspense>} />
-          <Route path="/admin/ti" element={<Suspense fallback={<DashboardLoading />}><TIStatusPanel /></Suspense>} />
+          {/* Modul 6: System & TI Admin Panels (lazy-loaded, role-protected) */}
+          <Route path="/admin/system" element={<ProtectedRoute allowedRoles={['admin']}><Suspense fallback={<DashboardLoading />}><SystemPanel /></Suspense></ProtectedRoute>} />
+          <Route path="/admin/ti" element={<ProtectedRoute allowedRoles={['arzt', 'admin']}><Suspense fallback={<DashboardLoading />}><TIStatusPanel /></Suspense></ProtectedRoute>} />
 
           {/* Modul 7: NFC & Flow Routes */}
           <Route path="/nfc" element={<Suspense fallback={<DashboardLoading />}><NfcLanding /></Suspense>} />
@@ -142,10 +143,10 @@ function App() {
           <Route path="/checkout/:sessionId" element={<Suspense fallback={<DashboardLoading />}><CheckoutWizard sessionId="" /></Suspense>} />
           <Route path="/feedback" element={<Suspense fallback={<DashboardLoading />}><AnonymousFeedbackForm praxisId="default" /></Suspense>} />
 
-          {/* Modul 7/8: Kiosk + Payment + Flow Builder */}
-          <Route path="/kiosk" element={<Suspense fallback={<DashboardLoading />}><KioskDashboard /></Suspense>} />
-          <Route path="/flows/builder" element={<Suspense fallback={<DashboardLoading />}><TreatmentFlowBuilder /></Suspense>} />
-          <Route path="/flows/builder/:flowId" element={<Suspense fallback={<DashboardLoading />}><TreatmentFlowBuilder /></Suspense>} />
+          {/* Modul 7/8: Kiosk + Payment + Flow Builder (role-protected) */}
+          <Route path="/kiosk" element={<ProtectedRoute allowedRoles={['mfa', 'arzt', 'admin']}><Suspense fallback={<DashboardLoading />}><KioskDashboard /></Suspense></ProtectedRoute>} />
+          <Route path="/flows/builder" element={<ProtectedRoute allowedRoles={['arzt', 'admin']}><Suspense fallback={<DashboardLoading />}><TreatmentFlowBuilder /></Suspense></ProtectedRoute>} />
+          <Route path="/flows/builder/:flowId" element={<ProtectedRoute allowedRoles={['arzt', 'admin']}><Suspense fallback={<DashboardLoading />}><TreatmentFlowBuilder /></Suspense></ProtectedRoute>} />
           <Route path="/checkout/:sessionId/delete" element={<Suspense fallback={<DashboardLoading />}><DataDeletionConfirm sessionId="" onConfirm={() => {}} onCancel={() => {}} /></Suspense>} />
 
           {/* Modul 9: Telemedizin */}
@@ -157,8 +158,8 @@ function App() {
           <Route path="/forms/builder/:formId" element={<Suspense fallback={<DashboardLoading />}><FormBuilderPage /></Suspense>} />
           <Route path="/forms/run/:formId" element={<Suspense fallback={<DashboardLoading />}><FormRunnerPage /></Suspense>} />
 
-          {/* Modul 11: Private ePA */}
-          <Route path="/epa/:patientId" element={<Suspense fallback={<DashboardLoading />}><PrivateEpaDashboard /></Suspense>} />
+          {/* Modul 11: Private ePA (role-protected) */}
+          <Route path="/epa/:patientId" element={<ProtectedRoute allowedRoles={['arzt', 'admin']}><Suspense fallback={<DashboardLoading />}><PrivateEpaDashboard /></Suspense></ProtectedRoute>} />
           <Route path="/epa/shared/:token" element={<Suspense fallback={<DashboardLoading />}><SharedEpaView /></Suspense>} />
 
           {/* PWA Patient Portal */}

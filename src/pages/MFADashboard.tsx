@@ -10,6 +10,7 @@ import { WartezimmerPanel } from '../components/WartezimmerPanel';
 import { StaffChat } from '../components/StaffChat';
 import { StaffTodoList } from '../components/StaffTodoList';
 import { CertificationModal } from '../components/CertificationModal';
+import { FullscreenButton } from '../components/FullscreenButton';
 
 /**
  * MFA-Dashboard – Route /mfa
@@ -107,6 +108,7 @@ export const MFADashboard: React.FC = () => {
                     </div>
 
                     <div className="flex items-center gap-6">
+                        <FullscreenButton />
                         <button
                             onClick={() => setShowQRModal(true)}
                             className="hidden md:flex items-center gap-2 text-sm bg-purple-600 hover:bg-purple-500 transition-all px-4 py-2 rounded-xl text-white font-bold shadow-lg shadow-purple-500/20"

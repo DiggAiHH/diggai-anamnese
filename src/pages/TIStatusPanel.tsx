@@ -1,4 +1,5 @@
 import { Shield, CreditCard, Wifi, WifiOff, RefreshCw, Radio, FileText, Mail, Settings, Zap, AlertTriangle, CheckCircle, XCircle, Clock } from 'lucide-react';
+import type { TICard } from '../types/admin';
 import {
   useTIStatus,
   useTIPing,
@@ -119,14 +120,14 @@ export function TIStatusPanel() {
               <CreditCard className="w-5 h-5 text-orange-500" /> Karten-Status
             </h2>
             {(cards?.cards || []).length === 0 ? (
-              <p className="text-sm text-gray-400">Keine Karten erkannt</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Keine Karten erkannt</p>
             ) : (
               <div className="space-y-4">
-                {(cards?.cards || []).map((card: any, i: number) => (
+                {(cards?.cards || []).map((card: TICard, i: number) => (
                   <div key={i} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                     <div className="flex items-center gap-3">
                       <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${card.inserted ? 'bg-green-100 dark:bg-green-900' : 'bg-gray-100 dark:bg-gray-700'}`}>
-                        <CreditCard className={`w-4 h-4 ${card.inserted ? 'text-green-600' : 'text-gray-400'}`} />
+                        <CreditCard className={`w-4 h-4 ${card.inserted ? 'text-green-600' : 'text-gray-600 dark:text-gray-400'}`} />
                       </div>
                       <div>
                         <p className="font-medium text-sm text-gray-900 dark:text-white">{card.type}</p>
@@ -138,7 +139,7 @@ export function TIStatusPanel() {
                         {card.inserted ? 'Eingesteckt' : 'Nicht erkannt'}
                       </span>
                       {card.expiry && (
-                        <p className="text-xs text-gray-400 mt-1 flex items-center justify-end gap-1">
+                        <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 flex items-center justify-end gap-1">
                           <Clock className="w-3 h-3" /> {new Date(card.expiry).toLocaleDateString('de-DE')}
                         </p>
                       )}
@@ -164,7 +165,7 @@ export function TIStatusPanel() {
               ].map(item => (
                 <div key={item.label} className="flex items-center justify-between text-sm">
                   <span className="text-gray-600 dark:text-gray-400">{item.label}</span>
-                  {item.enabled ? <CheckCircle className="w-4 h-4 text-green-500" /> : <XCircle className="w-4 h-4 text-gray-300" />}
+                  {item.enabled ? <CheckCircle className="w-4 h-4 text-green-500" /> : <XCircle className="w-4 h-4 text-gray-600 dark:text-gray-400" />}
                 </div>
               ))}
             </div>
@@ -176,7 +177,7 @@ export function TIStatusPanel() {
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
                 <FileText className="w-5 h-5 text-teal-500" /> ePA
               </h2>
-              <p className={`text-sm ${epaStatus?.enabled ? 'text-green-600' : 'text-gray-400'}`}>
+              <p className={`text-sm ${epaStatus?.enabled ? 'text-green-600' : 'text-gray-600 dark:text-gray-400'}`}>
                 {epaStatus?.message || 'Lade…'}
               </p>
             </div>
@@ -185,7 +186,7 @@ export function TIStatusPanel() {
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
                 <Mail className="w-5 h-5 text-blue-500" /> KIM
               </h2>
-              <p className={`text-sm ${kimStatus?.enabled ? 'text-green-600' : 'text-gray-400'}`}>
+              <p className={`text-sm ${kimStatus?.enabled ? 'text-green-600' : 'text-gray-600 dark:text-gray-400'}`}>
                 {kimStatus?.message || 'Lade…'}
               </p>
             </div>
@@ -203,12 +204,12 @@ export function TIStatusPanel() {
                   <div><p className="text-gray-500">Mandant-ID</p><p className="text-gray-900 dark:text-white">{config.mandantId}</p></div>
                   <div><p className="text-gray-500">Client-System</p><p className="text-gray-900 dark:text-white">{config.clientSystemId}</p></div>
                   <div><p className="text-gray-500">Arbeitsplatz</p><p className="text-gray-900 dark:text-white">{config.workplaceId}</p></div>
-                  <div><p className="text-gray-500">Client-Zertifikat</p><p>{config.hasCert ? <CheckCircle className="w-4 h-4 text-green-500 inline" /> : <XCircle className="w-4 h-4 text-gray-300 inline" />}</p></div>
-                  <div><p className="text-gray-500">Client-Key</p><p>{config.hasKey ? <CheckCircle className="w-4 h-4 text-green-500 inline" /> : <XCircle className="w-4 h-4 text-gray-300 inline" />}</p></div>
-                  <div><p className="text-gray-500">CA-Zertifikat</p><p>{config.hasCa ? <CheckCircle className="w-4 h-4 text-green-500 inline" /> : <XCircle className="w-4 h-4 text-gray-300 inline" />}</p></div>
+                  <div><p className="text-gray-500">Client-Zertifikat</p><p>{config.hasCert ? <CheckCircle className="w-4 h-4 text-green-500 inline" /> : <XCircle className="w-4 h-4 text-gray-600 dark:text-gray-400 inline" />}</p></div>
+                  <div><p className="text-gray-500">Client-Key</p><p>{config.hasKey ? <CheckCircle className="w-4 h-4 text-green-500 inline" /> : <XCircle className="w-4 h-4 text-gray-600 dark:text-gray-400 inline" />}</p></div>
+                  <div><p className="text-gray-500">CA-Zertifikat</p><p>{config.hasCa ? <CheckCircle className="w-4 h-4 text-green-500 inline" /> : <XCircle className="w-4 h-4 text-gray-600 dark:text-gray-400 inline" />}</p></div>
                 </div>
               ) : (
-                <p className="text-sm text-gray-400">TI nicht konfiguriert</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">TI nicht konfiguriert</p>
               )}
             </div>
           )}

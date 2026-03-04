@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Lock, Check, X } from 'lucide-react';
 import { useAdminPermissions, useAdminRolePermissions, useAdminSetRolePermissions } from '../../hooks/useApi';
+import type { Permission } from '../../types/admin';
 
 const ROLES = ['ADMIN', 'ARZT', 'MFA'];
 
@@ -11,12 +12,12 @@ export function PermissionMatrix() {
     const { data: rolePerms } = useAdminRolePermissions(selectedRole);
     const setRolePerms = useAdminSetRolePermissions();
 
-    const rolePermIds = useMemo(() => new Set((rolePerms || []).map((p: any) => p.id)), [rolePerms]);
+    const rolePermIds = useMemo(() => new Set((rolePerms || []).map((p: Permission) => p.id)), [rolePerms]);
 
     const categories = useMemo(() => {
         if (!allPermissions) return {};
-        const cats: Record<string, any[]> = {};
-        for (const p of allPermissions as any[]) {
+        const cats: Record<string, Permission[]> = {};
+        for (const p of allPermissions as Permission[]) {
             if (!cats[p.category]) cats[p.category] = [];
             cats[p.category].push(p);
         }
@@ -53,7 +54,7 @@ export function PermissionMatrix() {
                         {category}
                     </div>
                     <div className="divide-y divide-gray-100 dark:divide-gray-700">
-                        {(perms as any[]).map((perm: any) => (
+                        {perms.map((perm: Permission) => (
                             <div key={perm.id} className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50">
                                 <div>
                                     <div className="font-medium text-sm">{perm.name}</div>
@@ -62,7 +63,7 @@ export function PermissionMatrix() {
                                 <button onClick={() => handleToggle(perm.id)}
                                     className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${rolePermIds.has(perm.id)
                                         ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
-                                        : 'bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500'}`}>
+                                        : 'bg-gray-100 text-gray-600 dark:text-gray-400 dark:bg-gray-700 dark:text-gray-500'}`}>
                                     {rolePermIds.has(perm.id) ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}
                                 </button>
                             </div>

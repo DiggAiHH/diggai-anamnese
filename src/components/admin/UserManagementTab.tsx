@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Users, Plus, Trash2, Shield, CheckCircle, XCircle } from 'lucide-react';
 import { useAdminUsers, useAdminCreateUser, useAdminUpdateUser, useAdminDeleteUser } from '../../hooks/useApi';
+import type { ArztUser } from '../../types/admin';
 
 interface UserForm {
     username: string;
@@ -46,7 +47,7 @@ export function UserManagementTab() {
                         <input placeholder="Benutzername" value={form.username} onChange={e => setForm({ ...form, username: e.target.value })} className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" />
                         <input placeholder="Passwort" type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" />
                         <input placeholder="Anzeigename" value={form.displayName} onChange={e => setForm({ ...form, displayName: e.target.value })} className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" />
-                        <select value={form.role} onChange={e => setForm({ ...form, role: e.target.value })} className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600">
+                        <select value={form.role} onChange={e => setForm({ ...form, role: e.target.value })} aria-label="Rolle" className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600">
                             <option value="MFA">MFA</option>
                             <option value="ARZT">Arzt</option>
                             <option value="ADMIN">Admin</option>
@@ -71,7 +72,7 @@ export function UserManagementTab() {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                        {(users || []).map((user: any) => (
+                        {(users || []).map((user: ArztUser) => (
                             <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                                 <td className="px-4 py-3">
                                     <div className="font-medium">{user.displayName}</div>
@@ -91,10 +92,10 @@ export function UserManagementTab() {
                                 </td>
                                 <td className="px-4 py-3 text-sm text-gray-600">{user._count?.assignedSessions || 0}</td>
                                 <td className="px-4 py-3 text-right space-x-2">
-                                    <button onClick={() => handleToggleActive(user.id, user.isActive)} className="p-1.5 text-gray-400 hover:text-yellow-600 rounded" title={user.isActive ? 'Deaktivieren' : 'Aktivieren'}>
+                                    <button onClick={() => handleToggleActive(user.id, user.isActive)} className="p-1.5 text-gray-600 dark:text-gray-400 hover:text-yellow-600 rounded" title={user.isActive ? 'Deaktivieren' : 'Aktivieren'}>
                                         {user.isActive ? <XCircle className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
                                     </button>
-                                    <button onClick={() => deleteUser.mutate(user.id)} className="p-1.5 text-gray-400 hover:text-red-600 rounded" title="Deaktivieren">
+                                    <button onClick={() => deleteUser.mutate(user.id)} className="p-1.5 text-gray-600 dark:text-gray-400 hover:text-red-600 rounded" title="Deaktivieren">
                                         <Trash2 className="w-4 h-4" />
                                     </button>
                                 </td>

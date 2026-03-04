@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Lightbulb, Send, Cpu, Check, X, FileDown } from 'lucide-react';
 import { useWunschboxList, useWunschboxSubmit, useWunschboxProcess, useWunschboxReview, useWunschboxExport } from '../../hooks/useApi';
+import type { WunschboxEntry, AiParsedChange } from '../../types/admin';
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
     PENDING: { label: 'Ausstehend', color: 'bg-yellow-100 text-yellow-800' },
@@ -24,7 +25,7 @@ export function WunschboxTab() {
     const exportSpec = useWunschboxExport();
 
     const entries = data?.entries || [];
-    const selected = entries.find((e: any) => e.id === selectedId);
+    const selected = entries.find((e: WunschboxEntry) => e.id === selectedId);
 
     const handleSubmit = () => {
         if (newWish.trim().length < 10) return;
@@ -58,7 +59,7 @@ export function WunschboxTab() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {/* List */}
                 <div className="space-y-2 max-h-[500px] overflow-y-auto">
-                    {entries.map((entry: any) => (
+                    {entries.map((entry: WunschboxEntry) => (
                         <div key={entry.id} onClick={() => setSelectedId(entry.id)}
                             className={`bg-white dark:bg-gray-800 rounded-lg p-4 border cursor-pointer hover:border-blue-300 transition-colors ${selectedId === entry.id ? 'border-blue-500 ring-1 ring-blue-500' : 'border-gray-200 dark:border-gray-700'}`}>
                             <div className="flex items-start justify-between gap-2">
@@ -67,10 +68,10 @@ export function WunschboxTab() {
                                     {STATUS_LABELS[entry.status]?.label || entry.status}
                                 </span>
                             </div>
-                            <div className="text-xs text-gray-400 mt-1">{new Date(entry.createdAt).toLocaleDateString('de-DE')}</div>
+                            <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">{new Date(entry.createdAt).toLocaleDateString('de-DE')}</div>
                         </div>
                     ))}
-                    {entries.length === 0 && <div className="text-center py-8 text-gray-400">Keine Einträge</div>}
+                    {entries.length === 0 && <div className="text-center py-8 text-gray-600 dark:text-gray-400">Keine Einträge</div>}
                 </div>
 
                 {/* Detail */}
@@ -83,11 +84,11 @@ export function WunschboxTab() {
                             {selected.aiParsedChanges && (
                                 <div className="space-y-2">
                                     <h4 className="text-sm font-semibold text-blue-600">KI-Analyse:</h4>
-                                    {(selected.aiParsedChanges as any[]).map((c: any, i: number) => (
+                                    {(selected.aiParsedChanges ?? []).map((c: AiParsedChange, i: number) => (
                                         <div key={i} className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3 text-xs space-y-1">
                                             <div className="flex gap-2"><span className="font-medium">{c.area}</span><span className="text-gray-500">{c.component}</span></div>
                                             <div>{c.description}</div>
-                                            <div className="flex gap-3 text-gray-400">
+                                            <div className="flex gap-3 text-gray-600 dark:text-gray-400">
                                                 <span>Prio: {c.priority}</span><span>Aufwand: {c.estimatedEffort}</span>
                                             </div>
                                         </div>
@@ -124,7 +125,7 @@ export function WunschboxTab() {
                             </div>
                         </div>
                     ) : (
-                        <div className="text-center py-16 text-gray-400">
+                        <div className="text-center py-16 text-gray-600 dark:text-gray-400">
                             <Lightbulb className="w-12 h-12 mx-auto mb-3 opacity-30" />
                             <p>Wählen Sie einen Wunsch aus der Liste</p>
                         </div>

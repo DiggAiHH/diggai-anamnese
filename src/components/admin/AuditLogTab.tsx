@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { FileText, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAdminAuditLog } from '../../hooks/useApi';
+import type { AuditLogEntry } from '../../types/admin';
 
 export function AuditLogTab() {
     const [page, setPage] = useState(1);
@@ -22,10 +23,10 @@ export function AuditLogTab() {
 
             <div className="flex gap-3">
                 <div className="flex-1 relative">
-                    <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                    <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-600 dark:text-gray-400" />
                     <input value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} placeholder="Suchen..." className="w-full pl-9 pr-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" />
                 </div>
-                <select value={actionFilter} onChange={e => { setActionFilter(e.target.value); setPage(1); }} className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600">
+                <select value={actionFilter} onChange={e => { setActionFilter(e.target.value); setPage(1); }} aria-label="Aktion filtern" className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600">
                     <option value="">Alle Aktionen</option>
                     <option value="CREATE">CREATE</option>
                     <option value="READ">READ</option>
@@ -48,7 +49,7 @@ export function AuditLogTab() {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                        {entries.map((entry: any) => (
+                        {entries.map((entry: AuditLogEntry) => (
                             <tr key={entry.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                                 <td className="px-4 py-2 text-gray-500 whitespace-nowrap">{new Date(entry.createdAt).toLocaleString('de-DE')}</td>
                                 <td className="px-4 py-2">
@@ -58,11 +59,11 @@ export function AuditLogTab() {
                                 </td>
                                 <td className="px-4 py-2 text-gray-700 dark:text-gray-300">{entry.resource}</td>
                                 <td className="px-4 py-2 text-gray-500">{entry.userId || '–'}</td>
-                                <td className="px-4 py-2 text-gray-400 font-mono text-xs">{entry.ipAddress || '–'}</td>
+                                <td className="px-4 py-2 text-gray-600 dark:text-gray-400 font-mono text-xs">{entry.ipAddress || '–'}</td>
                             </tr>
                         ))}
                         {entries.length === 0 && (
-                            <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400">Keine Einträge gefunden</td></tr>
+                            <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-600 dark:text-gray-400">Keine Einträge gefunden</td></tr>
                         )}
                     </tbody>
                 </table>
@@ -70,9 +71,9 @@ export function AuditLogTab() {
 
             {pagination.totalPages > 1 && (
                 <div className="flex items-center justify-center gap-2">
-                    <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1} className="p-2 border rounded-lg disabled:opacity-30"><ChevronLeft className="w-4 h-4" /></button>
+                    <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1} aria-label="Vorherige Seite" className="p-2 border rounded-lg disabled:opacity-30"><ChevronLeft className="w-4 h-4" /></button>
                     <span className="text-sm text-gray-500">Seite {page} von {pagination.totalPages}</span>
-                    <button onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))} disabled={page >= pagination.totalPages} className="p-2 border rounded-lg disabled:opacity-30"><ChevronRight className="w-4 h-4" /></button>
+                    <button onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))} disabled={page >= pagination.totalPages} aria-label="Nächste Seite" className="p-2 border rounded-lg disabled:opacity-30"><ChevronRight className="w-4 h-4" /></button>
                 </div>
             )}
         </div>

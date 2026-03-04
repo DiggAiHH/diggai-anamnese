@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { Wifi, WifiOff, Server, ChevronRight, ChevronLeft, Check, Loader2, AlertCircle } from 'lucide-react';
 import { usePvsConnections, usePvsCreateConnection, usePvsTestConnection, usePvsDeleteConnection } from '../../hooks/useApi';
+import type { PvsConnection } from '../../types/admin';
 
 // ─── PVS Types & Protocols ─────────────────────────────────
 const PVS_TYPES = [
@@ -105,12 +106,12 @@ export function PvsConnectionWizard({ onClose }: { onClose?: () => void }) {
             {/* Step indicator */}
             <div className="flex items-center gap-2 text-sm">
                 {(['type', 'config', 'test'] as WizardStep[]).map((s, i) => (
-                    <React.Fragment key={s}>
-                        {i > 0 && <ChevronRight className="w-4 h-4 text-gray-400" />}
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${step === s ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' : 'text-gray-400'}`}>
+                    <Fragment key={s}>
+                        {i > 0 && <ChevronRight className="w-4 h-4 text-gray-600 dark:text-gray-400" />}
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${step === s ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' : 'text-gray-600 dark:text-gray-400'}`}>
                             {s === 'type' ? '1. PVS-Typ' : s === 'config' ? '2. Konfiguration' : '3. Verbindungstest'}
                         </span>
-                    </React.Fragment>
+                    </Fragment>
                 ))}
             </div>
 
@@ -123,7 +124,7 @@ export function PvsConnectionWizard({ onClose }: { onClose?: () => void }) {
                             <div className="text-2xl mb-2">{pvs.icon}</div>
                             <div className="font-medium text-sm">{pvs.label}</div>
                             <div className="text-xs text-gray-500 mt-1">{pvs.protocol}</div>
-                            <div className="text-xs text-gray-400 mt-0.5">{pvs.desc}</div>
+                            <div className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">{pvs.desc}</div>
                         </button>
                     ))}
                 </div>
@@ -172,7 +173,7 @@ export function PvsConnectionWizard({ onClose }: { onClose?: () => void }) {
                             <div>
                                 <label className="block text-sm font-medium mb-1">Authentifizierung</label>
                                 <select value={config.authType} onChange={e => setConfig(prev => ({ ...prev, authType: e.target.value }))}
-                                    className="w-full px-3 py-2 rounded-lg border dark:bg-gray-700 dark:border-gray-600 text-sm">
+                                    aria-label="Authentifizierung" className="w-full px-3 py-2 rounded-lg border dark:bg-gray-700 dark:border-gray-600 text-sm">
                                     <option value="none">Keine (offener Endpunkt)</option>
                                     <option value="basic">Basic Auth</option>
                                     <option value="oauth2">OAuth2 Client Credentials</option>
@@ -263,19 +264,19 @@ export function PvsConnectionList() {
 
     if (isLoading) return <div className="animate-pulse p-4">Lade Verbindungen...</div>;
     if (!connections || connections.length === 0) {
-        return <div className="text-center py-8 text-gray-400">Keine PVS-Verbindungen konfiguriert</div>;
+        return <div className="text-center py-8 text-gray-600 dark:text-gray-400">Keine PVS-Verbindungen konfiguriert</div>;
     }
 
     return (
         <div className="space-y-3">
-            {connections.map((conn: any) => (
+            {connections.map((conn: PvsConnection) => (
                 <div key={conn.id} className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700 flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3 min-w-0">
                         <div className={`w-3 h-3 rounded-full ${conn.isActive ? 'bg-green-500' : 'bg-gray-400'}`} />
                         <div className="min-w-0">
                             <div className="font-medium text-sm truncate">{conn.name}</div>
                             <div className="text-xs text-gray-500">{conn.pvsType} · {conn.protocol}</div>
-                            {conn.lastSyncAt && <div className="text-xs text-gray-400">Letzter Sync: {new Date(conn.lastSyncAt).toLocaleString('de-DE')}</div>}
+                            {conn.lastSyncAt && <div className="text-xs text-gray-600 dark:text-gray-400">Letzter Sync: {new Date(conn.lastSyncAt).toLocaleString('de-DE')}</div>}
                         </div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">

@@ -59,14 +59,14 @@ function SectionHeader({
   return (
     <button
       onClick={() => onToggle(section)}
-      className="w-full rounded-2xl bg-white border border-gray-100 shadow-sm px-4 py-4 flex items-center gap-3 hover:shadow-md transition-shadow"
+      className="w-full rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-sm px-4 py-4 flex items-center gap-3 hover:shadow-md transition-shadow"
     >
       <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${color}`}>
         <Icon className="w-4 h-4" />
       </div>
-      <span className="flex-1 text-sm font-medium text-gray-800 text-left">{label}</span>
+      <span className="flex-1 text-sm font-medium text-gray-800 dark:text-gray-200 text-left">{label}</span>
       <ChevronRight
-        className={`w-4 h-4 text-gray-300 transition-transform ${expanded === section ? 'rotate-90' : ''}`}
+        className={`w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform ${expanded === section ? 'rotate-90' : ''}`}
       />
     </button>
   );
@@ -75,8 +75,8 @@ function SectionHeader({
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between text-sm">
-      <span className="text-gray-500">{label}</span>
-      <span className="font-medium text-gray-800 truncate ml-4 text-right">{value}</span>
+      <span className="text-gray-500 dark:text-gray-400">{label}</span>
+      <span className="font-medium text-gray-800 dark:text-gray-200 truncate ml-4 text-right">{value}</span>
     </div>
   );
 }
@@ -94,7 +94,7 @@ function ToggleRow({
 }) {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-sm text-gray-700">{label}</span>
+      <span className="text-sm text-gray-700 dark:text-gray-300">{label}</span>
       <button
         type="button"
         role="switch"
@@ -103,7 +103,7 @@ function ToggleRow({
         onClick={onChange}
         disabled={disabled}
         className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${
-          checked ? 'bg-sky-500' : 'bg-gray-200'
+          checked ? 'bg-sky-500' : 'bg-gray-200 dark:bg-gray-700'
         } ${disabled ? 'opacity-50' : ''}`}
       >
         <span
@@ -219,15 +219,15 @@ export default function PwaSettings() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-24">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 pb-24">
       {/* ── Header ── */}
-      <header className="bg-white border-b border-gray-100 px-4 pt-6 pb-4">
+      <header className="bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 px-4 pt-6 pb-4">
         <div className="max-w-lg mx-auto">
-          <h1 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <User className="w-5 h-5 text-gray-500" />
+          <h1 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <User className="w-5 h-5 text-gray-500 dark:text-gray-400" />
             Einstellungen
           </h1>
-          <p className="text-xs text-gray-400 mt-0.5">Profil, Benachrichtigungen &amp; Sicherheit</p>
+          <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">Profil, Benachrichtigungen &amp; Sicherheit</p>
         </div>
       </header>
 
@@ -235,15 +235,15 @@ export default function PwaSettings() {
         {/* ────────────── Profile ────────────── */}
         <SectionHeader icon={User} label="Profil" section="profile" color="bg-sky-100 text-sky-600" expanded={expanded} onToggle={toggle} />
         {expanded === 'profile' && (
-          <div className="rounded-2xl bg-white border border-gray-100 shadow-sm px-4 py-4 space-y-3 ml-1">
+          <div className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-sm px-4 py-4 space-y-3 ml-1">
             {profile.isLoading ? (
-              <Loader2 className="w-5 h-5 animate-spin text-gray-300 mx-auto" />
+              <Loader2 className="w-5 h-5 animate-spin text-gray-500 dark:text-gray-400 mx-auto" />
             ) : (
               <>
                 <InfoRow label="Patientennummer" value={profileData.patientNumber ?? '–'} />
                 <InfoRow label="E-Mail" value={profileData.email ?? '–'} />
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-500">Verifiziert</span>
+                  <span className="text-gray-500 dark:text-gray-400">Verifiziert</span>
                   <span
                     className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
                       profileData.emailVerified
@@ -268,9 +268,9 @@ export default function PwaSettings() {
         {/* ────────────── Notifications ────────────── */}
         <SectionHeader icon={Bell} label="Benachrichtigungen" section="notifications" color="bg-amber-100 text-amber-600" expanded={expanded} onToggle={toggle} />
         {expanded === 'notifications' && (
-          <div className="rounded-2xl bg-white border border-gray-100 shadow-sm px-4 py-4 space-y-4 ml-1">
+          <div className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-sm px-4 py-4 space-y-4 ml-1">
             {settings.isLoading ? (
-              <Loader2 className="w-5 h-5 animate-spin text-gray-300 mx-auto" />
+              <Loader2 className="w-5 h-5 animate-spin text-gray-500 dark:text-gray-400 mx-auto" />
             ) : (
               <>
                 <ToggleRow
@@ -299,11 +299,11 @@ export default function PwaSettings() {
         {/* ────────────── Consents ────────────── */}
         <SectionHeader icon={Shield} label="Einwilligungen" section="consents" color="bg-emerald-100 text-emerald-600" expanded={expanded} onToggle={toggle} />
         {expanded === 'consents' && (
-          <div className="rounded-2xl bg-white border border-gray-100 shadow-sm px-4 py-4 space-y-4 ml-1">
+          <div className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-sm px-4 py-4 space-y-4 ml-1">
             {consents.isLoading ? (
-              <Loader2 className="w-5 h-5 animate-spin text-gray-300 mx-auto" />
+              <Loader2 className="w-5 h-5 animate-spin text-gray-500 dark:text-gray-400 mx-auto" />
             ) : consentList.length === 0 ? (
-              <p className="text-xs text-gray-400 text-center py-2">Keine Einwilligungen vorhanden.</p>
+              <p className="text-xs text-gray-600 dark:text-gray-400 text-center py-2">Keine Einwilligungen vorhanden.</p>
             ) : (
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               consentList.map((c: any) => (
@@ -322,11 +322,11 @@ export default function PwaSettings() {
         {/* ────────────── Devices ────────────── */}
         <SectionHeader icon={Smartphone} label="Geräte" section="devices" color="bg-violet-100 text-violet-600" expanded={expanded} onToggle={toggle} />
         {expanded === 'devices' && (
-          <div className="rounded-2xl bg-white border border-gray-100 shadow-sm px-4 py-4 space-y-3 ml-1">
+          <div className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-sm px-4 py-4 space-y-3 ml-1">
             {devices.isLoading ? (
-              <Loader2 className="w-5 h-5 animate-spin text-gray-300 mx-auto" />
+              <Loader2 className="w-5 h-5 animate-spin text-gray-500 dark:text-gray-400 mx-auto" />
             ) : deviceList.length === 0 ? (
-              <p className="text-xs text-gray-400 text-center py-2">Keine Geräte registriert.</p>
+              <p className="text-xs text-gray-600 dark:text-gray-400 text-center py-2">Keine Geräte registriert.</p>
             ) : (
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               deviceList.map((d: any) => (
@@ -335,8 +335,8 @@ export default function PwaSettings() {
                   className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0"
                 >
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-gray-700 truncate">{d.deviceName ?? d.name ?? 'Gerät'}</p>
-                    <p className="text-xs text-gray-400">{d.deviceType ?? d.type ?? '–'}</p>
+                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">{d.deviceName ?? d.name ?? 'Gerät'}</p>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">{d.deviceType ?? d.type ?? '–'}</p>
                   </div>
                   <button
                     className="p-2 rounded-xl text-red-400 hover:bg-red-50 transition-colors"
@@ -354,10 +354,10 @@ export default function PwaSettings() {
         {/* ────────────── Security ────────────── */}
         <SectionHeader icon={Lock} label="Sicherheit" section="security" color="bg-red-100 text-red-600" expanded={expanded} onToggle={toggle} />
         {expanded === 'security' && (
-          <div className="rounded-2xl bg-white border border-gray-100 shadow-sm px-4 py-4 space-y-5 ml-1">
+          <div className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-sm px-4 py-4 space-y-5 ml-1">
             {/* Change password */}
             <div className="space-y-3">
-              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Passwort ändern</h3>
+              <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Passwort ändern</h3>
               <div className="relative">
                 <input
                   type={showOld ? 'text' : 'password'}
@@ -369,7 +369,7 @@ export default function PwaSettings() {
                 <button
                   type="button"
                   onClick={() => setShowOld(!showOld)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 dark:text-gray-400"
                 >
                   {showOld ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -385,7 +385,7 @@ export default function PwaSettings() {
                 <button
                   type="button"
                   onClick={() => setShowNew(!showNew)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 dark:text-gray-400"
                 >
                   {showNew ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -412,7 +412,7 @@ export default function PwaSettings() {
 
             {/* PIN */}
             <div className="space-y-3 border-t border-gray-100 pt-4">
-              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">PIN festlegen</h3>
+              <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">PIN festlegen</h3>
               <input
                 type="password"
                 inputMode="numeric"
@@ -447,7 +447,7 @@ export default function PwaSettings() {
         {/* ────────────── Language ────────────── */}
         <SectionHeader icon={Globe} label="Sprache" section="language" color="bg-indigo-100 text-indigo-600" expanded={expanded} onToggle={toggle} />
         {expanded === 'language' && (
-          <div className="rounded-2xl bg-white border border-gray-100 shadow-sm px-4 py-3 space-y-1 ml-1">
+          <div className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-sm px-4 py-3 space-y-1 ml-1">
             {LANGUAGES.map(({ code, label }) => {
               const isActive = (settingsData.language ?? 'de') === code;
               return (

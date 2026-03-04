@@ -3,6 +3,7 @@ import { Layers, GripVertical, ToggleLeft, ToggleRight, FileEdit, Trash2, Upload
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import { useAtomToggle, useAtomDraftCreate, useAtomDraftsList, useAtomDraftPublish, useAtomDraftDelete } from '../../hooks/useApi';
+import type { MedicalAtomAdmin, AtomDraft } from '../../types/admin';
 
 export function FragebogenBuilder() {
     const { data: atomsData, isLoading } = useQuery({
@@ -16,21 +17,21 @@ export function FragebogenBuilder() {
     const publishDraft = useAtomDraftPublish();
     const deleteDraft = useAtomDraftDelete();
 
-    const [selectedAtom, setSelectedAtom] = useState<any>(null);
+    const [selectedAtom, setSelectedAtom] = useState<MedicalAtomAdmin | null>(null);
     const [showDrafts, setShowDrafts] = useState(false);
     const [moduleFilter, setModuleFilter] = useState<string>('');
     const [searchTerm, setSearchTerm] = useState('');
 
-    const atoms = (atomsData?.atoms || []) as any[];
-    const drafts = (draftsData?.drafts || []) as any[];
+    const atoms = (atomsData?.atoms || []) as MedicalAtomAdmin[];
+    const drafts = (draftsData?.drafts || []) as AtomDraft[];
 
-    const filteredAtoms = atoms.filter((a: any) => {
+    const filteredAtoms = atoms.filter((a: MedicalAtomAdmin) => {
         if (moduleFilter && a.module !== moduleFilter) return false;
         if (searchTerm && !a.questionText?.toLowerCase().includes(searchTerm.toLowerCase()) && !a.id?.toLowerCase().includes(searchTerm.toLowerCase())) return false;
         return true;
     });
 
-    const modules = [...new Set(atoms.map((a: any) => a.module).filter(Boolean))];
+    const modules = [...new Set(atoms.map((a: MedicalAtomAdmin) => a.module).filter(Boolean))];
 
     const handleToggle = (id: string, isActive: boolean) => {
         toggle.mutate({ id, isActive: !isActive });
@@ -61,15 +62,15 @@ export function FragebogenBuilder() {
             {showDrafts && drafts.length > 0 && (
                 <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-xl p-4 border border-yellow-200 dark:border-yellow-800 space-y-2">
                     <h3 className="font-semibold text-sm">Unveröffentlichte Entwürfe</h3>
-                    {drafts.map((d: any) => (
+                    {drafts.map((d: AtomDraft) => (
                         <div key={d.id} className="flex items-center justify-between bg-white dark:bg-gray-800 rounded-lg p-3 border">
                             <div>
-                                <div className="text-sm font-medium">{d.draftData?.questionText || d.atomId || 'Neuer Entwurf'}</div>
+                                <div className="text-sm font-medium">{String(d.draftData?.questionText || d.atomId || 'Neuer Entwurf')}</div>
                                 <div className="text-xs text-gray-500">{d.changeNote} — {new Date(d.createdAt).toLocaleDateString('de-DE')}</div>
                             </div>
                             <div className="flex gap-1">
                                 <button onClick={() => publishDraft.mutate(d.id)} className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"><Upload className="w-3 h-3 inline mr-1" />Veröffentlichen</button>
-                                <button onClick={() => deleteDraft.mutate(d.id)} className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200"><Trash2 className="w-3 h-3" /></button>
+                                <button onClick={() => deleteDraft.mutate(d.id)} className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200" aria-label="Entwurf löschen" title="Entwurf löschen"><Trash2 className="w-3 h-3" /></button>
                             </div>
                         </div>
                     ))}
@@ -78,7 +79,7 @@ export function FragebogenBuilder() {
 
             <div className="flex gap-2">
                 <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Frage suchen..." className="flex-1 px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm" />
-                <select value={moduleFilter} onChange={e => setModuleFilter(e.target.value)} className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm">
+                <select value={moduleFilter} onChange={e => setModuleFilter(e.target.value)} className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm" aria-label="Modul filtern">
                     <option value="">Alle Module</option>
                     {modules.map(m => <option key={m as string} value={m as string}>{m as string}</option>)}
                 </select>
@@ -89,14 +90,14 @@ export function FragebogenBuilder() {
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden max-h-[600px] overflow-y-auto">
                     <div className="px-4 py-3 bg-gray-50 dark:bg-gray-900 font-semibold text-sm">Fragen ({filteredAtoms.length})</div>
                     <div className="divide-y divide-gray-100 dark:divide-gray-700">
-                        {filteredAtoms.map((atom: any) => (
+                        {filteredAtoms.map((atom: MedicalAtomAdmin) => (
                             <div key={atom.id} onClick={() => setSelectedAtom({ ...atom })}
                                 className={`flex items-center gap-2 px-4 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 ${selectedAtom?.id === atom.id ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500' : ''}`}>
-                                <GripVertical className="w-4 h-4 text-gray-300 flex-shrink-0" />
-                                <span className="text-xs font-mono text-gray-400 w-16 flex-shrink-0">{atom.id}</span>
+                                <GripVertical className="w-4 h-4 text-gray-600 dark:text-gray-400 flex-shrink-0" />
+                                <span className="text-xs font-mono text-gray-600 dark:text-gray-400 w-16 flex-shrink-0">{atom.id}</span>
                                 <span className="text-sm flex-1 truncate">{atom.questionText}</span>
                                 <button onClick={e => { e.stopPropagation(); handleToggle(atom.id, atom.isActive !== false); }}
-                                    className={`flex-shrink-0 ${atom.isActive !== false ? 'text-green-500' : 'text-gray-300'}`}>
+                                    className={`flex-shrink-0 ${atom.isActive !== false ? 'text-green-500' : 'text-gray-600 dark:text-gray-400'}`}>
                                     {atom.isActive !== false ? <ToggleRight className="w-5 h-5" /> : <ToggleLeft className="w-5 h-5" />}
                                 </button>
                             </div>
@@ -110,18 +111,18 @@ export function FragebogenBuilder() {
                         <div className="space-y-4">
                             <div className="flex items-center justify-between">
                                 <h3 className="font-semibold flex items-center gap-2"><FileEdit className="w-4 h-4" /> Frage bearbeiten</h3>
-                                <span className="text-xs font-mono text-gray-400">ID: {selectedAtom.id}</span>
+                                <span className="text-xs font-mono text-gray-600 dark:text-gray-400">ID: {selectedAtom.id}</span>
                             </div>
                             <div>
                                 <label className="text-sm text-gray-500">Fragetext</label>
                                 <textarea value={selectedAtom.questionText || ''} onChange={e => setSelectedAtom({ ...selectedAtom, questionText: e.target.value })} rows={3}
-                                    className="w-full mt-1 px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm" />
+                                    className="w-full mt-1 px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm" aria-label="Fragetext" />
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className="text-sm text-gray-500">Antworttyp</label>
                                     <select value={selectedAtom.answerType || 'text'} onChange={e => setSelectedAtom({ ...selectedAtom, answerType: e.target.value })}
-                                        className="w-full mt-1 px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm">
+                                        className="w-full mt-1 px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm" aria-label="Antworttyp">
                                         <option value="text">Text</option>
                                         <option value="radio">Radio</option>
                                         <option value="checkbox">Checkbox</option>
@@ -134,7 +135,7 @@ export function FragebogenBuilder() {
                                 <div>
                                     <label className="text-sm text-gray-500">Modul</label>
                                     <input value={selectedAtom.module || ''} onChange={e => setSelectedAtom({ ...selectedAtom, module: e.target.value })}
-                                        className="w-full mt-1 px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm" />
+                                        className="w-full mt-1 px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm" aria-label="Modul" />
                                 </div>
                             </div>
                             <div className="flex gap-4">
@@ -163,7 +164,7 @@ export function FragebogenBuilder() {
                             </div>
                         </div>
                     ) : (
-                        <div className="text-center py-16 text-gray-400">
+                        <div className="text-center py-16 text-gray-600 dark:text-gray-400">
                             <Layers className="w-12 h-12 mx-auto mb-3 opacity-30" />
                             <p>Wählen Sie eine Frage aus der Liste</p>
                         </div>

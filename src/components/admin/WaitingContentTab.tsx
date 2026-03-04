@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { BookOpen, Plus, Edit, Trash2, Eye, EyeOff } from 'lucide-react';
 import { useAdminContentList, useAdminContentCreate, useAdminContentUpdate, useAdminContentDelete } from '../../hooks/useApi';
+import type { WaitingContentItem } from '../../types/admin';
 
 const CONTENT_TYPES = ['HEALTH_TIP', 'FUN_FACT', 'MINI_QUIZ', 'BREATHING_EXERCISE', 'SEASONAL_INFO', 'PRAXIS_NEWS'];
 
@@ -45,7 +46,7 @@ export function WaitingContentTab() {
         });
     };
 
-    const startEdit = (item: any) => {
+    const startEdit = (item: WaitingContentItem) => {
         setForm({
             type: item.type, category: item.category || '', title: item.title, body: item.body,
             displayDurationSec: item.displayDurationSec || 15, priority: item.priority || 50,
@@ -55,7 +56,7 @@ export function WaitingContentTab() {
         setShowForm(true);
     };
 
-    const items = (content || []) as any[];
+    const items = (content || []) as WaitingContentItem[];
 
     if (isLoading) return <div className="animate-pulse p-8">Lade Content...</div>;
 
@@ -84,7 +85,7 @@ export function WaitingContentTab() {
                 <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-blue-200 dark:border-blue-700 space-y-4">
                     <h3 className="font-semibold">{editingId ? 'Content bearbeiten' : 'Neuen Content erstellen'}</h3>
                     <div className="grid grid-cols-2 gap-4">
-                        <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm">
+                        <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} aria-label="Content-Typ" className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm">
                             {CONTENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                         </select>
                         <input placeholder="Kategorie (z.B. allgemein)" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm" />
@@ -94,15 +95,15 @@ export function WaitingContentTab() {
                     <div className="grid grid-cols-4 gap-3">
                         <div>
                             <label className="text-xs text-gray-500">Dauer (Sek)</label>
-                            <input type="number" value={form.displayDurationSec} onChange={e => setForm({ ...form, displayDurationSec: parseInt(e.target.value) })} className="w-full mt-1 px-2 py-1.5 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm" />
+                            <input type="number" value={form.displayDurationSec} onChange={e => setForm({ ...form, displayDurationSec: parseInt(e.target.value) })} aria-label="Dauer in Sekunden" className="w-full mt-1 px-2 py-1.5 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm" />
                         </div>
                         <div>
                             <label className="text-xs text-gray-500">Priorität</label>
-                            <input type="number" value={form.priority} onChange={e => setForm({ ...form, priority: parseInt(e.target.value) })} className="w-full mt-1 px-2 py-1.5 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm" />
+                            <input type="number" value={form.priority} onChange={e => setForm({ ...form, priority: parseInt(e.target.value) })} aria-label="Priorität" className="w-full mt-1 px-2 py-1.5 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm" />
                         </div>
                         <div>
                             <label className="text-xs text-gray-500">Saison</label>
-                            <select value={form.seasonal} onChange={e => setForm({ ...form, seasonal: e.target.value })} className="w-full mt-1 px-2 py-1.5 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm">
+                            <select value={form.seasonal} onChange={e => setForm({ ...form, seasonal: e.target.value })} aria-label="Saison" className="w-full mt-1 px-2 py-1.5 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm">
                                 <option value="">Keine</option>
                                 <option value="spring">Frühling</option>
                                 <option value="summer">Sommer</option>
@@ -112,7 +113,7 @@ export function WaitingContentTab() {
                         </div>
                         <div>
                             <label className="text-xs text-gray-500">Sprache</label>
-                            <select value={form.language} onChange={e => setForm({ ...form, language: e.target.value })} className="w-full mt-1 px-2 py-1.5 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm">
+                            <select value={form.language} onChange={e => setForm({ ...form, language: e.target.value })} aria-label="Sprache" className="w-full mt-1 px-2 py-1.5 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm">
                                 <option value="de">Deutsch</option>
                                 <option value="en">English</option>
                                 <option value="tr">Türkçe</option>
@@ -146,7 +147,7 @@ export function WaitingContentTab() {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                        {items.map((item: any) => (
+                        {items.map((item: WaitingContentItem) => (
                             <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                                 <td className="px-4 py-3">
                                     <div className="font-medium truncate max-w-[200px]">{item.title}</div>
@@ -167,16 +168,16 @@ export function WaitingContentTab() {
                                     )}
                                 </td>
                                 <td className="px-4 py-3 text-right space-x-1">
-                                    <button onClick={() => startEdit(item)} className="p-1.5 text-gray-400 hover:text-blue-600 rounded"><Edit className="w-4 h-4" /></button>
+                                    <button onClick={() => startEdit(item)} title="Bearbeiten" aria-label="Bearbeiten" className="p-1.5 text-gray-400 hover:text-blue-600 rounded"><Edit className="w-4 h-4" /></button>
                                     <button onClick={() => update.mutate({ id: item.id, isActive: item.isActive === false })} className="p-1.5 text-gray-400 hover:text-yellow-600 rounded">
                                         {item.isActive !== false ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                     </button>
-                                    <button onClick={() => { if (confirm('Content wirklich löschen?')) del.mutate(item.id); }} className="p-1.5 text-gray-400 hover:text-red-600 rounded"><Trash2 className="w-4 h-4" /></button>
+                                    <button onClick={() => { if (confirm('Content wirklich löschen?')) del.mutate(item.id); }} title="Löschen" aria-label="Löschen" className="p-1.5 text-gray-400 hover:text-red-600 rounded"><Trash2 className="w-4 h-4" /></button>
                                 </td>
                             </tr>
                         ))}
                         {items.length === 0 && (
-                            <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">Kein Content vorhanden</td></tr>
+                            <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-600 dark:text-gray-400">Kein Content vorhanden</td></tr>
                         )}
                     </tbody>
                 </table>

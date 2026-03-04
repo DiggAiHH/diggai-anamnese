@@ -17,6 +17,7 @@ import {
 import { UserManagementTab } from '../components/admin/UserManagementTab';
 import { PermissionMatrix } from '../components/admin/PermissionMatrix';
 import { ROIDashboard } from '../components/admin/ROIDashboard';
+import { FullscreenButton } from '../components/FullscreenButton';
 import { FragebogenBuilder } from '../components/admin/FragebogenBuilder';
 import { WunschboxTab } from '../components/admin/WunschboxTab';
 import { WaitingContentTab } from '../components/admin/WaitingContentTab';
@@ -1368,6 +1369,7 @@ export function AdminDashboard() {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <FullscreenButton />
             <span className="text-xs text-green-400 bg-green-500/10 px-3 py-1 rounded-full border border-green-500/30 flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
               System Online

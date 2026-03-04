@@ -7,6 +7,7 @@ import { useArztLogin, useArztSessions, useArztSessionDetail, useArztSessionSumm
 import { setAuthToken, getAuthToken, API_BASE_URL, SOCKET_BASE_URL, api } from '../api/client';
 import { StaffChat } from '../components/StaffChat';
 import { StaffTodoList } from '../components/StaffTodoList';
+import { FullscreenButton } from '../components/FullscreenButton';
 
 // Helper for playing an alert sound safely
 const playAlertSound = () => {
@@ -179,12 +180,15 @@ export const ArztDashboard: React.FC = () => {
                             <p className="text-xs text-white/40">{t('arzt.overview')}</p>
                         </div>
                     </div>
-                    <button
-                        onClick={() => { setToken(null); localStorage.removeItem('arzt_token'); setAuthToken(null); }}
-                        className="flex items-center gap-2 text-sm text-white/50 hover:text-white transition-colors"
-                    >
-                        <LogOut className="w-4 h-4" /> {t('arzt.logout')}
-                    </button>
+                    <div className="flex items-center gap-3">
+                        <FullscreenButton />
+                        <button
+                            onClick={() => { setToken(null); localStorage.removeItem('arzt_token'); setAuthToken(null); }}
+                            className="flex items-center gap-2 text-sm text-white/50 hover:text-white transition-colors"
+                        >
+                            <LogOut className="w-4 h-4" /> {t('arzt.logout')}
+                        </button>
+                    </div>
                 </div>
             </header>
 
