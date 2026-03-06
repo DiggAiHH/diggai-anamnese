@@ -1,0 +1,8 @@
+{
+  "passwordReset.subject": "Restablecer contraseña — Portal del Paciente",
+  "passwordReset.html": "<p>Hola,</p><p>Ha solicitado restablecer su contraseña.</p><p>Haga clic en el siguiente enlace para establecer una nueva contraseña:</p><p><a href=\"{{resetLink}}\">{{resetLink}}</a></p><p>Este enlace es válido por 1 hora.</p><p>Si no realizó esta solicitud, puede ignorar este correo.</p>",
+  "emailVerification.subject": "Confirmar dirección de correo — Portal del Paciente",
+  "emailVerification.html": "<p>Hola,</p><p>Por favor confirme su dirección de correo electrónico haciendo clic en el siguiente enlace:</p><p><a href=\"{{verifyLink}}\">{{verifyLink}}</a></p><p>Este enlace es válido por 24 horas.</p>",
+  "passwordResetBranded.subject": "Restablecer contraseña — Portal del Paciente",
+  "passwordResetBranded.html": "<p>Hola,</p><p>Ha solicitado restablecer su contraseña.</p><p>Haga clic en el siguiente enlace para establecer una nueva contraseña:</p><p><a href=\"{{resetLink}}\">{{resetLink}}</a></p><p>Este enlace es válido por 1 hora.</p><p>Si no realizó esta solicitud, puede ignorar este correo.</p>"
+}

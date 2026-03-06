@@ -1,0 +1,20 @@
+# Local mode compose override (without cloud dependencies)
+# Usage: docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
+
+services:
+  app:
+    environment:
+      - DEPLOYMENT_MODE=LOCAL
+      - OFFLINE_MODE=true
+    # Additional local env overrides
+
+  backup:
+    profiles: [] # Always active in local mode (remove backup profile restriction)
+    environment:
+      - BACKUP_SCHEDULE=0 2 * * *
+      - BACKUP_ENCRYPTION_KEY=${LOCAL_BACKUP_ENCRYPTION_KEY:-changeme-backup-key}
+    volumes:
+      - ./backups:/backups
+
+  ti-proxy:
+    profiles: [] # Active in local mode

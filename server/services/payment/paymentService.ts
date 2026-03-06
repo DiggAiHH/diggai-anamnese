@@ -3,7 +3,7 @@
 
 import type { CreatePaymentIntentInput, NfcChargeInput, PaymentWebhookEvent, PaymentReceipt, PaymentStats } from './types';
 import { MAX_AMOUNT, MIN_AMOUNT } from './types';
-import crypto from 'crypto';
+import * as crypto from 'crypto';
 
 function getPrisma() {
   return (globalThis as any).__prisma;

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-import multer from 'multer';
+import * as multer from 'multer';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { prisma } from '../db';

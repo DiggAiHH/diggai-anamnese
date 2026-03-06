@@ -1,0 +1,8 @@
+{
+  "passwordReset.subject": "Şifrenizi sıfırlayın — Hasta Portalı",
+  "passwordReset.html": "<p>Merhaba,</p><p>Şifre sıfırlama talebinde bulundunuz.</p><p>Yeni bir şifre belirlemek için aşağıdaki bağlantıya tıklayın:</p><p><a href=\"{{resetLink}}\">{{resetLink}}</a></p><p>Bu bağlantı 1 saat geçerlidir.</p><p>Bu talebi yapmadıysanız, bu e-postayı görmezden gelebilirsiniz.</p>",
+  "emailVerification.subject": "E-posta adresinizi doğrulayın — Hasta Portalı",
+  "emailVerification.html": "<p>Merhaba,</p><p>Aşağıdaki bağlantıya tıklayarak e-posta adresinizi doğrulayın:</p><p><a href=\"{{verifyLink}}\">{{verifyLink}}</a></p><p>Bu bağlantı 24 saat geçerlidir.</p>",
+  "passwordResetBranded.subject": "Şifrenizi sıfırlayın — Hasta Portalı",
+  "passwordResetBranded.html": "<p>Merhaba,</p><p>Şifre sıfırlama talebinde bulundunuz.</p><p>Yeni bir şifre belirlemek için aşağıdaki bağlantıya tıklayın:</p><p><a href=\"{{resetLink}}\">{{resetLink}}</a></p><p>Bu bağlantı 1 saat geçerlidir.</p><p>Bu talebi yapmadıysanız, bu e-postayı görmezden gelebilirsiniz.</p>"
+}

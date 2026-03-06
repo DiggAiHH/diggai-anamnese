@@ -1,0 +1,14 @@
+FROM alpine:3.19
+
+# PostgreSQL client for pg_dump
+RUN apk add --no-cache postgresql16-client bash curl gnupg
+
+# OpenSSL for encryption
+RUN apk add --no-cache openssl
+
+WORKDIR /app
+COPY scripts/backup.sh /app/backup.sh
+RUN chmod +x /app/backup.sh
+
+# Entry point runs backup.sh on schedule (set via BACKUP_SCHEDULE env)
+CMD ["/bin/sh", "-c", "while true; do /app/backup.sh; sleep 86400; done"]

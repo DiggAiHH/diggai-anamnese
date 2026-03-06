@@ -1,0 +1,29 @@
+# gematik / TI mode compose override
+# Usage: docker compose -f docker-compose.yml -f docker-compose.gematik.yml up -d
+
+services:
+  app:
+    environment:
+      - DEPLOYMENT_MODE=LOCAL
+      - TI_ENABLED=true
+      - EPA_ENABLED=true
+      - KIM_ENABLED=true
+      - TI_KONNEKTOR_URL=${TI_KONNEKTOR_URL}
+      - KIM_SMTP_HOST=${KIM_SMTP_HOST}
+      - KIM_SMTP_PORT=${KIM_SMTP_PORT:-465}
+      - KIM_POP3_HOST=${KIM_POP3_HOST}
+      - VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY}
+      - VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY}
+      - VAPID_EMAIL=${VAPID_EMAIL}
+    volumes:
+      - ./certs:/certs:ro
+
+  ti-proxy:
+    profiles: [] # Always active
+    environment:
+      - TI_KONNEKTOR_URL=${TI_KONNEKTOR_URL}
+    volumes:
+      - ./certs:/certs:ro
+
+  backup:
+    profiles: [] # Always active

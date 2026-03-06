@@ -3,7 +3,7 @@
 // ============================================
 
 import { promises as fs } from 'fs';
-import path from 'path';
+import * as path from 'path';
 import type { GdtExportOptions, PatientSessionFull } from '../types.js';
 import { GDT_FIELDS, GDT_VERSION, GDT_SATZARTEN, GENDER_TO_GDT } from './gdt-constants.js';
 

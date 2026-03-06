@@ -2,7 +2,7 @@
 // Modul 7: NFC Checkpoint & Scan Service
 // ═══════════════════════════════════════════════════════════════
 
-import crypto from 'crypto';
+import * as crypto from 'crypto';
 import { getRedisClient } from '../../redis';
 import {
   NfcTapPayload,

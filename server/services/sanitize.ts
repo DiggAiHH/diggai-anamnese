@@ -10,7 +10,7 @@
  * Für medizinische Daten erlauben wir KEIN HTML — nur Plaintext.
  */
 
-import sanitizeHtml from 'sanitize-html';
+import * as sanitizeHtml from 'sanitize-html';
 
 /**
  * Entfernt ALLE HTML-Tags und Attribute aus einem String.

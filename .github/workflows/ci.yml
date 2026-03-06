@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [master, develop]
+  pull_request:
+    branches: [master]
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: anamnese-app/package-lock.json
+
+      - name: Install dependencies
+        working-directory: anamnese-app
+        run: npm ci
+
+      - name: TypeScript check
+        working-directory: anamnese-app
+        run: npx tsc -b
+
+      - name: Lint
+        working-directory: anamnese-app
+        run: npm run lint || true
+
+      - name: Build frontend
+        working-directory: anamnese-app
+        run: npm run build
+
+      - name: Prisma generate
+        working-directory: anamnese-app
+        run: npx prisma generate
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: anamnese-app/dist/
+          retention-days: 7

@@ -1,0 +1,8 @@
+{
+  "passwordReset.subject": "Resetowanie hasła — Portal Pacjenta",
+  "passwordReset.html": "<p>Cześć,</p><p>Poprosiłeś o zresetowanie hasła.</p><p>Kliknij poniższy link, aby ustawić nowe hasło:</p><p><a href=\"{{resetLink}}\">{{resetLink}}</a></p><p>Link jest ważny przez 1 godzinę.</p><p>Jeśli nie składałeś tego wniosku, możesz zignorować ten email.</p>",
+  "emailVerification.subject": "Potwierdź adres email — Portal Pacjenta",
+  "emailVerification.html": "<p>Cześć,</p><p>Potwierdź swój adres email, klikając poniższy link:</p><p><a href=\"{{verifyLink}}\">{{verifyLink}}</a></p><p>Link jest ważny przez 24 godziny.</p>",
+  "passwordResetBranded.subject": "Resetowanie hasła — Portal Pacjenta",
+  "passwordResetBranded.html": "<p>Cześć,</p><p>Poprosiłeś o zresetowanie hasła.</p><p>Kliknij poniższy link, aby ustawić nowe hasło:</p><p><a href=\"{{resetLink}}\">{{resetLink}}</a></p><p>Link jest ważny przez 1 godzinę.</p><p>Jeśli nie składałeś tego wniosku, możesz zignorować ten email.</p>"
+}

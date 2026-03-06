@@ -1,11 +1,17 @@
-import { Router } from 'express';
+import { Router, type Request } from 'express';
 import { prisma } from '../db';
 import { z } from 'zod';
-import bcrypt from 'bcryptjs';
+import * as bcrypt from 'bcryptjs';
 import { requireAuth, requireRole, requirePermission } from '../middleware/auth';
 import { t, parseLang } from '../i18n';
 
 const router = Router();
+
+/** Extract a route param as a guaranteed string (Express 5 compat) */
+function param(req: Request, key: string): string {
+    const v = req.params[key];
+    return Array.isArray(v) ? v[0] : v;
+}
 
 // Alle Admin-Routen erfordern Admin-Rolle (except /permissions/check)
 router.use(requireAuth);
@@ -290,7 +296,7 @@ router.put('/users/:id', requireRole('admin'), async (req, res) => {
         if (data.pin) updateData.pinHash = await bcrypt.hash(data.pin, 12);
 
         const user = await prisma.arztUser.update({
-            where: { id: req.params.id },
+            where: { id: param(req, 'id') },
             data: updateData,
             select: { id: true, username: true, displayName: true, role: true, isActive: true },
         });
@@ -310,7 +316,7 @@ router.delete('/users/:id', requireRole('admin'), async (req, res) => {
     try {
         // Soft delete: deactivate instead of hard delete
         await prisma.arztUser.update({
-            where: { id: req.params.id },
+            where: { id: param(req, 'id') },
             data: { isActive: false },
         });
         res.json({ success: true, message: 'Benutzer deaktiviert' });
@@ -344,7 +350,7 @@ router.get('/permissions', requireRole('admin'), async (_req, res) => {
 router.get('/roles/:role/permissions', requireRole('admin'), async (req, res) => {
     try {
         const rolePerms = await prisma.rolePermission.findMany({
-            where: { role: req.params.role },
+            where: { role: param(req, 'role') },
             include: { permission: true },
         });
         res.json(rolePerms.map((rp: any) => rp.permission));
@@ -362,7 +368,7 @@ const setRolePermsSchema = z.object({
 router.put('/roles/:role/permissions', requireRole('admin'), async (req, res) => {
     try {
         const { permissionIds } = setRolePermsSchema.parse(req.body);
-        const role = req.params.role;
+        const role = param(req, 'role');
         const userId = (req as any).user?.userId || 'unknown';
 
         // Delete existing, then re-create
@@ -392,7 +398,7 @@ router.put('/users/:id/permissions', requireRole('admin'), async (req, res) => {
         const { permissionCodes } = setUserPermsSchema.parse(req.body);
 
         await prisma.arztUser.update({
-            where: { id: req.params.id },
+            where: { id: param(req, 'id') },
             data: { customPermissions: JSON.stringify(permissionCodes) },
         });
 
@@ -521,7 +527,7 @@ router.put('/content/:id', requireRole('admin'), async (req, res) => {
         }
 
         const content = await prisma.waitingContent.update({
-            where: { id: req.params.id },
+            where: { id: param(req, 'id') },
             data: updateData,
         });
         res.json({ ...content, quizData: content.quizData ? JSON.parse(content.quizData) : null });
@@ -535,7 +541,7 @@ router.put('/content/:id', requireRole('admin'), async (req, res) => {
 // DELETE /api/admin/content/:id — Delete content
 router.delete('/content/:id', requireRole('admin'), async (req, res) => {
     try {
-        await prisma.waitingContent.delete({ where: { id: req.params.id } });
+        await prisma.waitingContent.delete({ where: { id: param(req, 'id') } });
         res.json({ success: true });
     } catch (err: any) {
         if (err.code === 'P2025') { res.status(404).json({ error: 'Content nicht gefunden' }); return; }

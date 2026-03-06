@@ -1,0 +1,12 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Simple HTTP proxy for TI-Konnektor (avoids direct SOAP from app container)
+# Just proxies requests to TI_KONNEKTOR_URL with mTLS cert
+RUN npm install -g http-proxy-cli
+
+# Expose on 8585
+EXPOSE 8585
+
+CMD ["sh", "-c", "echo 'TI Proxy starting on :8585 → ${TI_KONNEKTOR_URL}' && node -e \"const http=require('http'),https=require('https'),url=require('url'); const target=process.env.TI_KONNEKTOR_URL||'https://konnektor.local'; http.createServer((req,res)=>{const opts=url.parse(target+req.url);opts.method=req.method;opts.headers=req.headers; const pr=https.request(opts,r=>{res.writeHead(r.statusCode,r.headers);r.pipe(res)});req.pipe(pr);pr.on('error',e=>{res.writeHead(502);res.end(e.message)})}).listen(8585)\""]

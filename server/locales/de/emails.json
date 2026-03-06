@@ -1,0 +1,10 @@
+{
+  "passwordReset.subject": "Passwort zurücksetzen — Patientenportal",
+  "passwordReset.html": "<p>Hallo,</p><p>Sie haben eine Anfrage zum Zurücksetzen Ihres Passworts gestellt.</p><p>Bitte klicken Sie auf den folgenden Link, um ein neues Passwort zu setzen:</p><p><a href=\"{{resetLink}}\">{{resetLink}}</a></p><p>Dieser Link ist 1 Stunde gültig.</p><p>Falls Sie diese Anfrage nicht gestellt haben, können Sie diese E-Mail ignorieren.</p>",
+
+  "emailVerification.subject": "E-Mail-Adresse bestätigen — Patientenportal",
+  "emailVerification.html": "<p>Hallo,</p><p>Bitte bestätigen Sie Ihre E-Mail-Adresse durch Klicken auf den folgenden Link:</p><p><a href=\"{{verifyLink}}\">{{verifyLink}}</a></p><p>Dieser Link ist 24 Stunden gültig.</p>",
+
+  "passwordResetBranded.subject": "Passwort zurücksetzen — Patientenportal",
+  "passwordResetBranded.html": "<p>Hallo,</p><p>Sie haben eine Anfrage zum Zurücksetzen Ihres Passworts gestellt.</p><p>Bitte klicken Sie auf den folgenden Link, um ein neues Passwort zu setzen:</p><p><a href=\"{{resetLink}}\">{{resetLink}}</a></p><p>Dieser Link ist 1 Stunde gültig.</p><p>Falls Sie diese Anfrage nicht gestellt haben, können Sie diese E-Mail ignorieren.</p>"
+}

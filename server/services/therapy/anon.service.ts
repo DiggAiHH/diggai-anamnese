@@ -1,4 +1,4 @@
-import crypto from 'crypto';
+import * as crypto from 'crypto';
 
 // ─── Anonymization Service ──────────────────────────────────
 // Generates and manages patient pseudonyms (PAT-XXXX-XXXX format)

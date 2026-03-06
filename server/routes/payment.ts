@@ -3,7 +3,7 @@
 
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
-import crypto from 'crypto';
+import * as crypto from 'crypto';
 import {
   createPaymentIntent,
   processNfcCharge,
