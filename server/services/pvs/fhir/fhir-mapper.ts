@@ -68,6 +68,9 @@ export function patientToFhir(patient: PatientSessionFull['patient']): FhirPatie
 export function sessionToEncounter(session: PatientSessionFull): FhirEncounter {
   return {
     resourceType: 'Encounter',
+    meta: {
+      profile: ['https://fhir.kbv.de/StructureDefinition/KBV_PR_Base_Encounter|1.5.0'],
+    },
     status: session.status === 'COMPLETED' ? 'finished' : 'in-progress',
     class: {
       system: 'http://terminology.hl7.org/CodeSystem/v3-ActCode',

@@ -94,7 +94,7 @@ function PvsMappingsPanel() {
             <div>
                 <label className="block text-sm font-medium mb-2">Verbindung auswählen</label>
                 <select value={selectedConnId} onChange={e => setSelectedConnId(e.target.value)}
-                    className="w-full max-w-sm px-3 py-2 rounded-lg border dark:bg-gray-700 dark:border-gray-600 text-sm">
+                    title="Verbindung auswählen" className="w-full max-w-sm px-3 py-2 rounded-lg border dark:bg-gray-700 dark:border-gray-600 text-sm">
                     <option value="">– Bitte wählen –</option>
                     {activeConnections.map((c: any) => (
                         <option key={c.id} value={c.id}>{c.name} ({c.pvsType})</option>
@@ -155,14 +155,14 @@ function MappingEditor({ connectionId }: { connectionId: string }) {
                                         const updated = [...localMappings];
                                         updated[idx] = { ...updated[idx], sourceField: e.target.value };
                                         setLocalMappings(updated);
-                                    }} className="w-full px-2 py-1 rounded border dark:bg-gray-700 dark:border-gray-600 text-xs font-mono" />
+                                    }} aria-label="DiggAI-Feld" className="w-full px-2 py-1 rounded border dark:bg-gray-700 dark:border-gray-600 text-xs font-mono" />
                                 </td>
                                 <td className="px-4 py-2">
                                     <input type="text" value={m.targetField} onChange={e => {
                                         const updated = [...localMappings];
                                         updated[idx] = { ...updated[idx], targetField: e.target.value };
                                         setLocalMappings(updated);
-                                    }} className="w-full px-2 py-1 rounded border dark:bg-gray-700 dark:border-gray-600 text-xs font-mono" />
+                                    }} aria-label="PVS-Feld" className="w-full px-2 py-1 rounded border dark:bg-gray-700 dark:border-gray-600 text-xs font-mono" />
                                 </td>
                                 <td className="px-4 py-2">
                                     <input type="text" value={m.transform || ''} onChange={e => {

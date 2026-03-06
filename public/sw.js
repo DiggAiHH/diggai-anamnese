@@ -91,3 +91,61 @@ self.addEventListener('fetch', (event) => {
       )))
   );
 });
+
+// ─── Push Notification Handler ─────────────────────────────
+
+self.addEventListener('push', function(event) {
+  if (!event.data) return;
+
+  let payload;
+  try {
+    payload = event.data.json();
+  } catch (e) {
+    payload = { title: 'DiggAI', body: event.data.text() };
+  }
+
+  const title = payload.title || 'DiggAI';
+  const options = {
+    body: payload.body || '',
+    icon: payload.icon || '/icons/icon-192.svg',
+    badge: payload.badge || '/icons/icon-192.svg',
+    tag: payload.tag || 'diggai-notification',
+    data: payload.data || {},
+    requireInteraction: payload.type === 'medication_reminder',
+    actions: payload.type === 'medication_reminder' ? [
+      { action: 'confirm', title: '✅ Genommen' },
+      { action: 'skip', title: '⏭ Überspringen' }
+    ] : [],
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', function(event) {
+  event.notification.close();
+
+  const action = event.action;
+  const data = event.notification.data;
+
+  if (action === 'confirm' && data.reminderId) {
+    // Post message to all clients to confirm reminder
+    event.waitUntil(
+      self.clients.matchAll({ type: 'window' }).then(clients => {
+        clients.forEach(client => {
+          client.postMessage({ type: 'REMINDER_CONFIRMED', reminderId: data.reminderId });
+        });
+      })
+    );
+  } else {
+    // Open the PWA
+    event.waitUntil(
+      self.clients.matchAll({ type: 'window' }).then(clients => {
+        if (clients.length > 0) {
+          clients[0].focus();
+        } else {
+          self.clients.openWindow('/pwa');
+        }
+      })
+    );
+  }
+});

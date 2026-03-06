@@ -28,6 +28,7 @@ const apiClient = axios.create({
         'Content-Type': 'application/json',
     },
     timeout: 10000, // 10 Sekunden
+    withCredentials: true, // Send httpOnly cookies with every request
 });
 
 // JWT Token Management
@@ -133,11 +134,29 @@ apiClient.interceptors.response.use(
                 isRefreshing = false;
             }
         }
+        // Show error toast for non-auth errors (401 is handled above via redirect)
+        if (error.response?.status !== 401) {
+            const status = error.response?.status;
+            const msg: string = error.response?.data?.error
+                ?? error.response?.data?.message
+                ?? (error.code === 'ECONNABORTED' ? 'Zeitüberschreitung — bitte erneut versuchen.' : 'Verbindungsfehler. Bitte Internetverbindung prüfen.');
+
+            import('../store/toastStore').then(({ toast }) => {
+                if (status && status >= 500) {
+                    toast.error(msg, 'Serverfehler');
+                } else if (status && status >= 400) {
+                    toast.warning(msg);
+                } else if (!status) {
+                    toast.error(msg, 'Netzwerkfehler');
+                }
+            });
+        }
+
         return Promise.reject(error);
     }
 );
 
-// â”€â”€â”€ API Funktionen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── API Funktionen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export interface CreateSessionPayload {
     email: string;
@@ -1293,10 +1312,25 @@ export const api = {
         return response.data;
     },
 
-    // AI stubs
+    // AI Engine
     therapyAiStatus: async () => {
-        if (isDemoMode()) return { status: 'not_configured', model: null, available: false };
+        if (isDemoMode()) return { available: false, provider: 'none', model: null, online: false };
         const response = await apiClient.get('/therapy/ai/status');
+        return response.data;
+    },
+    therapyAiSuggest: async (sessionId: string) => {
+        if (isDemoMode()) return { available: false, mode: 'lite', suggestion: null };
+        const response = await apiClient.post('/therapy/ai/suggest', { sessionId });
+        return response.data;
+    },
+    therapyAiSummarize: async (sessionId: string) => {
+        if (isDemoMode()) return { available: false, mode: 'lite', summary: null };
+        const response = await apiClient.post(`/therapy/ai/summarize/${sessionId}`);
+        return response.data;
+    },
+    therapyAiIcdSuggest: async (symptoms: string) => {
+        if (isDemoMode()) return { available: false, mode: 'lite', suggestions: [] };
+        const response = await apiClient.post('/therapy/ai/icd-suggest', { symptoms });
         return response.data;
     },
 
@@ -1467,6 +1501,66 @@ export const api = {
     pwaProfile: async () => {
         if (isDemoMode()) return { accountId: 'demo', patientNumber: 'P-10001', email: 'demo@example.com', isVerified: true };
         const response = await apiClient.get('/pwa/profile');
+        return response.data;
+    },
+    pwaVerifyEmail: async (token: string) => {
+        if (isDemoMode()) return { success: true };
+        const response = await apiClient.post('/pwa/auth/verify-email', { token });
+        return response.data;
+    },
+    pwaDiaryTrends: async (metric: string, period: string) => {
+        if (isDemoMode()) return { metric, period, dataPoints: [], average: 0, min: 0, max: 0, trend: 'stable', unit: '' };
+        const response = await apiClient.get('/pwa/diary/trends', { params: { metric, period } });
+        return response.data;
+    },
+    pwaDiaryExport: async (format: string) => {
+        if (isDemoMode()) return new Blob(['demo'], { type: 'text/csv' });
+        const response = await apiClient.get('/pwa/diary/export', { params: { format }, responseType: 'blob' });
+        return response.data;
+    },
+    pwaAppointments: async () => {
+        if (isDemoMode()) return [];
+        const response = await apiClient.get('/pwa/appointments');
+        return response.data;
+    },
+    pwaAppointmentSlots: async (date: string, service: string) => {
+        if (isDemoMode()) return ['09:00', '10:00', '11:00', '14:00', '15:00'];
+        const response = await apiClient.get('/pwa/appointments/available-slots', { params: { date, service } });
+        return response.data;
+    },
+    pwaAppointmentCreate: async (data: { service: string; date: string; requestNotes?: string }) => {
+        if (isDemoMode()) return { id: 'demo-apt', ...data, status: 'REQUESTED' };
+        const response = await apiClient.post('/pwa/appointments', data);
+        return response.data;
+    },
+    pwaAppointmentCancel: async (id: string) => {
+        if (isDemoMode()) return { success: true };
+        const response = await apiClient.put(`/pwa/appointments/${id}/cancel`);
+        return response.data;
+    },
+    pwaReminders: async () => {
+        if (isDemoMode()) return [];
+        const response = await apiClient.get('/pwa/reminders');
+        return response.data;
+    },
+    pwaReminderAdherence: async () => {
+        if (isDemoMode()) return [];
+        const response = await apiClient.get('/pwa/reminders/adherence');
+        return response.data;
+    },
+    pwaReminderCreate: async (data: { medicationId: string; scheduleCron: string; scheduleLabel: string; pushEnabled: boolean; pushTitle?: string; pushBody?: string }) => {
+        if (isDemoMode()) return { id: 'demo-rem', ...data };
+        const response = await apiClient.post('/pwa/reminders', data);
+        return response.data;
+    },
+    pwaReminderToggle: async (id: string, active: boolean) => {
+        if (isDemoMode()) return { id, active };
+        const response = await apiClient.put(`/pwa/reminders/${id}`, { active });
+        return response.data;
+    },
+    pwaReminderDelete: async (id: string) => {
+        if (isDemoMode()) return { success: true };
+        const response = await apiClient.delete(`/pwa/reminders/${id}`);
         return response.data;
     },
 
@@ -2039,6 +2133,28 @@ export const api = {
     epaGetExport: async (exportId: string) => {
         if (isDemoMode()) return { id: exportId, content: '# Export', hash: 'demo', exportType: 'FULL_HISTORY' };
         const response = await apiClient.get(`/epa/export/${exportId}`);
+        return response.data;
+    },
+
+    // ─── Agent API ─────────────────────────────────────────
+    agentStatus: async () => {
+        const response = await apiClient.get('/agents');
+        return response.data;
+    },
+    agentTasks: async (params?: { status?: string; agentName?: string; limit?: number }) => {
+        const response = await apiClient.get('/agents/tasks', { params });
+        return response.data;
+    },
+    agentTaskDetail: async (id: string) => {
+        const response = await apiClient.get(`/agents/tasks/${id}`);
+        return response.data;
+    },
+    agentCreateTask: async (data: { taskType?: string; description?: string; agentName?: string; priority?: string; payload?: Record<string, unknown> }) => {
+        const response = await apiClient.post('/agents/task', data);
+        return response.data;
+    },
+    agentMetrics: async () => {
+        const response = await apiClient.get('/agents/metrics');
         return response.data;
     },
 };

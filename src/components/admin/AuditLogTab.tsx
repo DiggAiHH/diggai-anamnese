@@ -1,9 +1,11 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FileText, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAdminAuditLog } from '../../hooks/useApi';
 import type { AuditLogEntry } from '../../types/admin';
 
 export function AuditLogTab() {
+    const { i18n } = useTranslation();
     const [page, setPage] = useState(1);
     const [search, setSearch] = useState('');
     const [actionFilter, setActionFilter] = useState('');
@@ -51,7 +53,7 @@ export function AuditLogTab() {
                     <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                         {entries.map((entry: AuditLogEntry) => (
                             <tr key={entry.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                                <td className="px-4 py-2 text-gray-500 whitespace-nowrap">{new Date(entry.createdAt).toLocaleString('de-DE')}</td>
+                                <td className="px-4 py-2 text-gray-500 whitespace-nowrap">{new Date(entry.createdAt).toLocaleString(i18n.language)}</td>
                                 <td className="px-4 py-2">
                                     <span className={`px-2 py-0.5 rounded text-xs font-medium ${entry.action === 'CREATE' ? 'bg-green-100 text-green-700' : entry.action === 'DELETE' ? 'bg-red-100 text-red-700' : entry.action === 'UPDATE' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'}`}>
                                         {entry.action}

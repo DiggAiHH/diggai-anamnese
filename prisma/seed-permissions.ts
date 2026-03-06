@@ -48,6 +48,28 @@ const PERMISSIONS: PermissionDef[] = [
     { code: 'admin.roi', name: 'ROI-Dashboard', description: 'Wirtschaftlichkeitsanalyse einsehen', category: 'admin', defaultAdmin: true, defaultArzt: false, defaultMfa: false },
     { code: 'admin.wunschbox', name: 'Wunschbox verwalten', description: 'Feature-Requests bearbeiten', category: 'admin', defaultAdmin: true, defaultArzt: false, defaultMfa: false },
     { code: 'admin.settings', name: 'Systemeinstellungen', description: 'Systemkonfiguration ändern', category: 'admin', defaultAdmin: true, defaultArzt: false, defaultMfa: false },
+    // nfc
+    { code: 'nfc.manage', name: 'NFC verwalten', description: 'NFC-Tags lesen und beschreiben', category: 'nfc', defaultAdmin: true, defaultArzt: false, defaultMfa: true },
+    // flow
+    { code: 'flow.manage', name: 'Workflow verwalten', description: 'Praxis-Workflows erstellen und ändern', category: 'flow', defaultAdmin: true, defaultArzt: false, defaultMfa: false },
+    { code: 'flow.override', name: 'Workflow überschreiben', description: 'Laufende Workflows manuell übersteuern', category: 'flow', defaultAdmin: true, defaultArzt: true, defaultMfa: false },
+    // chat (extended)
+    { code: 'chat.broadcast', name: 'Broadcast-Nachricht senden', description: 'Nachrichten an alle Wartenden senden', category: 'chat', defaultAdmin: true, defaultArzt: false, defaultMfa: false },
+    // feedback
+    { code: 'feedback.review', name: 'Feedback einsehen', description: 'Patientenfeedback und Bewertungen ansehen', category: 'feedback', defaultAdmin: true, defaultArzt: true, defaultMfa: false },
+    { code: 'feedback.escalate', name: 'Feedback eskalieren', description: 'Kritisches Feedback weiterleiten', category: 'feedback', defaultAdmin: true, defaultArzt: false, defaultMfa: false },
+    // payment
+    { code: 'payment.manage', name: 'Zahlungen verwalten', description: 'Abrechnungen und Zahlungsvorgänge verwalten', category: 'payment', defaultAdmin: true, defaultArzt: false, defaultMfa: false },
+    // avatar
+    { code: 'avatar.manage', name: 'Avatar verwalten', description: 'KI-Avatar-Einstellungen konfigurieren', category: 'avatar', defaultAdmin: true, defaultArzt: false, defaultMfa: false },
+    // telemedicine
+    { code: 'telemedicine.manage', name: 'Telemedizin verwalten', description: 'Videosprechstunden und Telemedizin-Funktionen verwalten', category: 'telemedicine', defaultAdmin: true, defaultArzt: true, defaultMfa: false },
+    // forms
+    { code: 'forms.ai.generate', name: 'KI-Formulare generieren', description: 'Fragebögen per KI automatisch erstellen', category: 'forms', defaultAdmin: true, defaultArzt: false, defaultMfa: false },
+    // epa
+    { code: 'private_epa.manage', name: 'Private ePA verwalten', description: 'Zugriff auf private elektronische Patientenakte', category: 'epa', defaultAdmin: true, defaultArzt: true, defaultMfa: false },
+    // export (extended)
+    { code: 'export.anonymized', name: 'Anonymisiert exportieren', description: 'Patientendaten anonymisiert für Forschung exportieren', category: 'export', defaultAdmin: true, defaultArzt: false, defaultMfa: false },
 ];
 
 export async function seedPermissions() {

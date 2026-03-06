@@ -2,6 +2,7 @@
 // Modul 7/8: Tap-to-Pay UI component for kiosk/checkout
 
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { CreditCard, Wifi, CheckCircle2, XCircle, Loader2, ShieldCheck, Receipt } from 'lucide-react';
 
 type PaymentState = 'idle' | 'waiting' | 'processing' | 'success' | 'error';
@@ -26,6 +27,7 @@ export function NfcPaymentTerminal({
   onSuccess,
   onCancel,
 }: NfcPaymentTerminalProps) {
+  const { i18n } = useTranslation();
   const [state, setState] = useState<PaymentState>('idle');
   const [receiptUrl, setReceiptUrl] = useState<string>('');
 
@@ -50,7 +52,7 @@ export function NfcPaymentTerminal({
     }
   };
 
-  const formatCurrency = (n: number) => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(n);
+  const formatCurrency = (n: number) => new Intl.NumberFormat(i18n.language, { style: 'currency', currency: 'EUR' }).format(n);
 
   const typeLabels: Record<PaymentType, string> = {
     SELBSTZAHLER: 'Selbstzahler',

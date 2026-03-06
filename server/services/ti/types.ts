@@ -79,3 +79,21 @@ export interface KIMDirectoryEntry {
   professionOid?: string;
   speciality?: string;
 }
+
+// ─── Card Service Types ──────────────────────────────────────
+
+export interface CardInfo {
+  cardHandle: string;
+  cardType: 'SMC_B' | 'HBA' | 'EGK' | 'SMC_KT';
+  iccsn: string;
+  cardHolderName?: string;
+  expirationDate?: Date;
+}
+
+export interface VerifyPinResult {
+  status: 'OK' | 'FAILED' | 'BLOCKED';
+  retriesLeft?: number;
+}
+
+// Alias for TIConnectionConfig used in SOAP calls
+export type TIConfig = TIConnectionConfig;

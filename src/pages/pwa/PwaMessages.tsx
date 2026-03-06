@@ -1,10 +1,12 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { MessageSquare, Send, User, Bot, ChevronLeft, Plus, Mail, MailOpen, Loader2, AlertTriangle } from 'lucide-react';
 import { usePwaMessages, usePwaMessageSend, usePwaUnreadCount } from '../../hooks/useApi';
 
 type View = 'list' | 'detail' | 'compose';
 
 export default function PwaMessages() {
+  const { t, i18n } = useTranslation();
   const [page] = useState(1);
   const messages = usePwaMessages({ page });
   const unread = usePwaUnreadCount();
@@ -46,7 +48,7 @@ export default function PwaMessages() {
   };
 
   const formatDate = (d: string) =>
-    new Date(d).toLocaleDateString('de-DE', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+    new Date(d).toLocaleDateString(i18n.language || 'de-DE', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 
   /* ─────────────── Compose View ─────────────── */
   if (view === 'compose') {
@@ -57,11 +59,11 @@ export default function PwaMessages() {
             <button
               onClick={() => setView('list')}
               className="p-2 -ml-2 rounded-xl hover:bg-gray-100 text-gray-400 transition-colors"
-              aria-label="Zurück"
+              aria-label={t('Zurück')}
             >
               <ChevronLeft className="w-5 h-5" />
             </button>
-            <h1 className="text-lg font-bold text-gray-900">Neue Nachricht</h1>
+            <h1 className="text-lg font-bold text-gray-900">{t('Neue Nachricht')}</h1>
           </div>
         </header>
         <main className="max-w-lg mx-auto px-4 py-5 space-y-4">
@@ -70,13 +72,13 @@ export default function PwaMessages() {
               type="text"
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
-              placeholder="Betreff (optional)"
+              placeholder={t('Betreff Ihrer Nachricht')}
               className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
             />
             <textarea
               value={body}
               onChange={(e) => setBody(e.target.value)}
-              placeholder="Ihre Nachricht..."
+              placeholder={t('Nachricht...')}
               rows={6}
               className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 resize-none"
             />
@@ -90,11 +92,11 @@ export default function PwaMessages() {
               ) : (
                 <Send className="w-4 h-4" />
               )}
-              Nachricht senden
+              {t('Nachricht senden')}
             </button>
             {sendMutation.isError && (
               <p className="text-xs text-red-500 flex items-center gap-1">
-                <AlertTriangle className="w-3 h-3" /> Senden fehlgeschlagen. Bitte erneut versuchen.
+                <AlertTriangle className="w-3 h-3" /> {t('verwaltung.login.failed')}
               </p>
             )}
           </div>
@@ -113,12 +115,12 @@ export default function PwaMessages() {
             <button
               onClick={() => setView('list')}
               className="p-2 -ml-2 rounded-xl hover:bg-gray-100 text-gray-400 transition-colors"
-              aria-label="Zurück"
+              aria-label={t('Zurück')}
             >
               <ChevronLeft className="w-5 h-5" />
             </button>
             <h1 className="text-lg font-bold text-gray-900 truncate">
-              {selectedMsg.subject || 'Nachricht'}
+              {selectedMsg.subject || t('Nachricht')}
             </h1>
           </div>
         </header>
@@ -135,7 +137,7 @@ export default function PwaMessages() {
               </div>
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-gray-800">
-                  {selectedMsg.senderName ?? (isDoctor ? 'Praxis' : 'System')}
+                  {selectedMsg.senderName ?? (isDoctor ? t('Praxis-Chat') : t('System Online'))}
                 </p>
                 <p className="text-xs text-gray-400">
                   {selectedMsg.createdAt ? formatDate(selectedMsg.createdAt) : ''}
@@ -166,7 +168,7 @@ export default function PwaMessages() {
         <div className="max-w-lg mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2">
             <MessageSquare className="w-5 h-5 text-sky-500" />
-            <h1 className="text-lg font-bold text-gray-900">Nachrichten</h1>
+            <h1 className="text-lg font-bold text-gray-900">{t('pwa.nav.messages')}</h1>
             {unreadCount > 0 && (
               <span className="inline-flex items-center justify-center min-w-[20px] h-5 rounded-full bg-red-500 text-[10px] font-bold text-white px-1.5">
                 {unreadCount > 99 ? '99+' : unreadCount}
@@ -178,7 +180,7 @@ export default function PwaMessages() {
             className="rounded-xl bg-sky-500 text-white px-3 py-2 text-xs font-semibold hover:bg-sky-600 transition-colors flex items-center gap-1.5"
           >
             <Plus className="w-3.5 h-3.5" />
-            Neue Nachricht
+            {t('Neue Nachricht')}
           </button>
         </div>
       </header>
@@ -195,7 +197,7 @@ export default function PwaMessages() {
         {!messages.isLoading && msgList.length === 0 && (
           <div className="rounded-2xl bg-white border border-gray-100 shadow-sm px-4 py-10 text-center">
             <Mail className="w-8 h-8 mx-auto text-gray-300 mb-2" />
-            <p className="text-sm text-gray-400">Keine Nachrichten vorhanden.</p>
+            <p className="text-sm text-gray-400">{t('Keine Nachrichten vorhanden.')}</p>
           </div>
         )}
 
@@ -226,7 +228,7 @@ export default function PwaMessages() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2">
                   <p className={`text-sm truncate ${isRead ? 'text-gray-700' : 'font-semibold text-gray-900'}`}>
-                    {msg.subject || (isDoctor ? 'Nachricht von der Praxis' : 'Systemnachricht')}
+                    {msg.subject || (isDoctor ? t('Nachricht von der Praxis') : t('System Online'))}
                   </p>
                   {/* Read indicator */}
                   {isRead ? (
@@ -251,7 +253,7 @@ export default function PwaMessages() {
         {messages.isError && (
           <div className="rounded-2xl bg-red-50 border border-red-100 px-4 py-3 flex items-center gap-2 text-sm text-red-600">
             <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-            Nachrichten konnten nicht geladen werden.
+            {t('errorBoundary.title')}
           </div>
         )}
       </main>

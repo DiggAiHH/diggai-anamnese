@@ -3,6 +3,7 @@ import { Activity, ShieldCheck, Clock, MessageSquare, Phone, AlertCircle, Calend
 import { useCreateSession } from '../hooks/useApi';
 import { useSessionStore } from '../store/sessionStore';
 import { DatenschutzGame } from './DatenschutzGame';
+import { SignaturePad } from './SignaturePad';
 import { useTranslation } from 'react-i18next';
 import { LanguageSelector } from './LanguageSelector';
 import { ThemeToggle } from './ThemeToggle';
@@ -28,6 +29,7 @@ export function LandingPage() {
     const { mutate: createSession, status: createStatus } = useCreateSession();
     const setPatientData = useSessionStore(state => state.setPatientData);
     const [showDSGVO, setShowDSGVO] = useState(false);
+    const [showSignature, setShowSignature] = useState(false);
     const [selectedService, setSelectedService] = useState<ServiceCard | null>(null);
 
 
@@ -150,11 +152,23 @@ export function LandingPage() {
     };
 
     const handleConsentAccept = () => {
-        localStorage.setItem('dsgvo_consent', new Date().toISOString());
         setShowDSGVO(false);
+        setShowSignature(true);
+    };
+
+    const handleSignatureComplete = (signatureData: string, documentHash: string) => {
+        localStorage.setItem('dsgvo_consent', new Date().toISOString());
+        localStorage.setItem('dsgvo_signature_hash', documentHash);
+        localStorage.setItem('dsgvo_signature_data', signatureData);
+        setShowSignature(false);
         if (selectedService) {
             startFlow(selectedService);
         }
+    };
+
+    const handleSignatureDecline = () => {
+        setShowSignature(false);
+        setSelectedService(null);
     };
 
     const handleConsentDecline = () => {
@@ -312,6 +326,30 @@ export function LandingPage() {
                     onDecline={handleConsentDecline}
                     praxisName="DiggAI Praxis"
                 />
+            )}
+
+            {/* DSGVO Digital Signature */}
+            {showSignature && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" role="dialog" aria-modal="true">
+                    <div className="w-full max-w-lg rounded-2xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] shadow-2xl p-6 space-y-4 animate-fade-in">
+                        <h2 className="text-xl font-bold text-[var(--text-primary)] text-center">
+                            {t('signature.dsgvo_title', 'Einwilligung unterschreiben')}
+                        </h2>
+                        <p className="text-sm text-[var(--text-secondary)] text-center">
+                            {t('signature.dsgvo_desc', 'Bitte unterschreiben Sie zur Bestätigung Ihrer Einwilligung.')}
+                        </p>
+                        <SignaturePad
+                            documentText={t('dsgvoGame.consent1Title', 'Einwilligung in die Datenverarbeitung') + ' — DiggAI Praxis — ' + new Date().toISOString()}
+                            onComplete={handleSignatureComplete}
+                        />
+                        <button
+                            onClick={handleSignatureDecline}
+                            className="w-full py-2 text-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
+                        >
+                            {t('signature.decline', 'Abbrechen')}
+                        </button>
+                    </div>
+                </div>
             )}
 
             {/* Chat Bot (bot-only on landing, no sessionId) */}

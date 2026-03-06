@@ -52,7 +52,7 @@ export async function blacklistToken(jti: string, expiresInMs: number): Promise<
 /**
  * Prüfe ob Token auf der Blacklist steht
  */
-async function isTokenBlacklisted(jti: string): Promise<boolean> {
+export async function isTokenBlacklisted(jti: string): Promise<boolean> {
     const redis = getRedisClient();
     if (redis?.isReady) {
         try {
@@ -80,19 +80,42 @@ export function createToken(payload: AuthPayload): string {
     );
 }
 
+/** Set JWT as httpOnly cookie on the response */
+export function setTokenCookie(res: Response, token: string): void {
+    res.cookie('access_token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 24 * 60 * 60 * 1000, // 24h
+        path: '/',
+    });
+}
+
+/** Clear the JWT cookie on logout */
+export function clearTokenCookie(res: Response): void {
+    res.clearCookie('access_token', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        path: '/',
+    });
+}
+
 /**
  * JWT-Validierung Middleware — mit Algorithm Pinning + Blacklist-Check (Redis)
  */
-export function requireAuth(req: Request, res: Response, next: NextFunction): void {
-    // Header-based auth (preferred)
+export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
+    // 1. Try Authorization header (API clients, mobile)
     let token: string | undefined;
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
         token = authHeader.split(' ')[1];
     }
 
-    // Query-string token removed for security (tokens in URLs get logged).
-    // File downloads should use Authorization header or same-origin fetch.
+    // 2. Fallback to httpOnly cookie (browser clients)
+    if (!token && (req as any).cookies?.access_token) {
+        token = (req as any).cookies.access_token;
+    }
 
     if (!token) {
         res.status(401).json({ error: 'Authentifizierung erforderlich' });
@@ -106,22 +129,22 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
 
         // Check token blacklist (async — Redis or fallback)
         if (decoded.jti) {
-            isTokenBlacklisted(decoded.jti).then(blacklisted => {
+            try {
+                const blacklisted = await isTokenBlacklisted(decoded.jti);
                 if (blacklisted) {
                     res.status(401).json({ error: 'Token wurde widerrufen' });
                     return;
                 }
-                req.auth = decoded;
-                next();
-            }).catch(() => {
-                // If blacklist check fails, allow through (fail-open for availability)
-                req.auth = decoded;
-                next();
-            });
-        } else {
-            req.auth = decoded;
-            next();
+            } catch (err) {
+                // DSGVO/HIPAA: fail-closed on blacklist check failure — medical data requires deny-by-default
+                console.error('[Auth] Blacklist check failed — denying request for security:', err);
+                res.status(503).json({ error: 'Authentifizierung vorübergehend nicht verfügbar' });
+                return;
+            }
         }
+
+        req.auth = decoded;
+        next();
     } catch (_err) {
         res.status(401).json({ error: 'Ungültiger oder abgelaufener Token' });
     }
@@ -224,8 +247,8 @@ export function requirePermission(permissionCode: string) {
             res.status(403).json({ error: 'Fehlende Berechtigung', requiredPermission: permissionCode });
         } catch (err) {
             console.error('[Auth] Permission check error:', err);
-            // Fail-open for availability (matches existing pattern)
-            next();
+            // DSGVO/HIPAA: fail-closed — medical data requires deny-by-default on errors
+            res.status(503).json({ error: 'Berechtigungsprüfung vorübergehend nicht verfügbar' });
         }
     };
 }

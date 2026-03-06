@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FC } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AchievementBadge } from './AchievementBadge';
 
 interface RecentAchievement {
@@ -47,6 +48,7 @@ export const PointsDisplay: FC<PointsDisplayProps> = ({
   recentAchievements,
   className = '',
 }) => {
+  const { i18n } = useTranslation();
   const displayPoints = useCountUp(points);
   const topAchievements = recentAchievements?.slice(0, 3) ?? [];
 
@@ -60,7 +62,7 @@ export const PointsDisplay: FC<PointsDisplayProps> = ({
           <p className="mb-1 text-sm font-medium text-blue-100">{staffName}</p>
         )}
         <p className="text-5xl font-extrabold tabular-nums tracking-tight">
-          {displayPoints.toLocaleString('de-DE')}
+          {displayPoints.toLocaleString(i18n.language)}
         </p>
         <p className="mt-1 text-sm text-blue-200">Punkte</p>
       </div>

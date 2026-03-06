@@ -190,7 +190,7 @@ export function VideoRoom() {
               <AlertTriangle className="w-3 h-3" /> 5 Min. verbleibend
             </span>
           )}
-          <button onClick={toggleFullscreen} className="p-1.5 text-gray-400 hover:text-white rounded">
+          <button onClick={toggleFullscreen} title="Vollbild umschalten" className="p-1.5 text-gray-400 hover:text-white rounded">
             {state.fullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
           </button>
         </div>
@@ -267,6 +267,7 @@ export function VideoRoom() {
       <footer className="flex items-center justify-center gap-3 px-4 py-4 bg-gray-800/80 backdrop-blur">
         <button
           onClick={toggleAudio}
+          title="Mikrofon umschalten"
           className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
             state.audioEnabled ? 'bg-gray-600 text-white hover:bg-gray-500' : 'bg-red-500 text-white hover:bg-red-600'
           }`}
@@ -276,6 +277,7 @@ export function VideoRoom() {
 
         <button
           onClick={toggleVideo}
+          title="Kamera umschalten"
           className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
             state.videoEnabled ? 'bg-gray-600 text-white hover:bg-gray-500' : 'bg-red-500 text-white hover:bg-red-600'
           }`}
@@ -285,6 +287,7 @@ export function VideoRoom() {
 
         <button
           onClick={toggleScreenShare}
+          title="Bildschirm teilen"
           className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
             state.screenSharing ? 'bg-blue-500 text-white' : 'bg-gray-600 text-white hover:bg-gray-500'
           }`}
@@ -296,6 +299,7 @@ export function VideoRoom() {
 
         <button
           onClick={toggleChat}
+          title="Chat anzeigen"
           className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
             state.showChat ? 'bg-blue-500 text-white' : 'bg-gray-600 text-white hover:bg-gray-500'
           }`}
@@ -305,6 +309,7 @@ export function VideoRoom() {
 
         <button
           onClick={toggleNotes}
+          title="Notizen anzeigen"
           className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
             state.showNotes ? 'bg-blue-500 text-white' : 'bg-gray-600 text-white hover:bg-gray-500'
           }`}
@@ -312,7 +317,7 @@ export function VideoRoom() {
           <FileText className="w-4 h-4" />
         </button>
 
-        <button className="w-10 h-10 rounded-full bg-gray-600 text-white hover:bg-gray-500 flex items-center justify-center">
+        <button title="Einstellungen" className="w-10 h-10 rounded-full bg-gray-600 text-white hover:bg-gray-500 flex items-center justify-center">
           <Settings className="w-4 h-4" />
         </button>
 
@@ -320,6 +325,7 @@ export function VideoRoom() {
 
         <button
           onClick={handleHangUp}
+          title="Auflegen"
           className="w-14 h-12 rounded-full bg-red-500 text-white hover:bg-red-600 flex items-center justify-center transition-all"
         >
           <PhoneOff className="w-5 h-5" />

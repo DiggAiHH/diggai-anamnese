@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { getIO } from '../socket';
-import { requireAuth, requireRole } from '../middleware/auth';
+import { requireAuth, requireRole, requirePermission } from '../middleware/auth';
 import * as queueService from '../services/queueService';
 
 const router = Router();
@@ -91,7 +91,7 @@ router.get('/flow-config/:sessionId', requireAuth, async (req, res) => {
 });
 
 // ─── PUT /api/queue/:id/call ────────────────────────────────
-router.put('/:id/call', requireAuth, requireRole('mfa', 'admin', 'arzt'), async (req, res) => {
+router.put('/:id/call', requireAuth, requireRole('mfa', 'admin', 'arzt'), requirePermission('queue_manage'), async (req, res) => {
     try {
         const entry = await queueService.callEntry(req.params.id as string);
         await broadcastQueue();
@@ -116,7 +116,7 @@ router.put('/:id/call', requireAuth, requireRole('mfa', 'admin', 'arzt'), async 
 });
 
 // ─── PUT /api/queue/:id/treat ───────────────────────────────
-router.put('/:id/treat', requireAuth, requireRole('mfa', 'admin', 'arzt'), async (req, res) => {
+router.put('/:id/treat', requireAuth, requireRole('mfa', 'admin', 'arzt'), requirePermission('queue_manage'), async (req, res) => {
     try {
         const entry = await queueService.treatEntry(req.params.id as string);
         await broadcastQueue();
@@ -132,7 +132,7 @@ router.put('/:id/treat', requireAuth, requireRole('mfa', 'admin', 'arzt'), async
 });
 
 // ─── PUT /api/queue/:id/done ────────────────────────────────
-router.put('/:id/done', requireAuth, requireRole('mfa', 'admin', 'arzt'), async (req, res) => {
+router.put('/:id/done', requireAuth, requireRole('mfa', 'admin', 'arzt'), requirePermission('queue_manage'), async (req, res) => {
     try {
         const entry = await queueService.doneEntry(req.params.id as string);
         await broadcastQueue();

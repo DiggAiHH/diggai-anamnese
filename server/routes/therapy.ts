@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { evaluateAlertRules, generatePseudonym, anonymizeSession } from '../services/therapy';
+import { aiEngine } from '../services/ai/ai-engine.service';
 
 const router = Router();
 
@@ -462,36 +463,68 @@ router.post('/templates/:id/apply', requireAuth, requireRole('arzt', 'admin'), a
 // 4. AI STUBS (prepared for future AI integration)
 // ═══════════════════════════════════════════════════════════════
 
-// POST /ai/suggest — AI therapy suggestions stub
-router.post('/ai/suggest', requireAuth, requireRole('arzt', 'admin'), async (_req: Request, res: Response) => {
-  res.json({
-    available: false,
-    message: 'KI-Therapievorschläge werden in einer zukünftigen Version verfügbar sein.',
-    suggestedMeasures: [],
-  });
+// POST /ai/suggest — AI therapy suggestions
+router.post('/ai/suggest', requireAuth, requireRole('arzt', 'admin'), async (req: Request, res: Response) => {
+  try {
+    const { sessionId } = z.object({ sessionId: z.string().uuid() }).parse(req.body);
+    const result = await aiEngine.suggestTherapy(sessionId);
+    res.json({
+      available: true,
+      mode: result.mode,
+      aiModel: result.aiModel,
+      aiConfidence: result.aiConfidence,
+      aiPromptHash: result.aiPromptHash,
+      durationMs: result.durationMs,
+      suggestion: result.suggestion,
+    });
+  } catch (err: any) {
+    console.error('[AI suggest] error:', err.message);
+    res.status(500).json({ error: 'KI-Vorschlag fehlgeschlagen', details: err.message });
+  }
 });
 
-// POST /ai/summarize/:sessionId — AI summary stub
-router.post('/ai/summarize/:sessionId', requireAuth, requireRole('arzt', 'admin'), async (_req: Request, res: Response) => {
-  res.json({
-    available: false,
-    message: 'KI-Zusammenfassung wird in einer zukünftigen Version verfügbar sein.',
-    summary: null,
-  });
+// POST /ai/summarize/:sessionId — AI session summary
+router.post('/ai/summarize/:sessionId', requireAuth, requireRole('arzt', 'admin'), async (req: Request, res: Response) => {
+  try {
+    const sessionId = z.string().uuid().parse(req.params.sessionId);
+    const result = await aiEngine.summarizeSession(sessionId);
+    res.json({
+      available: true,
+      mode: result.mode,
+      aiModel: result.aiModel,
+      durationMs: result.durationMs,
+      summary: result.summary,
+    });
+  } catch (err: any) {
+    console.error('[AI summarize] error:', err.message);
+    res.status(500).json({ error: 'KI-Zusammenfassung fehlgeschlagen', details: err.message });
+  }
 });
 
-// POST /ai/icd-suggest — AI ICD-10 code suggestion stub
-router.post('/ai/icd-suggest', requireAuth, requireRole('arzt', 'admin'), async (_req: Request, res: Response) => {
-  res.json({
-    available: false,
-    message: 'KI-ICD-Vorschläge werden in einer zukünftigen Version verfügbar sein.',
-    suggestions: [],
-  });
+// POST /ai/icd-suggest — AI ICD-10 code suggestions
+router.post('/ai/icd-suggest', requireAuth, requireRole('arzt', 'admin'), async (req: Request, res: Response) => {
+  try {
+    const { symptoms } = z.object({ symptoms: z.string().min(1) }).parse(req.body);
+    const result = await aiEngine.suggestIcd(symptoms);
+    res.json({
+      available: true,
+      mode: result.mode,
+      suggestions: result.suggestions,
+    });
+  } catch (err: any) {
+    console.error('[AI icd-suggest] error:', err.message);
+    res.status(500).json({ error: 'ICD-Vorschlag fehlgeschlagen', details: err.message });
+  }
 });
 
 // GET /ai/status — AI service status
 router.get('/ai/status', requireAuth, async (_req: Request, res: Response) => {
-  res.json({ status: 'not_configured', model: null, available: false });
+  try {
+    const status = await aiEngine.getStatus();
+    res.json(status);
+  } catch (err: any) {
+    res.json({ available: false, provider: 'none', model: null, online: false, error: err.message });
+  }
 });
 
 // ═══════════════════════════════════════════════════════════════

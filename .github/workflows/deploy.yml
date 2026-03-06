@@ -19,22 +19,18 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-          cache-dependency-path: anamnese-app/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        working-directory: anamnese-app
         run: npm ci
 
       - name: TypeScript check
-        working-directory: anamnese-app
         run: npx tsc -b
 
       - name: Build frontend
-        working-directory: anamnese-app
         run: npm run build
 
       - name: Lint
-        working-directory: anamnese-app
         run: npm run lint || true
 
   # ─── Deploy to VPS ─────────────────────────────────────────

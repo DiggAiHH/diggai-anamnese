@@ -206,7 +206,7 @@ export function TherapyPlanBuilder({ sessionId, patientId, onCreated }: TherapyP
                                 <div>
                                     <label className="block text-xs font-medium mb-1">Typ</label>
                                     <select value={measureType} onChange={e => setMeasureType(e.target.value)}
-                                        className="w-full px-2 py-1.5 rounded-lg border dark:bg-gray-700 dark:border-gray-600 text-sm">
+                                        title="Maßnahmen-Typ" className="w-full px-2 py-1.5 rounded-lg border dark:bg-gray-700 dark:border-gray-600 text-sm">
                                         {MEASURE_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                                     </select>
                                 </div>

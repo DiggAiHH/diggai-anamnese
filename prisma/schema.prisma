@@ -44,6 +44,15 @@ model Patient {
   // Modul 5: Patienten-Portal PWA
   account          PatientAccount?
 
+  // Modul 6: gematik / ePA
+  epaKvnr          String?   // Verschlüsselte KVNR für ePA-Zuordnung
+
+  // Modul 7/8: NFC-Ökosystem & Advanced Patient Experience
+  hasPrivateEPA    Boolean    @default(false)
+  bonusPoints      Int        @default(0)
+  privateEpa       PrivateEPA?
+  signatures       Signature[]
+
   @@index([insuranceNumHash, birthDate])
 }
 
@@ -77,6 +86,7 @@ model PatientSession {
   chatMessages    ChatMessage[]
   accidentDetails AccidentDetails?
   queueEntry      QueueEntry?
+  signatures      Signature[]
 
   // Modul 3: PVS-Export-Status
   pvsExported     Boolean   @default(false)
@@ -86,6 +96,10 @@ model PatientSession {
   // Modul 4: Therapieplan & Alerts
   therapyPlans    TherapyPlan[]
   clinicalAlerts  ClinicalAlert[]
+
+  // Modul 7: NFC TreatmentFlow
+  currentFlowId   String?
+  flowProgress    PatientFlowProgress?
 
   @@index([patientId, createdAt])
   @@index([status])
@@ -199,6 +213,52 @@ model ArztUser {
 
   // Modul 4: Therapieplan-Erstellung
   createdTherapyPlans TherapyPlan[] @relation("TherapyPlanCreator")
+
+  // Modul 8: Avatar & Voice
+  avatar              StaffAvatar?
+}
+
+// ─── Digitale Unterschrift (Phase 12 — eIDAS FES) ───────────
+
+enum SignerRole {
+  PATIENT
+  ARZT
+  MFA
+  LIEFERANT
+}
+
+enum FormType {
+  DSGVO
+  BEHANDLUNG
+  AVV
+  VIDEO_CONSENT
+  SONSTIG
+}
+
+model Signature {
+  id                     String    @id @default(uuid())
+  patientId              String?
+  patient                Patient?  @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  sessionId              String?
+  session                PatientSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  signerRole             SignerRole
+  formType               FormType
+  documentVersion        String    @default("1.0")
+  documentHash           String    // SHA-256 des signierten Formulartexts
+  encryptedSignatureData String    // AES-256-GCM verschlüsseltes Base64-PNG
+  ipHash                 String    // SHA-256(IP + Salt) — DSGVO-konform
+  userAgent              String    // Browser-Info (truncated)
+
+  invalidatedAt          DateTime?
+  invalidationReason     String?
+
+  createdAt              DateTime  @default(now())
+
+  @@index([patientId, createdAt])
+  @@index([sessionId])
+  @@index([formType, createdAt])
+  @@unique([patientId, formType, documentHash])
 }
 
 // ─── Audit Log (HIPAA Compliance) ───────────────────────────
@@ -246,10 +306,18 @@ model PatientMedication {
   frequency   String   // z.B. "1-0-1"
   notes       String?  // Optionale Freitext-Notizen
 
+  // Modul 5: Erinnerungs-System
+  isActive     Boolean   @default(true)
+  startDate    DateTime?
+  endDate      DateTime?
+  prescribedBy String?
+  reminders    MedicationReminder[]
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  
+
   @@index([patientId])
+  @@index([isActive])
 }
 
 // ─── Patient Surgeries (OP-Historie) ─────────────────────────
@@ -294,16 +362,26 @@ model Appointment {
   sessionId   String?
   arztId      String?
   arzt        ArztUser? @relation("ArztAppointments", fields: [arztId], references: [id])
+
+  // Modul 5: PWA-Verknüpfung
+  patientAccountId String?
+  patientAccount   PatientAccount? @relation(fields: [patientAccountId], references: [id])
+
   service     String
   date        DateTime
   duration    Int      @default(30) // Minuten
-  status      String   @default("SCHEDULED") // SCHEDULED, CONFIRMED, CANCELLED, COMPLETED
+  status      String   @default("SCHEDULED") // SCHEDULED, REQUESTED, CONFIRMED, CANCELLED, COMPLETED
   notes       String?
+  requestNotes String?   // Notizen vom Patienten bei Terminanfrage
+  requestedAt  DateTime? // Wann der Patient die Anfrage gestellt hat
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@index([date])
   @@index([arztId])
+  @@index([patientAccountId])
+  @@index([status])
 }
 
 // ─── Queue Entry (Persistente Warteschlange) ────────────────
@@ -429,7 +507,7 @@ model ROISnapshot {
   patientsServed        Int
   sessionsCompleted     Int
   avgCompletionMinutes  Float
-  messagesCount         Int
+  messagesCount         Int      @default(0)
   mfaMinutesSaved       Float
   estimatedCostSaving   Float
 
@@ -857,72 +935,120 @@ model PatientAccount {
   id              String            @id @default(uuid())
   patientId       String            @unique
   patient         Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  
+
   email           String?           @unique
   phone           String?
   passwordHash    String
   pinHash         String?
-  
+
+  // WebAuthn / FIDO2 (optional Biometrie-Login)
+  webauthnCredentialId  String?
+  webauthnPublicKey     Bytes?
+  webauthnCounter       Int       @default(0)
+  webauthnDeviceType    String?   // platform, cross-platform
+
+  // Email-Verifizierung & Passwort-Reset
+  verificationToken     String?
+  verificationExpiry    DateTime?
+  resetToken            String?
+  resetTokenExpiry      DateTime?
+
   isActive        Boolean           @default(true)
   isVerified      Boolean           @default(false)
   verifiedAt      DateTime?
   lastLoginAt     DateTime?
   loginCount      Int               @default(0)
-  
+
   locale          String            @default("de")
   notifyEmail     Boolean           @default(true)
   notifyPush      Boolean           @default(false)
   notifySms       Boolean           @default(false)
-  
+
+  // DSGVO Soft-Delete
+  deletedAt       DateTime?
+  deletionScheduledAt DateTime?
+
   devices         PatientDevice[]
   consents        PatientConsent[]
   diaryEntries    DiaryEntry[]
   measureTrackings MeasureTracking[]
   messages        ProviderMessage[]
-  
+  medicationReminders MedicationReminder[]
+  appointments    Appointment[]
+
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
-  
+
   @@index([email])
   @@index([phone])
+  @@index([deletedAt])
 }
 
 model PatientDevice {
   id              String            @id @default(uuid())
   accountId       String
   account         PatientAccount    @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  
+
   deviceName      String
   deviceType      String            // ios, android, web
   pushToken       String?
-  pushEndpoint    String?
+  pushEndpoint    String?           @unique // Web Push endpoint URL
+  p256dh          String?           // VAPID: Browser public key (base64url)
+  auth            String?           // VAPID: Auth secret (base64url)
   userAgent       String?
-  
+
   isActive        Boolean           @default(true)
   lastSeenAt      DateTime          @default(now())
-  
+  lastUsedAt      DateTime?
+
   createdAt       DateTime          @default(now())
-  
+
   @@index([accountId])
   @@index([pushToken])
+  @@index([isActive])
 }
 
 model PatientConsent {
   id              String            @id @default(uuid())
   accountId       String
   account         PatientAccount    @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  
+
   type            ConsentType
   granted         Boolean           @default(false)
   grantedAt       DateTime?
   revokedAt       DateTime?
   ipAddress       String?
-  
+
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
-  
+
+  consentLogs     ConsentLog[]
+
   @@unique([accountId, type])
   @@index([accountId])
+}
+
+// DSGVO Art. 7 Abs. 1 — Nachweispflicht der Einwilligung
+// Audit-Trail jeder Consent-Änderung mit IP, User-Agent, Version
+model ConsentLog {
+  id              String            @id @default(uuid())
+  accountId       String
+  consentId       String
+  consent         PatientConsent    @relation(fields: [consentId], references: [id], onDelete: Cascade)
+
+  consentType     ConsentType
+  action          String            // "GRANTED" | "REVOKED" | "UPDATED"
+  granted         Boolean
+  consentVersion  String?           // Version der Datenschutzerklärung
+  ipHash          String?           // SHA-256 der IP-Adresse (nicht Plaintext)
+  userAgent       String?           // Browser/Client zur Audit-Nachverfolgung
+  changedBy       String?           // "patient" | "doctor" | "system"
+
+  createdAt       DateTime          @default(now())
+
+  @@index([accountId])
+  @@index([consentId])
+  @@index([createdAt])
 }
 
 model DiaryEntry {
@@ -930,7 +1056,7 @@ model DiaryEntry {
   accountId       String
   account         PatientAccount    @relation(fields: [accountId], references: [id], onDelete: Cascade)
   patientId       String
-  
+
   date            DateTime          @default(now())
   mood            DiaryMood?
   painLevel       Int?              // 0-10
@@ -938,22 +1064,26 @@ model DiaryEntry {
   sleepHours      Float?
   symptoms        String[]
   notes           String?
-  
-  vitalBp         String?           // "120/80"
+
+  vitalBp         String?           // "120/80" (legacy string format)
+  vitalBpSys      Int?              // Systolisch (für Trend-Aggregation)
+  vitalBpDia      Int?              // Diastolisch
   vitalPulse      Int?
   vitalTemp       Float?
   vitalWeight     Float?
   vitalBloodSugar Float?
-  
+  vitalSpO2       Int?              // Sauerstoffsättigung %
+
   offlineCreated  Boolean           @default(false)
   syncedAt        DateTime?
-  
+
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
-  
+
   @@index([accountId])
   @@index([patientId])
   @@index([date])
+  @@index([accountId, date])
 }
 
 model MeasureTracking {
@@ -986,26 +1116,83 @@ model ProviderMessage {
   accountId       String
   account         PatientAccount    @relation(fields: [accountId], references: [id], onDelete: Cascade)
   patientId       String
-  
+
   direction       MessageDirection
   subject         String?
   body            String
-  
+
   senderName      String?
   senderRole      String?           // arzt, mfa, system
-  
+
+  // Kategorisierung
+  category        String            @default("general") // general, appointment, prescription, lab, urgent
+  priority        String            @default("normal")  // normal, high, urgent
+
   isRead          Boolean           @default(false)
   readAt          DateTime?
-  
+  archivedAt      DateTime?
+
+  // Thread-Support
+  parentId        String?
+  parent          ProviderMessage?  @relation("MessageThread", fields: [parentId], references: [id])
+  replies         ProviderMessage[] @relation("MessageThread")
+
   attachmentUrl   String?
   attachmentName  String?
-  
+
   createdAt       DateTime          @default(now())
-  
+
   @@index([accountId])
   @@index([patientId])
   @@index([isRead])
   @@index([createdAt])
+  @@index([parentId])
+}
+
+// ─── Modul 5: Medikamenten-Erinnerungen ─────────────────────
+
+model MedicationReminder {
+  id              String            @id @default(uuid())
+  accountId       String
+  account         PatientAccount    @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  medicationId    String
+  medication      PatientMedication @relation(fields: [medicationId], references: [id], onDelete: Cascade)
+
+  scheduleCron    String            // "0 8 * * *" = täglich 8 Uhr
+  scheduleLabel   String            // "Morgens", "Abends"
+  timezone        String            @default("Europe/Berlin")
+  isActive        Boolean           @default(true)
+
+  pushEnabled     Boolean           @default(true)
+  pushTitle       String?
+  pushBody        String?
+
+  reminderLogs    ReminderLog[]
+
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([accountId, isActive])
+  @@index([medicationId])
+  @@index([isActive, scheduleCron])
+  @@map("medication_reminders")
+}
+
+model ReminderLog {
+  id              String            @id @default(uuid())
+  reminderId      String
+  reminder        MedicationReminder @relation(fields: [reminderId], references: [id], onDelete: Cascade)
+
+  scheduledAt     DateTime
+  status          String            // sent, confirmed, skipped, missed
+  confirmedAt     DateTime?
+  skipReason      String?
+
+  createdAt       DateTime          @default(now())
+
+  @@index([reminderId, scheduledAt])
+  @@index([status])
+  @@map("reminder_logs")
 }
 
 // ─── Modul 6: Lokaler Modus / gematik / ePA ────────────────
@@ -1361,6 +1548,7 @@ model FlowStep {
 model PatientFlowProgress {
   id                  String             @id @default(uuid())
   sessionId           String             @unique
+  session             PatientSession     @relation(fields: [sessionId], references: [id])
   flowId              String
   flow                TreatmentFlow      @relation(fields: [flowId], references: [id])
   currentStep         Int                @default(0)
@@ -1461,6 +1649,7 @@ enum AvatarType {
 model StaffAvatar {
   id                 String     @id @default(uuid())
   staffId            String     @unique
+  staff              ArztUser   @relation(fields: [staffId], references: [id])
   voiceCloneId       String?
   voiceSettings      Json?
   avatarUrl          String?
@@ -1576,6 +1765,7 @@ model CustomForm {
 model PrivateEPA {
   id              String        @id @default(cuid())
   patientId       String        @unique
+  patient         Patient       @relation(fields: [patientId], references: [id])
   consentSignedAt DateTime?
   consentVersion  String
   createdAt       DateTime      @default(now())
@@ -1600,7 +1790,7 @@ model EpaDocument {
   validUntil  DateTime?
 
   @@index([epaId, createdAt])
-  @@map("epa_documents")
+  @@map("private_epa_documents")
 }
 
 model EpaShare {
@@ -1629,4 +1819,170 @@ model AnonymizedExport {
 
   @@index([patientId, createdAt])
   @@map("anonymized_exports")
+}
+
+model StaffTodo {
+  id          String    @id @default(cuid())
+  text        String
+  completed   Boolean   @default(false)
+  priority    String    @default("medium") // low|medium|high|urgent
+  category    String    @default("general") // patient|admin|followup|general
+  assignee    String?
+  assigneeId  String
+  sessionId   String?
+  patientName String?
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  @@index([assigneeId, completed])
+  @@index([priority, completed])
+  @@map("staff_todos")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DiggAI: Multi-Agenten-System
+// ═══════════════════════════════════════════════════════════════
+
+enum AgentType {
+  ORCHESTRATOR
+  EMPFANG
+  ABRECHNUNG
+  TRIAGE
+  CUSTOM
+}
+
+enum AgentStatus {
+  IDLE
+  BUSY
+  ERROR
+  DISABLED
+}
+
+enum AgentTaskStatus {
+  PENDING
+  QUEUED
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum AgentTaskPriority {
+  LOW
+  NORMAL
+  HIGH
+  CRITICAL
+}
+
+// ─── Agent Definition ────────────────────────────────────────
+
+model Agent {
+  id            String      @id @default(uuid())
+  name          String      @unique
+  type          AgentType
+  description   String?
+  systemPrompt  String      // Das Haupt-System-Prompt des Agenten
+  version       Int         @default(1)
+  status        AgentStatus @default(IDLE)
+  enabled       Boolean     @default(true)
+
+  // Konfiguration (Tools, Modell, etc.)
+  config        Json?       // { model, temperature, maxTokens, tools: [] }
+
+  // Metriken
+  totalTasks    Int         @default(0)
+  successTasks  Int         @default(0)
+  failedTasks   Int         @default(0)
+  avgDurationMs Int?
+
+  lastActiveAt  DateTime?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  tasks         AgentTask[]
+  auditLogs     AgentAuditLog[]
+
+  @@index([type, enabled])
+  @@index([status])
+  @@map("agents")
+}
+
+// ─── Agent Task (Job-Queue) ───────────────────────────────────
+
+model AgentTask {
+  id            String            @id @default(uuid())
+  agentId       String
+  agent         Agent             @relation(fields: [agentId], references: [id])
+
+  type          String            // "book_appointment" | "triage_call" | "generate_invoice" etc.
+  status        AgentTaskStatus   @default(PENDING)
+  priority      AgentTaskPriority @default(NORMAL)
+
+  // Input/Output (keine PHI — nur anonymisierte IDs oder nicht-sensible Daten)
+  inputData     Json?             // Anonymisierter Task-Input
+  outputData    Json?             // Ergebnis
+  errorMessage  String?
+
+  // Nachverfolgung
+  queuedAt      DateTime?
+  startedAt     DateTime?
+  completedAt   DateTime?
+  durationMs    Int?
+
+  // Kontext (anonymisierte Referenzen)
+  sessionRef    String?           // Anonymisierte Session-ID (nicht FK!)
+  patientRef    String?           // Pseudonymisierte Patienten-Referenz (nicht FK!)
+  requestedBy   String?           // ArztUser.id oder "system"
+
+  // RabbitMQ Message-ID zur Deduplizierung
+  messageId     String?           @unique
+
+  retryCount    Int               @default(0)
+  maxRetries    Int               @default(3)
+
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  auditLogs     AgentAuditLog[]
+
+  @@index([agentId, status])
+  @@index([status, priority])
+  @@index([createdAt])
+  @@index([requestedBy])
+  @@map("agent_tasks")
+}
+
+// ─── Agent Audit Log (DSGVO-Pflicht: KI-Entscheidungsnachverfolgung) ──
+
+model AgentAuditLog {
+  id            String    @id @default(uuid())
+  agentId       String
+  agent         Agent     @relation(fields: [agentId], references: [id])
+  taskId        String?
+  task          AgentTask? @relation(fields: [taskId], references: [id])
+
+  // Was hat der Agent getan?
+  action        String    // "task_started" | "llm_called" | "decision_made" | "task_completed" | "error"
+  details       String?   // Freitext-Beschreibung der Aktion
+
+  // KI-spezifische Daten (KEIN PHI!)
+  modelUsed     String?   // "llama3", "mistral", etc.
+  promptHash    String?   // SHA-256 des Prompts (nicht der Prompt selbst)
+  tokensUsed    Int?
+  latencyMs     Int?
+
+  // Entscheidungs-Kontext (anonymisiert)
+  decisionType  String?   // "appointment_booked" | "triage_escalated" | "invoice_generated"
+  confidence    Float?    // 0.0 - 1.0 (Modell-Konfidenz wenn verfügbar)
+  humanReview   Boolean   @default(false) // War menschliche Überprüfung nötig?
+  humanReviewBy String?   // userId
+
+  ipHash        String?   // SHA-256 der Request-IP
+  createdAt     DateTime  @default(now())
+
+  @@index([agentId, createdAt])
+  @@index([taskId])
+  @@index([action, createdAt])
+  @@index([decisionType])
+  @@map("agent_audit_logs")
 }

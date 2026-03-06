@@ -39,7 +39,7 @@ export function PvsExportDialog({ sessionId, patientName, onClose }: PvsExportDi
                         <h3 className="font-semibold">An PVS exportieren</h3>
                         {patientName && <p className="text-sm text-gray-500">{patientName}</p>}
                     </div>
-                    <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+                    <button onClick={onClose} title="Schließen" className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
                         <X className="w-5 h-5" />
                     </button>
                 </div>

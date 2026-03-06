@@ -2,6 +2,7 @@
 // Modul 7/8: Post-payment success screen with receipt
 
 import { CheckCircle2, Receipt, Download, ArrowRight, Printer } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface PaymentSuccessProps {
   amount: number;
@@ -11,8 +12,9 @@ interface PaymentSuccessProps {
 }
 
 export function PaymentSuccess({ amount, transactionId, receiptUrl, onContinue }: PaymentSuccessProps) {
+  const { i18n } = useTranslation();
   const formatCurrency = (n: number) =>
-    new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(n);
+    new Intl.NumberFormat(i18n.language, { style: 'currency', currency: 'EUR' }).format(n);
 
   return (
     <div className="max-w-md mx-auto text-center space-y-8 py-8">

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Shield, LogOut, AlertTriangle, User, ChevronRight, CheckCircle, Activity, Sparkles, Send, MessageSquare, Download, FileText } from 'lucide-react';
+import { Shield, LogOut, AlertTriangle, User, ChevronRight, CheckCircle, Activity, Sparkles, Send, MessageSquare, Download, FileText, Bell, ClipboardList } from 'lucide-react';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { io } from 'socket.io-client';
 import { useTranslation } from 'react-i18next';
@@ -8,6 +8,7 @@ import { setAuthToken, getAuthToken, API_BASE_URL, SOCKET_BASE_URL, api } from '
 import { StaffChat } from '../components/StaffChat';
 import { StaffTodoList } from '../components/StaffTodoList';
 import { FullscreenButton } from '../components/FullscreenButton';
+import { ClinicalAlertList } from '../components/therapy/ClinicalAlertBanner';
 
 // Helper for playing an alert sound safely
 const playAlertSound = () => {
@@ -112,7 +113,8 @@ export const ArztDashboard: React.FC = () => {
     const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
     const [toastAlerts, setToastAlerts] = useState<ToastAlert[]>([]);
     const [activeLocks, setActiveLocks] = useState<Record<string, string>>({});
-    const [activeTab, setActiveTab] = useState<'patients' | 'chat' | 'todo'>('patients');
+    const [activeTab, setActiveTab] = useState<'patients' | 'chat' | 'todo' | 'therapy' | 'alerts'>('patients');
+    const [clinicalAlertCount, setClinicalAlertCount] = useState(0);
     const queryClient = useQueryClient();
 
     React.useEffect(() => {
@@ -158,6 +160,63 @@ export const ArztDashboard: React.FC = () => {
             });
         });
 
+        // ─── Modul 3+4: PVS & Therapy Events ───────────────
+        socket.on('therapy:alert-new', (data: { severity: string; title: string; message: string; patientId: string }) => {
+            playAlertSound();
+            setClinicalAlertCount(prev => prev + 1);
+            setToastAlerts(prev => [...prev, {
+                id: Date.now() + Math.random(),
+                type: 'triage',
+                title: data.title,
+                message: data.message,
+                level: data.severity,
+            }]);
+            queryClient.invalidateQueries({ queryKey: ['therapy'] });
+        });
+
+        socket.on('therapy:alert-critical', () => {
+            playAlertSound();
+            queryClient.invalidateQueries({ queryKey: ['therapy'] });
+        });
+
+        socket.on('pvs:export-completed', (data: { sessionId: string; pvsType: string }) => {
+            setToastAlerts(prev => [...prev, {
+                id: Date.now() + Math.random(),
+                type: 'success',
+                title: t('arzt.pvsExportSuccess', 'PVS-Export erfolgreich'),
+                message: `${data.pvsType}`,
+                sessionId: data.sessionId,
+            }]);
+        });
+
+        socket.on('pvs:export-failed', (data: { sessionId: string; error: string }) => {
+            setToastAlerts(prev => [...prev, {
+                id: Date.now() + Math.random(),
+                type: 'triage',
+                title: t('arzt.pvsExportFailed', 'PVS-Export fehlgeschlagen'),
+                message: data.error,
+                sessionId: data.sessionId,
+                level: 'WARNING',
+            }]);
+        });
+
+        socket.on('pvs:patient-imported', () => {
+            queryClient.invalidateQueries({ queryKey: ['arzt'] });
+        });
+
+        socket.on('therapy:plan-updated', () => {
+            queryClient.invalidateQueries({ queryKey: ['therapy'] });
+        });
+
+        socket.on('therapy:measure-due', (data: { title: string; planId: string }) => {
+            setToastAlerts(prev => [...prev, {
+                id: Date.now() + Math.random(),
+                type: 'message',
+                title: t('arzt.measureDue', 'Maßnahme fällig'),
+                message: data.title,
+            }]);
+        });
+
         return () => {
             socket.disconnect();
         };
@@ -197,9 +256,11 @@ export const ArztDashboard: React.FC = () => {
                 <div className="flex gap-2 border-b border-white/10 pb-0 mb-8">
                     {([
                         { key: 'patients' as const, label: t('arzt.patients', 'Patienten'), icon: User },
+                        { key: 'therapy' as const, label: t('arzt.therapyPlans', 'Therapiepläne'), icon: ClipboardList },
+                        { key: 'alerts' as const, label: t('arzt.alerts', 'Alerts'), icon: Bell, badge: clinicalAlertCount },
                         { key: 'chat' as const, label: t('arzt.teamChat', 'Team-Chat'), icon: MessageSquare },
                         { key: 'todo' as const, label: t('arzt.todoList', 'Aufgaben'), icon: CheckCircle },
-                    ]).map(tab => (
+                    ] as const).map(tab => (
                         <button
                             key={tab.key}
                             onClick={() => setActiveTab(tab.key)}
@@ -209,7 +270,13 @@ export const ArztDashboard: React.FC = () => {
                             }`}
                         >
                             <tab.icon className="w-4 h-4" />
+                            <tab.icon className="w-4 h-4" />
                             {tab.label}
+                            {'badge' in tab && (tab as any).badge > 0 && (
+                                <span className="ml-1 px-1.5 py-0.5 min-w-[20px] text-center bg-red-500 text-white text-[10px] font-black rounded-full">
+                                    {(tab as any).badge}
+                                </span>
+                            )}
                         </button>
                     ))}
                 </div>
@@ -220,6 +287,26 @@ export const ArztDashboard: React.FC = () => {
                     ) : (
                         <SessionList onSelect={setSelectedSessionId} activeLocks={activeLocks} />
                     )
+                )}
+
+                {activeTab === 'therapy' && (
+                    <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-md">
+                        <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                            <ClipboardList className="w-5 h-5 text-blue-400" />
+                            {t('arzt.therapyPlans', 'Therapiepläne')}
+                        </h2>
+                        <p className="text-white/50 text-sm">{t('arzt.therapySelectPatient', 'Wählen Sie einen Patienten in der Patientenliste, um einen Therapieplan zu erstellen.')}</p>
+                    </div>
+                )}
+
+                {activeTab === 'alerts' && (
+                    <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-md">
+                        <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                            <Bell className="w-5 h-5 text-red-400" />
+                            {t('arzt.clinicalAlerts', 'Klinische Alerts')}
+                        </h2>
+                        <ClinicalAlertList />
+                    </div>
                 )}
 
                 {activeTab === 'chat' && (
@@ -567,10 +654,10 @@ const SessionDetail: React.FC<{ sessionId: string; onBack: () => void }> = ({ se
                                         </span>
                                         <div className="flex-1 min-w-0">
                                             <p className="text-xs text-white font-medium">{te.message}</p>
-                                            <p className="text-[10px] text-white/30 mt-1">{t('arzt.question')}: {te.atomId} • {new Date(te.createdAt).toLocaleString('de-DE')}</p>
+                                            <p className="text-[10px] text-white/30 mt-1">{t('arzt.question')}: {te.atomId} • {new Date(te.createdAt).toLocaleString(navigator.language)}</p>
                                             {te.acknowledgedAt && (
                                                 <p className="text-[10px] text-green-400/70 mt-1 flex items-center gap-1">
-                                                    <CheckCircle className="w-3 h-3" /> {t('arzt.triageAckedBy', { by: te.acknowledgedBy, at: new Date(te.acknowledgedAt).toLocaleString('de-DE') })}
+                                                    <CheckCircle className="w-3 h-3" /> {t('arzt.triageAckedBy', { by: te.acknowledgedBy, at: new Date(te.acknowledgedAt).toLocaleString(navigator.language) })}
                                                 </p>
                                             )}
                                         </div>
@@ -719,9 +806,9 @@ const SessionDetail: React.FC<{ sessionId: string; onBack: () => void }> = ({ se
                         {patientTyping && (
                             <div className="px-4 py-2 flex items-center gap-2 text-white/40">
                                 <div className="flex gap-1">
-                                    <span className="w-1.5 h-1.5 bg-blue-400/60 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                                    <span className="w-1.5 h-1.5 bg-blue-400/60 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                                    <span className="w-1.5 h-1.5 bg-blue-400/60 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                                    <span className="w-1.5 h-1.5 bg-blue-400/60 rounded-full animate-bounce" />
+                                    <span className="w-1.5 h-1.5 bg-blue-400/60 rounded-full animate-bounce [animation-delay:150ms]" />
+                                    <span className="w-1.5 h-1.5 bg-blue-400/60 rounded-full animate-bounce [animation-delay:300ms]" />
                                 </div>
                                 <span className="text-[10px]">{t('arzt.patientTyping')}</span>
                             </div>

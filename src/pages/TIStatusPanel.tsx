@@ -1,4 +1,7 @@
-import { Shield, CreditCard, Wifi, WifiOff, RefreshCw, Radio, FileText, Mail, Settings, Zap, AlertTriangle, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Shield, CreditCard, Wifi, WifiOff, RefreshCw, Radio, Settings, Zap, AlertTriangle, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { KIMPanel } from '../components/admin/KIMPanel';
+import { EPAPanel } from '../components/admin/EPAPanel';
 import type { TICard } from '../types/admin';
 import {
   useTIStatus,
@@ -6,8 +9,6 @@ import {
   useTIRefresh,
   useTICards,
   useTIConfig,
-  useTIEpaStatus,
-  useTIKimStatus,
 } from '../hooks/useApi';
 
 const CONNECTION_COLORS: Record<string, string> = {
@@ -19,11 +20,10 @@ const CONNECTION_COLORS: Record<string, string> = {
 };
 
 export function TIStatusPanel() {
+  const { i18n } = useTranslation();
   const { data: status, isLoading } = useTIStatus();
   const { data: cards } = useTICards();
   const { data: config } = useTIConfig();
-  const { data: epaStatus } = useTIEpaStatus();
-  const { data: kimStatus } = useTIKimStatus();
   const ping = useTIPing();
   const refresh = useTIRefresh();
 
@@ -105,7 +105,7 @@ export function TIStatusPanel() {
               <div className="flex justify-between"><span className="text-gray-500">Version</span><span className="text-gray-900 dark:text-white">{status?.konnektorVersion || '—'}</span></div>
               <div className="flex justify-between"><span className="text-gray-500">Praxis-ID</span><span className="text-gray-900 dark:text-white">{status?.praxisId || '—'}</span></div>
               <div className="flex justify-between"><span className="text-gray-500">Latenz</span><span className="text-gray-900 dark:text-white">{status?.lastPingMs != null ? `${status.lastPingMs}ms` : '—'}</span></div>
-              <div className="flex justify-between"><span className="text-gray-500">Letzter Ping</span><span className="text-gray-900 dark:text-white">{status?.lastPingAt ? new Date(status.lastPingAt).toLocaleString('de-DE') : '—'}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">Letzter Ping</span><span className="text-gray-900 dark:text-white">{status?.lastPingAt ? new Date(status.lastPingAt).toLocaleString(i18n.language) : '—'}</span></div>
               {status?.lastError && (
                 <div className="pt-2 border-t border-gray-100 dark:border-gray-800">
                   <p className="text-red-500 text-xs"><AlertTriangle className="w-3 h-3 inline mr-1" />{status.lastError}</p>
@@ -171,25 +171,14 @@ export function TIStatusPanel() {
             </div>
           </div>
 
-          {/* ePA + KIM Status */}
-          <div className="space-y-6">
-            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-                <FileText className="w-5 h-5 text-teal-500" /> ePA
-              </h2>
-              <p className={`text-sm ${epaStatus?.enabled ? 'text-green-600' : 'text-gray-600 dark:text-gray-400'}`}>
-                {epaStatus?.message || 'Lade…'}
-              </p>
-            </div>
+          {/* ePA Panel */}
+          <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6 lg:col-span-2">
+            <EPAPanel />
+          </div>
 
-            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-                <Mail className="w-5 h-5 text-blue-500" /> KIM
-              </h2>
-              <p className={`text-sm ${kimStatus?.enabled ? 'text-green-600' : 'text-gray-600 dark:text-gray-400'}`}>
-                {kimStatus?.message || 'Lade…'}
-              </p>
-            </div>
+          {/* KIM Panel */}
+          <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6 lg:col-span-2">
+            <KIMPanel />
           </div>
 
           {/* Configuration */}

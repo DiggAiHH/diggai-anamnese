@@ -1,7 +1,7 @@
 /**
  * HomeScreen — Shared Tablet / Kiosk Entry Point
  * 
- * 4 Kacheln: Patient, Arzt, MFA, Lieferant
+ * Patientenansicht: Aufnahme, Patienten-Portal, Telemedizin
  * Auto-Reset nach 60s Inaktivität
  * Uhr, Datum, Praxis-Branding
  */
@@ -9,7 +9,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Stethoscope, Shield, Users, Truck, Clock, Calendar } from 'lucide-react';
+import { Stethoscope, Smartphone, Video, Clock, Calendar } from 'lucide-react';
 import { LanguageSelector } from './LanguageSelector';
 import { ThemeToggle } from './ThemeToggle';
 
@@ -67,28 +67,20 @@ export function HomeScreen() {
       descKey: 'home.tile.patient_desc',
     },
     {
-      id: 'arzt',
-      route: '/arzt',
-      icon: <Shield className="w-16 h-16 md:w-20 md:h-20" />,
+      id: 'pwa',
+      route: '/pwa/login',
+      icon: <Smartphone className="w-16 h-16 md:w-20 md:h-20" />,
       gradient: 'from-emerald-500 to-teal-600',
-      labelKey: 'home.tile.arzt',
-      descKey: 'home.tile.arzt_desc',
+      labelKey: 'home.tile.pwa',
+      descKey: 'home.tile.pwa_desc',
     },
     {
-      id: 'mfa',
-      route: '/mfa',
-      icon: <Users className="w-16 h-16 md:w-20 md:h-20" />,
+      id: 'telemedizin',
+      route: '/telemedizin',
+      icon: <Video className="w-16 h-16 md:w-20 md:h-20" />,
       gradient: 'from-purple-500 to-violet-600',
-      labelKey: 'home.tile.mfa',
-      descKey: 'home.tile.mfa_desc',
-    },
-    {
-      id: 'lieferant',
-      route: '/lieferant',
-      icon: <Truck className="w-16 h-16 md:w-20 md:h-20" />,
-      gradient: 'from-amber-500 to-orange-600',
-      labelKey: 'home.tile.lieferant',
-      descKey: 'home.tile.lieferant_desc',
+      labelKey: 'home.tile.telemedizin',
+      descKey: 'home.tile.telemedizin_desc',
     },
   ];
 
@@ -132,7 +124,7 @@ export function HomeScreen() {
 
       {/* Tiles Grid */}
       <main className="flex-1 flex items-center justify-center p-6 md:p-12">
-        <div className="grid grid-cols-2 gap-6 md:gap-8 max-w-3xl w-full">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 max-w-5xl w-full">
           {tiles.map((tile) => (
             <button
               key={tile.id}
@@ -172,7 +164,15 @@ export function HomeScreen() {
 
       {/* Footer */}
       <footer className="text-center py-3 text-xs text-[var(--text-muted)] border-t border-[var(--border-primary)]">
-        {t('home.footer', 'Bitte wählen Sie Ihren Bereich. Dieses Gerät setzt sich nach 60 Sekunden automatisch zurück.')}
+        <div>{t('home.footer_patient', 'Bitte wählen Sie Ihren Patientenbereich. Dieses Gerät setzt sich nach 60 Sekunden automatisch zurück.')}</div>
+        <div className="mt-1">
+          <button
+            onClick={() => navigate('/verwaltung')}
+            className="underline hover:text-[var(--text-secondary)] transition-colors"
+          >
+            {t('home.verwaltung_link', 'Zur Verwaltungsansicht')}
+          </button>
+        </div>
       </footer>
     </div>
   );

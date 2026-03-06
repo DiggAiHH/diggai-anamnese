@@ -420,7 +420,7 @@ function GlassCard({ children, className = '', onClick }: { children: React.Reac
       className={`rounded-2xl border border-[var(--border-primary)] bg-[var(--bg-card)] backdrop-blur-xl p-5 transition-all duration-300 hover:border-[var(--border-hover)] ${onClick ? 'cursor-pointer hover:scale-[1.02]' : ''} ${className}`}
       onClick={onClick}
       onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } : undefined}
-      role={onClick ? 'button' : 'presentation'}
+      role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
     >
       {children}
@@ -1388,7 +1388,7 @@ export function AdminDashboard() {
             <button
               key={tab.id}
               role="tab"
-              aria-selected={activeTab === tab.id}
+              aria-selected={activeTab === tab.id ? 'true' : 'false'}
               aria-controls={`panel-${tab.id}`}
               onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200 ${
@@ -1398,14 +1398,14 @@ export function AdminDashboard() {
               }`}
             >
               {tab.icon}
-              {tab.label}
+              {t(`admin.tabs.${tab.id}`, tab.label)}
             </button>
           ))}
         </div>
       </nav>
 
       {/* Content */}
-      <main className="max-w-7xl mx-auto px-4 py-6" role="tabpanel" id={`panel-${activeTab}`} aria-label={TABS.find(t => t.id === activeTab)?.label}>
+      <main className="max-w-7xl mx-auto px-4 py-6" role="tabpanel" id={`panel-${activeTab}`} aria-label={TABS.find(tab => tab.id === activeTab)?.label}>
         {tabContent}
       </main>
 

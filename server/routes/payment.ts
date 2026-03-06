@@ -3,6 +3,7 @@
 
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
+import crypto from 'crypto';
 import {
   createPaymentIntent,
   processNfcCharge,
@@ -60,8 +61,58 @@ router.post('/nfc-charge', async (req: Request, res: Response) => {
 // POST /api/payment/webhook — Stripe/Adyen webhook handler
 router.post('/webhook', async (req: Request, res: Response) => {
   try {
-    // TODO: Verify webhook signature in production
-    // const sig = req.headers['stripe-signature'];
+    // Verify webhook signature (Stripe HMAC-SHA256)
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    if (webhookSecret) {
+      const sig = req.headers['stripe-signature'] as string | undefined;
+      if (!sig) {
+        console.warn('[Payment] Webhook rejected: missing stripe-signature header');
+        res.status(401).json({ error: 'Missing webhook signature' });
+        return;
+      }
+
+      // Parse Stripe signature header: t=timestamp,v1=signature
+      const parts = sig.split(',').reduce<Record<string, string>>((acc, part) => {
+        const [key, val] = part.split('=');
+        acc[key] = val;
+        return acc;
+      }, {});
+
+      const timestamp = parts['t'];
+      const expectedSig = parts['v1'];
+      if (!timestamp || !expectedSig) {
+        res.status(401).json({ error: 'Invalid webhook signature format' });
+        return;
+      }
+
+      // Replay attack protection: reject events older than 5 minutes
+      const ageSeconds = Math.floor(Date.now() / 1000) - parseInt(timestamp, 10);
+      if (isNaN(ageSeconds) || ageSeconds > 300) {
+        console.warn('[Payment] Webhook rejected: timestamp too old', { ageSeconds });
+        res.status(401).json({ error: 'Webhook timestamp expired' });
+        return;
+      }
+
+      // Compute expected signature: HMAC-SHA256(secret, "timestamp.rawBody")
+      const rawBody = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+      const payload = `${timestamp}.${rawBody}`;
+      const computedSig = crypto
+        .createHmac('sha256', webhookSecret)
+        .update(payload)
+        .digest('hex');
+
+      // Timing-safe comparison to prevent timing attacks
+      if (!crypto.timingSafeEqual(Buffer.from(expectedSig), Buffer.from(computedSig))) {
+        console.warn('[Payment] Webhook rejected: invalid signature');
+        res.status(401).json({ error: 'Invalid webhook signature' });
+        return;
+      }
+    } else if (process.env.NODE_ENV === 'production') {
+      console.error('[Payment] CRITICAL: STRIPE_WEBHOOK_SECRET not set in production!');
+      res.status(500).json({ error: 'Webhook verification not configured' });
+      return;
+    }
+
     const event = req.body as { type: string; data: any };
     const result = await handleWebhook({
       type: event.type,

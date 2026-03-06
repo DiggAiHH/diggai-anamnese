@@ -44,9 +44,9 @@ export function ProtectedRoute({ children, allowedRoles, redirectTo }: Props) {
     // Redirect to role-appropriate home
     const roleHome: Record<UserRole, string> = {
       patient: '/patient',
-      arzt: '/arzt',
-      mfa: '/mfa',
-      admin: '/admin',
+      arzt: '/verwaltung/arzt',
+      mfa: '/verwaltung/mfa',
+      admin: '/verwaltung/admin',
     };
     return <Navigate to={roleHome[role] ?? '/'} replace />;
   }

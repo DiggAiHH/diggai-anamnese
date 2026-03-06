@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
+import { requireAuth } from '../middleware/auth';
 import {
   getOrCreateEPA,
   addDocument,
@@ -15,6 +16,9 @@ import {
 } from '../services/epa';
 
 const router = Router();
+
+// All ePA routes require authentication (patient data — must be protected)
+router.use(requireAuth);
 
 // ─── Zod schemas ─────────────────────────────────────────────────────
 

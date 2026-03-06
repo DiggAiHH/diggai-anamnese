@@ -9,7 +9,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma as _prisma } from '../db';
-import { requireAuth, requireRole } from '../middleware/auth';
+import { requireAuth, requireRole, requirePermission } from '../middleware/auth';
 
 const prisma: any = _prisma;
 
@@ -184,7 +184,7 @@ router.post('/waiting/quiz/:id/answer', requireAuth, async (req, res) => {
 });
 
 // ─── GET /api/content/waiting/analytics ─────────────────────
-router.get('/waiting/analytics', requireAuth, requireRole('admin'), async (req, res) => {
+router.get('/waiting/analytics', requireAuth, requireRole('admin'), requirePermission('admin_content'), async (req, res) => {
     try {
         const days = parseInt(req.query.days as string) || 30;
         const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);

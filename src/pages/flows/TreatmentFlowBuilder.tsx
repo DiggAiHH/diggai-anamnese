@@ -135,7 +135,7 @@ export function TreatmentFlowBuilder() {
       <header className="sticky top-0 z-20 bg-white/90 backdrop-blur border-b border-gray-200 px-6 py-4">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <button onClick={() => navigate(-1)} className="p-2 hover:bg-gray-100 rounded-lg">
+            <button onClick={() => navigate(-1)} title="Zurück" className="p-2 hover:bg-gray-100 rounded-lg">
               <ArrowLeft className="w-5 h-5" />
             </button>
             <div>
@@ -186,6 +186,7 @@ export function TreatmentFlowBuilder() {
               <select
                 value={flow.serviceType}
                 onChange={e => updateFlow({ serviceType: e.target.value })}
+                title="Leistungsart"
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-500 outline-none"
               >
                 {SERVICE_TYPES.map(st => (
@@ -253,13 +254,13 @@ export function TreatmentFlowBuilder() {
                       {step.estimatedMinutes} Min.
                     </div>
                     <div className="flex items-center gap-1">
-                      <button onClick={e => { e.stopPropagation(); moveStep(step.id, 'up'); }} disabled={idx === 0} className="p-1 hover:bg-gray-100 rounded disabled:opacity-30">
+                      <button onClick={e => { e.stopPropagation(); moveStep(step.id, 'up'); }} disabled={idx === 0} title="Nach oben" className="p-1 hover:bg-gray-100 rounded disabled:opacity-30">
                         <ChevronUp className="w-4 h-4" />
                       </button>
-                      <button onClick={e => { e.stopPropagation(); moveStep(step.id, 'down'); }} disabled={idx === flow.steps.length - 1} className="p-1 hover:bg-gray-100 rounded disabled:opacity-30">
+                      <button onClick={e => { e.stopPropagation(); moveStep(step.id, 'down'); }} disabled={idx === flow.steps.length - 1} title="Nach unten" className="p-1 hover:bg-gray-100 rounded disabled:opacity-30">
                         <ChevronDown className="w-4 h-4" />
                       </button>
-                      <button onClick={e => { e.stopPropagation(); removeStep(step.id); }} className="p-1 hover:bg-red-50 text-red-400 hover:text-red-600 rounded">
+                      <button onClick={e => { e.stopPropagation(); removeStep(step.id); }} title="Entfernen" className="p-1 hover:bg-red-50 text-red-400 hover:text-red-600 rounded">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
@@ -274,6 +275,7 @@ export function TreatmentFlowBuilder() {
                           <select
                             value={step.type}
                             onChange={e => updateStep(step.id, { type: e.target.value as StepType })}
+                            title="Schritt-Typ"
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-200 outline-none"
                           >
                             {Object.entries(STEP_TYPE_CONFIG).map(([key, val]) => (
@@ -291,6 +293,7 @@ export function TreatmentFlowBuilder() {
                             onChange={e => updateStep(step.id, { estimatedMinutes: parseInt(e.target.value) || 0 })}
                             min={1}
                             max={120}
+                            placeholder="Dauer"
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-200 outline-none"
                           />
                         </div>
@@ -302,6 +305,7 @@ export function TreatmentFlowBuilder() {
                             onChange={e => updateStep(step.id, { bufferMinutes: parseInt(e.target.value) || 0 })}
                             min={0}
                             max={30}
+                            placeholder="Puffer"
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-200 outline-none"
                           />
                         </div>

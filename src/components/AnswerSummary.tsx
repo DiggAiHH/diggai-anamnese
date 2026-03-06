@@ -27,7 +27,7 @@ export const AnswerSummary: React.FC<AnswerSummaryProps> = ({
     onEdit,
     colorClass,
 }) => {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     // Define clinical groupings
     const groups: SummaryGroup[] = [
         {
@@ -78,7 +78,7 @@ export const AnswerSummary: React.FC<AnswerSummaryProps> = ({
             {/* Header for Print */}
             <div className="hidden print:block border-b-2 border-black pb-4 mb-6">
                 <h1 className="text-2xl font-bold uppercase tracking-tight">{t('Medizinische Anamnese - Zusammenfassung')}</h1>
-                <p className="text-sm text-gray-600">{t('summary.createdAt', 'Erstellt am')}: {new Date().toLocaleString('de-DE')}</p>
+                <p className="text-sm text-gray-600">{t('summary.createdAt', 'Erstellt am')}: {new Date().toLocaleString(i18n.language)}</p>
             </div>
 
             <div className="flex items-center justify-between mb-2 print:hidden">

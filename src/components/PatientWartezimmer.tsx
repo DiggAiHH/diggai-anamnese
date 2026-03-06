@@ -1,12 +1,17 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  Clock, Users, Bell, MessageSquare, CheckCircle, AlertTriangle,
-  Wifi, WifiOff, Volume2, Smartphone, Coffee, BookOpen
+  Clock, Bell, CheckCircle, AlertTriangle,
+  ClipboardList, Heart, Gamepad2, Newspaper
 } from 'lucide-react';
 import { io, Socket } from 'socket.io-client';
 import { SOCKET_BASE_URL } from '../api/client';
-import { useQueuePosition } from '../hooks/useApi';
+import { useQueuePosition, useWaitingContent, useTrackContentView, useLikeContent, useTrackQuizAnswer } from '../hooks/useApi';
+import { QueueStatusCard } from './waiting/QueueStatusCard';
+import { HealthTipCarousel } from './waiting/HealthTipCarousel';
+import { WaitingGames } from './waiting/WaitingGames';
+import { PraxisNewsFeed } from './waiting/PraxisNewsFeed';
+import { MoodCheck } from './waiting/MoodCheck';
 
 interface PatientWartezimmerProps {
   sessionId: string;
@@ -16,10 +21,11 @@ interface PatientWartezimmerProps {
 }
 
 type WaitingStatus = 'WAITING' | 'CALLED' | 'IN_TREATMENT' | 'DONE';
+type WartezimmerTab = 'queue' | 'tipps' | 'games' | 'news';
 
 /**
- * Online Wartezimmer — Patient sieht seine Wartenummer,
- * geschätzte Wartezeit und wird benachrichtigt wenn aufgerufen.
+ * Online Wartezimmer — Reichhaltiges Entertainment-Center mit Tabs
+ * für wartende Patienten.
  */
 export const PatientWartezimmer: React.FC<PatientWartezimmerProps> = ({
   sessionId,
@@ -31,15 +37,33 @@ export const PatientWartezimmer: React.FC<PatientWartezimmerProps> = ({
   const [position, setPosition] = useState<number | null>(null);
   const [status, setStatus] = useState<WaitingStatus>('WAITING');
   const [estimatedWait, setEstimatedWait] = useState<number | null>(null);
+  const [queueLength, setQueueLength] = useState<number | null>(null);
   const [connected, setConnected] = useState(false);
   const [calledMessage, setCalledMessage] = useState<string | null>(null);
   const [joinedAt] = useState(new Date());
   const [elapsed, setElapsed] = useState(0);
+  const [activeTab, setActiveTab] = useState<WartezimmerTab>('queue');
+  const [showMoodCheck, setShowMoodCheck] = useState(false);
+  const [seenContentIds, setSeenContentIds] = useState<string[]>([]);
   const socketRef = useRef<Socket | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Polling fallback via React Query
   const { data: queueData } = useQueuePosition(sessionId);
+
+  // Fetch content for tips/news
+  const waitMin = Math.floor(elapsed / 60);
+  const { data: tipsData } = useWaitingContent(
+    { lang: 'de', waitMin, exclude: seenContentIds.join(','), limit: 10 }
+  );
+  const { data: newsData } = useWaitingContent(
+    { lang: 'de', category: 'praxis', limit: 10 }
+  );
+
+  // Mutations for analytics
+  const { mutate: trackView } = useTrackContentView();
+  const { mutate: likeContent } = useLikeContent();
+  const { mutate: trackQuizAnswer } = useTrackQuizAnswer();
 
   // Update from polling
   useEffect(() => {
@@ -47,6 +71,7 @@ export const PatientWartezimmer: React.FC<PatientWartezimmerProps> = ({
       if (queueData.position !== undefined) setPosition(queueData.position);
       if (queueData.status) setStatus(queueData.status);
       if (queueData.estimatedWaitMinutes !== undefined) setEstimatedWait(queueData.estimatedWaitMinutes);
+      if (queueData.queueLength !== undefined) setQueueLength(queueData.queueLength);
     }
   }, [queueData]);
 
@@ -72,28 +97,31 @@ export const PatientWartezimmer: React.FC<PatientWartezimmerProps> = ({
 
     socket.on('disconnect', () => setConnected(false));
 
-    socket.on('queue:position', (data: { position: number; status: WaitingStatus; estimatedWaitMinutes: number }) => {
+    socket.on('queue:position', (data: { position: number; status: WaitingStatus; estimatedWaitMinutes: number; queueLength?: number }) => {
       setPosition(data.position);
       setStatus(data.status);
       setEstimatedWait(data.estimatedWaitMinutes);
+      if (data.queueLength !== undefined) setQueueLength(data.queueLength);
     });
 
     socket.on('queue:called', (data: { message: string }) => {
       setStatus('CALLED');
       setCalledMessage(data.message);
-      // Play notification sound
       try {
         audioRef.current = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbsGczFj+a37nFdzANMIS/0LlkHgMvi7LVqFMFH3+q08RzAw==');
         audioRef.current.volume = 0.5;
         audioRef.current.play().catch(() => { });
       } catch { /* ignore */ }
-      // Browser notification
       if ('Notification' in window && Notification.permission === 'granted') {
         new Notification(t('wartezimmer.calledTitle', 'Sie werden aufgerufen!'), {
           body: data.message,
           icon: '/icons/icon-192.png'
         });
       }
+    });
+
+    socket.on('queue:mood-check', () => {
+      setShowMoodCheck(true);
     });
 
     return () => { socket.disconnect(); };
@@ -106,11 +134,31 @@ export const PatientWartezimmer: React.FC<PatientWartezimmerProps> = ({
     }
   }, []);
 
-  const formatTime = (seconds: number) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-  };
+  // Show mood check at 10-min intervals
+  useEffect(() => {
+    const waitMinutes = Math.floor(elapsed / 60);
+    if ([10, 20, 30].includes(waitMinutes) && status === 'WAITING') {
+      setShowMoodCheck(true);
+    }
+  }, [Math.floor(elapsed / 60), status]);
+
+  const handleContentView = useCallback((contentId: string) => {
+    trackView({ contentId, sessionId, durationSec: 10 });
+    setSeenContentIds((prev) => prev.includes(contentId) ? prev : [...prev, contentId]);
+  }, [trackView, sessionId]);
+
+  const handleContentLike = useCallback((contentId: string) => {
+    likeContent({ contentId, sessionId });
+  }, [likeContent, sessionId]);
+
+  const handleQuizAnswer = useCallback((quizId: string, selectedOption: number, correct: boolean) => {
+    trackQuizAnswer({ contentId: quizId, sessionId, selectedOption, correct });
+  }, [trackQuizAnswer, sessionId]);
+
+  const handleMoodRespond = useCallback((mood: string) => {
+    socketRef.current?.emit('queue:mood-response', { sessionId, mood });
+    setTimeout(() => setShowMoodCheck(false), 2000);
+  }, [sessionId]);
 
   // ─── Called State ─────────────────────────────────────────
 
@@ -119,19 +167,15 @@ export const PatientWartezimmer: React.FC<PatientWartezimmerProps> = ({
       <div className="min-h-[60vh] flex items-center justify-center p-6">
         <div className="w-full max-w-md text-center animate-fade-in">
           <div className="rounded-2xl border-2 border-emerald-500/50 bg-emerald-500/10 p-10 shadow-2xl shadow-emerald-500/20">
-            {/* Pulsing bell */}
             <div className="w-24 h-24 mx-auto rounded-full bg-emerald-500/20 border-2 border-emerald-500/40 flex items-center justify-center mb-6 animate-pulse">
               <Bell className="w-12 h-12 text-emerald-400" />
             </div>
-
             <h2 className="text-2xl font-black text-emerald-400 mb-3">
               {t('wartezimmer.youAreCalled', 'Sie werden aufgerufen!')}
             </h2>
-
             <p className="text-lg text-[var(--text-secondary)] mb-4">
               {calledMessage || t('wartezimmer.pleaseGoTo', 'Bitte begeben Sie sich zum Behandlungszimmer.')}
             </p>
-
             <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500/20 border border-emerald-500/30">
               <CheckCircle className="w-5 h-5 text-emerald-400" />
               <span className="font-bold text-emerald-400">{patientName}</span>
@@ -184,92 +228,99 @@ export const PatientWartezimmer: React.FC<PatientWartezimmerProps> = ({
     );
   }
 
-  // ─── Waiting State (main view) ────────────────────────────
+  // ─── Waiting State (Tab-based Entertainment Center) ───────
+
+  const tipItems = (tipsData?.items ?? []).filter(
+    (i: { type: string }) => i.type === 'HEALTH_TIP' || i.type === 'FUN_FACT' || i.type === 'SEASONAL_INFO'
+  );
+  const quizItems = (tipsData?.items ?? []).filter(
+    (i: { type: string }) => i.type === 'MINI_QUIZ'
+  );
+  const newsItems = (newsData?.items ?? []).filter(
+    (i: { type: string }) => i.type === 'PRAXIS_NEWS'
+  );
+
+  const TABS: { id: WartezimmerTab; icon: React.ReactNode; label: string }[] = [
+    { id: 'queue', icon: <ClipboardList className="w-4 h-4" />, label: t('waiting.tabQueue', 'Queue') },
+    { id: 'tipps', icon: <Heart className="w-4 h-4" />, label: t('waiting.tabTips', 'Gesundheit') },
+    { id: 'games', icon: <Gamepad2 className="w-4 h-4" />, label: t('waiting.tabGames', 'Spiele') },
+    { id: 'news', icon: <Newspaper className="w-4 h-4" />, label: t('waiting.tabNews', 'Praxis') },
+  ];
 
   return (
-    <div className="w-full max-w-lg mx-auto p-6 space-y-6 animate-fade-in">
-      {/* Connection status */}
+    <div className="w-full max-w-lg mx-auto p-6 space-y-4 animate-fade-in">
+      {/* Header with compact queue display */}
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-bold flex items-center gap-2 text-[var(--text-primary)]">
           <Clock className="w-5 h-5 text-blue-400" />
           {t('wartezimmer.title', 'Online-Wartezimmer')}
         </h2>
-        <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold ${
-          connected ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'
-        }`}>
-          {connected ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
-          {connected ? t('wartezimmer.connected', 'Verbunden') : t('wartezimmer.disconnected', 'Getrennt')}
+        <div className="flex items-center gap-3 text-xs">
+          <span className="font-bold text-[var(--text-secondary)]">{patientName}</span>
+          <span className="text-[var(--text-muted)]">{service}</span>
         </div>
       </div>
 
-      {/* Queue Number Card */}
-      <div className="rounded-2xl border border-[var(--border-primary)] bg-gradient-to-b from-blue-600/10 to-violet-600/10 p-8 text-center">
-        <p className="text-xs font-black uppercase tracking-widest text-[var(--text-muted)] mb-2">
-          {t('wartezimmer.yourNumber', 'Ihre Wartenummer')}
-        </p>
-        <div className="w-28 h-28 mx-auto rounded-2xl bg-[var(--bg-card)] border-2 border-blue-500/30 flex items-center justify-center mb-4 shadow-lg shadow-blue-500/10">
-          <span className="text-5xl font-black text-blue-400">
-            {position !== null ? position : '—'}
-          </span>
-        </div>
-        <p className="text-sm text-[var(--text-secondary)] font-medium">{patientName}</p>
-        <p className="text-xs text-[var(--text-muted)]">{service}</p>
+      {/* Tab bar */}
+      <div className="flex gap-1 p-1 rounded-xl bg-[var(--bg-card)] border border-[var(--border-primary)]">
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg text-[11px] font-bold transition-all ${
+              activeTab === tab.id
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
+                : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-primary)]'
+            }`}
+          >
+            {tab.icon}
+            <span className="hidden sm:inline">{tab.label}</span>
+          </button>
+        ))}
       </div>
 
-      {/* Stats Row */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className="rounded-xl border border-[var(--border-primary)] bg-[var(--bg-card)] p-4 text-center">
-          <Clock className="w-5 h-5 mx-auto text-amber-400 mb-2" />
-          <div className="text-lg font-black text-[var(--text-primary)]">{formatTime(elapsed)}</div>
-          <div className="text-[9px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
-            {t('wartezimmer.waited', 'Gewartet')}
-          </div>
-        </div>
+      {/* Tab content */}
+      <div className="min-h-[300px]">
+        {activeTab === 'queue' && (
+          <QueueStatusCard
+            position={position}
+            estimatedMin={estimatedWait}
+            status={status}
+            queueLength={queueLength}
+            connected={connected}
+            elapsed={elapsed}
+          />
+        )}
 
-        <div className="rounded-xl border border-[var(--border-primary)] bg-[var(--bg-card)] p-4 text-center">
-          <Users className="w-5 h-5 mx-auto text-blue-400 mb-2" />
-          <div className="text-lg font-black text-[var(--text-primary)]">
-            {position !== null ? position - 1 : '—'}
-          </div>
-          <div className="text-[9px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
-            {t('wartezimmer.ahead', 'Vor Ihnen')}
-          </div>
-        </div>
+        {activeTab === 'tipps' && (
+          <HealthTipCarousel
+            items={tipItems}
+            onView={handleContentView}
+            onLike={handleContentLike}
+          />
+        )}
 
-        <div className="rounded-xl border border-[var(--border-primary)] bg-[var(--bg-card)] p-4 text-center">
-          <Coffee className="w-5 h-5 mx-auto text-emerald-400 mb-2" />
-          <div className="text-lg font-black text-[var(--text-primary)]">
-            {estimatedWait !== null ? `~${estimatedWait}` : '—'}
-          </div>
-          <div className="text-[9px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
-            {t('wartezimmer.estMin', 'Min. geschätzt')}
-          </div>
-        </div>
+        {activeTab === 'games' && (
+          <WaitingGames
+            sessionId={sessionId}
+            quizItems={quizItems}
+            onQuizAnswer={handleQuizAnswer}
+          />
+        )}
+
+        {activeTab === 'news' && (
+          <PraxisNewsFeed items={newsItems} />
+        )}
       </div>
 
-      {/* Tips while waiting */}
-      <div className="rounded-xl border border-[var(--border-primary)] bg-[var(--bg-card)] p-5">
-        <h3 className="text-xs font-black uppercase tracking-wider text-[var(--text-muted)] mb-3 flex items-center gap-2">
-          <BookOpen className="w-3.5 h-3.5" />
-          {t('wartezimmer.tips', 'Tipps während Sie warten')}
-        </h3>
-        <div className="space-y-2">
-          {[
-            { icon: <Smartphone className="w-4 h-4" />, text: t('wartezimmer.tip1', 'Halten Sie Ihre Versicherungskarte bereit') },
-            { icon: <Volume2 className="w-4 h-4" />, text: t('wartezimmer.tip2', 'Aktivieren Sie den Ton für die Benachrichtigung') },
-            { icon: <MessageSquare className="w-4 h-4" />, text: t('wartezimmer.tip3', 'Nutzen Sie den Chat bei Fragen an das Praxis-Team') },
-          ].map((tip, i) => (
-            <div key={i} className="flex items-center gap-3 text-xs text-[var(--text-secondary)]">
-              <div className="text-blue-400 shrink-0">{tip.icon}</div>
-              {tip.text}
-            </div>
-          ))}
-        </div>
-      </div>
+      {/* Mood check overlay */}
+      {showMoodCheck && (
+        <MoodCheck onRespond={handleMoodRespond} />
+      )}
 
       {/* Notification hint */}
-      <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-500/5 border border-amber-500/20">
-        <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+      <div className="flex items-start gap-3 p-3 rounded-xl bg-amber-500/5 border border-amber-500/20">
+        <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
         <p className="text-[10px] text-amber-400/80 leading-relaxed">
           {t('wartezimmer.notifHint', 'Sie werden per Ton und Browserbenachrichtigung informiert, wenn Sie aufgerufen werden. Bitte lassen Sie diese Seite geöffnet.')}
         </p>

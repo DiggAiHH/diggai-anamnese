@@ -1,4 +1,5 @@
 import type { FC } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface LeaderboardEntry {
   staffId: string;
@@ -52,6 +53,7 @@ export const LeaderboardTable: FC<LeaderboardTableProps> = ({
   period,
   loading = false,
 }) => {
+  const { i18n } = useTranslation();
   const periodLabel = PERIOD_LABELS[period] ?? period;
 
   return (
@@ -113,7 +115,7 @@ export const LeaderboardTable: FC<LeaderboardTableProps> = ({
                       </div>
                     </td>
                     <td className="px-4 py-3 text-right font-semibold text-gray-800">
-                      {entry.totalPoints.toLocaleString('de-DE')}
+                      {entry.totalPoints.toLocaleString(i18n.language)}
                     </td>
                   </tr>
                 );
@@ -168,7 +170,7 @@ export const LeaderboardTable: FC<LeaderboardTableProps> = ({
                     {entry.staffName ?? entry.staffId}
                   </p>
                   <p className="text-xs text-gray-500">
-                    {entry.totalPoints.toLocaleString('de-DE')} Punkte
+                    {entry.totalPoints.toLocaleString(i18n.language)} Punkte
                   </p>
                 </div>
               </div>

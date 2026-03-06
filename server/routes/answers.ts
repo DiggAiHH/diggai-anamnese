@@ -4,7 +4,7 @@ import { prisma } from '../db';
 import { requireAuth, requireSessionOwner } from '../middleware/auth';
 import { encrypt, isPIIAtom } from '../services/encryption';
 import { TriageEngine } from '../engine/TriageEngine';
-import { emitTriageAlert } from '../socket';
+import { emitTriageAlert, emitAnswerSubmitted, emitSessionProgress } from '../socket';
 import { z } from 'zod';
 
 const router = Router();
@@ -147,6 +147,15 @@ router.post('/:id', requireAuth, requireSessionOwner, async (req: Request, res: 
 
         const totalQuestions = session.isNewPatient ? 40 : 15;
         const progress = Math.min(100, Math.round((allAnswers.length / totalQuestions) * 100));
+
+        // Push real-time events to doctor dashboard and patient
+        emitAnswerSubmitted(sessionId, {
+            atomId,
+            progress,
+            totalAnswers: allAnswers.length,
+            hasRedFlag: triageResults.length > 0,
+        });
+        emitSessionProgress(sessionId, progress);
 
         res.json({
             success: true,

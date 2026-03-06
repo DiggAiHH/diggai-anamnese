@@ -40,9 +40,9 @@ function buildPatientBlock(session: PatientSessionFull): string {
   if (!p) return out;
 
   if (p.patientNumber) out += gdtLine(GDT_FIELDS.PAT_NR, p.patientNumber);
-  // Name: would need decryption in real implementation; placeholder
-  out += gdtLine(GDT_FIELDS.PAT_NAME, 'Patient');
-  out += gdtLine(GDT_FIELDS.PAT_VORNAME, p.id.substring(0, 8));
+  // Name: encrypted in DB — use decrypted name if available, else patientNumber as fallback
+  out += gdtLine(GDT_FIELDS.PAT_NAME, (p as any).decryptedLastName || p.patientNumber || p.id.substring(0, 8));
+  out += gdtLine(GDT_FIELDS.PAT_VORNAME, (p as any).decryptedFirstName || '');
 
   if (p.birthDate) {
     const d = new Date(p.birthDate);

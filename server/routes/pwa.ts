@@ -5,6 +5,7 @@
 // ============================================
 
 import { Router, Request, Response, NextFunction } from 'express';
+import { t, parseLang, LocalizedError } from '../i18n';
 import { z } from 'zod';
 import { requireAuth } from '../middleware/auth';
 import {
@@ -17,6 +18,20 @@ import {
   getChangesSince,
 } from '../services/pwa';
 import type { PwaJwtPayload } from '../services/pwa';
+import {
+  verifyEmailToken,
+  forgotPasswordExtended,
+  resetPasswordWithToken,
+  softDeleteAccount,
+  exportAccountData,
+} from '../services/pwa/auth.service';
+import { getTrends, syncOfflineDiary, exportDiary } from '../services/pwa/diary.service';
+import {
+  getVapidPublicKey,
+  subscribeDevice,
+  unsubscribeDevice,
+  sendNotification,
+} from '../services/pwa/push.service';
 
 const router = Router();
 
@@ -36,7 +51,7 @@ async function requirePatientAuth(req: Request, res: Response, next: NextFunctio
   try {
     const header = req.headers.authorization;
     if (!header || !header.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Authentifizierung erforderlich.' });
+      return res.status(401).json({ error: t(parseLang(req.headers['accept-language']), 'errors.auth.required') });
     }
 
     const token = header.slice(7);
@@ -50,7 +65,7 @@ async function requirePatientAuth(req: Request, res: Response, next: NextFunctio
 
     next();
   } catch {
-    return res.status(401).json({ error: 'Token ungültig oder abgelaufen.' });
+    return res.status(401).json({ error: t(parseLang(req.headers['accept-language']), 'errors.auth.invalid_token') });
   }
 }
 
@@ -212,9 +227,10 @@ router.post('/auth/register', async (req: Request, res: Response) => {
     const account = await registerPatient(data);
     res.status(201).json(account);
   } catch (err: any) {
-    if (err instanceof z.ZodError) return res.status(400).json({ error: 'Validierungsfehler', details: err.issues });
+    if (err instanceof z.ZodError) return res.status(400).json({ error: t(parseLang(req.headers['accept-language']), 'errors.validation'), details: err.issues });
+    if (err instanceof LocalizedError) return res.status(400).json({ error: t(parseLang(req.headers['accept-language']), err.errorKey) });
     if (err?.message) return res.status(400).json({ error: err.message });
-    res.status(500).json({ error: 'Registrierung fehlgeschlagen.' });
+    res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.pwa.register_failed') });
   }
 });
 
@@ -225,9 +241,10 @@ router.post('/auth/login', async (req: Request, res: Response) => {
     const result = await loginPatient(data);
     res.json(result);
   } catch (err: any) {
-    if (err instanceof z.ZodError) return res.status(400).json({ error: 'Validierungsfehler', details: err.issues });
+    if (err instanceof z.ZodError) return res.status(400).json({ error: t(parseLang(req.headers['accept-language']), 'errors.validation'), details: err.issues });
+    if (err instanceof LocalizedError) return res.status(401).json({ error: t(parseLang(req.headers['accept-language']), err.errorKey) });
     if (err?.message) return res.status(401).json({ error: err.message });
-    res.status(500).json({ error: 'Anmeldung fehlgeschlagen.' });
+    res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.pwa.login_failed') });
   }
 });
 
@@ -238,9 +255,10 @@ router.post('/auth/pin-login', async (req: Request, res: Response) => {
     const result = await loginWithPin(data.patientId, data.pin);
     res.json(result);
   } catch (err: any) {
-    if (err instanceof z.ZodError) return res.status(400).json({ error: 'Validierungsfehler', details: err.issues });
+    if (err instanceof z.ZodError) return res.status(400).json({ error: t(parseLang(req.headers['accept-language']), 'errors.validation'), details: err.issues });
+    if (err instanceof LocalizedError) return res.status(401).json({ error: t(parseLang(req.headers['accept-language']), err.errorKey) });
     if (err?.message) return res.status(401).json({ error: err.message });
-    res.status(500).json({ error: 'PIN-Anmeldung fehlgeschlagen.' });
+    res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.pwa.pin_login_failed') });
   }
 });
 
@@ -251,8 +269,9 @@ router.post('/auth/refresh', requirePatientAuth, async (req: Request, res: Respo
     const result = await refreshToken(accountId);
     res.json(result);
   } catch (err: any) {
+    if (err instanceof LocalizedError) return res.status(400).json({ error: t(parseLang(req.headers['accept-language']), err.errorKey) });
     if (err?.message) return res.status(400).json({ error: err.message });
-    res.status(500).json({ error: 'Token-Erneuerung fehlgeschlagen.' });
+    res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.pwa.token_refresh_failed') });
   }
 });
 
@@ -274,7 +293,7 @@ router.get('/dashboard', requirePatientAuth, async (req: Request, res: Response)
       include: { patient: true },
     });
 
-    if (!account) return res.status(404).json({ error: 'Konto nicht gefunden.' });
+    if (!account) return res.status(404).json({ error: t(parseLang(req.headers['accept-language']), 'errors.auth.account_not_found') });
 
     // Active therapy measures count
     const activeMeasures = await prisma.therapyMeasure.count({
@@ -323,7 +342,7 @@ router.get('/dashboard', requirePatientAuth, async (req: Request, res: Response)
     });
   } catch (err: any) {
     console.error('[pwa] dashboard error:', err);
-    res.status(500).json({ error: 'Dashboard konnte nicht geladen werden.' });
+    res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.pwa.dashboard_load_failed') });
   }
 });
 
@@ -358,7 +377,7 @@ router.get('/diary', requirePatientAuth, async (req: Request, res: Response) => 
     res.json({ entries, total, page, limit });
   } catch (err: any) {
     console.error('[pwa] diary list error:', err);
-    res.status(500).json({ error: 'Tagebuch konnte nicht geladen werden.' });
+    res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.pwa.diary_load_failed') });
   }
 });
 
@@ -370,11 +389,11 @@ router.get('/diary/:id', requirePatientAuth, async (req: Request, res: Response)
     const entry = await prisma.diaryEntry.findFirst({
       where: { id: req.params.id, accountId },
     });
-    if (!entry) return res.status(404).json({ error: 'Eintrag nicht gefunden.' });
+    if (!entry) return res.status(404).json({ error: t(parseLang(req.headers['accept-language']), 'errors.not_found') });
     res.json(entry);
   } catch (err: any) {
     console.error('[pwa] diary get error:', err);
-    res.status(500).json({ error: 'Eintrag konnte nicht geladen werden.' });
+    res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.generic') });
   }
 });
 
@@ -408,9 +427,9 @@ router.post('/diary', requirePatientAuth, async (req: Request, res: Response) =>
 
     res.status(201).json(entry);
   } catch (err: any) {
-    if (err instanceof z.ZodError) return res.status(400).json({ error: 'Validierungsfehler', details: err.issues });
+    if (err instanceof z.ZodError) return res.status(400).json({ error: t(parseLang(req.headers['accept-language']), 'errors.validation'), details: err.issues });
     console.error('[pwa] diary create error:', err);
-    res.status(500).json({ error: 'Eintrag konnte nicht erstellt werden.' });
+    res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.pwa.entry_create_failed') });
   }
 });
 
@@ -425,7 +444,7 @@ router.put('/diary/:id', requirePatientAuth, async (req: Request, res: Response)
     const existing = await prisma.diaryEntry.findFirst({
       where: { id: req.params.id, accountId },
     });
-    if (!existing) return res.status(404).json({ error: 'Eintrag nicht gefunden.' });
+    if (!existing) return res.status(404).json({ error: t(parseLang(req.headers['accept-language']), 'errors.not_found') });
 
     const entry = await prisma.diaryEntry.update({
       where: { id: req.params.id },
@@ -446,9 +465,9 @@ router.put('/diary/:id', requirePatientAuth, async (req: Request, res: Response)
 
     res.json(entry);
   } catch (err: any) {
-    if (err instanceof z.ZodError) return res.status(400).json({ error: 'Validierungsfehler', details: err.issues });
+    if (err instanceof z.ZodError) return res.status(400).json({ error: t(parseLang(req.headers['accept-language']), 'errors.validation'), details: err.issues });
     console.error('[pwa] diary update error:', err);
-    res.status(500).json({ error: 'Eintrag konnte nicht aktualisiert werden.' });
+    res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.pwa.entry_update_failed') });
   }
 });
 
@@ -462,13 +481,13 @@ router.delete('/diary/:id', requirePatientAuth, async (req: Request, res: Respon
     const existing = await prisma.diaryEntry.findFirst({
       where: { id: req.params.id, accountId },
     });
-    if (!existing) return res.status(404).json({ error: 'Eintrag nicht gefunden.' });
+    if (!existing) return res.status(404).json({ error: t(parseLang(req.headers['accept-language']), 'errors.not_found') });
 
     await prisma.diaryEntry.delete({ where: { id: req.params.id } });
     res.json({ success: true });
   } catch (err: any) {
     console.error('[pwa] diary delete error:', err);
-    res.status(500).json({ error: 'Eintrag konnte nicht gelöscht werden.' });
+    res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.pwa.entry_delete_failed') });
   }
 });
 
@@ -500,7 +519,7 @@ router.get('/measures', requirePatientAuth, async (req: Request, res: Response) 
     res.json(measures);
   } catch (err: any) {
     console.error('[pwa] measures list error:', err);
-    res.status(500).json({ error: 'Maßnahmen konnten nicht geladen werden.' });
+    res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.pwa.measures_load_failed') });
   }
 });
 
@@ -532,7 +551,7 @@ router.get('/measures/tracking', requirePatientAuth, async (req: Request, res: R
     res.json({ trackings, total, page, limit });
   } catch (err: any) {
     console.error('[pwa] tracking list error:', err);
-    res.status(500).json({ error: 'Trackings konnten nicht geladen werden.' });
+    res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.pwa.trackings_load_failed') });
   }
 });
 
@@ -558,9 +577,9 @@ router.post('/measures/tracking', requirePatientAuth, async (req: Request, res: 
 
     res.status(201).json(tracking);
   } catch (err: any) {
-    if (err instanceof z.ZodError) return res.status(400).json({ error: 'Validierungsfehler', details: err.issues });
+    if (err instanceof z.ZodError) return res.status(400).json({ error: t(parseLang(req.headers['accept-language']), 'errors.validation'), details: err.issues });
     console.error('[pwa] tracking create error:', err);
-    res.status(500).json({ error: 'Tracking konnte nicht erstellt werden.' });
+    res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.pwa.tracking_create_failed') });
   }
 });
 
@@ -575,7 +594,7 @@ router.put('/measures/tracking/:id', requirePatientAuth, async (req: Request, re
     const existing = await prisma.measureTracking.findFirst({
       where: { id: req.params.id, accountId },
     });
-    if (!existing) return res.status(404).json({ error: 'Tracking nicht gefunden.' });
+    if (!existing) return res.status(404).json({ error: t(parseLang(req.headers['accept-language']), 'errors.not_found') });
 
     const tracking = await prisma.measureTracking.update({
       where: { id: req.params.id },
@@ -589,9 +608,9 @@ router.put('/measures/tracking/:id', requirePatientAuth, async (req: Request, re
 
     res.json(tracking);
   } catch (err: any) {
-    if (err instanceof z.ZodError) return res.status(400).json({ error: 'Validierungsfehler', details: err.issues });
+    if (err instanceof z.ZodError) return res.status(400).json({ error: t(parseLang(req.headers['accept-language']), 'errors.validation'), details: err.issues });
     console.error('[pwa] tracking update error:', err);
-    res.status(500).json({ error: 'Tracking konnte nicht aktualisiert werden.' });
+    res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.pwa.tracking_update_failed') });
   }
 });
 
@@ -617,9 +636,9 @@ router.post('/measures/:id/complete', requirePatientAuth, async (req: Request, r
 
     res.status(201).json(tracking);
   } catch (err: any) {
-    if (err instanceof z.ZodError) return res.status(400).json({ error: 'Validierungsfehler', details: err.issues });
+    if (err instanceof z.ZodError) return res.status(400).json({ error: t(parseLang(req.headers['accept-language']), 'errors.validation'), details: err.issues });
     console.error('[pwa] measure complete error:', err);
-    res.status(500).json({ error: 'Maßnahme konnte nicht abgeschlossen werden.' });
+    res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.pwa.measure_complete_failed') });
   }
 });
 
@@ -644,9 +663,9 @@ router.post('/measures/:id/skip', requirePatientAuth, async (req: Request, res: 
 
     res.status(201).json(tracking);
   } catch (err: any) {
-    if (err instanceof z.ZodError) return res.status(400).json({ error: 'Validierungsfehler', details: err.issues });
+    if (err instanceof z.ZodError) return res.status(400).json({ error: t(parseLang(req.headers['accept-language']), 'errors.validation'), details: err.issues });
     console.error('[pwa] measure skip error:', err);
-    res.status(500).json({ error: 'Maßnahme konnte nicht übersprungen werden.' });
+    res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.pwa.measure_skip_failed') });
   }
 });
 
@@ -677,7 +696,7 @@ router.get('/messages', requirePatientAuth, async (req: Request, res: Response) 
     res.json({ messages, total, page, limit });
   } catch (err: any) {
     console.error('[pwa] messages list error:', err);
-    res.status(500).json({ error: 'Nachrichten konnten nicht geladen werden.' });
+    res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.pwa.messages_load_failed') });
   }
 });
 
@@ -694,7 +713,7 @@ router.get('/messages/unread-count', requirePatientAuth, async (req: Request, re
     res.json({ count });
   } catch (err: any) {
     console.error('[pwa] unread count error:', err);
-    res.status(500).json({ error: 'Zählung fehlgeschlagen.' });
+    res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.generic') });
   }
 });
 
@@ -707,7 +726,7 @@ router.get('/messages/:id', requirePatientAuth, async (req: Request, res: Respon
     const message = await prisma.patientMessage.findFirst({
       where: { id: req.params.id, accountId },
     });
-    if (!message) return res.status(404).json({ error: 'Nachricht nicht gefunden.' });
+    if (!message) return res.status(404).json({ error: t(parseLang(req.headers['accept-language']), 'errors.not_found') });
 
     // Mark as read if currently unread
     if (!message.isRead) {
@@ -722,7 +741,7 @@ router.get('/messages/:id', requirePatientAuth, async (req: Request, res: Respon
     res.json(message);
   } catch (err: any) {
     console.error('[pwa] message get error:', err);
-    res.status(500).json({ error: 'Nachricht konnte nicht geladen werden.' });
+    res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.generic') });
   }
 });
 
@@ -749,9 +768,9 @@ router.post('/messages', requirePatientAuth, async (req: Request, res: Response)
 
     res.status(201).json(message);
   } catch (err: any) {
-    if (err instanceof z.ZodError) return res.status(400).json({ error: 'Validierungsfehler', details: err.issues });
+    if (err instanceof z.ZodError) return res.status(400).json({ error: t(parseLang(req.headers['accept-language']), 'errors.validation'), details: err.issues });
     console.error('[pwa] message create error:', err);
-    res.status(500).json({ error: 'Nachricht konnte nicht gesendet werden.' });
+    res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.pwa.message_send_failed') });
   }
 });
 
@@ -764,7 +783,7 @@ router.put('/messages/:id/read', requirePatientAuth, async (req: Request, res: R
     const existing = await prisma.patientMessage.findFirst({
       where: { id: req.params.id, accountId },
     });
-    if (!existing) return res.status(404).json({ error: 'Nachricht nicht gefunden.' });
+    if (!existing) return res.status(404).json({ error: t(parseLang(req.headers['accept-language']), 'errors.not_found') });
 
     const message = await prisma.patientMessage.update({
       where: { id: req.params.id },
@@ -774,7 +793,7 @@ router.put('/messages/:id/read', requirePatientAuth, async (req: Request, res: R
     res.json(message);
   } catch (err: any) {
     console.error('[pwa] message read error:', err);
-    res.status(500).json({ error: 'Nachricht konnte nicht aktualisiert werden.' });
+    res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.pwa.message_update_failed') });
   }
 });
 
@@ -797,7 +816,7 @@ router.get('/consents', requirePatientAuth, async (req: Request, res: Response) 
     res.json(consents);
   } catch (err: any) {
     console.error('[pwa] consents list error:', err);
-    res.status(500).json({ error: 'Einwilligungen konnten nicht geladen werden.' });
+    res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.pwa.consents_load_failed') });
   }
 });
 
@@ -833,9 +852,9 @@ router.put('/consents', requirePatientAuth, async (req: Request, res: Response) 
 
     res.json(results);
   } catch (err: any) {
-    if (err instanceof z.ZodError) return res.status(400).json({ error: 'Validierungsfehler', details: err.issues });
+    if (err instanceof z.ZodError) return res.status(400).json({ error: t(parseLang(req.headers['accept-language']), 'errors.validation'), details: err.issues });
     console.error('[pwa] consents update error:', err);
-    res.status(500).json({ error: 'Einwilligungen konnten nicht aktualisiert werden.' });
+    res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.pwa.consents_update_failed') });
   }
 });
 
@@ -858,7 +877,7 @@ router.get('/devices', requirePatientAuth, async (req: Request, res: Response) =
     res.json(devices);
   } catch (err: any) {
     console.error('[pwa] devices list error:', err);
-    res.status(500).json({ error: 'Geräte konnten nicht geladen werden.' });
+    res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.pwa.devices_load_failed') });
   }
 });
 
@@ -883,9 +902,9 @@ router.post('/devices', requirePatientAuth, async (req: Request, res: Response) 
 
     res.status(201).json(device);
   } catch (err: any) {
-    if (err instanceof z.ZodError) return res.status(400).json({ error: 'Validierungsfehler', details: err.issues });
+    if (err instanceof z.ZodError) return res.status(400).json({ error: t(parseLang(req.headers['accept-language']), 'errors.validation'), details: err.issues });
     console.error('[pwa] device register error:', err);
-    res.status(500).json({ error: 'Gerät konnte nicht registriert werden.' });
+    res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.pwa.device_register_failed') });
   }
 });
 
@@ -899,13 +918,13 @@ router.delete('/devices/:id', requirePatientAuth, async (req: Request, res: Resp
     const existing = await prisma.patientDevice.findFirst({
       where: { id: req.params.id, accountId },
     });
-    if (!existing) return res.status(404).json({ error: 'Gerät nicht gefunden.' });
+    if (!existing) return res.status(404).json({ error: t(parseLang(req.headers['accept-language']), 'errors.not_found') });
 
     await prisma.patientDevice.delete({ where: { id: req.params.id } });
     res.json({ success: true });
   } catch (err: any) {
     console.error('[pwa] device delete error:', err);
-    res.status(500).json({ error: 'Gerät konnte nicht entfernt werden.' });
+    res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.pwa.device_remove_failed') });
   }
 });
 
@@ -931,11 +950,11 @@ router.get('/settings', requirePatientAuth, async (req: Request, res: Response) 
       },
     });
 
-    if (!account) return res.status(404).json({ error: 'Konto nicht gefunden.' });
+    if (!account) return res.status(404).json({ error: t(parseLang(req.headers['accept-language']), 'errors.auth.account_not_found') });
     res.json(account);
   } catch (err: any) {
     console.error('[pwa] settings get error:', err);
-    res.status(500).json({ error: 'Einstellungen konnten nicht geladen werden.' });
+    res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.pwa.settings_load_failed') });
   }
 });
 
@@ -965,9 +984,9 @@ router.put('/settings', requirePatientAuth, async (req: Request, res: Response) 
 
     res.json(account);
   } catch (err: any) {
-    if (err instanceof z.ZodError) return res.status(400).json({ error: 'Validierungsfehler', details: err.issues });
+    if (err instanceof z.ZodError) return res.status(400).json({ error: t(parseLang(req.headers['accept-language']), 'errors.validation'), details: err.issues });
     console.error('[pwa] settings update error:', err);
-    res.status(500).json({ error: 'Einstellungen konnten nicht aktualisiert werden.' });
+    res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.pwa.settings_update_failed') });
   }
 });
 
@@ -981,12 +1000,12 @@ router.put('/settings/password', requirePatientAuth, async (req: Request, res: R
     const account = await prisma.patientAccount.findUnique({
       where: { id: accountId },
     });
-    if (!account) return res.status(404).json({ error: 'Konto nicht gefunden.' });
+    if (!account) return res.status(404).json({ error: t(parseLang(req.headers['accept-language']), 'errors.auth.account_not_found') });
 
     // Verify old password
     const bcrypt = await import('bcryptjs');
     const valid = await bcrypt.compare(data.oldPassword, account.passwordHash);
-    if (!valid) return res.status(400).json({ error: 'Altes Passwort ist falsch.' });
+    if (!valid) return res.status(400).json({ error: t(parseLang(req.headers['accept-language']), 'errors.pwa.wrong_password') });
 
     // Hash new password
     const newHash = await bcrypt.hash(data.newPassword, 12);
@@ -997,9 +1016,9 @@ router.put('/settings/password', requirePatientAuth, async (req: Request, res: R
 
     res.json({ success: true });
   } catch (err: any) {
-    if (err instanceof z.ZodError) return res.status(400).json({ error: 'Validierungsfehler', details: err.issues });
+    if (err instanceof z.ZodError) return res.status(400).json({ error: t(parseLang(req.headers['accept-language']), 'errors.validation'), details: err.issues });
     console.error('[pwa] password change error:', err);
-    res.status(500).json({ error: 'Passwort konnte nicht geändert werden.' });
+    res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.pwa.password_change_failed') });
   }
 });
 
@@ -1020,9 +1039,9 @@ router.put('/settings/pin', requirePatientAuth, async (req: Request, res: Respon
 
     res.json({ success: true });
   } catch (err: any) {
-    if (err instanceof z.ZodError) return res.status(400).json({ error: 'Validierungsfehler', details: err.issues });
+    if (err instanceof z.ZodError) return res.status(400).json({ error: t(parseLang(req.headers['accept-language']), 'errors.validation'), details: err.issues });
     console.error('[pwa] pin change error:', err);
-    res.status(500).json({ error: 'PIN konnte nicht geändert werden.' });
+    res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.pwa.pin_change_failed') });
   }
 });
 
@@ -1040,9 +1059,9 @@ router.post('/sync', requirePatientAuth, async (req: Request, res: Response) => 
     const result = await syncOfflineData(accountId, payload);
     res.json(result);
   } catch (err: any) {
-    if (err instanceof z.ZodError) return res.status(400).json({ error: 'Validierungsfehler', details: err.issues });
+    if (err instanceof z.ZodError) return res.status(400).json({ error: t(parseLang(req.headers['accept-language']), 'errors.validation'), details: err.issues });
     console.error('[pwa] sync error:', err);
-    res.status(500).json({ error: 'Synchronisation fehlgeschlagen.' });
+    res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.pwa.sync_failed') });
   }
 });
 
@@ -1052,13 +1071,13 @@ router.get('/sync/changes', requirePatientAuth, async (req: Request, res: Respon
     const accountId = getAccountId(req);
     const since = req.query.since as string;
 
-    if (!since) return res.status(400).json({ error: 'Parameter "since" ist erforderlich.' });
+    if (!since) return res.status(400).json({ error: t(parseLang(req.headers['accept-language']), 'errors.pwa.since_required') });
 
     const result = await getChangesSince(accountId, since);
     res.json(result);
   } catch (err: any) {
     console.error('[pwa] sync changes error:', err);
-    res.status(500).json({ error: 'Änderungen konnten nicht geladen werden.' });
+    res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.pwa.changes_load_failed') });
   }
 });
 
@@ -1089,7 +1108,7 @@ router.get('/profile', requirePatientAuth, async (req: Request, res: Response) =
       },
     });
 
-    if (!account) return res.status(404).json({ error: 'Profil nicht gefunden.' });
+    if (!account) return res.status(404).json({ error: t(parseLang(req.headers['accept-language']), 'errors.not_found') });
 
     res.json({
       id: account.id,
@@ -1105,7 +1124,7 @@ router.get('/profile', requirePatientAuth, async (req: Request, res: Response) =
     });
   } catch (err: any) {
     console.error('[pwa] profile error:', err);
-    res.status(500).json({ error: 'Profil konnte nicht geladen werden.' });
+    res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.pwa.profile_load_failed') });
   }
 });
 

@@ -1,18 +1,18 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../db';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
-import { requireAuth, requireRole } from '../middleware/auth';
+import { requireAuth, requireRole, requirePermission } from '../middleware/auth';
+import { t, parseLang } from '../i18n';
 
 const router = Router();
-const prisma: any = new PrismaClient();
 
 // Alle Admin-Routen erfordern Admin-Rolle (except /permissions/check)
 router.use(requireAuth);
 
 // ─── Dashboard Stats ────────────────────────────────────────
 
-router.get('/stats', requireRole('admin'), async (_req, res) => {
+router.get('/stats', requireRole('admin'), async (req, res) => {
     try {
         const [
             totalPatients,
@@ -71,7 +71,7 @@ router.get('/stats', requireRole('admin'), async (_req, res) => {
         });
     } catch (err) {
         console.error('[Admin] Stats error:', err);
-        res.status(500).json({ error: 'Statistiken konnten nicht geladen werden' });
+        res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.stats.load_failed') });
     }
 });
 
@@ -79,7 +79,7 @@ router.get('/stats', requireRole('admin'), async (_req, res) => {
 
 router.get('/sessions/timeline', requireRole('admin'), async (req, res) => {
     try {
-        const days = parseInt(req.query.days as string) || 30;
+        const days = Math.min(Math.max(parseInt(req.query.days as string) || 30, 1), 365);
         const since = new Date();
         since.setDate(since.getDate() - days);
 
@@ -102,13 +102,13 @@ router.get('/sessions/timeline', requireRole('admin'), async (req, res) => {
         res.json(Object.entries(timeline).map(([date, data]) => ({ date, ...data })));
     } catch (err) {
         console.error('[Admin] Timeline error:', err);
-        res.status(500).json({ error: 'Timeline konnte nicht geladen werden' });
+        res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.timeline.load_failed') });
     }
 });
 
 // ─── Service Analytics (Pie Chart) ──────────────────────────
 
-router.get('/analytics/services', requireRole('admin'), async (_req, res) => {
+router.get('/analytics/services', requireRole('admin'), async (req, res) => {
     try {
         const services = await prisma.patientSession.groupBy({
             by: ['selectedService'],
@@ -122,7 +122,7 @@ router.get('/analytics/services', requireRole('admin'), async (_req, res) => {
         })));
     } catch (err) {
         console.error('[Admin] Services analytics error:', err);
-        res.status(500).json({ error: 'Service-Analytik konnte nicht geladen werden' });
+        res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.analytics.service_failed') });
     }
 });
 
@@ -130,7 +130,7 @@ router.get('/analytics/services', requireRole('admin'), async (_req, res) => {
 
 router.get('/analytics/triage', requireRole('admin'), async (req, res) => {
     try {
-        const days = parseInt(req.query.days as string) || 30;
+        const days = Math.min(Math.max(parseInt(req.query.days as string) || 30, 1), 365);
         const since = new Date();
         since.setDate(since.getDate() - days);
 
@@ -153,7 +153,7 @@ router.get('/analytics/triage', requireRole('admin'), async (req, res) => {
         res.json(Object.entries(timeline).map(([date, data]) => ({ date, ...data })));
     } catch (err) {
         console.error('[Admin] Triage analytics error:', err);
-        res.status(500).json({ error: 'Triage-Analytik konnte nicht geladen werden' });
+        res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.analytics.triage_failed') });
     }
 });
 
@@ -169,7 +169,7 @@ const auditLogQuerySchema = z.object({
     search: z.string().optional(),
 });
 
-router.get('/audit-log', requireRole('admin'), async (req, res) => {
+router.get('/audit-log', requireRole('admin'), requirePermission('admin_audit'), async (req, res) => {
     try {
         const query = auditLogQuerySchema.parse(req.query);
         const where: any = {};
@@ -210,13 +210,13 @@ router.get('/audit-log', requireRole('admin'), async (req, res) => {
         });
     } catch (err) {
         console.error('[Admin] Audit log error:', err);
-        res.status(500).json({ error: 'Audit-Log konnte nicht geladen werden' });
+        res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.audit.load_failed') });
     }
 });
 
 // ─── User Management (CRUD) ────────────────────────────────
 
-router.get('/users', requireRole('admin'), async (_req, res) => {
+router.get('/users', requireRole('admin'), requirePermission('admin_users'), async (req, res) => {
     try {
         const users = await prisma.arztUser.findMany({
             select: {
@@ -233,7 +233,7 @@ router.get('/users', requireRole('admin'), async (_req, res) => {
         res.json(users);
     } catch (err) {
         console.error('[Admin] Users list error:', err);
-        res.status(500).json({ error: 'Benutzerliste konnte nicht geladen werden' });
+        res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.users.load_failed') });
     }
 });
 
@@ -262,11 +262,11 @@ router.post('/users', requireRole('admin'), async (req, res) => {
         res.status(201).json(user);
     } catch (err: any) {
         if (err.code === 'P2002') {
-            res.status(409).json({ error: 'Benutzername existiert bereits' });
+            res.status(409).json({ error: t(parseLang(req.headers['accept-language']), 'errors.users.username_exists') });
             return;
         }
         console.error('[Admin] Create user error:', err);
-        res.status(500).json({ error: 'Benutzer konnte nicht erstellt werden' });
+        res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.users.create_failed') });
     }
 });
 
@@ -459,7 +459,7 @@ router.get('/permissions/check', async (req, res) => {
 // ─── Content Admin CRUD ─────────────────────────────────────
 
 // GET /api/admin/content — List all waiting content (admin view)
-router.get('/content', requireRole('admin'), async (req, res) => {
+router.get('/content', requireRole('admin'), requirePermission('admin_content'), async (req, res) => {
     try {
         const type = req.query.type as string;
         const category = req.query.category as string;
@@ -541,6 +541,18 @@ router.delete('/content/:id', requireRole('admin'), async (req, res) => {
         if (err.code === 'P2025') { res.status(404).json({ error: 'Content nicht gefunden' }); return; }
         console.error('[Admin] Content delete error:', err);
         res.status(500).json({ error: 'Content konnte nicht gelöscht werden' });
+    }
+});
+
+// POST /api/admin/content/seed — Seed default waiting content
+router.post('/content/seed', requireRole('admin'), async (req, res) => {
+    try {
+        const { seedWaitingContent } = await import('../../prisma/seed-content');
+        const created = await seedWaitingContent();
+        res.json({ success: true, created });
+    } catch (err) {
+        console.error('[Admin] Content seed error:', err);
+        res.status(500).json({ error: 'Seed fehlgeschlagen' });
     }
 });
 

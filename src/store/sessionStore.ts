@@ -72,6 +72,10 @@ export interface SessionState {
     error: string | null;
     progress: number;
     isHydrated: boolean;
+
+    // Wartezeit-Management (Modul 1)
+    infoBreakHistory: string[];       // IDs der bereits gesehenen InfoBreak-Contents
+    entertainmentMode: 'AUTO' | 'GAMES' | 'READING' | 'QUIET';
 }
 
 export interface SessionActions {
@@ -100,6 +104,10 @@ export interface SessionActions {
     setError: (error: string | null) => void;
     setProgress: (progress: number) => void;
     setHydrated: () => void;
+
+    // Wartezeit-Management (Modul 1)
+    addInfoBreakSeen: (contentId: string) => void;
+    setEntertainmentMode: (mode: 'AUTO' | 'GAMES' | 'READING' | 'QUIET') => void;
 }
 
 const initialState: SessionState = {
@@ -121,6 +129,8 @@ const initialState: SessionState = {
     error: null,
     progress: 0,
     isHydrated: false,
+    infoBreakHistory: [],
+    entertainmentMode: 'AUTO',
 };
 
 // ─── Store ──────────────────────────────────────────────────
@@ -139,8 +149,6 @@ export const useSessionStore = create<SessionState & SessionActions>()(
             })),
 
             clearSession: () => {
-                localStorage.removeItem('anamnese_token');
-                localStorage.removeItem('anamnese_session_id');
                 set(initialState);
             },
 
@@ -213,6 +221,12 @@ export const useSessionStore = create<SessionState & SessionActions>()(
             setError: (error) => set({ error }),
             setProgress: (progress) => set({ progress }),
             setHydrated: () => set({ isHydrated: true }),
+
+            // Wartezeit-Management (Modul 1)
+            addInfoBreakSeen: (contentId) => set((state) => ({
+                infoBreakHistory: [...state.infoBreakHistory, contentId],
+            })),
+            setEntertainmentMode: (mode) => set({ entertainmentMode: mode }),
         }),
         {
             name: 'anamnese-session',

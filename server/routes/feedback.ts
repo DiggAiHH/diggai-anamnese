@@ -207,4 +207,81 @@ router.post('/checkout/:sessionId', requireAuth, async (req: Request, res: Respo
   }
 });
 
+// GET /api/feedback/threat-analysis — Detailed threat analysis (admin)
+router.get('/threat-analysis', requireAuth, requireRole('ADMIN'), async (req: Request, res: Response) => {
+  try {
+    const prisma = (globalThis as any).__prisma;
+    const praxisId = req.query.praxisId as string | undefined;
+    const status = req.query.status as string | undefined;
+
+    const where: any = { containsThreats: true };
+    if (praxisId) where.praxisId = praxisId;
+    if (status) where.escalationStatus = status;
+
+    const [threats, statusCounts] = await Promise.all([
+      prisma.anonymousFeedback.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: 100,
+      }),
+      prisma.anonymousFeedback.groupBy({
+        by: ['escalationStatus'],
+        where: { containsThreats: true, ...(praxisId ? { praxisId } : {}) },
+        _count: { id: true },
+      }),
+    ]);
+
+    res.json({
+      threats,
+      summary: {
+        total: threats.length,
+        byStatus: statusCounts.map((s: any) => ({ status: s.escalationStatus, count: s._count.id })),
+      },
+    });
+  } catch (err: any) {
+    console.error('[Feedback] Threat analysis error:', err);
+    res.status(500).json({ error: 'Bedrohungsanalyse fehlgeschlagen' });
+  }
+});
+
+// POST /api/feedback/checkout/:sessionId/delete-data — DSGVO hard delete
+router.post('/checkout/:sessionId/delete-data', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const prisma = (globalThis as any).__prisma;
+    const { mode } = req.body; // 'soft' | 'hard'
+    const { sessionId } = req.params;
+
+    const session = await prisma.patientSession.findUnique({ where: { id: sessionId } });
+    if (!session) { res.status(404).json({ error: 'Session nicht gefunden' }); return; }
+
+    if (mode === 'hard') {
+      // DSGVO Art. 17 — vollständige Löschung
+      await prisma.$transaction([
+        prisma.answer.deleteMany({ where: { sessionId } }),
+        prisma.praxisChatMessage.deleteMany({ where: { sessionId } }),
+        prisma.nfcScan.updateMany({ where: { sessionId }, data: { sessionId: null } }),
+        prisma.patientSession.update({
+          where: { id: sessionId },
+          data: {
+            encryptedName: null,
+            patientId: null,
+            status: 'COMPLETED',
+          },
+        }),
+      ]);
+      res.json({ sessionId, mode: 'hard', deletedAt: new Date().toISOString(), message: 'Vollständige DSGVO-Löschung durchgeführt (Art. 17)' });
+    } else {
+      // Soft delete — PII anonymisieren, Metadaten erhalten
+      await prisma.patientSession.update({
+        where: { id: sessionId },
+        data: { encryptedName: null, status: 'COMPLETED' },
+      });
+      res.json({ sessionId, mode: 'soft', deletedAt: new Date().toISOString(), message: 'PII anonymisiert. Medizinische Metadaten aufbewahrt.' });
+    }
+  } catch (err: any) {
+    console.error('[Checkout] Delete error:', err);
+    res.status(500).json({ error: 'Löschung fehlgeschlagen' });
+  }
+});
+
 export default router;

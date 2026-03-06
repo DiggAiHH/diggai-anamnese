@@ -91,29 +91,29 @@ export const DSGVOConsent: React.FC<DSGVOConsentProps> = ({
 
                         {showDetails && (
                             <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-primary)] p-5 space-y-4 text-xs text-[var(--text-muted)] leading-relaxed">
-                                <h4 className="text-sm font-semibold text-[var(--text-secondary)]">1. Verantwortliche Stelle</h4>
-                                <p>{praxisName} (Adresse wird in der Praxis ausgehängt)</p>
+                                <h4 className="text-sm font-semibold text-[var(--text-secondary)]">{t('dsgvoPolicy1Title', '1. Verantwortliche Stelle')}</h4>
+                                <p>{t('dsgvoPolicy1Text', `${praxisName} (Adresse wird in der Praxis ausgehängt)`)}</p>
 
-                                <h4 className="text-sm font-semibold text-[var(--text-secondary)]">2. Zweck der Verarbeitung</h4>
-                                <p>Die Daten werden zur Vorbereitung und Durchführung Ihrer medizinischen Behandlung erhoben (Art. 6 Abs. 1 lit. b DSGVO i.V.m. Art. 9 Abs. 2 lit. h DSGVO).</p>
+                                <h4 className="text-sm font-semibold text-[var(--text-secondary)]">{t('dsgvoPolicy2Title', '2. Zweck der Verarbeitung')}</h4>
+                                <p>{t('dsgvoPolicy2Text', 'Die Daten werden zur Vorbereitung und Durchführung Ihrer medizinischen Behandlung erhoben (Art. 6 Abs. 1 lit. b DSGVO i.V.m. Art. 9 Abs. 2 lit. h DSGVO).')}</p>
 
-                                <h4 className="text-sm font-semibold text-[var(--text-secondary)]">3. Speicherdauer</h4>
-                                <p>Ihre Daten werden gemäß den ärztlichen Aufbewahrungsfristen (§ 630f BGB: 10 Jahre nach Abschluss der Behandlung) gespeichert.</p>
+                                <h4 className="text-sm font-semibold text-[var(--text-secondary)]">{t('dsgvoPolicy3Title', '3. Speicherdauer')}</h4>
+                                <p>{t('dsgvoPolicy3Text', 'Ihre Daten werden gemäß den ärztlichen Aufbewahrungsfristen (§ 630f BGB: 10 Jahre nach Abschluss der Behandlung) gespeichert.')}</p>
 
-                                <h4 className="text-sm font-semibold text-[var(--text-secondary)]">4. Technische Maßnahmen</h4>
+                                <h4 className="text-sm font-semibold text-[var(--text-secondary)]">{t('dsgvoPolicy4Title', '4. Technische Maßnahmen')}</h4>
                                 <ul className="list-disc list-inside space-y-1">
-                                    <li>Verschlüsselte Übertragung (TLS 1.3)</li>
-                                    <li>AES-256-GCM Verschlüsselung für personenbezogene Daten</li>
-                                    <li>Pseudonymisierte Speicherung (SHA-256 Hash der E-Mail)</li>
-                                    <li>Zugriffskontrolle über JWT-basierte Authentifizierung</li>
-                                    <li>HIPAA-konformes Audit-Logging aller Datenzugriffe</li>
+                                    <li>{t('dsgvoPolicy4a', 'Verschlüsselte Übertragung (TLS 1.3)')}</li>
+                                    <li>{t('dsgvoPolicy4b', 'AES-256-GCM Verschlüsselung für personenbezogene Daten')}</li>
+                                    <li>{t('dsgvoPolicy4c', 'Pseudonymisierte Speicherung (SHA-256 Hash der E-Mail)')}</li>
+                                    <li>{t('dsgvoPolicy4d', 'Zugriffskontrolle über JWT-basierte Authentifizierung')}</li>
+                                    <li>{t('dsgvoPolicy4e', 'HIPAA-konformes Audit-Logging aller Datenzugriffe')}</li>
                                 </ul>
 
-                                <h4 className="text-sm font-semibold text-[var(--text-secondary)]">5. Ihre Rechte</h4>
-                                <p>Auskunft (Art. 15), Berichtigung (Art. 16), Löschung (Art. 17), Einschränkung (Art. 18), Datenübertragbarkeit (Art. 20), Widerspruch (Art. 21), Beschwerde bei der Aufsichtsbehörde.</p>
+                                <h4 className="text-sm font-semibold text-[var(--text-secondary)]">{t('dsgvoPolicy5Title', '5. Ihre Rechte')}</h4>
+                                <p>{t('dsgvoPolicy5Text', 'Auskunft (Art. 15), Berichtigung (Art. 16), Löschung (Art. 17), Einschränkung (Art. 18), Datenübertragbarkeit (Art. 20), Widerspruch (Art. 21), Beschwerde bei der Aufsichtsbehörde.')}</p>
 
-                                <h4 className="text-sm font-semibold text-[var(--text-secondary)]">6. Kontakt Datenschutzbeauftragter</h4>
-                                <p>Kontaktdaten des/der betrieblichen Datenschutzbeauftragten sind in der Praxis einsehbar.</p>
+                                <h4 className="text-sm font-semibold text-[var(--text-secondary)]">{t('dsgvoPolicy6Title', '6. Kontakt Datenschutzbeauftragter')}</h4>
+                                <p>{t('dsgvoPolicy6Text', 'Kontaktdaten des/der betrieblichen Datenschutzbeauftragten sind in der Praxis einsehbar.')}</p>
                             </div>
                         )}
 
@@ -121,8 +121,7 @@ export const DSGVOConsent: React.FC<DSGVOConsentProps> = ({
                         <div className="flex items-start gap-3 p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5">
                             <Lock className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
                             <p className="text-xs text-emerald-300/80 leading-relaxed">
-                                Ihre Daten werden durch AES-256-GCM verschlüsselt und ausschließlich für die medizinische
-                                Behandlung verwendet. Sie verlassen zu keinem Zeitpunkt den abgesicherten Bereich.
+                                {t('dsgvoSecurityNote', 'Ihre Daten werden durch AES-256-GCM verschlüsselt und ausschließlich für die medizinische Behandlung verwendet. Sie verlassen zu keinem Zeitpunkt den abgesicherten Bereich.')}
                             </p>
                         </div>
                     </div>

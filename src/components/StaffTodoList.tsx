@@ -1,9 +1,10 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   CheckSquare, Square, Plus, Trash2, AlertTriangle, Clock,
   User, Edit3, X, Check
 } from 'lucide-react';
+import apiClient from '../api/client';
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -43,8 +44,8 @@ const CATEGORY_CONFIG = {
 
 // ─── Component ──────────────────────────────────────────────
 
-export const StaffTodoList: React.FC<StaffTodoListProps> = ({ currentUser, className = '' }) => {
-  const { t } = useTranslation();
+export const StaffTodoList: React.FC<StaffTodoListProps> = ({ currentUser: _currentUser, className = '' }) => {
+  const { t, i18n } = useTranslation();
   const [todos, setTodos] = useState<TodoItem[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newText, setNewText] = useState('');
@@ -55,37 +56,65 @@ export const StaffTodoList: React.FC<StaffTodoListProps> = ({ currentUser, class
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
 
+  // ─── Fetch from API ────────────────────────────────
+
+  const fetchTodos = useCallback(async () => {
+    try {
+      const res = await apiClient.get('/todos');
+      setTodos(res.data);
+    } catch (err) {
+      console.error('[StaffTodoList] fetch error:', err);
+    }
+  }, []);
+
+  useEffect(() => { fetchTodos(); }, [fetchTodos]);
+
   // ─── CRUD Operations ──────────────────────────────────
 
-  const addTodo = useCallback(() => {
+  const addTodo = useCallback(async () => {
     if (!newText.trim()) return;
-    const todo: TodoItem = {
-      id: `todo-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      text: newText.trim(),
-      completed: false,
-      priority: newPriority,
-      category: newCategory,
-      assignee: currentUser.displayName,
-      createdAt: new Date().toISOString(),
-    };
-    setTodos(prev => [todo, ...prev]);
-    setNewText('');
-    setShowAddForm(false);
-  }, [newText, newPriority, newCategory, currentUser]);
+    try {
+      const res = await apiClient.post('/todos', {
+        text: newText.trim(),
+        priority: newPriority,
+        category: newCategory,
+      });
+      setTodos(prev => [res.data, ...prev]);
+      setNewText('');
+      setShowAddForm(false);
+    } catch (err) {
+      console.error('[StaffTodoList] create error:', err);
+    }
+  }, [newText, newPriority, newCategory]);
 
-  const toggleTodo = useCallback((id: string) => {
-    setTodos(prev => prev.map(t =>
-      t.id === id ? { ...t, completed: !t.completed, completedAt: !t.completed ? new Date().toISOString() : undefined } : t
-    ));
+  const toggleTodo = useCallback(async (id: string) => {
+    const todo = todos.find(t => t.id === id);
+    if (!todo) return;
+    try {
+      const res = await apiClient.put(`/todos/${id}`, { completed: !todo.completed });
+      setTodos(prev => prev.map(t => t.id === id ? res.data : t));
+    } catch (err) {
+      console.error('[StaffTodoList] toggle error:', err);
+    }
+  }, [todos]);
+
+  const deleteTodo = useCallback(async (id: string) => {
+    try {
+      await apiClient.delete(`/todos/${id}`);
+      setTodos(prev => prev.filter(t => t.id !== id));
+    } catch (err) {
+      console.error('[StaffTodoList] delete error:', err);
+    }
   }, []);
 
-  const deleteTodo = useCallback((id: string) => {
-    setTodos(prev => prev.filter(t => t.id !== id));
-  }, []);
-
-  const updateTodoText = useCallback((id: string, text: string) => {
-    setTodos(prev => prev.map(t => t.id === id ? { ...t, text } : t));
-    setEditingId(null);
+  const updateTodoText = useCallback(async (id: string, text: string) => {
+    try {
+      const res = await apiClient.put(`/todos/${id}`, { text });
+      setTodos(prev => prev.map(t => t.id === id ? res.data : t));
+      setEditingId(null);
+    } catch (err) {
+      console.error('[StaffTodoList] update error:', err);
+    }
   }, []);
 
   // ─── Filter & Sort ─────────────────────────────────────
@@ -300,7 +329,7 @@ export const StaffTodoList: React.FC<StaffTodoListProps> = ({ currentUser, class
                     <div className="mt-2 text-[10px] text-[var(--text-muted)] space-y-1">
                       {todo.patientName && <p>Patient: {todo.patientName}</p>}
                       {todo.sessionId && <p>Session: {todo.sessionId.slice(0, 8)}...</p>}
-                      {todo.completedAt && <p>{t('todo.completedAt', 'Erledigt am')}: {new Date(todo.completedAt).toLocaleString('de-DE')}</p>}
+                      {todo.completedAt && <p>{t('todo.completedAt', 'Erledigt am')}: {new Date(todo.completedAt).toLocaleString(i18n.language)}</p>}
                     </div>
                   )}
                 </div>

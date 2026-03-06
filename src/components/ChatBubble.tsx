@@ -372,9 +372,9 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({ sessionId }) => {
                 {botTyping && activeTab === 'bot' && (
                     <div className="flex items-center gap-2 text-white/40">
                         <div className="flex gap-1">
-                            <span className="w-1.5 h-1.5 bg-white/40 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                            <span className="w-1.5 h-1.5 bg-white/40 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                            <span className="w-1.5 h-1.5 bg-white/40 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                            <span className="w-1.5 h-1.5 bg-white/40 rounded-full animate-bounce" />
+                            <span className="w-1.5 h-1.5 bg-white/40 rounded-full animate-bounce [animation-delay:150ms]" />
+                            <span className="w-1.5 h-1.5 bg-white/40 rounded-full animate-bounce [animation-delay:300ms]" />
                         </div>
                         <span className="text-[10px]">{t('botTyping', 'Assistent tippt...')}</span>
                     </div>
@@ -384,9 +384,9 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({ sessionId }) => {
                 {teamTyping && activeTab === 'team' && (
                     <div className="flex items-center gap-2 text-white/40">
                         <div className="flex gap-1">
-                            <span className="w-1.5 h-1.5 bg-purple-400/60 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                            <span className="w-1.5 h-1.5 bg-purple-400/60 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                            <span className="w-1.5 h-1.5 bg-purple-400/60 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                            <span className="w-1.5 h-1.5 bg-purple-400/60 rounded-full animate-bounce" />
+                            <span className="w-1.5 h-1.5 bg-purple-400/60 rounded-full animate-bounce [animation-delay:150ms]" />
+                            <span className="w-1.5 h-1.5 bg-purple-400/60 rounded-full animate-bounce [animation-delay:300ms]" />
                         </div>
                         <span className="text-[10px]">{t('chat.teamTyping', 'Praxis-Team tippt...')}</span>
                     </div>

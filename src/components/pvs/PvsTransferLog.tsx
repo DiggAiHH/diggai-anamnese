@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ArrowUpRight, ArrowDownLeft, CheckCircle, XCircle, Clock, RotateCw, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
 import { usePvsTransfers, usePvsRetryTransfer, usePvsTransferStats } from '../../hooks/useApi';
 
@@ -15,6 +16,7 @@ const DIRECTION_CONFIG: Record<string, { label: string; icon: React.ReactNode }>
 };
 
 export function PvsTransferLog() {
+  const { i18n } = useTranslation();
     const [page, setPage] = useState(1);
     const [directionFilter, setDirectionFilter] = useState('');
     const [statusFilter, setStatusFilter] = useState('');
@@ -105,7 +107,7 @@ export function PvsTransferLog() {
                                             {t.recordCount ?? '–'}
                                         </td>
                                         <td className="px-4 py-2.5 text-gray-500 text-xs">
-                                            {new Date(t.createdAt).toLocaleString('de-DE')}
+                                            {new Date(t.createdAt).toLocaleString(i18n.language)}
                                         </td>
                                         <td className="px-4 py-2.5">
                                             {t.status === 'FAILED' && (
@@ -129,11 +131,11 @@ export function PvsTransferLog() {
                     <span>Seite {pagination.page} von {pagination.totalPages} ({pagination.total} Einträge)</span>
                     <div className="flex gap-2">
                         <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
-                            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-30">
+                            title="Vorherige Seite" className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-30">
                             <ChevronLeft className="w-4 h-4" />
                         </button>
                         <button onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))} disabled={page >= pagination.totalPages}
-                            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-30">
+                            title="Nächste Seite" className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-30">
                             <ChevronRight className="w-4 h-4" />
                         </button>
                     </div>

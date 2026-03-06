@@ -5,6 +5,15 @@ import {
   CheckCircle, XCircle, ChevronRight, Award, Star, Sparkles,
   ArrowRight, Trophy, Heart, Info
 } from 'lucide-react';
+import { LottieStation } from './animations/LottieStation';
+
+const STATION_ANIMATIONS = [
+  '/assets/3d/data-flow.json',
+  '/assets/3d/heart-shield.json',
+  '/assets/3d/data-vault.json',
+  '/assets/3d/freedom-bird.json',
+  '/assets/3d/toxic-shield.json',
+];
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -381,6 +390,16 @@ export const DatenschutzGame: React.FC<DatenschutzGameProps> = ({
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+              {/* Lottie Animation */}
+              <div className="flex justify-center">
+                <LottieStation
+                  animationPath={STATION_ANIMATIONS[currentConsentIndex]}
+                  label={currentItem.title}
+                  isActive={true}
+                  className="w-28 h-28"
+                />
+              </div>
+
               {/* Section Header */}
               <div className={`flex items-start gap-4 p-5 rounded-xl border ${colorMap[currentItem.color]}`}>
                 <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${iconColorMap[currentItem.color]}`}>

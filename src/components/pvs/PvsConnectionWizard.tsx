@@ -1,4 +1,5 @@
 import { Fragment, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Wifi, WifiOff, Server, ChevronRight, ChevronLeft, Check, Loader2, AlertCircle } from 'lucide-react';
 import { usePvsConnections, usePvsCreateConnection, usePvsTestConnection, usePvsDeleteConnection } from '../../hooks/useApi';
 import type { PvsConnection } from '../../types/admin';
@@ -185,12 +186,12 @@ export function PvsConnectionWizard({ onClose }: { onClose?: () => void }) {
                                     <div>
                                         <label className="block text-sm font-medium mb-1">Client ID</label>
                                         <input type="text" value={config.clientId} onChange={e => setConfig(prev => ({ ...prev, clientId: e.target.value }))}
-                                            className="w-full px-3 py-2 rounded-lg border dark:bg-gray-700 dark:border-gray-600 text-sm" />
+                                            placeholder="Client ID" className="w-full px-3 py-2 rounded-lg border dark:bg-gray-700 dark:border-gray-600 text-sm" />
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium mb-1">Client Secret</label>
                                         <input type="password" value={config.clientSecret} onChange={e => setConfig(prev => ({ ...prev, clientSecret: e.target.value }))}
-                                            className="w-full px-3 py-2 rounded-lg border dark:bg-gray-700 dark:border-gray-600 text-sm" />
+                                            placeholder="Client Secret" className="w-full px-3 py-2 rounded-lg border dark:bg-gray-700 dark:border-gray-600 text-sm" />
                                     </div>
                                 </div>
                             )}
@@ -198,7 +199,7 @@ export function PvsConnectionWizard({ onClose }: { onClose?: () => void }) {
                                 <div>
                                     <label className="block text-sm font-medium mb-1">API Key</label>
                                     <input type="password" value={config.apiKey} onChange={e => setConfig(prev => ({ ...prev, apiKey: e.target.value }))}
-                                        className="w-full px-3 py-2 rounded-lg border dark:bg-gray-700 dark:border-gray-600 text-sm" />
+                                        placeholder="API Key" className="w-full px-3 py-2 rounded-lg border dark:bg-gray-700 dark:border-gray-600 text-sm" />
                                 </div>
                             )}
                         </>
@@ -250,6 +251,7 @@ export function PvsConnectionWizard({ onClose }: { onClose?: () => void }) {
 // ─── Connection List (used in PvsAdminPanel) ─────────────────
 
 export function PvsConnectionList() {
+    const { i18n } = useTranslation();
     const { data: connections, isLoading } = usePvsConnections();
     const testConn = usePvsTestConnection();
     const deleteConn = usePvsDeleteConnection();
@@ -276,7 +278,7 @@ export function PvsConnectionList() {
                         <div className="min-w-0">
                             <div className="font-medium text-sm truncate">{conn.name}</div>
                             <div className="text-xs text-gray-500">{conn.pvsType} · {conn.protocol}</div>
-                            {conn.lastSyncAt && <div className="text-xs text-gray-600 dark:text-gray-400">Letzter Sync: {new Date(conn.lastSyncAt).toLocaleString('de-DE')}</div>}
+                            {conn.lastSyncAt && <div className="text-xs text-gray-600 dark:text-gray-400">Letzter Sync: {new Date(conn.lastSyncAt).toLocaleString(i18n.language)}</div>}
                         </div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">

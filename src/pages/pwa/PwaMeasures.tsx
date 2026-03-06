@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pill, Check, SkipForward, Clock, AlertTriangle, ChevronDown, Loader2, Activity, Droplets, Dumbbell } from 'lucide-react';
 import { usePwaMeasures, usePwaMeasureTrackings, usePwaMeasureComplete, usePwaMeasureSkip } from '../../hooks/useApi';
 
@@ -21,6 +22,7 @@ const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
 };
 
 export default function PwaMeasures() {
+  const { t, i18n } = useTranslation();
   const measures = usePwaMeasures();
   const trackings = usePwaMeasureTrackings();
   const completeMutation = usePwaMeasureComplete();
@@ -55,7 +57,7 @@ export default function PwaMeasures() {
   };
 
   const formatDate = (d: string) =>
-    new Date(d).toLocaleDateString('de-DE', { day: '2-digit', month: 'short', year: 'numeric' });
+    new Date(d).toLocaleDateString(i18n.language || 'de-DE', { day: '2-digit', month: 'short', year: 'numeric' });
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
@@ -64,9 +66,9 @@ export default function PwaMeasures() {
         <div className="max-w-lg mx-auto">
           <h1 className="text-lg font-bold text-gray-900 flex items-center gap-2">
             <Pill className="w-5 h-5 text-violet-500" />
-            Maßnahmen &amp; Medikamente
+            {t('Medikamente / Rezepte')}
           </h1>
-          <p className="text-xs text-gray-400 mt-0.5">Ihre aktiven Behandlungsmaßnahmen</p>
+          <p className="text-xs text-gray-400 mt-0.5">{t('Aktive Behandlung')}</p>
         </div>
       </header>
 
@@ -82,7 +84,7 @@ export default function PwaMeasures() {
         {!measures.isLoading && measureList.length === 0 && (
           <div className="rounded-2xl bg-white border border-gray-100 shadow-sm px-4 py-10 text-center">
             <Activity className="w-8 h-8 mx-auto text-gray-300 mb-2" />
-            <p className="text-sm text-gray-400">Keine aktiven Maßnahmen vorhanden.</p>
+            <p className="text-sm text-gray-400">{t('Keine aktiven Maßnahmen vorhanden.')}</p>
           </div>
         )}
 
@@ -110,11 +112,11 @@ export default function PwaMeasures() {
                   <div className="flex items-center gap-2">
                     <h3 className="text-sm font-semibold text-gray-800 truncate">{m.name ?? m.title}</h3>
                     <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${status.cls}`}>
-                      {status.label}
+                      {t(status.label)}
                     </span>
                   </div>
                   {m.dosage && (
-                    <p className="text-xs text-gray-500 mt-0.5">Dosierung: {m.dosage}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{t('Dosierung')}: {m.dosage}</p>
                   )}
                   {(m.startDate || m.endDate) && (
                     <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
@@ -139,7 +141,7 @@ export default function PwaMeasures() {
                     ) : (
                       <Check className="w-3.5 h-3.5" />
                     )}
-                    Genommen ✓
+                    {t('Abgeschlossen')} ✓
                   </button>
                   <button
                     onClick={() => setSkipDialogId(m.id)}
@@ -147,7 +149,7 @@ export default function PwaMeasures() {
                     className="flex-1 rounded-xl bg-amber-50 text-amber-600 px-3 py-2.5 text-xs font-semibold hover:bg-amber-100 disabled:opacity-50 transition-colors flex items-center justify-center gap-1.5"
                   >
                     <SkipForward className="w-3.5 h-3.5" />
-                    Übersprungen
+                    {t('Übersprungen')}
                   </button>
                 </div>
               )}
@@ -159,7 +161,7 @@ export default function PwaMeasures() {
                     onClick={() => setExpandedId(isExpanded ? null : m.id)}
                     className="w-full px-4 py-2 border-t border-gray-50 flex items-center justify-between text-xs text-gray-400 hover:bg-gray-50 transition-colors"
                   >
-                    <span>Verlauf ({myTrackings.length})</span>
+                    <span>{t('Verlauf')} ({myTrackings.length})</span>
                     <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                   </button>
 
@@ -183,11 +185,11 @@ export default function PwaMeasures() {
                           >
                             {t.completed ?? t.status === 'COMPLETED' ? (
                               <>
-                                <Check className="w-3 h-3" /> Genommen
+                                <Check className="w-3 h-3" /> {t('Abgeschlossen')}
                               </>
                             ) : (
                               <>
-                                <SkipForward className="w-3 h-3" /> Übersprungen
+                                <SkipForward className="w-3 h-3" /> {t('Übersprungen')}
                               </>
                             )}
                           </span>
@@ -205,7 +207,7 @@ export default function PwaMeasures() {
         {measures.isError && (
           <div className="rounded-2xl bg-red-50 border border-red-100 px-4 py-3 flex items-center gap-2 text-sm text-red-600">
             <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-            Daten konnten nicht geladen werden.
+            {t('errorBoundary.title')}
           </div>
         )}
       </main>
@@ -218,14 +220,14 @@ export default function PwaMeasures() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="w-10 h-1 rounded-full bg-gray-200 mx-auto" />
-            <h3 className="text-base font-semibold text-gray-800">Maßnahme überspringen</h3>
+            <h3 className="text-base font-semibold text-gray-800">{t('Übersprungen')}</h3>
             <p className="text-xs text-gray-400">
-              Haben Sie Nebenwirkungen oder einen Grund? (optional)
+              {t('Grund der Absage (optional)')}
             </p>
             <textarea
               value={skipReason}
               onChange={(e) => setSkipReason(e.target.value)}
-              placeholder="z.B. Übelkeit, Vergessen, ..."
+              placeholder={t('Grund der Absage (optional)')}
               rows={3}
               className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300 resize-none"
             />
@@ -234,7 +236,7 @@ export default function PwaMeasures() {
                 onClick={() => { setSkipDialogId(null); setSkipReason(''); }}
                 className="flex-1 rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
               >
-                Abbrechen
+                {t('Abbrechen & Home')}
               </button>
               <button
                 onClick={handleSkip}
@@ -246,7 +248,7 @@ export default function PwaMeasures() {
                 ) : (
                   <SkipForward className="w-4 h-4" />
                 )}
-                Überspringen
+                {t('Übersprungen')}
               </button>
             </div>
           </div>

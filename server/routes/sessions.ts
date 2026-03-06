@@ -1,8 +1,9 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { prisma } from '../db';
-import { createToken, requireAuth, requireSessionOwner } from '../middleware/auth';
+import { createToken, requireAuth, requireSessionOwner, setTokenCookie } from '../middleware/auth';
 import { hashEmail, encrypt } from '../services/encryption';
+import { t, parseLang, LocalizedError } from '../i18n';
 
 import * as jwt from 'jsonwebtoken';
 const { sign } = jwt;
@@ -28,7 +29,7 @@ router.post('/qr-token', requireAuth, (req: Request, res: Response) => {
         res.json({ token });
     } catch (err) {
         console.error('[QR Token] Error:', err);
-        res.status(500).json({ error: 'Fehler beim Generieren des Tokens' });
+        res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.session.token_gen_failed') });
     }
 });
 
@@ -81,6 +82,7 @@ router.post('/', async (req: Request, res: Response) => {
             role: 'patient',
         });
 
+        setTokenCookie(res, token);
         res.status(201).json({
             sessionId: session.id,
             token,
@@ -88,7 +90,7 @@ router.post('/', async (req: Request, res: Response) => {
         });
     } catch (err: unknown) {
         console.error('[Sessions] Fehler beim Erstellen:', err);
-        res.status(500).json({ error: 'Interner Serverfehler' });
+        res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.generic') });
     }
 });
 
@@ -103,7 +105,7 @@ router.get('/:id/state', requireAuth, requireSessionOwner, async (req: Request, 
         });
 
         if (!session) {
-            res.status(404).json({ error: 'Session nicht gefunden' });
+            res.status(404).json({ error: t(parseLang(req.headers['accept-language']), 'errors.session.not_found') });
             return;
         }
 
@@ -147,7 +149,7 @@ router.get('/:id/state', requireAuth, requireSessionOwner, async (req: Request, 
         });
     } catch (err: unknown) {
         console.error('[Sessions] Fehler beim Abrufen:', err);
-        res.status(500).json({ error: 'Interner Serverfehler' });
+        res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.generic') });
     }
 });
 
@@ -168,6 +170,19 @@ router.post('/:id/submit', requireAuth, requireSessionOwner, async (req: Request
         const { emitSessionComplete } = await import('../socket');
         emitSessionComplete(session.id, session.selectedService);
 
+        // Auto-trigger agent pipeline (non-blocking — never delay the response)
+        setImmediate(async () => {
+            try {
+                const { createTask } = await import('../agents/orchestrator.agent');
+                const basePayload = { sessionId: session.id, service: session.selectedService };
+                createTask({ type: 'triage',         description: `Triage für Session ${session.id}`,         payload: basePayload, priority: 'high' });
+                createTask({ type: 'dokumentation',  description: `Zusammenfassung für Session ${session.id}`, payload: basePayload });
+                createTask({ type: 'empfang',        description: `Empfangsvorbereitung für Session ${session.id}`, payload: basePayload, priority: 'low' });
+            } catch (agentErr) {
+                console.warn('[Sessions] Auto-Triage fehlgeschlagen (non-critical):', agentErr);
+            }
+        });
+
         res.json({
             success: true,
             sessionId: session.id,
@@ -175,7 +190,7 @@ router.post('/:id/submit', requireAuth, requireSessionOwner, async (req: Request
         });
     } catch (err: unknown) {
         console.error('[Sessions] Fehler beim Submit:', err);
-        res.status(500).json({ error: 'Interner Serverfehler' });
+        res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.generic') });
     }
 });
 
@@ -221,7 +236,7 @@ router.post('/:id/accident', requireAuth, requireSessionOwner, async (req: Reque
         res.status(201).json({ success: true, accidentId: accident.id });
     } catch (err: unknown) {
         console.error('[Sessions/Accident] Fehler beim Speichern:', err);
-        res.status(500).json({ error: 'Interner Serverfehler' });
+        res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.generic') });
     }
 });
 
@@ -243,7 +258,7 @@ router.get('/:id/accident', requireAuth, async (req: Request, res: Response) => 
         res.json({ success: true, accident });
     } catch (err: unknown) {
         console.error('[Sessions/Accident] Fehler beim Abrufen:', err);
-        res.status(500).json({ error: 'Interner Serverfehler' });
+        res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.generic') });
     }
 });
 /**
@@ -273,7 +288,7 @@ router.post('/:id/medications', requireAuth, requireSessionOwner, async (req: Re
         });
 
         if (!session || !session.patientId) {
-            res.status(404).json({ error: 'Session oder Patient nicht gefunden' });
+            res.status(404).json({ error: t(parseLang(req.headers['accept-language']), 'errors.session.not_found') });
             return;
         }
 
@@ -297,7 +312,7 @@ router.post('/:id/medications', requireAuth, requireSessionOwner, async (req: Re
         res.status(201).json({ success: true, count: medications.length });
     } catch (err: unknown) {
         console.error('[Sessions/Medications] Fehler beim Speichern:', err);
-        res.status(500).json({ error: 'Interner Serverfehler' });
+        res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.generic') });
     }
 });
 
@@ -315,7 +330,7 @@ router.get('/:id/medications', requireAuth, async (req: Request, res: Response) 
         });
 
         if (!session || !session.patientId) {
-            res.status(404).json({ error: 'Session oder Patient nicht gefunden' });
+            res.status(404).json({ error: t(parseLang(req.headers['accept-language']), 'errors.session.not_found') });
             return;
         }
 
@@ -327,7 +342,7 @@ router.get('/:id/medications', requireAuth, async (req: Request, res: Response) 
         res.json({ success: true, medications });
     } catch (err: unknown) {
         console.error('[Sessions/Medications] Fehler beim Abrufen:', err);
-        res.status(500).json({ error: 'Interner Serverfehler' });
+        res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.generic') });
     }
 });
 
@@ -358,7 +373,7 @@ router.post('/:id/surgeries', requireAuth, requireSessionOwner, async (req: Requ
         });
 
         if (!session || !session.patientId) {
-            res.status(404).json({ error: 'Session oder Patient nicht gefunden' });
+            res.status(404).json({ error: t(parseLang(req.headers['accept-language']), 'errors.session.not_found') });
             return;
         }
 
@@ -382,7 +397,7 @@ router.post('/:id/surgeries', requireAuth, requireSessionOwner, async (req: Requ
         res.status(201).json({ success: true, count: surgeries.length });
     } catch (err: unknown) {
         console.error('[Sessions/Surgeries] Fehler beim Speichern:', err);
-        res.status(500).json({ error: 'Interner Serverfehler' });
+        res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.generic') });
     }
 });
 
@@ -398,7 +413,7 @@ router.get('/:id/surgeries', requireAuth, async (req: Request, res: Response) =>
         });
 
         if (!session || !session.patientId) {
-            res.status(404).json({ error: 'Session oder Patient nicht gefunden' });
+            res.status(404).json({ error: t(parseLang(req.headers['accept-language']), 'errors.session.not_found') });
             return;
         }
 
@@ -410,7 +425,7 @@ router.get('/:id/surgeries', requireAuth, async (req: Request, res: Response) =>
         res.json({ success: true, surgeries });
     } catch (err: unknown) {
         console.error('[Sessions/Surgeries] Fehler beim Abrufen:', err);
-        res.status(500).json({ error: 'Interner Serverfehler' });
+        res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.generic') });
     }
 });
 
@@ -422,7 +437,7 @@ router.get('/:id/surgeries', requireAuth, async (req: Request, res: Response) =>
 router.post('/refresh-token', requireAuth, async (req: Request, res: Response) => {
     try {
         if (!req.auth) {
-            res.status(401).json({ error: 'Ungültiger Token' });
+            res.status(401).json({ error: t(parseLang(req.headers['accept-language']), 'errors.auth.invalid_token') });
             return;
         }
 
@@ -433,10 +448,11 @@ router.post('/refresh-token', requireAuth, async (req: Request, res: Response) =
             role: req.auth.role,
         });
 
+        setTokenCookie(res, newToken);
         res.json({ token: newToken });
     } catch (err: unknown) {
         console.error('[Sessions] Token-Refresh-Fehler:', err);
-        res.status(500).json({ error: 'Token konnte nicht erneuert werden' });
+        res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.session.token_refresh_failed') });
     }
 });
 

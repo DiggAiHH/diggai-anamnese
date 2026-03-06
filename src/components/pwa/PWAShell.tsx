@@ -1,18 +1,20 @@
 import { useState, useEffect } from 'react';
 import { Outlet, NavLink, Navigate } from 'react-router-dom';
 import { LayoutDashboard, BookOpen, Pill, MessageSquare, Settings, Wifi, WifiOff } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { usePwaUnreadCount } from '../../hooks/useApi';
 import { usePwaStore } from '../../stores/pwaStore';
 
 const NAV_ITEMS = [
-    { to: '/pwa/dashboard', icon: LayoutDashboard, label: 'Home' },
-    { to: '/pwa/diary', icon: BookOpen, label: 'Tagebuch' },
-    { to: '/pwa/measures', icon: Pill, label: 'Medikamente' },
-    { to: '/pwa/messages', icon: MessageSquare, label: 'Nachrichten' },
-    { to: '/pwa/settings', icon: Settings, label: 'Einstellungen' },
+    { to: '/pwa/dashboard', icon: LayoutDashboard, labelKey: 'pwa.nav.home', fallback: 'Home' },
+    { to: '/pwa/diary', icon: BookOpen, labelKey: 'pwa.nav.diary', fallback: 'Tagebuch' },
+    { to: '/pwa/measures', icon: Pill, labelKey: 'pwa.nav.measures', fallback: 'Medikamente' },
+    { to: '/pwa/messages', icon: MessageSquare, labelKey: 'pwa.nav.messages', fallback: 'Nachrichten' },
+    { to: '/pwa/settings', icon: Settings, labelKey: 'pwa.nav.settings', fallback: 'Einstellungen' },
 ];
 
 export function PWAShell() {
+    const { t } = useTranslation();
     const isAuthenticated = usePwaStore(s => s.isAuthenticated);
     const { data: unread } = usePwaUnreadCount();
     const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -33,7 +35,7 @@ export function PWAShell() {
             <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-4 py-3 flex items-center justify-between sticky top-0 z-40">
                 <div className="flex items-center gap-2">
                     <span className="text-lg font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">DiggAI</span>
-                    <span className="text-xs text-gray-400">Patienten-Portal</span>
+                    <span className="text-xs text-gray-400">{t('pwa.shell.subtitle', 'Patienten-Portal')}</span>
                 </div>
                 <div className="flex items-center gap-2">
                     {isOnline ? <Wifi className="w-4 h-4 text-green-500" /> : <WifiOff className="w-4 h-4 text-red-500" />}
@@ -61,7 +63,7 @@ export function PWAShell() {
                                             </span>
                                         )}
                                     </div>
-                                    <span className={isActive ? 'font-medium' : ''}>{item.label}</span>
+                                    <span className={isActive ? 'font-medium' : ''}>{t(item.labelKey, item.fallback)}</span>
                                 </>
                             )}
                         </NavLink>

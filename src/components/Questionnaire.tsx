@@ -1,7 +1,7 @@
 import { useEffect, useCallback, useState, useMemo, useRef } from 'react';
 import { useSessionStore } from '../store/sessionStore';
 import type { Answer } from '../types/question';
-import { useSubmitAnswer, useSubmitSession, useSubmitAccidentDetails, useSubmitMedications, useSubmitSurgeries } from '../hooks/useApi';
+import { useSubmitAnswer, useSubmitSession, useSubmitAccidentDetails, useSubmitMedications, useSubmitSurgeries, useQueuePosition, useQueueFlowConfig, useWaitingContent } from '../hooks/useApi';
 import { questions as allQuestions } from '../data/questions';
 import { QuestionRenderer } from './QuestionRenderer';
 import { ProgressBar } from './ProgressBar';
@@ -34,6 +34,7 @@ import { CompletionCelebration } from './Celebrations';
 import { KioskToggle } from './KioskToggle';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { SessionTimeoutWarning } from './SessionTimeoutWarning';
+import { InfoBreak } from './waiting/InfoBreak';
 import { hapticTap, hapticSelect, hapticSuccess, hapticWarning } from '../utils/haptics';
 import {
     ClipboardList,
@@ -130,6 +131,17 @@ export function Questionnaire() {
     const [medications, setMedications] = useState<{ id: string; name: string; dosage: string; frequency: string; sinceWhen: string }[]>([]);
     const [surgeries, setSurgeries] = useState<{ id: string; surgeryName: string; date: string; complications: string; notes: string }[]>([]);
     const [showCameraScanner, setShowCameraScanner] = useState(false);
+
+    // InfoBreak state (Modul 1: Wartezeit-Management)
+    const [infoBreakContent, setInfoBreakContent] = useState<{ id: string; type: string; title: string; body: string; displayDurationSec?: number } | null>(null);
+    const [infoBreakSeenIds, setInfoBreakSeenIds] = useState<string[]>([]);
+
+    // Queue & flow config for adaptive InfoBreak timing
+    const { data: queuePositionData } = useQueuePosition(store.sessionId ?? '');
+    const { data: flowConfigData } = useQueueFlowConfig(store.sessionId ?? '');
+    const { data: infoBreakContentData } = useWaitingContent(
+      { lang: 'de', limit: 1, exclude: infoBreakSeenIds.join(',') }
+    );
 
     // Guard: Skip SyncEffect during active user input to prevent race conditions
     const isUserInteractingRef = useRef(false);
@@ -248,6 +260,18 @@ export function Questionnaire() {
             // we could store it if we had a field, left as example
         }
     }, [handleAnswer]);
+
+    // InfoBreak logic: determine if we should show an info break between questions
+    const shouldInsertInfoBreak = useCallback((): boolean => {
+        if (!queuePositionData || queuePositionData.status !== 'WAITING') return false;
+        if (!flowConfigData || flowConfigData.level === 0) return false;
+
+        const answeredCount = Object.keys(state.answers).length;
+        const breakFrequency = flowConfigData.breakFrequency ?? 5;
+
+        // Insert InfoBreak every N questions based on adaptive level
+        return answeredCount > 0 && answeredCount % breakFrequency === 0;
+    }, [queuePositionData, flowConfigData, state.answers]);
 
     const handleNext = useCallback(async () => {
         hapticTap();
@@ -388,6 +412,17 @@ export function Questionnaire() {
         const currentIndex = activePath.indexOf(currentAtomId);
         if (currentIndex !== -1 && currentIndex + 1 < activePath.length) {
             const nextQuestionId = activePath[currentIndex + 1];
+
+            // InfoBreak check: show info break between questions if adaptive flow requires it
+            if (shouldInsertInfoBreak() && infoBreakContentData?.items?.[0]) {
+                const content = infoBreakContentData.items[0];
+                setInfoBreakContent(content);
+                setInfoBreakSeenIds((prev) => [...prev, content.id]);
+                // Store the pending next question — will navigate after InfoBreak dismissal
+                store.setAnswer('__pendingNextAtom', nextQuestionId);
+                return;
+            }
+
             if (import.meta.env.DEV) console.log(`handleNext -> navigating to ${nextQuestionId} (Index ${currentIndex + 1} of ${activePath.length})`);
             dispatch({ type: 'SET_CURRENT_QUESTION', payload: nextQuestionId });
             setLocalError(null);
@@ -395,7 +430,7 @@ export function Questionnaire() {
         } else {
             if (import.meta.env.DEV) console.log('handleNext -> No next question found or end of path reached.');
         }
-    }, [state.answers, state.selectedReason, dispatch, isMedicationQuestion, medications, submitMedicationsAsync, surgeries, submitSurgeriesAsync, patientGender, patientAge]);
+    }, [state.answers, state.selectedReason, dispatch, isMedicationQuestion, medications, submitMedicationsAsync, surgeries, submitSurgeriesAsync, patientGender, patientAge, shouldInsertInfoBreak, infoBreakContentData]);
 
     const handleGoBack = useCallback(() => {
         hapticSelect();
@@ -747,6 +782,29 @@ export function Questionnaire() {
                 <CameraScanner
                     onScan={handleCameraScan}
                     onClose={() => setShowCameraScanner(false)}
+                />
+            )}
+
+            {/* InfoBreak Overlay (Modul 1: Wartezeit-Management) */}
+            {infoBreakContent && (
+                <InfoBreak
+                    content={infoBreakContent}
+                    onDismiss={() => {
+                        const pendingNext = state.answers['__pendingNextAtom']?.value as string;
+                        setInfoBreakContent(null);
+                        if (pendingNext) {
+                            dispatch({ type: 'SET_CURRENT_QUESTION', payload: pendingNext });
+                            store.setAnswer('__pendingNextAtom', null);
+                        }
+                    }}
+                    onSkip={() => {
+                        const pendingNext = state.answers['__pendingNextAtom']?.value as string;
+                        setInfoBreakContent(null);
+                        if (pendingNext) {
+                            dispatch({ type: 'SET_CURRENT_QUESTION', payload: pendingNext });
+                            store.setAnswer('__pendingNextAtom', null);
+                        }
+                    }}
                 />
             )}
 

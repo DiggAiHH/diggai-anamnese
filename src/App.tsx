@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useParams, useNavigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useSessionStore } from './store/sessionStore';
 import { useThemeStore } from './store/themeStore';
@@ -13,6 +13,10 @@ import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp';
 import { CookieConsent } from './components/CookieConsent';
 import { PWAShell } from './components/pwa/PWAShell';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
+import { StaffShell } from './components/staff/StaffShell';
+import { ToastContainer } from './components/ui/Toast';
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage').then(m => ({ default: m.NotFoundPage })));
+const AgentDashboard = lazy(() => import('./pages/agents/AgentDashboard').then(m => ({ default: m.AgentDashboard })));
 const SystemPanel = lazy(() => import('./pages/SystemPanel').then(m => ({ default: m.SystemPanel })));
 const TIStatusPanel = lazy(() => import('./pages/TIStatusPanel').then(m => ({ default: m.TIStatusPanel })));
 const NfcLanding = lazy(() => import('./pages/nfc/NfcLanding').then(m => ({ default: m.NfcLanding })));
@@ -40,9 +44,14 @@ const PwaDiary = lazy(() => import('./pages/pwa/PwaDiary'));
 const PwaMeasures = lazy(() => import('./pages/pwa/PwaMeasures'));
 const PwaMessages = lazy(() => import('./pages/pwa/PwaMessages'));
 const PwaSettings = lazy(() => import('./pages/pwa/PwaSettings'));
+const PwaDiaryTrends = lazy(() => import('./pages/pwa/PwaDiaryTrends'));
+const PwaEmailVerification = lazy(() => import('./pages/pwa/PwaEmailVerification'));
+const PwaAppointments = lazy(() => import('./pages/pwa/PwaAppointments'));
+const PwaReminderConfig = lazy(() => import('./pages/pwa/PwaReminderConfig'));
 const HandbuchPage = lazy(() => import('./pages/HandbuchPage').then(m => ({ default: m.HandbuchPage })));
 const DatenschutzPage = lazy(() => import('./pages/DatenschutzPage').then(m => ({ default: m.DatenschutzPage })));
 const ImpressumPage = lazy(() => import('./pages/ImpressumPage').then(m => ({ default: m.ImpressumPage })));
+const StaffLogin = lazy(() => import('./pages/staff/StaffLogin'));
 
 // Suspense fallback for lazy routes
 function DashboardLoading() {
@@ -73,6 +82,23 @@ const queryClient = new QueryClient({
   },
 });
 
+function CheckoutWizardRoute() {
+  const { sessionId } = useParams<{ sessionId: string }>();
+  return <CheckoutWizard sessionId={sessionId ?? ''} />;
+}
+
+function DataDeletionConfirmRoute() {
+  const { sessionId } = useParams<{ sessionId: string }>();
+  const navigate = useNavigate();
+  return (
+    <DataDeletionConfirm
+      sessionId={sessionId ?? ''}
+      onConfirm={() => navigate(`/checkout/${sessionId}`)}
+      onCancel={() => navigate(`/checkout/${sessionId}`)}
+    />
+  );
+}
+
 function PatientApp() {
   const flowStep = useSessionStore(state => state.flowStep);
 
@@ -100,32 +126,34 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
+        <ToastContainer />
         {/* Skip-to-content link for keyboard/screen-reader users */}
         <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[9999] focus:px-4 focus:py-2 focus:bg-blue-600 focus:text-white focus:rounded-lg focus:text-sm focus:font-bold">
           {t('app.skip_to_content', 'Zum Inhalt springen')}
         </a>
         <main id="main-content">
           <Routes>
-          {/* HomeScreen — Shared Tablet Entry Point */}
+          {/* Patientenansicht */}
           <Route path="/" element={<HomeScreen />} />
 
           {/* Patient-Flow */}
           <Route path="/patient" element={<PatientApp />} />
 
-          {/* Arzt-Dashboard (lazy-loaded, role-protected) */}
-          <Route path="/arzt" element={<ProtectedRoute allowedRoles={['arzt', 'admin']}><Suspense fallback={<DashboardLoading />}><ArztDashboard /></Suspense></ProtectedRoute>} />
-
-          {/* MFA-Dashboard (lazy-loaded, role-protected) */}
-          <Route path="/mfa" element={<ProtectedRoute allowedRoles={['mfa', 'admin']}><Suspense fallback={<DashboardLoading />}><MFADashboard /></Suspense></ProtectedRoute>} />
-
-          {/* Admin-Dashboard (lazy-loaded, role-protected) */}
-          <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin']}><Suspense fallback={<DashboardLoading />}><AdminDashboard /></Suspense></ProtectedRoute>} />
-
-          {/* Dokumentation (lazy-loaded) */}
-          <Route path="/docs" element={<Suspense fallback={<DashboardLoading />}><DokumentationPage /></Suspense>} />
-
-          {/* Bedienungsanleitung / Handbuch (lazy-loaded) */}
-          <Route path="/handbuch" element={<Suspense fallback={<DashboardLoading />}><HandbuchPage /></Suspense>} />
+          {/* Verwaltungsansicht */}
+          <Route path="/verwaltung/login" element={<Suspense fallback={<DashboardLoading />}><StaffLogin /></Suspense>} />
+          <Route path="/verwaltung" element={<StaffShell />}>
+            <Route index element={<Navigate to="/verwaltung/arzt" replace />} />
+            <Route path="arzt" element={<ProtectedRoute allowedRoles={['arzt', 'admin']}><Suspense fallback={<DashboardLoading />}><ArztDashboard /></Suspense></ProtectedRoute>} />
+            <Route path="mfa" element={<ProtectedRoute allowedRoles={['mfa', 'admin']}><Suspense fallback={<DashboardLoading />}><MFADashboard /></Suspense></ProtectedRoute>} />
+            <Route path="admin" element={<ProtectedRoute allowedRoles={['admin']}><Suspense fallback={<DashboardLoading />}><AdminDashboard /></Suspense></ProtectedRoute>} />
+            <Route path="docs" element={<ProtectedRoute allowedRoles={['arzt', 'mfa', 'admin']}><Suspense fallback={<DashboardLoading />}><DokumentationPage /></Suspense></ProtectedRoute>} />
+            <Route path="handbuch" element={<ProtectedRoute allowedRoles={['arzt', 'mfa', 'admin']}><Suspense fallback={<DashboardLoading />}><HandbuchPage /></Suspense></ProtectedRoute>} />
+            {/* Modul 6: System & TI Admin Panels (lazy-loaded, role-protected) */}
+            <Route path="system" element={<ProtectedRoute allowedRoles={['admin']}><Suspense fallback={<DashboardLoading />}><SystemPanel /></Suspense></ProtectedRoute>} />
+            <Route path="ti" element={<ProtectedRoute allowedRoles={['arzt', 'admin']}><Suspense fallback={<DashboardLoading />}><TIStatusPanel /></Suspense></ProtectedRoute>} />
+            {/* DiggAI Agent Dashboard */}
+            <Route path="agents" element={<ProtectedRoute allowedRoles={['arzt', 'mfa', 'admin']}><Suspense fallback={<DashboardLoading />}><AgentDashboard /></Suspense></ProtectedRoute>} />
+          </Route>
 
           {/* Datenschutzerklärung — DSGVO Art. 13/14 (lazy-loaded) */}
           <Route path="/datenschutz" element={<Suspense fallback={<DashboardLoading />}><DatenschutzPage /></Suspense>} />
@@ -133,21 +161,17 @@ function App() {
           {/* Impressum — §5 DDG (lazy-loaded) */}
           <Route path="/impressum" element={<Suspense fallback={<DashboardLoading />}><ImpressumPage /></Suspense>} />
 
-          {/* Modul 6: System & TI Admin Panels (lazy-loaded, role-protected) */}
-          <Route path="/admin/system" element={<ProtectedRoute allowedRoles={['admin']}><Suspense fallback={<DashboardLoading />}><SystemPanel /></Suspense></ProtectedRoute>} />
-          <Route path="/admin/ti" element={<ProtectedRoute allowedRoles={['arzt', 'admin']}><Suspense fallback={<DashboardLoading />}><TIStatusPanel /></Suspense></ProtectedRoute>} />
-
           {/* Modul 7: NFC & Flow Routes */}
           <Route path="/nfc" element={<Suspense fallback={<DashboardLoading />}><NfcLanding /></Suspense>} />
           <Route path="/flows/live" element={<Suspense fallback={<DashboardLoading />}><PatientFlowLiveBoard /></Suspense>} />
-          <Route path="/checkout/:sessionId" element={<Suspense fallback={<DashboardLoading />}><CheckoutWizard sessionId="" /></Suspense>} />
+          <Route path="/checkout/:sessionId" element={<Suspense fallback={<DashboardLoading />}><CheckoutWizardRoute /></Suspense>} />
           <Route path="/feedback" element={<Suspense fallback={<DashboardLoading />}><AnonymousFeedbackForm praxisId="default" /></Suspense>} />
 
           {/* Modul 7/8: Kiosk + Payment + Flow Builder (role-protected) */}
           <Route path="/kiosk" element={<ProtectedRoute allowedRoles={['mfa', 'arzt', 'admin']}><Suspense fallback={<DashboardLoading />}><KioskDashboard /></Suspense></ProtectedRoute>} />
           <Route path="/flows/builder" element={<ProtectedRoute allowedRoles={['arzt', 'admin']}><Suspense fallback={<DashboardLoading />}><TreatmentFlowBuilder /></Suspense></ProtectedRoute>} />
           <Route path="/flows/builder/:flowId" element={<ProtectedRoute allowedRoles={['arzt', 'admin']}><Suspense fallback={<DashboardLoading />}><TreatmentFlowBuilder /></Suspense></ProtectedRoute>} />
-          <Route path="/checkout/:sessionId/delete" element={<Suspense fallback={<DashboardLoading />}><DataDeletionConfirm sessionId="" onConfirm={() => {}} onCancel={() => {}} /></Suspense>} />
+          <Route path="/checkout/:sessionId/delete" element={<Suspense fallback={<DashboardLoading />}><DataDeletionConfirmRoute /></Suspense>} />
 
           {/* Modul 9: Telemedizin */}
           <Route path="/telemedizin" element={<Suspense fallback={<DashboardLoading />}><TelemedizinScheduler /></Suspense>} />
@@ -164,17 +188,30 @@ function App() {
 
           {/* PWA Patient Portal */}
           <Route path="/pwa/login" element={<Suspense fallback={<DashboardLoading />}><PwaLogin /></Suspense>} />
+          <Route path="/pwa/verify-email" element={<Suspense fallback={<DashboardLoading />}><PwaEmailVerification /></Suspense>} />
           <Route path="/pwa" element={<PWAShell />}>
             <Route path="dashboard" element={<Suspense fallback={<DashboardLoading />}><PwaDashboard /></Suspense>} />
             <Route path="diary" element={<Suspense fallback={<DashboardLoading />}><PwaDiary /></Suspense>} />
+            <Route path="diary/trends" element={<Suspense fallback={<DashboardLoading />}><PwaDiaryTrends /></Suspense>} />
             <Route path="measures" element={<Suspense fallback={<DashboardLoading />}><PwaMeasures /></Suspense>} />
             <Route path="messages" element={<Suspense fallback={<DashboardLoading />}><PwaMessages /></Suspense>} />
             <Route path="settings" element={<Suspense fallback={<DashboardLoading />}><PwaSettings /></Suspense>} />
+            <Route path="appointments" element={<Suspense fallback={<DashboardLoading />}><PwaAppointments /></Suspense>} />
+            <Route path="reminders" element={<Suspense fallback={<DashboardLoading />}><PwaReminderConfig /></Suspense>} />
             <Route index element={<Suspense fallback={<DashboardLoading />}><PwaDashboard /></Suspense>} />
           </Route>
 
-          {/* Fallback: redirect unknown routes to HomeScreen */}
-          <Route path="*" element={<HomeScreen />} />
+          {/* Legacy staff route redirects */}
+          <Route path="/arzt" element={<Navigate to="/verwaltung/arzt" replace />} />
+          <Route path="/mfa" element={<Navigate to="/verwaltung/mfa" replace />} />
+          <Route path="/admin" element={<Navigate to="/verwaltung/admin" replace />} />
+          <Route path="/admin/system" element={<Navigate to="/verwaltung/system" replace />} />
+          <Route path="/admin/ti" element={<Navigate to="/verwaltung/ti" replace />} />
+          <Route path="/docs" element={<Navigate to="/verwaltung/docs" replace />} />
+          <Route path="/handbuch" element={<Navigate to="/verwaltung/handbuch" replace />} />
+
+          {/* 404 Fallback */}
+          <Route path="*" element={<Suspense fallback={<DashboardLoading />}><NotFoundPage /></Suspense>} />
           </Routes>
           <KeyboardShortcutsHelp />
           <CookieConsent />

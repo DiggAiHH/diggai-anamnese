@@ -37,4 +37,9 @@ export const config = {
 
     // Arzt-Dashboard Init
     arztDefaultPassword: requireEnv('ARZT_PASSWORD', 'Fehlendes Standard-Passwort für die Ersteinrichtung (ARZT_PASSWORD)'),
+
+    // Feature Flags (Modul 7/8)
+    nfcEnabled: process.env.NFC_ENABLED === 'true',
+    paymentEnabled: process.env.PAYMENT_ENABLED === 'true',
+    telemedicineEnabled: process.env.TELEMED_ENABLED === 'true',
 };

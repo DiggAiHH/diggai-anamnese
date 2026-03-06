@@ -40,7 +40,7 @@ export function TherapyTemplateSelector({ planId, onSelect, onApply, mode = 'sel
                         placeholder="Template suchen..." className="w-full pl-9 pr-3 py-2 rounded-lg border dark:bg-gray-700 dark:border-gray-600 text-sm" />
                 </div>
                 <select value={category} onChange={e => setCategory(e.target.value)}
-                    className="px-3 py-2 rounded-lg border dark:bg-gray-700 dark:border-gray-600 text-sm">
+                    title="Kategorie filtern" className="px-3 py-2 rounded-lg border dark:bg-gray-700 dark:border-gray-600 text-sm">
                     <option value="">Alle Kategorien</option>
                     {categories.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>

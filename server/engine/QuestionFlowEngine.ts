@@ -44,6 +44,7 @@ export interface MedicalAtomData {
     section: string;
     orderIndex: number;
     isPII?: boolean;
+    isActive?: boolean;
 }
 
 export interface AnswerData {
@@ -186,6 +187,9 @@ export class QuestionFlowEngine {
     shouldShowAtom(atomId: string, allAnswers: Map<string, AnswerData>, context: SessionContext): boolean {
         const atom = this.atoms.get(atomId);
         if (!atom) return false;
+
+        // isActive check — skip deactivated atoms
+        if (atom.isActive === false) return false;
 
         // showIf-Logik
         if (atom.branchingLogic?.showIf && atom.branchingLogic.showIf.length > 0) {

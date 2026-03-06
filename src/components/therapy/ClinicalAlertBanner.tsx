@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AlertTriangle, AlertCircle, Info, ShieldAlert, X, Check, MessageSquare } from 'lucide-react';
 import { useTherapyAlertsByPatient, useTherapyAlertRead, useTherapyAlertDismiss, useTherapyAlertAction, useTherapyAlerts } from '../../hooks/useApi';
 import type { ClinicalAlert } from '../../types/admin';
@@ -61,6 +62,7 @@ export function ClinicalAlertBanner({ patientId }: { patientId: string }) {
 // ─── Full Alert List (for Admin/ArztDashboard) ─────────────
 
 export function ClinicalAlertList({ patientId }: { patientId?: string }) {
+    const { i18n } = useTranslation();
     const patientAlerts = useTherapyAlertsByPatient(patientId || '');
     const allAlerts = useTherapyAlerts({ unreadOnly: false });
     const markRead = useTherapyAlertRead();
@@ -93,7 +95,7 @@ export function ClinicalAlertList({ patientId }: { patientId?: string }) {
                                 </div>
                                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">{alert.message}</p>
                                 <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-gray-400 mt-1">
-                                    <span>{new Date(alert.createdAt).toLocaleString('de-DE')}</span>
+                                    <span>{new Date(alert.createdAt).toLocaleString(i18n.language)}</span>
                                     {alert.category && <span className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 rounded">{alert.category}</span>}
                                     {alert.triggerField && <span>Trigger: {alert.triggerField}</span>}
                                 </div>

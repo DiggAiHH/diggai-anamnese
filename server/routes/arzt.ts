@@ -2,7 +2,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { prisma } from '../db';
 import * as bcrypt from 'bcryptjs';
-import { createToken, requireAuth, requireRole, blacklistToken } from '../middleware/auth';
+import { createToken, requireAuth, requireRole, blacklistToken, setTokenCookie, clearTokenCookie } from '../middleware/auth';
 import { AIService } from '../services/aiService';
 import { decrypt, isPIIAtom } from '../services/encryption';
 import rateLimit from 'express-rate-limit';
@@ -52,6 +52,9 @@ router.post('/login', loginRateLimiter, async (req: Request, res: Response) => {
             role: arzt.role as 'arzt' | 'mfa' | 'admin',
         });
 
+        // Set httpOnly cookie for browser clients
+        setTokenCookie(res, token);
+
         res.json({
             token,
             user: {
@@ -74,6 +77,7 @@ router.post('/logout', requireAuth, (req: Request, res: Response) => {
         // Token auf Blacklist setzen (24h Ablauf = maximale Token-Lebensdauer)
         blacklistToken(req.auth.jti, 24 * 60 * 60 * 1000);
     }
+    clearTokenCookie(res);
     res.json({ message: 'Erfolgreich abgemeldet' });
 });
 

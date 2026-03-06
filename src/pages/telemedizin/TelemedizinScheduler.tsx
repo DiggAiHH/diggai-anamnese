@@ -115,11 +115,11 @@ export function TelemedizinScheduler() {
 
         {/* Date Navigation */}
         <div className="flex items-center gap-3">
-          <button className="p-2 hover:bg-gray-100 rounded-lg"><ChevronLeft className="w-4 h-4" /></button>
+          <button title="Vorheriger Tag" className="p-2 hover:bg-gray-100 rounded-lg"><ChevronLeft className="w-4 h-4" /></button>
           <span className="font-medium text-gray-800">
             {selectedDate.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
           </span>
-          <button className="p-2 hover:bg-gray-100 rounded-lg"><ChevronRight className="w-4 h-4" /></button>
+          <button title="Nächster Tag" className="p-2 hover:bg-gray-100 rounded-lg"><ChevronRight className="w-4 h-4" /></button>
         </div>
 
         {/* Sessions List */}

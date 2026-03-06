@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { z } from 'zod';
-import { requireAuth, requireRole } from '../middleware/auth';
+import { requireAuth, requireRole, requirePermission } from '../middleware/auth';
 import { processWunschboxEntry, generateExportSpec } from '../services/wunschboxService';
 
 const router = Router();
@@ -31,7 +31,7 @@ router.post('/', requireAuth, requireRole('admin', 'arzt', 'mfa'), async (req, r
 
 // ─── GET /api/wunschbox — List all (admin) ──────────────────
 
-router.get('/', requireAuth, requireRole('admin'), async (req, res) => {
+router.get('/', requireAuth, requireRole('admin'), requirePermission('admin_wunschbox'), async (req, res) => {
     try {
         const page = parseInt(req.query.page as string) || 1;
         const limit = Math.min(parseInt(req.query.limit as string) || 25, 100);
@@ -89,7 +89,7 @@ router.get('/my', requireAuth, requireRole('admin', 'arzt', 'mfa'), async (req, 
 
 // ─── POST /api/wunschbox/:id/process — AI processing ───────
 
-router.post('/:id/process', requireAuth, requireRole('admin'), async (req, res) => {
+router.post('/:id/process', requireAuth, requireRole('admin'), requirePermission('admin_wunschbox'), async (req, res) => {
     try {
         const parsed = await processWunschboxEntry(req.params.id as string);
         const entry = await prisma.wunschboxEntry.findUnique({ where: { id: req.params.id } });
@@ -111,7 +111,7 @@ const reviewSchema = z.object({
     adminNotes: z.string().max(2000).optional(),
 });
 
-router.put('/:id/review', requireAuth, requireRole('admin'), async (req, res) => {
+router.put('/:id/review', requireAuth, requireRole('admin'), requirePermission('admin_wunschbox'), async (req, res) => {
     try {
         const data = reviewSchema.parse(req.body);
         const userId = (req as any).user?.userId || 'unknown';

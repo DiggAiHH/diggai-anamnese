@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Server, Database, Wifi, Shield, HardDrive, Activity, Clock, Download, Upload, Trash2, RefreshCw, CheckCircle, XCircle, AlertTriangle, Info } from 'lucide-react';
 import {
   useSystemDeployment,
@@ -60,6 +61,7 @@ function formatUptime(seconds: number): string {
 }
 
 export function SystemPanel() {
+  const { i18n } = useTranslation();
   const { data: deployment, isLoading: deployLoading } = useSystemDeployment();
   const { data: features } = useSystemFeatures();
   const { data: network, refetch: refetchNetwork } = useSystemNetwork();
@@ -212,7 +214,7 @@ export function SystemPanel() {
                             'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
                           }`}>{b.status}</span>
                         </td>
-                        <td className="py-2 text-gray-500">{new Date(b.startedAt).toLocaleString('de-DE')}</td>
+                        <td className="py-2 text-gray-500">{new Date(b.startedAt).toLocaleString(i18n.language)}</td>
                         <td className="py-2 text-right">
                           <div className="flex items-center justify-end gap-1">
                             {b.status === 'COMPLETED' && (

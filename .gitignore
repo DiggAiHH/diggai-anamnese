@@ -35,6 +35,9 @@ prisma/migrations/
 *.sln
 *.sw?
 
+# Claude Code Desktop — worktrees for parallel sessions
+.claude/worktrees/
+
 # Deploy/build log files
 *.txt
 !README.md

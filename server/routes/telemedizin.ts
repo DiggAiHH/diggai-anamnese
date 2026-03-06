@@ -3,6 +3,7 @@
 
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
+import { requireAuth, requireRole } from '../middleware/auth';
 import {
   createSession,
   getSession,
@@ -17,6 +18,9 @@ import {
 } from '../services/telemedizin';
 
 const router = Router();
+
+// All telemedizin routes require authentication
+router.use(requireAuth);
 
 // POST /api/telemedizin/session — Create new session
 router.post('/session', async (req: Request, res: Response) => {

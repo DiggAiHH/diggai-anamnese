@@ -3,6 +3,7 @@
 
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
+import { requireAuth, requireRole } from '../middleware/auth';
 import {
   sendMessage,
   getSessionMessages,
@@ -51,8 +52,8 @@ router.post('/send', async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/praxis-chat/broadcast — Broadcast to multiple sessions
-router.post('/broadcast', async (req: Request, res: Response) => {
+// POST /api/praxis-chat/broadcast — Broadcast to multiple sessions (requires auth)
+router.post('/broadcast', requireAuth, requireRole('ARZT', 'MFA', 'ADMIN'), async (req: Request, res: Response) => {
   try {
     const schema = z.object({
       praxisId: z.string().min(1),
@@ -132,6 +133,39 @@ router.delete('/:sessionId', async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error('[PraxisChat] Delete error:', err.message);
     res.status(500).json({ error: 'Chat konnte nicht gelöscht werden' });
+  }
+});
+
+// POST /api/praxis-chat/templates — Create/save a message template
+router.post('/templates', requireAuth, requireRole('ARZT', 'MFA', 'ADMIN'), async (req: Request, res: Response) => {
+  try {
+    const schema = z.object({
+      praxisId: z.string().min(1),
+      name: z.string().min(1).max(100),
+      content: z.string().min(1).max(2000),
+      category: z.string().optional(),
+      flowStepType: z.string().optional(),
+    });
+
+    const data = schema.parse(req.body);
+    const prisma = (globalThis as any).__prisma;
+
+    // Store as a PraxisChatMessage marked as template
+    const template = await prisma.praxisChatMessage.create({
+      data: {
+        sessionId: `template:${data.praxisId}`,
+        senderType: 'SYSTEM',
+        contentType: 'TEXT',
+        content: data.content,
+        isTemplate: true,
+        templateId: data.category || null,
+      },
+    });
+
+    res.status(201).json({ ...template, name: data.name, flowStepType: data.flowStepType });
+  } catch (err: any) {
+    console.error('[PraxisChat] Template create error:', err.message);
+    res.status(400).json({ error: err.message || 'Template konnte nicht erstellt werden' });
   }
 });
 

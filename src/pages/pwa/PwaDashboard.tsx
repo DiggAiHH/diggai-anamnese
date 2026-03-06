@@ -13,14 +13,15 @@ import {
   Loader2,
   ChevronRight,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { usePwaDashboard, usePwaUnreadCount, usePwaMeasureComplete } from '../../hooks/useApi';
 import { usePwaStore } from '../../stores/pwaStore';
 
 const QUICK_ACTIONS = [
-  { label: 'Tagebuch', icon: BookOpen, to: '/pwa/diary', color: 'bg-emerald-100 text-emerald-600' },
-  { label: 'Medikamente', icon: Pill, to: '/pwa/measures', color: 'bg-violet-100 text-violet-600' },
-  { label: 'Nachrichten', icon: MessageSquare, to: '/pwa/messages', color: 'bg-amber-100 text-amber-600' },
-  { label: 'Einstellungen', icon: Settings, to: '/pwa/settings', color: 'bg-gray-100 text-gray-600' },
+  { key: 'pwa.nav.diary', icon: BookOpen, to: '/pwa/diary', color: 'bg-emerald-100 text-emerald-600' },
+  { key: 'pwa.nav.measures', icon: Pill, to: '/pwa/measures', color: 'bg-violet-100 text-violet-600' },
+  { key: 'pwa.nav.messages', icon: MessageSquare, to: '/pwa/messages', color: 'bg-amber-100 text-amber-600' },
+  { key: 'pwa.nav.settings', icon: Settings, to: '/pwa/settings', color: 'bg-gray-100 text-gray-600' },
 ] as const;
 
 const MOOD_MAP: Record<string, string> = {
@@ -32,6 +33,7 @@ const MOOD_MAP: Record<string, string> = {
 };
 
 export default function PwaDashboard() {
+  const { t, i18n } = useTranslation();
   const patientId = usePwaStore((s) => s.patientId);
   const dashboard = usePwaDashboard();
   const unread = usePwaUnreadCount();
@@ -75,7 +77,7 @@ export default function PwaDashboard() {
       <header className="bg-white border-b border-gray-100 px-4 pt-6 pb-4">
         <div className="max-w-lg mx-auto flex items-center justify-between">
           <div>
-            <p className="text-xs text-gray-400 uppercase tracking-wide">Willkommen</p>
+            <p className="text-xs text-gray-400 uppercase tracking-wide">{t('Willkommen')}</p>
             <h1 className="text-lg font-bold text-gray-900 truncate">
               {patientName || `Patient ${patientId ?? ''}`}
             </h1>
@@ -88,13 +90,13 @@ export default function PwaDashboard() {
               }`}
             >
               {online ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
-              {online ? 'Online' : 'Offline'}
+              {online ? t('Online') : t('autosave.offline')}
             </span>
             {/* Refresh */}
             <button
               onClick={() => { dashboard.refetch(); unread.refetch(); }}
               className="p-2 rounded-xl hover:bg-gray-100 text-gray-400 transition-colors"
-              aria-label="Aktualisieren"
+              aria-label={t('Kontrolle (z.B. Blutzucker, Labor)')}
             >
               <RefreshCw className={`w-4 h-4 ${dashboard.isFetching ? 'animate-spin' : ''}`} />
             </button>
@@ -106,8 +108,8 @@ export default function PwaDashboard() {
         {/* ── Quick Actions ── */}
         <section>
           <div className="grid grid-cols-2 gap-3">
-            {QUICK_ACTIONS.map(({ label, icon: Icon, to, color }) => {
-              const isMessages = label === 'Nachrichten';
+            {QUICK_ACTIONS.map(({ key, icon: Icon, to, color }) => {
+              const isMessages = key === 'pwa.nav.messages';
               return (
                 <Link
                   key={to}
@@ -117,7 +119,7 @@ export default function PwaDashboard() {
                   <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${color}`}>
                     <Icon className="w-5 h-5" />
                   </div>
-                  <span className="text-sm font-medium text-gray-700">{label}</span>
+                  <span className="text-sm font-medium text-gray-700">{t(key)}</span>
                   {isMessages && unreadCount > 0 && (
                     <span className="absolute top-2 right-2 inline-flex items-center justify-center w-5 h-5 rounded-full bg-red-500 text-[10px] font-bold text-white">
                       {unreadCount > 9 ? '9+' : unreadCount}
@@ -134,10 +136,10 @@ export default function PwaDashboard() {
           <section className="space-y-2">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
-                <Activity className="w-4 h-4 text-sky-500" /> Aktive Maßnahmen
+                <Activity className="w-4 h-4 text-sky-500" /> {t('Aktive Maßnahmen')}
               </h2>
               <Link to="/pwa/measures" className="text-xs text-sky-600 hover:underline">
-                Alle anzeigen
+                {t('Verlauf anzeigen')}
               </Link>
             </div>
             <div className="space-y-2">
@@ -163,7 +165,7 @@ export default function PwaDashboard() {
                     ) : (
                       <CheckCircle className="w-3.5 h-3.5" />
                     )}
-                    Erledigt
+                    {t('Abgeschlossen')}
                   </button>
                 </div>
               ))}
@@ -175,10 +177,10 @@ export default function PwaDashboard() {
         <section className="space-y-2">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
-              <BookOpen className="w-4 h-4 text-emerald-500" /> Letzte Tagebucheinträge
+              <BookOpen className="w-4 h-4 text-emerald-500" /> {t('Letzte Tagebucheinträge')}
             </h2>
             <Link to="/pwa/diary" className="text-xs text-sky-600 hover:underline">
-              Alle anzeigen
+              {t('Verlauf anzeigen')}
             </Link>
           </div>
 
@@ -188,7 +190,7 @@ export default function PwaDashboard() {
             </div>
           ) : recentDiary.length === 0 ? (
             <div className="rounded-2xl bg-white border border-gray-100 shadow-sm px-4 py-6 text-center text-sm text-gray-400">
-              Noch keine Einträge vorhanden.
+              {t('Noch keine Einträge vorhanden.')}
             </div>
           ) : (
             <div className="space-y-2">
@@ -204,7 +206,7 @@ export default function PwaDashboard() {
                   </span>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-800 truncate">
-                      {new Date(entry.date ?? entry.createdAt).toLocaleDateString('de-DE', {
+                      {new Date(entry.date ?? entry.createdAt).toLocaleDateString(i18n.language || 'de-DE', {
                         day: '2-digit',
                         month: 'short',
                         year: 'numeric',

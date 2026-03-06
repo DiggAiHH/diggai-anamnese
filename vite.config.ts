@@ -7,6 +7,8 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    // VitePWA removed: injectRegister: null + filename: 'sw-workbox.js' generated dead code.
+    // Service worker is manually registered in main.tsx using public/sw.js.
   ],
   server: {
     port: 5173,

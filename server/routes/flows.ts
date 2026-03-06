@@ -131,4 +131,43 @@ router.post('/delay', requireAuth, async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/flows/call-patient — Call patient to specific room
+router.post('/call-patient', requireAuth, requireRole('ARZT', 'MFA', 'ADMIN'), async (req: Request, res: Response) => {
+  try {
+    const { sessionId, targetRoom, message } = req.body;
+    if (!sessionId || !targetRoom) {
+      res.status(400).json({ error: 'Fehlende Pflichtfelder: sessionId, targetRoom' });
+      return;
+    }
+
+    const prisma = (globalThis as any).__prisma;
+    const progress = await prisma.patientFlowProgress.findUnique({ where: { sessionId } });
+    if (!progress) {
+      res.status(404).json({ error: 'Kein aktiver Flow für diese Session' });
+      return;
+    }
+
+    // Emit Socket.IO event for real-time notification
+    const io = (globalThis as any).__io;
+    if (io) {
+      io.to(`session:${sessionId}`).emit('flow:call-patient', {
+        sessionId,
+        targetRoom,
+        message: message || `Bitte kommen Sie jetzt zu ${targetRoom}.`,
+        calledAt: new Date().toISOString(),
+      });
+    }
+
+    res.json({
+      sessionId,
+      targetRoom,
+      message: message || `Bitte kommen Sie jetzt zu ${targetRoom}.`,
+      calledAt: new Date().toISOString(),
+    });
+  } catch (err: any) {
+    console.error('[Flow] Call-patient error:', err);
+    res.status(500).json({ error: err.message || 'Patientenruf fehlgeschlagen' });
+  }
+});
+
 export default router;

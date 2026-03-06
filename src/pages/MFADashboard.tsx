@@ -561,7 +561,7 @@ const SessionManagementList: React.FC<{ onOpenChat: (id: string) => void }> = Re
                                     </div>
                                     <div className="flex flex-col">
                                         <span className="text-xs font-bold font-mono">{session.id.slice(0, 13)}...</span>
-                                        <span className="text-[10px] text-white/30">{new Date(session.createdAt).toLocaleString('de-DE')}</span>
+                                        <span className="text-[10px] text-white/30">{new Date(session.createdAt).toLocaleString(navigator.language)}</span>
                                     </div>
                                 </div>
                             </td>

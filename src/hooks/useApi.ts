@@ -903,6 +903,52 @@ export function usePvsMappingPreview() {
     });
 }
 
+// ─── PVS Compatibility Aliases ──────────────────────────────
+
+export function usePvsFieldMappings(connectionId: string) {
+    return usePvsMappings(connectionId);
+}
+
+export function usePvsUpdateFieldMapping() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ connectionId, mappingId: _mappingId, data }: { connectionId: string; mappingId: string; data: Record<string, unknown> }) =>
+            api.pvsSaveMappings(connectionId, [{ sourceField: (data.gdtField as string) || '', targetField: `${data.diggaiModel || ''}.${data.diggaiField || ''}`, transform: data.transform as string | undefined }]),
+        onSuccess: (_d, v) => { queryClient.invalidateQueries({ queryKey: ['pvs', 'mappings', v.connectionId] }); },
+    });
+}
+
+export function usePvsLinkPatient() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ connectionId, pvsPatientId, patientNumber }: { connectionId: string; pvsPatientId: string; patientNumber: string }) =>
+            api.pvsCreatePatientLink({ patientId: patientNumber, connectionId, externalPatientId: pvsPatientId }),
+        onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['pvs', 'patient-links'] }); },
+    });
+}
+
+export function usePvsUnlinkPatient() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ linkId }: { connectionId: string; linkId: string }) =>
+            api.pvsDeletePatientLink(linkId),
+        onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['pvs', 'patient-links'] }); },
+    });
+}
+
+export function usePvsSearchPatient() {
+    return useMutation({
+        mutationFn: async ({ connectionId, query }: { connectionId: string; query: string }) => {
+            const response = await api.pvsPatientLinks(connectionId);
+            const all = Array.isArray(response) ? response : [];
+            const filtered = all.filter((p: Record<string, string>) =>
+                Object.values(p).some(v => typeof v === 'string' && v.toLowerCase().includes(query.toLowerCase()))
+            );
+            return { patients: filtered };
+        },
+    });
+}
+
 // ─── Therapy / Therapieplan Hooks ───────────────────────────
 
 export function useTherapyPlansBySession(sessionId: string) {
@@ -998,6 +1044,22 @@ export function useTherapyExportPvs() {
     return useMutation({ mutationFn: (planId: string) => api.therapyExportPvs(planId), onSuccess: () => { qc.invalidateQueries({ queryKey: ['therapy'] }); } });
 }
 
+// ─── AI Engine Hooks ─────────────────────────────────────────
+
+export function useAiStatus() {
+    return useQuery({ queryKey: ['ai', 'status'], queryFn: () => api.therapyAiStatus(), staleTime: 30_000 });
+}
+export function useAiSuggestTherapy() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: (sessionId: string) => api.therapyAiSuggest(sessionId), onSuccess: () => { qc.invalidateQueries({ queryKey: ['therapy'] }); } });
+}
+export function useAiSummarizeSession() {
+    return useMutation({ mutationFn: (sessionId: string) => api.therapyAiSummarize(sessionId) });
+}
+export function useAiIcdSuggest() {
+    return useMutation({ mutationFn: (symptoms: string) => api.therapyAiIcdSuggest(symptoms) });
+}
+
 // ─── Patient Portal (PWA) Hooks ─────────────────────────────
 
 export function usePwaDashboard() {
@@ -1084,6 +1146,44 @@ export function usePwaLogin() {
 }
 export function usePwaRegister() {
     return useMutation({ mutationFn: (data: { patientNumber: string; birthDate: string; password: string; email?: string }) => api.pwaRegister(data) });
+}
+export function usePwaVerifyEmail() {
+    return useMutation({ mutationFn: (token: string) => api.pwaVerifyEmail(token) });
+}
+export function usePwaDiaryTrends(metric: string, period: string) {
+    return useQuery({ queryKey: ['pwa', 'diary', 'trends', metric, period], queryFn: () => api.pwaDiaryTrends(metric, period), enabled: !!metric && !!period });
+}
+export function usePwaAppointments() {
+    return useQuery({ queryKey: ['pwa', 'appointments'], queryFn: () => api.pwaAppointments() });
+}
+export function usePwaAppointmentSlots(date: string, service: string) {
+    return useQuery({ queryKey: ['pwa', 'appointment-slots', date, service], queryFn: () => api.pwaAppointmentSlots(date, service), enabled: !!date && !!service });
+}
+export function usePwaAppointmentCreate() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: (data: { service: string; date: string; requestNotes?: string }) => api.pwaAppointmentCreate(data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['pwa', 'appointments'] }); } });
+}
+export function usePwaAppointmentCancel() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: (id: string) => api.pwaAppointmentCancel(id), onSuccess: () => { qc.invalidateQueries({ queryKey: ['pwa', 'appointments'] }); } });
+}
+export function usePwaReminders() {
+    return useQuery({ queryKey: ['pwa', 'reminders'], queryFn: () => api.pwaReminders() });
+}
+export function usePwaReminderAdherence() {
+    return useQuery({ queryKey: ['pwa', 'reminders', 'adherence'], queryFn: () => api.pwaReminderAdherence() });
+}
+export function usePwaReminderCreate() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: (data: { medicationId: string; scheduleCron: string; scheduleLabel: string; pushEnabled: boolean; pushTitle?: string; pushBody?: string }) => api.pwaReminderCreate(data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['pwa', 'reminders'] }); } });
+}
+export function usePwaReminderToggle() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: ({ id, active }: { id: string; active: boolean }) => api.pwaReminderToggle(id, active), onSuccess: () => { qc.invalidateQueries({ queryKey: ['pwa', 'reminders'] }); } });
+}
+export function usePwaReminderDelete() {
+    const qc = useQueryClient();
+    return useMutation({ mutationFn: (id: string) => api.pwaReminderDelete(id), onSuccess: () => { qc.invalidateQueries({ queryKey: ['pwa', 'reminders'] }); } });
 }
 
 // ─── Modul 6: System Management Hooks ───────────────────────
@@ -1451,4 +1551,48 @@ export function useEpaRevokeShare() {
 export function useEpaCreateExport() {
     const qc = useQueryClient();
     return useMutation({ mutationFn: (data: { patientId: string; exportType: string; format?: string }) => api.epaCreateExport(data), onSuccess: () => { qc.invalidateQueries({ queryKey: ['epa'] }); } });
+}
+
+// ─── Agent Hooks ──────────────────────────────────────────
+
+export function useAgentStatus() {
+    return useQuery({
+        queryKey: ['agents', 'status'],
+        queryFn: () => api.agentStatus(),
+        refetchInterval: 15_000,
+    });
+}
+
+export function useAgentTasks(params?: { status?: string; agentName?: string; limit?: number }) {
+    return useQuery({
+        queryKey: ['agents', 'tasks', params],
+        queryFn: () => api.agentTasks(params),
+        refetchInterval: 10_000,
+    });
+}
+
+export function useAgentTaskDetail(id: string) {
+    return useQuery({
+        queryKey: ['agents', 'tasks', id],
+        queryFn: () => api.agentTaskDetail(id),
+        enabled: !!id,
+        refetchInterval: 5_000,
+    });
+}
+
+export function useCreateAgentTask() {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (data: { taskType?: string; description?: string; agentName?: string; priority?: string; payload?: Record<string, unknown> }) =>
+            api.agentCreateTask(data),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: ['agents', 'tasks'] }); },
+    });
+}
+
+export function useAgentMetrics() {
+    return useQuery({
+        queryKey: ['agents', 'metrics'],
+        queryFn: () => api.agentMetrics(),
+        refetchInterval: 30_000,
+    });
 }

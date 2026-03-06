@@ -26,7 +26,7 @@ export const RedFlagOverlay: React.FC<RedFlagOverlayProps> = ({ alert, onAcknowl
     }, [countdown]);
 
     return (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm" role="alertdialog" aria-modal="true" aria-label="Medical Emergency Alert">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm" role="alertdialog" aria-modal="true" aria-label="Medical Emergency Alert" aria-live="assertive">
             <div className="mx-4 max-w-lg w-full animate-in fade-in zoom-in duration-300">
                 {/* Pulsierender roter Rahmen */}
                 <div className="relative rounded-2xl overflow-hidden shadow-2xl shadow-red-500/30">
@@ -128,7 +128,7 @@ interface WarningBannerProps {
 export const WarningBanner: React.FC<WarningBannerProps> = ({ alert, onDismiss }) => {
     const { t } = useTranslation();
     return (
-        <div className="mx-4 mb-4 rounded-xl border border-yellow-500/30 bg-yellow-500/10 backdrop-blur-sm p-4">
+        <div className="mx-4 mb-4 rounded-xl border border-yellow-500/30 bg-yellow-500/10 backdrop-blur-sm p-4" role="alert" aria-live="polite">
             <div className="flex items-start gap-3">
                 <AlertTriangle className="w-5 h-5 text-yellow-400 shrink-0 mt-0.5" />
                 <div className="flex-1">

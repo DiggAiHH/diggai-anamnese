@@ -24,6 +24,21 @@ export class ErrorBoundary extends Component<Props, State> {
 
     public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
         console.error('Uncaught error in ErrorBoundary:', error, errorInfo);
+
+        // Non-blocking error report to backend
+        try {
+            fetch('/api/system/error-report', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    message: error.message,
+                    stack: error.stack,
+                    componentStack: errorInfo.componentStack,
+                    url: window.location.href,
+                    timestamp: new Date().toISOString(),
+                }),
+            }).catch(() => { /* Ignore — backend may be down */ });
+        } catch { /* Ignore */ }
     }
 
     public render() {
@@ -39,6 +54,7 @@ export class ErrorBoundary extends Component<Props, State> {
                             {i18n.t('errorBoundary.description', 'Die Applikation hat ein unerwartetes Problem festgestellt. Bitte laden Sie die Seite neu, um fortzufahren. Ihr bisheriger Fortschritt wurde (sofern möglich) lokal gesichert.')}
                         </p>
                         <button
+                            type="button"
                             onClick={() => window.location.reload()}
                             className="w-full flex justify-center items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-6 rounded-2xl transition-all shadow-lg active:scale-95"
                         >

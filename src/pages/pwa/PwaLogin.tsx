@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Heart, Loader2, Eye, EyeOff } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { usePwaLogin, usePwaRegister } from '../../hooks/useApi';
 import { usePwaStore } from '../../stores/pwaStore';
 
@@ -10,6 +11,7 @@ type Tab = 'login' | 'register';
 export default function PwaLogin() {
   const navigate = useNavigate();
   const login = usePwaStore((s) => s.login);
+  const { t } = useTranslation();
 
   const [tab, setTab] = useState<Tab>('login');
 
@@ -39,7 +41,7 @@ export default function PwaLogin() {
     setLocalError(null);
 
     if (!identifier.trim() || !password) {
-      setLocalError('Bitte füllen Sie alle Felder aus.');
+      setLocalError(t('Bitte füllen Sie dieses Pflichtfeld aus'));
       return;
     }
 
@@ -50,7 +52,7 @@ export default function PwaLogin() {
       navigate('/pwa/dashboard', { replace: true });
     } catch (err: unknown) {
       const e = err as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
-      setLocalError(e?.response?.data?.message ?? e?.message ?? 'Anmeldung fehlgeschlagen.');
+      setLocalError(e?.response?.data?.message ?? e?.message ?? t('verwaltung.login.failed'));
     }
   };
 
@@ -59,15 +61,15 @@ export default function PwaLogin() {
     setLocalError(null);
 
     if (!regPatientNumber.trim() || !regBirthDate || !regPassword) {
-      setLocalError('Bitte füllen Sie alle Pflichtfelder aus.');
+      setLocalError(t('Bitte füllen Sie dieses Pflichtfeld aus'));
       return;
     }
     if (regPassword !== regConfirmPassword) {
-      setLocalError('Passwörter stimmen nicht überein.');
+      setLocalError(t('patternLock.mismatch'));
       return;
     }
     if (regPassword.length < 8) {
-      setLocalError('Das Passwort muss mindestens 8 Zeichen lang sein.');
+      setLocalError(t('Neues Passwort (min. 8 Zeichen)'));
       return;
     }
 
@@ -93,7 +95,7 @@ export default function PwaLogin() {
       navigate('/pwa/dashboard', { replace: true });
     } catch (err: unknown) {
       const e = err as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
-      setLocalError(e?.response?.data?.message ?? e?.message ?? 'Registrierung fehlgeschlagen.');
+      setLocalError(e?.response?.data?.message ?? e?.message ?? t('verwaltung.login.failed'));
     }
   };
 
@@ -111,20 +113,20 @@ export default function PwaLogin() {
             <Heart className="w-8 h-8" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900">DiggAI</h1>
-          <p className="text-sm text-gray-500">Ihr digitaler Gesundheitsbegleiter</p>
+          <p className="text-sm text-gray-500">{t('home.subtitle')}</p>
         </div>
 
         {/* Tabs */}
         <div className="flex rounded-xl bg-gray-100 p-1">
-          {(['login', 'register'] as Tab[]).map((t) => (
+          {(['login', 'register'] as Tab[]).map((tabKey) => (
             <button
-              key={t}
-              onClick={() => { setTab(t); setLocalError(null); }}
+              key={tabKey}
+              onClick={() => { setTab(tabKey); setLocalError(null); }}
               className={`flex-1 py-2.5 text-sm font-medium rounded-lg transition-colors ${
-                tab === t ? 'bg-white text-sky-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                tab === tabKey ? 'bg-white text-sky-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
               }`}
             >
-              {t === 'login' ? 'Anmelden' : 'Registrieren'}
+              {tabKey === 'login' ? t('verwaltung.login.submit') : t('certify.submit')}
             </button>
           ))}
         </div>
@@ -143,7 +145,7 @@ export default function PwaLogin() {
               {/* Identifier */}
               <div className="space-y-1.5">
                 <label htmlFor="login-identifier" className="block text-sm font-medium text-gray-700">
-                  E-Mail oder Telefon
+                  {t('E-Mail-Adresse')} / {t('Telefonnummer (optional)')}
                 </label>
                 <input
                   id="login-identifier"
@@ -151,7 +153,7 @@ export default function PwaLogin() {
                   autoComplete="username"
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
-                  placeholder="email@beispiel.de"
+                  placeholder={t('E-Mail-Adresse (optional)')}
                   className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
                 />
               </div>
@@ -159,7 +161,7 @@ export default function PwaLogin() {
               {/* Password */}
               <div className="space-y-1.5">
                 <label htmlFor="login-password" className="block text-sm font-medium text-gray-700">
-                  Passwort
+                  {t('verwaltung.login.password')}
                 </label>
                 <div className="relative">
                   <input
@@ -189,7 +191,7 @@ export default function PwaLogin() {
               className="w-full rounded-xl bg-sky-600 px-4 py-3.5 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
             >
               {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-              Anmelden
+              {t('verwaltung.login.submit')}
             </button>
 
             <p className="text-center text-xs text-gray-400">
@@ -198,7 +200,7 @@ export default function PwaLogin() {
                 onClick={() => {/* TODO: PIN login flow */}}
                 className="underline hover:text-sky-600 transition-colors"
               >
-                Mit PIN anmelden
+                {t('PIN festlegen')}
               </button>
             </p>
           </form>
@@ -211,14 +213,14 @@ export default function PwaLogin() {
               {/* Patient number */}
               <div className="space-y-1.5">
                 <label htmlFor="reg-patient" className="block text-sm font-medium text-gray-700">
-                  Patientennummer <span className="text-red-500">*</span>
+                  {t('certify.patient_number')} <span className="text-red-500">*</span>
                 </label>
                 <input
                   id="reg-patient"
                   type="text"
                   value={regPatientNumber}
                   onChange={(e) => setRegPatientNumber(e.target.value)}
-                  placeholder="z. B. PAT-00123"
+                  placeholder={t('patientIdentify.patientNumber')}
                   className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
                 />
               </div>
@@ -226,7 +228,7 @@ export default function PwaLogin() {
               {/* Birth date */}
               <div className="space-y-1.5">
                 <label htmlFor="reg-birthdate" className="block text-sm font-medium text-gray-700">
-                  Geburtsdatum <span className="text-red-500">*</span>
+                  {t('Geburtsdatum')} <span className="text-red-500">*</span>
                 </label>
                 <input
                   id="reg-birthdate"
@@ -240,7 +242,7 @@ export default function PwaLogin() {
               {/* Email */}
               <div className="space-y-1.5">
                 <label htmlFor="reg-email" className="block text-sm font-medium text-gray-700">
-                  E-Mail
+                  {t('E-Mail-Adresse')}
                 </label>
                 <input
                   id="reg-email"
@@ -248,7 +250,7 @@ export default function PwaLogin() {
                   autoComplete="email"
                   value={regEmail}
                   onChange={(e) => setRegEmail(e.target.value)}
-                  placeholder="email@beispiel.de"
+                  placeholder={t('E-Mail-Adresse (optional)')}
                   className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
                 />
               </div>
@@ -256,7 +258,7 @@ export default function PwaLogin() {
               {/* Password */}
               <div className="space-y-1.5">
                 <label htmlFor="reg-password" className="block text-sm font-medium text-gray-700">
-                  Passwort <span className="text-red-500">*</span>
+                  {t('verwaltung.login.password')} <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <input
@@ -265,7 +267,7 @@ export default function PwaLogin() {
                     autoComplete="new-password"
                     value={regPassword}
                     onChange={(e) => setRegPassword(e.target.value)}
-                    placeholder="Mind. 8 Zeichen"
+                    placeholder={t('Neues Passwort (min. 8 Zeichen)')}
                     className="w-full rounded-xl border border-gray-200 px-4 py-3 pr-11 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
                   />
                   <button
@@ -282,7 +284,7 @@ export default function PwaLogin() {
               {/* Confirm password */}
               <div className="space-y-1.5">
                 <label htmlFor="reg-confirm" className="block text-sm font-medium text-gray-700">
-                  Passwort bestätigen <span className="text-red-500">*</span>
+                  {t('Muster bestätigen')} <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <input
@@ -291,7 +293,7 @@ export default function PwaLogin() {
                     autoComplete="new-password"
                     value={regConfirmPassword}
                     onChange={(e) => setRegConfirmPassword(e.target.value)}
-                    placeholder="Passwort wiederholen"
+                    placeholder={t('Muster bestätigen')}
                     className="w-full rounded-xl border border-gray-200 px-4 py-3 pr-11 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
                   />
                   <button
@@ -312,13 +314,13 @@ export default function PwaLogin() {
               className="w-full rounded-xl bg-sky-600 px-4 py-3.5 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
             >
               {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-              Registrieren
+              {t('certify.submit')}
             </button>
           </form>
         )}
 
         <p className="text-center text-xs text-gray-400 pt-2">
-          © {new Date().getFullYear()} DiggAI · Datenschutz & Sicherheit
+          © {new Date().getFullYear()} DiggAI · {t('Datenschutz-Einwilligung')} & {t('security')}
         </p>
       </div>
     </div>

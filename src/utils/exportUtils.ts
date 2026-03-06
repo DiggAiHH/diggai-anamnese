@@ -132,7 +132,7 @@ export function exportAsPrintableHTML(payload: ExportPayload): string {
         <tbody>${rows}</tbody>
     </table>
     <div class="footer">
-        <p>Automatisch generiert am ${new Date().toLocaleString('de-DE')} · Verschlüsselt gespeichert (AES-256-GCM) · DSGVO-konform</p>
+        <p>Automatisch generiert am ${new Date().toLocaleString(typeof document !== 'undefined' ? document.documentElement.lang || 'de' : 'de')} · Verschlüsselt gespeichert (AES-256-GCM) · DSGVO-konform</p>
         <p>Anamnese-App v${payload.metadata.version}</p>
     </div>
 </body>

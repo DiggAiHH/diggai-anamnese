@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { requireAuth, requireRole } from '../middleware/auth';
+import { requireAuth, requireRole, requirePermission } from '../middleware/auth';
 import {
     calculateTodayROI,
     getROIHistory,
@@ -12,7 +12,7 @@ import {
 const router = Router();
 
 // All ROI routes require admin
-router.use(requireAuth, requireRole('admin'));
+router.use(requireAuth, requireRole('admin'), requirePermission('admin_roi'));
 
 // ─── GET /api/roi/today — Live daily ROI ────────────────────
 

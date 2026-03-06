@@ -1,7 +1,9 @@
 import express from 'express';
+import compression from 'compression';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import cookieParser from 'cookie-parser';
 import { createServer } from 'http';
 import { config } from './config';
 import { setupSocketIO } from './socket';
@@ -39,11 +41,21 @@ import telemedizinRoutes from './routes/telemedizin';
 import gamificationRoutes from './routes/gamification';
 import formsRoutes from './routes/forms';
 import epaRoutes from './routes/epa';
+import todoRoutes from './routes/todos';
+import signatureRoutes from './routes/signatures';
+import agentRoutes from './routes/agents';
+import { messageBroker } from './services/messagebroker.service';
 
 const app = express();
 const httpServer = createServer(app);
 
+// Request timeout — prevents slow-client (Slowloris) attacks
+httpServer.setTimeout(30000);
+
 // ─── Security Middleware ────────────────────────────────────
+
+// Response compression — reduces bandwidth for large JSON payloads (atoms, content)
+app.use(compression());
 
 // Security Headers with custom CSP — K-07 FIX: unsafe-inline entfernt für scripts
 app.use(helmet({
@@ -80,7 +92,7 @@ app.use(helmet({
 
 // Permissions-Policy Header (via custom middleware, Helmet doesn't support it)
 app.use((_req, res, next) => {
-    res.setHeader('Permissions-Policy', 'camera=(self), microphone=(), geolocation=(), payment=()');
+    res.setHeader('Permissions-Policy', 'camera=(self), microphone=(self), geolocation=(), payment=()');
     next();
 });
 
@@ -88,6 +100,7 @@ app.use((_req, res, next) => {
 app.use(cors({
     origin: config.frontendUrl,
     credentials: true,
+    exposedHeaders: ['X-CSRF-Token'],
 }));
 
 // Global Rate Limiting (fallback)
@@ -103,9 +116,14 @@ app.use(globalLimiter);
 // Per-endpoint rate limits (stricter for auth endpoints)
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, message: { error: 'Zu viele Login-Versuche.' } });
 const uploadLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 30, message: { error: 'Upload-Limit erreicht.' } });
+// Patient portal limiter — protects login/register/password-reset from brute force
+const pwaLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100, message: { error: 'Zu viele Anfragen. Bitte warten Sie einen Moment.' } });
 
 // Body Parser
 app.use(express.json({ limit: '10mb' }));
+
+// Cookie Parser (for httpOnly JWT cookies)
+app.use(cookieParser());
 
 // K-05/K-06 FIX: Globale Input-Sanitization — entfernt HTML-Tags aus allen User-Inputs
 import { sanitizeBody } from './services/sanitize';
@@ -133,7 +151,7 @@ app.use('/api/roi', roiRoutes);
 app.use('/api/wunschbox', wunschboxRoutes);
 app.use('/api/pvs', authLimiter, pvsRoutes);
 app.use('/api/therapy', authLimiter, therapyRoutes);
-app.use('/api/pwa', pwaRoutes);
+app.use('/api/pwa', pwaLimiter, pwaRoutes);
 app.use('/api/system', authLimiter, systemRoutes);
 app.use('/api/ti', authLimiter, tiRoutes);
 app.use('/api/nfc', nfcRoutes);
@@ -146,6 +164,9 @@ app.use('/api/telemedizin', authLimiter, telemedizinRoutes);
 app.use('/api/gamification', authLimiter, gamificationRoutes);
 app.use('/api/forms', authLimiter, formsRoutes);
 app.use('/api/epa', authLimiter, epaRoutes);
+app.use('/api/todos', authLimiter, todoRoutes);
+app.use('/api/signatures', authLimiter, signatureRoutes);
+app.use('/api/agents', agentRoutes);
 
 // Health Check — includes DB + Redis connectivity
 app.get('/api/health', async (_req, res) => {
@@ -174,6 +195,9 @@ app.get('/api/health', async (_req, res) => {
         }
     }
 
+    const { agentService } = await import('./services/agent/agent.service');
+    const agentList = agentService.listAgents().map(a => ({ name: a.name, online: a.online, busy: a.busy }));
+
     res.json({
         status: dbStatus === 'connected' ? 'ok' : 'degraded',
         version: '3.0.0',
@@ -182,6 +206,8 @@ app.get('/api/health', async (_req, res) => {
         db: dbStatus,
         redis: redisStatus,
         uptime: Math.floor(process.uptime()),
+        agents: agentList,
+        reminderWorker: 'running',
     });
 });
 
@@ -211,9 +237,20 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 // ─── Start ──────────────────────────────────────────────────
 
 import { startDatabaseCleanupJob } from './jobs/cleanup';
-import { startROISnapshotJob } from './jobs/roiSnapshot';
-startDatabaseCleanupJob();
-startROISnapshotJob();
+import { startROISnapshotJob, stopROISnapshotJob } from './jobs/roiSnapshot';
+import { startReminderWorker, stopReminderWorker } from './jobs/reminderWorker';
+import { startHardDeleteWorker } from './jobs/hardDeleteWorker';
+import { startAgentOrchestrator } from './agents/orchestrator.agent';
+try { startDatabaseCleanupJob(); } catch (err) { console.error('[Server] Failed to start cleanup job:', err); }
+try { startROISnapshotJob(); } catch (err) { console.error('[Server] Failed to start ROI snapshot job:', err); }
+try { startReminderWorker(); } catch (err) { console.error('[Server] Failed to start reminder worker:', err); }
+try { startHardDeleteWorker(); } catch (err) { console.error('[Server] Failed to start hard-delete worker:', err); }
+try { startAgentOrchestrator(); } catch (err) { console.error('[Server] Failed to start agent orchestrator:', err); }
+
+// RabbitMQ — verbindet sich mit Agent-Core (non-blocking, graceful degradation)
+messageBroker.connect().catch(err =>
+    console.warn('[Server] RabbitMQ nicht verfügbar (HTTP-only Modus):', err.message)
+);
 
 // Initialize Redis (non-blocking — graceful degradation)
 initRedis().catch(err => console.warn('[Server] Redis init skipped:', err.message));
@@ -221,8 +258,16 @@ initRedis().catch(err => console.warn('[Server] Redis init skipped:', err.messag
 // Graceful shutdown
 process.on('SIGTERM', async () => {
     console.log('[Server] SIGTERM received, shutting down gracefully...');
+    try { stopReminderWorker(); } catch (err) { console.error('[Server] Error stopping reminder worker:', err); }
+    try { stopROISnapshotJob(); } catch (err) { console.error('[Server] Error stopping ROI snapshot job:', err); }
+    await messageBroker.disconnect().catch(() => {});
     await closeRedis();
     httpServer.close(() => process.exit(0));
+});
+
+// Catch unhandled promise rejections — prevents silent crashes
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('[Server] Unhandled Promise Rejection at:', promise, 'reason:', reason);
 });
 
 httpServer.listen(config.port, () => {

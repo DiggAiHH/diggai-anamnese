@@ -2,6 +2,7 @@
 
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
+import { requireAuth, requireRole } from '../middleware/auth';
 import {
   createForm,
   getForm,
@@ -12,6 +13,7 @@ import {
   publishForm,
   incrementUsage,
   getFormStats,
+  submitForm,
 } from '../services/forms';
 
 const router = Router();
@@ -103,9 +105,11 @@ router.post(
   }),
 );
 
-// POST /ai-generate — AI generate form
+// POST /ai-generate — AI generate form (requires auth + staff role)
 router.post(
   '/ai-generate',
+  requireAuth,
+  requireRole('ARZT', 'MFA', 'ADMIN'),
   wrap(async (req, res) => {
     const data = AiGenerateSchema.parse(req.body);
     const form = await aiGenerate(data);
@@ -171,6 +175,22 @@ router.post(
   wrap(async (req, res) => {
     const form = await incrementUsage(req.params.id as string);
     res.json(form);
+  }),
+);
+
+// POST /:id/submit — Submit form answers
+router.post(
+  '/:id/submit',
+  requireAuth,
+  wrap(async (req, res) => {
+    const SubmitSchema = z.object({
+      sessionId: z.string().min(1),
+      answers: z.record(z.unknown()),
+      submittedAt: z.string().datetime().optional(),
+    });
+    const data = SubmitSchema.parse(req.body);
+    const form = await submitForm(req.params.id as string, data);
+    res.status(201).json(form);
   }),
 );
 

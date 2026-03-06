@@ -12,6 +12,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import {
   usePwaDiaryList,
   usePwaDiaryCreate,
@@ -23,12 +24,12 @@ import {
 
 type MoodKey = 'VERY_GOOD' | 'GOOD' | 'NEUTRAL' | 'BAD' | 'VERY_BAD';
 
-const MOOD_EMOJIS: { key: MoodKey; emoji: string; label: string }[] = [
-  { key: 'VERY_GOOD', emoji: '😊', label: 'Sehr gut' },
-  { key: 'GOOD', emoji: '🙂', label: 'Gut' },
-  { key: 'NEUTRAL', emoji: '😐', label: 'Neutral' },
-  { key: 'BAD', emoji: '😕', label: 'Schlecht' },
-  { key: 'VERY_BAD', emoji: '😣', label: 'Sehr schlecht' },
+const MOOD_EMOJIS: { key: MoodKey; emoji: string; labelKey: string }[] = [
+  { key: 'VERY_GOOD', emoji: '😊', labelKey: 'Sehr gut' },
+  { key: 'GOOD', emoji: '🙂', labelKey: 'Gut' },
+  { key: 'NEUTRAL', emoji: '😐', labelKey: 'Neutral' },
+  { key: 'BAD', emoji: '😕', labelKey: 'Schlecht' },
+  { key: 'VERY_BAD', emoji: '😣', labelKey: 'Sehr schlecht' },
 ];
 
 const MOOD_MAP: Record<string, string> = Object.fromEntries(MOOD_EMOJIS.map((m) => [m.key, m.emoji]));
@@ -69,15 +70,16 @@ const SYMPTOM_PRESETS = [
   'Übelkeit',
   'Müdigkeit',
   'Schwindel',
-  'Rückenschmerzen',
+  'Rücken / Rückenschmerzen',
   'Appetitlosigkeit',
-  'Schlafstörungen',
+  'Schlafstörungen (Ein-/Durchschlafprobleme)',
   'Atemnot',
 ];
 
 // ── Component ──
 
 export default function PwaDiary() {
+  const { t, i18n } = useTranslation();
   const [page, setPage] = useState(1);
   const limit = 10;
 
@@ -140,7 +142,7 @@ export default function PwaDiary() {
   const handleSubmit = async () => {
     setFormError(null);
     if (!form.mood) {
-      setFormError('Bitte wählen Sie Ihre Stimmung aus.');
+      setFormError(t('Bitte beantworten Sie die Frage'));
       return;
     }
 
@@ -169,12 +171,12 @@ export default function PwaDiary() {
     } catch (err: unknown) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const e = err as any;
-      setFormError(e?.response?.data?.message ?? e?.message ?? 'Speichern fehlgeschlagen.');
+      setFormError(e?.response?.data?.message ?? e?.message ?? t('Fehler beim Speichern der Medikamente.'));
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Eintrag wirklich löschen?')) return;
+    if (!window.confirm(t('Löschen') + '?')) return;
     try {
       await deleteMutation.mutateAsync(id);
     } catch {
@@ -208,8 +210,8 @@ export default function PwaDiary() {
       {/* Header */}
       <header className="bg-white border-b border-gray-100 px-4 pt-6 pb-4">
         <div className="max-w-lg mx-auto">
-          <h1 className="text-lg font-bold text-gray-900">Tagebuch</h1>
-          <p className="text-xs text-gray-400 mt-0.5">Ihr tägliches Gesundheitstagebuch</p>
+          <h1 className="text-lg font-bold text-gray-900">{t('pwa.nav.diary')}</h1>
+          <p className="text-xs text-gray-400 mt-0.5">{t('Ihre Daten sind geschützt')}</p>
         </div>
       </header>
 
@@ -219,12 +221,12 @@ export default function PwaDiary() {
           <section className="rounded-2xl bg-white border border-gray-100 shadow-sm p-5 space-y-5 animate-in fade-in slide-in-from-top-2">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold text-gray-700">
-                {editId ? 'Eintrag bearbeiten' : 'Neuer Eintrag'}
+                {editId ? t('Bearbeiten') : t('Neues Medikament')}
               </h2>
               <button
                 onClick={() => { setShowForm(false); resetForm(); }}
                 className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400"
-                aria-label="Schließen"
+                aria-label={t('Schließen')}
               >
                 <X className="w-4 h-4" />
               </button>
@@ -239,10 +241,10 @@ export default function PwaDiary() {
             {/* Mood picker */}
             <div className="space-y-2">
               <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                Stimmung
+                {t('Stimmung')}
               </label>
               <div className="flex gap-2 justify-between">
-                {MOOD_EMOJIS.map(({ key, emoji, label }) => (
+                {MOOD_EMOJIS.map(({ key, emoji, labelKey }) => (
                   <button
                     key={key}
                     type="button"
@@ -254,7 +256,7 @@ export default function PwaDiary() {
                     }`}
                   >
                     <span className="text-2xl">{emoji}</span>
-                    <span className="text-[10px] text-gray-500">{label}</span>
+                    <span className="text-[10px] text-gray-500">{t(labelKey)}</span>
                   </button>
                 ))}
               </div>
@@ -263,7 +265,7 @@ export default function PwaDiary() {
             {/* Pain slider */}
             <div className="space-y-2">
               <label className="text-xs font-medium text-gray-500 uppercase tracking-wide flex items-center gap-1">
-                <Heart className="w-3.5 h-3.5 text-red-400" /> Schmerz ({form.painLevel}/10)
+                <Heart className="w-3.5 h-3.5 text-red-400" /> {t('Schmerzen')} ({form.painLevel}/10)
               </label>
               <input
                 type="range"
@@ -272,18 +274,18 @@ export default function PwaDiary() {
                 value={form.painLevel}
                 onChange={(e) => setForm((f) => ({ ...f, painLevel: parseInt(e.target.value, 10) }))}
                 className="w-full accent-red-500"
-                aria-label="Schmerzniveau"
+                aria-label={t('Schmerzstärke auf einer Skala von 0-10?')}
               />
               <div className="flex justify-between text-[10px] text-gray-400">
-                <span>Kein Schmerz</span>
-                <span>Unerträglich</span>
+                <span>{t('Keine')}</span>
+                <span>{t('Sehr schlecht')}</span>
               </div>
             </div>
 
             {/* Sleep quality */}
             <div className="space-y-2">
               <label className="text-xs font-medium text-gray-500 uppercase tracking-wide flex items-center gap-1">
-                <Moon className="w-3.5 h-3.5 text-indigo-400" /> Schlafqualität ({form.sleepQuality}/10)
+                <Moon className="w-3.5 h-3.5 text-indigo-400" /> {t('Wie schätzen Sie Ihre Schlafqualität ein?')} ({form.sleepQuality}/10)
               </label>
               <input
                 type="range"
@@ -292,18 +294,18 @@ export default function PwaDiary() {
                 value={form.sleepQuality}
                 onChange={(e) => setForm((f) => ({ ...f, sleepQuality: parseInt(e.target.value, 10) }))}
                 className="w-full accent-indigo-500"
-                aria-label="Schlafqualität"
+                aria-label={t('Wie schätzen Sie Ihre Schlafqualität ein?')}
               />
               <div className="flex justify-between text-[10px] text-gray-400">
-                <span>Sehr schlecht</span>
-                <span>Ausgezeichnet</span>
+                <span>{t('Sehr schlecht')}</span>
+                <span>{t('Sehr gut')}</span>
               </div>
             </div>
 
             {/* Sleep hours */}
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                Schlafstunden
+                {t('Stunden')}
               </label>
               <input
                 type="number"
@@ -312,7 +314,7 @@ export default function PwaDiary() {
                 max={24}
                 value={form.sleepHours}
                 onChange={(e) => setForm((f) => ({ ...f, sleepHours: e.target.value }))}
-                placeholder="z. B. 7.5"
+                placeholder={t('Stunden')}
                 className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
               />
             </div>
@@ -320,7 +322,7 @@ export default function PwaDiary() {
             {/* Symptoms */}
             <div className="space-y-2">
               <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                Symptome
+                {t('Welche Symptome haben Sie?')}
               </label>
               <div className="flex flex-wrap gap-2">
                 {SYMPTOM_PRESETS.map((s) => (
@@ -334,7 +336,7 @@ export default function PwaDiary() {
                         : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     }`}
                   >
-                    {s}
+                    {t(s)}
                   </button>
                 ))}
               </div>
@@ -345,7 +347,7 @@ export default function PwaDiary() {
                   value={symptomInput}
                   onChange={(e) => setSymptomInput(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCustomSymptom(); } }}
-                  placeholder="Eigenes Symptom…"
+                  placeholder={t('Sonstige (Freitext)')}
                   className="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
                 />
                 <button
@@ -379,13 +381,13 @@ export default function PwaDiary() {
             {/* Notes */}
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                Notizen
+                {t('Sonstige Anmerkungen')}
               </label>
               <textarea
                 rows={3}
                 value={form.notes}
                 onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-                placeholder="Wie fühlen Sie sich heute?"
+                placeholder={t('Beschreiben Sie Ihre Beschwerden bitte kurz')}
                 className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
               />
             </div>
@@ -398,7 +400,7 @@ export default function PwaDiary() {
                 className="w-full flex items-center justify-between px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide hover:bg-gray-50 transition-colors"
               >
                 <span className="flex items-center gap-1.5">
-                  <ThermometerSun className="w-3.5 h-3.5" /> Vitalwerte
+                  <ThermometerSun className="w-3.5 h-3.5" /> {t('Laborwerte')}
                 </span>
                 <ChevronDown
                   className={`w-4 h-4 transition-transform ${showVitals ? 'rotate-180' : ''}`}
@@ -408,7 +410,7 @@ export default function PwaDiary() {
                 <div className="px-4 pb-4 pt-1 space-y-3 border-t border-gray-100">
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <label className="text-[10px] text-gray-400">Blutdruck sys</label>
+                      <label className="text-[10px] text-gray-400">{t('Blutdruckeinstellung')} SYS</label>
                       <input
                         type="number"
                         value={form.bloodPressureSys}
@@ -418,7 +420,7 @@ export default function PwaDiary() {
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] text-gray-400">Blutdruck dia</label>
+                      <label className="text-[10px] text-gray-400">{t('Blutdruckeinstellung')} DIA</label>
                       <input
                         type="number"
                         value={form.bloodPressureDia}
@@ -430,7 +432,7 @@ export default function PwaDiary() {
                   </div>
                   <div className="grid grid-cols-3 gap-3">
                     <div className="space-y-1">
-                      <label className="text-[10px] text-gray-400">Puls</label>
+                      <label className="text-[10px] text-gray-400">{t('Herzrhythmusstörungen')}</label>
                       <input
                         type="number"
                         value={form.heartRate}
@@ -440,7 +442,7 @@ export default function PwaDiary() {
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] text-gray-400">Temp. °C</label>
+                      <label className="text-[10px] text-gray-400">{t('Fieber')}</label>
                       <input
                         type="number"
                         step="0.1"
@@ -451,7 +453,7 @@ export default function PwaDiary() {
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] text-gray-400">Gewicht kg</label>
+                      <label className="text-[10px] text-gray-400">{t('Körpergewicht (in kg)')}</label>
                       <input
                         type="number"
                         step="0.1"
@@ -474,7 +476,7 @@ export default function PwaDiary() {
               className="w-full rounded-xl bg-sky-600 px-4 py-3 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
             >
               {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
-              {editId ? 'Aktualisieren' : 'Speichern'}
+              {editId ? t('Bearbeiten') : t('autosave.saved')}
             </button>
           </section>
         )}
@@ -486,8 +488,8 @@ export default function PwaDiary() {
           </div>
         ) : entries.length === 0 ? (
           <div className="rounded-2xl bg-white border border-gray-100 shadow-sm px-4 py-10 text-center space-y-2">
-            <p className="text-sm text-gray-400">Noch keine Einträge vorhanden.</p>
-            <p className="text-xs text-gray-300">Tippen Sie auf + um Ihren ersten Eintrag zu erstellen.</p>
+            <p className="text-sm text-gray-400">{t('Noch keine Einträge vorhanden.')}</p>
+            <p className="text-xs text-gray-300">{t('Weiter')}</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -508,7 +510,7 @@ export default function PwaDiary() {
                     <span className="text-2xl flex-shrink-0">{MOOD_MAP[entry.mood] ?? '😐'}</span>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-800">
-                        {new Date(entry.date ?? entry.createdAt).toLocaleDateString('de-DE', {
+                        {new Date(entry.date ?? entry.createdAt).toLocaleDateString(i18n.language || 'de-DE', {
                           weekday: 'short',
                           day: '2-digit',
                           month: 'short',
@@ -530,13 +532,12 @@ export default function PwaDiary() {
                     </div>
                     {/* Pain bar */}
                     {entry.painLevel != null && (
-                      <div className="w-14 h-1.5 rounded-full bg-gray-100 overflow-hidden flex-shrink-0" role="progressbar" aria-valuenow={entry.painLevel} aria-valuemin={0} aria-valuemax={10} aria-label="Schmerzniveau">
-                        <div
-                          className="h-full rounded-full bg-red-400 transition-all"
-                          // Width is dynamic per pain level; inline style required
-                          style={{ width: `${(entry.painLevel / 10) * 100}%` }}
-                        />
-                      </div>
+                      <progress
+                        className="w-14 h-1.5 rounded-full overflow-hidden flex-shrink-0"
+                        value={Number(entry.painLevel)}
+                        max={10}
+                        aria-label={t('Schmerzstärke auf einer Skala von 0-10?')}
+                      />
                     )}
                     <ChevronDown
                       className={`w-4 h-4 text-gray-300 flex-shrink-0 transition-transform ${
@@ -550,13 +551,13 @@ export default function PwaDiary() {
                     <div className="border-t border-gray-100 px-4 py-3 space-y-3 text-sm animate-in fade-in slide-in-from-top-1">
                       {entry.sleepQuality != null && (
                         <div>
-                          <span className="text-xs text-gray-400">Schlafqualität:</span>{' '}
+                          <span className="text-xs text-gray-400">{t('Wie schätzen Sie Ihre Schlafqualität ein?')}:</span>{' '}
                           <span className="font-medium">{entry.sleepQuality}/10</span>
                         </div>
                       )}
                       {entry.symptoms && entry.symptoms.length > 0 && (
                         <div>
-                          <span className="text-xs text-gray-400 block mb-1">Symptome:</span>
+                          <span className="text-xs text-gray-400 block mb-1">{t('Welche Symptome haben Sie?')}:</span>
                           <div className="flex flex-wrap gap-1.5">
                             {entry.symptoms.map((s: string) => (
                               <span
@@ -571,7 +572,7 @@ export default function PwaDiary() {
                       )}
                       {entry.notes && (
                         <div>
-                          <span className="text-xs text-gray-400">Notizen:</span>
+                          <span className="text-xs text-gray-400">{t('Sonstige Anmerkungen')}:</span>
                           <p className="text-gray-700 mt-0.5">{entry.notes}</p>
                         </div>
                       )}
@@ -588,19 +589,19 @@ export default function PwaDiary() {
                           )}
                           {entry.heartRate && (
                             <div className="bg-gray-50 rounded-lg px-2.5 py-1.5">
-                              <span className="text-gray-400">Puls:</span>{' '}
+                              <span className="text-gray-400">{t('Herzrhythmusstörungen')}:</span>{' '}
                               <span className="font-medium">{entry.heartRate}</span>
                             </div>
                           )}
                           {entry.temperature && (
                             <div className="bg-gray-50 rounded-lg px-2.5 py-1.5">
-                              <span className="text-gray-400">Temp:</span>{' '}
+                              <span className="text-gray-400">{t('Fieber')}:</span>{' '}
                               <span className="font-medium">{entry.temperature}°C</span>
                             </div>
                           )}
                           {entry.weight && (
                             <div className="bg-gray-50 rounded-lg px-2.5 py-1.5">
-                              <span className="text-gray-400">Gewicht:</span>{' '}
+                              <span className="text-gray-400">{t('Körpergewicht (in kg)')}:</span>{' '}
                               <span className="font-medium">{entry.weight} kg</span>
                             </div>
                           )}
@@ -613,7 +614,7 @@ export default function PwaDiary() {
                           onClick={() => openEdit(entry)}
                           className="flex items-center gap-1.5 rounded-xl bg-gray-100 px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-200 transition-colors"
                         >
-                          <Edit className="w-3.5 h-3.5" /> Bearbeiten
+                          <Edit className="w-3.5 h-3.5" /> {t('Bearbeiten')}
                         </button>
                         <button
                           type="button"
@@ -621,7 +622,7 @@ export default function PwaDiary() {
                           disabled={deleteMutation.isPending}
                           className="flex items-center gap-1.5 rounded-xl bg-red-50 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-100 disabled:opacity-50 transition-colors"
                         >
-                          <Trash2 className="w-3.5 h-3.5" /> Löschen
+                          <Trash2 className="w-3.5 h-3.5" /> {t('Löschen')}
                         </button>
                       </div>
                     </div>
@@ -640,19 +641,19 @@ export default function PwaDiary() {
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page <= 1}
               className="p-2 rounded-xl bg-white border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-30 transition-colors"
-              aria-label="Vorherige Seite"
+              aria-label={t('Zurück')}
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
             <span className="text-xs text-gray-500">
-              Seite {page} von {totalPages}
+              {t('Schritt {{current}} von {{total}} – Unfallmeldung (BG)', { current: page, total: totalPages })}
             </span>
             <button
               type="button"
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page >= totalPages}
               className="p-2 rounded-xl bg-white border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-30 transition-colors"
-              aria-label="Nächste Seite"
+              aria-label={t('Weiter')}
             >
               <ChevronRight className="w-4 h-4" />
             </button>
@@ -666,7 +667,7 @@ export default function PwaDiary() {
           type="button"
           onClick={openNew}
           className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-sky-600 text-white shadow-lg hover:bg-sky-700 active:scale-95 transition-all flex items-center justify-center z-50"
-          aria-label="Neuer Eintrag"
+          aria-label={t('Neues Medikament')}
         >
           <Plus className="w-6 h-6" />
         </button>
