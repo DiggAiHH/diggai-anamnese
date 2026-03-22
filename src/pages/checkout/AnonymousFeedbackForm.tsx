@@ -2,13 +2,24 @@
 // Modul 7: Anonymous Feedback Form
 // ═══════════════════════════════════════════════════════════════
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useFeedbackSubmit } from '../../hooks/useApi';
+import { toast } from '../../store/toastStore';
+import { hapticSelect, hapticSuccess, hapticWarning } from '../../utils/haptics';
 
 interface AnonymousFeedbackFormProps {
   praxisId: string;
   sessionId?: string;
-  onSubmit?: (data: any) => void;
+  onSubmit?: (data: FeedbackPayload) => void | Promise<void>;
+}
+
+interface FeedbackPayload {
+  praxisId: string;
+  sessionId?: string;
+  rating: number;
+  text?: string;
+  categories?: string[];
 }
 
 const CATEGORIES = [
@@ -22,6 +33,7 @@ const CATEGORIES = [
 
 export function AnonymousFeedbackForm({ praxisId, sessionId, onSubmit }: AnonymousFeedbackFormProps) {
   const { t } = useTranslation();
+  const submitFeedback = useFeedbackSubmit();
   const [rating, setRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
@@ -29,20 +41,82 @@ export function AnonymousFeedbackForm({ praxisId, sessionId, onSubmit }: Anonymo
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  const ratingLabel = useMemo(() => {
+    if (rating <= 0) return t('feedback.rating_hint', 'Tippen Sie auf die Sterne für eine schnelle Bewertung.');
+    if (rating <= 2) return t('feedback.rating_low', 'Danke für Ihre Ehrlichkeit — was können wir konkret verbessern?');
+    if (rating === 3) return t('feedback.rating_mid', 'Fast da — was hätte Ihren Besuch noch angenehmer gemacht?');
+    return t('feedback.rating_high', 'Wunderbar — was hat besonders gut funktioniert?');
+  }, [rating, t]);
+
+  const quickCommentChips = useMemo(() => {
+    if (rating <= 0) return [];
+    if (rating <= 2) {
+      return [
+        t('feedback.quick_wait', 'Wartezeit war zu lang'),
+        t('feedback.quick_unclear', 'Ablauf war unklar'),
+        t('feedback.quick_info', 'Ich hätte gern mehr Infos bekommen'),
+      ];
+    }
+    if (rating === 3) {
+      return [
+        t('feedback.quick_okay', 'Insgesamt okay'),
+        t('feedback.quick_room', 'Wartebereich war angenehm'),
+        t('feedback.quick_better_info', 'Etwas mehr Orientierung wäre hilfreich'),
+      ];
+    }
+    return [
+      t('feedback.quick_friendly', 'Sehr freundliches Team'),
+      t('feedback.quick_fast', 'Schneller Ablauf'),
+      t('feedback.quick_clear', 'Alles war klar erklärt'),
+    ];
+  }, [rating, t]);
+
   const toggleCategory = (key: string) => {
+    hapticSelect();
     setSelectedCategories(prev =>
       prev.includes(key) ? prev.filter(c => c !== key) : [...prev, key]
     );
   };
 
+  const appendQuickComment = (snippet: string) => {
+    hapticSelect();
+    setText(prev => {
+      if (prev.includes(snippet)) return prev;
+      return prev.trim() ? `${prev.trim()} ${snippet}.` : `${snippet}.`;
+    });
+  };
+
   const handleSubmit = async () => {
-    if (rating === 0) return;
+    if (rating === 0) {
+      hapticWarning();
+      toast.warning(t('feedback.rating_required', 'Bitte wählen Sie zuerst eine Bewertung aus.'));
+      return;
+    }
+
     setLoading(true);
-    const data = { praxisId, sessionId, rating, text: text.trim() || undefined, categories: selectedCategories };
-    onSubmit?.(data);
-    await new Promise(r => setTimeout(r, 1000));
-    setSubmitted(true);
-    setLoading(false);
+    const data: FeedbackPayload = {
+      praxisId,
+      sessionId,
+      rating,
+      text: text.trim() || undefined,
+      categories: selectedCategories,
+    };
+
+    try {
+      if (onSubmit) {
+        await onSubmit(data);
+      } else {
+        await submitFeedback.mutateAsync(data);
+      }
+      hapticSuccess();
+      setSubmitted(true);
+      toast.success(t('feedback.saved', 'Vielen Dank für Ihr Feedback.'));
+    } catch {
+      hapticWarning();
+      toast.error(t('feedback.submit_error', 'Feedback konnte gerade nicht gesendet werden. Bitte versuchen Sie es erneut.'));
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (submitted) {
@@ -63,29 +137,60 @@ export function AnonymousFeedbackForm({ praxisId, sessionId, onSubmit }: Anonymo
 
   return (
     <div className="space-y-6">
-      <div className="text-center">
+      <div className="text-center space-y-2">
         <h2 className="text-xl font-bold text-[var(--text-primary)]">
           {t('feedback.title', 'Wie war Ihr Besuch?')}
         </h2>
         <p className="text-sm text-[var(--text-secondary)] mt-1">
           {t('feedback.anonymous_notice', 'Ihre Bewertung ist vollständig anonym.')}
         </p>
+        <p className="text-xs text-[var(--text-tertiary)]">
+          {t('feedback.fast_hint', 'Dauert unter 10 Sekunden — ein Stern reicht, Details sind optional.')}
+        </p>
       </div>
 
       {/* Star rating */}
-      <div className="flex justify-center gap-2">
+      <div className="space-y-3">
+        <div className="flex justify-center gap-2">
         {[1, 2, 3, 4, 5].map(star => (
           <button
             key={star}
             onMouseEnter={() => setHoverRating(star)}
             onMouseLeave={() => setHoverRating(0)}
-            onClick={() => setRating(star)}
+            onClick={() => {
+              hapticSelect();
+              setRating(star);
+            }}
+            aria-label={`${star} von 5 Sternen`}
+            title={`${star} von 5 Sternen`}
             className="text-4xl transition-transform hover:scale-110 focus:outline-none"
           >
             {star <= (hoverRating || rating) ? '⭐' : '☆'}
           </button>
         ))}
       </div>
+        <p className="text-center text-sm font-medium text-[var(--text-secondary)]">{ratingLabel}</p>
+      </div>
+
+      {quickCommentChips.length > 0 && (
+        <div>
+          <p className="text-sm font-medium text-[var(--text-primary)] mb-3">
+            {t('feedback.quick_pick', 'Schnell auswählen')}
+          </p>
+          <div className="flex flex-wrap gap-2 justify-center">
+            {quickCommentChips.map(chip => (
+              <button
+                key={chip}
+                type="button"
+                onClick={() => appendQuickComment(chip)}
+                className="px-3 py-2 rounded-full text-sm border border-[var(--border-primary)] bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+              >
+                + {chip}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Categories */}
       <div>
@@ -134,6 +239,12 @@ export function AnonymousFeedbackForm({ praxisId, sessionId, onSubmit }: Anonymo
       >
         {loading ? t('feedback.submitting', 'Wird gesendet…') : t('feedback.submit', 'Feedback absenden')}
       </button>
+
+      {!submitted && rating > 0 && (
+        <p className="text-center text-xs text-[var(--text-tertiary)]">
+          {t('feedback.closing_note', 'Danke — Ihr Feedback hilft uns, Wartezeit, Kommunikation und Organisation gezielt zu verbessern.')}
+        </p>
+      )}
     </div>
   );
 }

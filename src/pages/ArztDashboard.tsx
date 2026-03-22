@@ -3,7 +3,7 @@ import { Shield, LogOut, AlertTriangle, User, ChevronRight, CheckCircle, Activit
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { io } from 'socket.io-client';
 import { useTranslation } from 'react-i18next';
-import { useArztLogin, useArztSessions, useArztSessionDetail, useArztSessionSummary, useChatMessages, useAckTriage } from '../hooks/useApi';
+import { useArztLogin, useArztSessions, useArztSessionDetail, useArztSessionSummary, useChatMessages, useAckTriage } from '../hooks/useStaffApi';
 import { setAuthToken, getAuthToken, API_BASE_URL, SOCKET_BASE_URL, api } from '../api/client';
 import { StaffChat } from '../components/StaffChat';
 import { StaffTodoList } from '../components/StaffTodoList';
@@ -107,7 +107,8 @@ interface ChatMessage {
     timestamp: string;
 }
 
-export const ArztDashboard: React.FC = () => {
+// Memory Leak Fix: Wrapped with React.memo to prevent unnecessary re-renders on parent updates
+export const ArztDashboard: React.FC = React.memo(function ArztDashboard() {
     const { t } = useTranslation();
     const [token, setToken] = useState<string | null>(localStorage.getItem('arzt_token'));
     const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
@@ -218,6 +219,20 @@ export const ArztDashboard: React.FC = () => {
         });
 
         return () => {
+            // Memory Leak Fix: Remove all event listeners before disconnect
+            socket.off('connect');
+            socket.off('triage:alert');
+            socket.off('session:complete');
+            socket.off('arzt:received_message');
+            socket.off('session:locked');
+            socket.off('session:unlocked');
+            socket.off('therapy:alert-new');
+            socket.off('therapy:alert-critical');
+            socket.off('pvs:export-completed');
+            socket.off('pvs:export-failed');
+            socket.off('pvs:patient-imported');
+            socket.off('therapy:plan-updated');
+            socket.off('therapy:measure-due');
             socket.disconnect();
         };
     }, [token, queryClient]);
@@ -355,9 +370,10 @@ export const ArztDashboard: React.FC = () => {
             </div>
         </div>
     );
-};
+});
 
-const ArztLogin: React.FC<{ onLogin: (token: string) => void }> = ({ onLogin }) => {
+// Memoized sub-components for better performance
+const ArztLogin: React.FC<{ onLogin: (token: string) => void }> = React.memo(function ArztLogin({ onLogin }) {
     const { t } = useTranslation();
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
@@ -386,17 +402,17 @@ const ArztLogin: React.FC<{ onLogin: (token: string) => void }> = ({ onLogin }) 
                     <p className="text-sm text-white/50 mt-2">{t('arzt.login.subtitle')}</p>
                 </div>
                 <form onSubmit={handleSubmit} className="space-y-4">
-                    <input type="text" value={username} onChange={e => setUsername(e.target.value)} placeholder={t('arzt.login.username')} className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white" />
-                    <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder={t('arzt.login.password')} className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white" />
-                    <button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-3 rounded-xl transition-all">{t('arzt.login.submit')}</button>
+                    <input type="text" value={username} onChange={e => setUsername(e.target.value)} placeholder={t('arzt.login.username')} required autoComplete="username" className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white" />
+                    <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder={t('arzt.login.password')} required autoComplete="current-password" className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white" />
+                    <button type="submit" disabled={loginMutation.isPending || !username || !password} className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-3 rounded-xl transition-all">{loginMutation.isPending ? t('arzt.login.loading', 'Anmeldung...') : t('arzt.login.submit')}</button>
                     {loginMutation.isError && <p className="text-sm text-red-400">{t('arzt.login.error')}</p>}
                 </form>
             </div>
         </div>
     );
-};
+});
 
-const SessionList: React.FC<{ onSelect: (id: string) => void, activeLocks: Record<string, string> }> = ({ onSelect, activeLocks }) => {
+const SessionList: React.FC<{ onSelect: (id: string) => void, activeLocks: Record<string, string> }> = React.memo(function SessionList({ onSelect, activeLocks }) {
     const { t } = useTranslation();
     const { data, isLoading } = useArztSessions();
     const sessions = data?.sessions || [];
@@ -439,9 +455,9 @@ const SessionList: React.FC<{ onSelect: (id: string) => void, activeLocks: Recor
             </div>
         </div>
     );
-};
+});
 
-const SessionDetail: React.FC<{ sessionId: string; onBack: () => void }> = ({ sessionId, onBack }) => {
+const SessionDetail: React.FC<{ sessionId: string; onBack: () => void }> = React.memo(function SessionDetail({ sessionId, onBack }) {
     const { t } = useTranslation();
     const { data, isLoading } = useArztSessionDetail(sessionId);
     const { data: summary, isLoading: infoLoading } = useArztSessionSummary(sessionId);
@@ -485,7 +501,7 @@ const SessionDetail: React.FC<{ sessionId: string; onBack: () => void }> = ({ se
             // Lock die Session
             const userStr = localStorage.getItem('arzt_user');
             let userName = t('arzt.colleague', 'Ein Kollege');
-            if (userStr) { try { userName = JSON.parse(userStr).displayName || t('arzt.doctor', 'Arzt'); } catch { } }
+            if (userStr) { try { userName = JSON.parse(userStr).displayName || t('arzt.doctor', 'Arzt'); } catch { /* ignore parse errors */ } }
             socket.emit('view:session', { sessionId, userName });
         });
 
@@ -504,6 +520,14 @@ const SessionDetail: React.FC<{ sessionId: string; onBack: () => void }> = ({ se
         });
 
         return () => {
+            // Memory Leak Fix: Clear typing timeout and remove socket listeners
+            if (patientTypingTimeout.current) {
+                clearTimeout(patientTypingTimeout.current);
+                patientTypingTimeout.current = null;
+            }
+            socket.off('connect');
+            socket.off('arzt:received_message');
+            socket.off('patient:typing');
             socket.emit('unview:session', { sessionId });
             socket.disconnect();
         };
@@ -848,7 +872,7 @@ const SessionDetail: React.FC<{ sessionId: string; onBack: () => void }> = ({ se
             </div>
         </div >
     );
-};
+});  // Memory Leak Fix: Closing React.memo wrapper
 
 const StatCard = React.memo<{ icon: React.ComponentType<{ className?: string }>; label: string; value: number; color: string }>(({ icon: Icon, label, value, color }) => {
     const colors: Record<string, string> = { blue: 'bg-blue-500/20 text-blue-400', emerald: 'bg-emerald-500/20 text-emerald-400', red: 'bg-red-500/20 text-red-400' };

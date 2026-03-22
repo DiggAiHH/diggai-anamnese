@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Users, Plus, Trash2, Shield, CheckCircle, XCircle } from 'lucide-react';
-import { useAdminUsers, useAdminCreateUser, useAdminUpdateUser, useAdminDeleteUser } from '../../hooks/useApi';
+import { useAdminUsers, useAdminCreateUser, useAdminUpdateUser, useAdminDeleteUser } from '../../hooks/useOpsApi';
 import type { ArztUser } from '../../types/admin';
 
 interface UserForm {

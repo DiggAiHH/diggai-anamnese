@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Plus, Save, FileText, Loader2, BookTemplate } from 'lucide-react';
-import { useTherapyCreatePlan, useTherapyAddMeasure } from '../../hooks/useApi';
+import { useTherapyCreatePlan, useTherapyAddMeasure } from '../../hooks/useOpsApi';
 import { TherapyMeasureCard } from './TherapyMeasureCard';
 import { TherapyTemplateSelector } from './TherapyTemplateSelector';
 

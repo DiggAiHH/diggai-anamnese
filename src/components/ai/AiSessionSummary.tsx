@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { FileText, Loader2, AlertTriangle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { useAiSummarizeSession } from '../../hooks/useApi';
+import { useAiSummarizeSession } from '../../hooks/useOpsApi';
 
 interface AiSessionSummaryProps {
     sessionId: string;

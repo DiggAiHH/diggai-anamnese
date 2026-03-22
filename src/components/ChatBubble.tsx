@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { MessageSquare, Send, X, User, Bot, HelpCircle, ChevronRight } from 'lucide-react';
 import { io, Socket } from 'socket.io-client';
-import { useChatMessages } from '../hooks/useApi';
+import { useChatMessages } from '../hooks/usePatientApi';
 import { SOCKET_BASE_URL } from '../api/client';
 import { useTranslation } from 'react-i18next';
 
@@ -220,17 +220,39 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({ sessionId }) => {
         const socket = io(SOCKET_BASE_URL || window.location.origin);
         socketRef.current = socket;
         socket.emit('join:session', sessionId);
-        socket.on('patient:message', (msg: Message) => {
+        
+        // Define handlers as named functions so we can remove them properly
+        const handlePatientMessage = (msg: Message) => {
             setLiveMessages(prev => [...prev, msg]);
             if (!isOpen || activeTab !== 'team') setUnreadCount(c => c + 1);
-        });
-        socket.on('arzt:typing', () => {
+        };
+        
+        const handleArztTyping = () => {
             setTeamTyping(true);
             if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
             typingTimeoutRef.current = setTimeout(() => setTeamTyping(false), 3000);
-        });
-        return () => { socket.disconnect(); };
+        };
+        
+        socket.on('patient:message', handlePatientMessage);
+        socket.on('arzt:typing', handleArztTyping);
+        
+        return () => {
+            // Memory Leak Fix: Remove specific event listeners before disconnect
+            socket.off('patient:message', handlePatientMessage);
+            socket.off('arzt:typing', handleArztTyping);
+            socket.disconnect();
+        };
     }, [sessionId, isOpen, activeTab, hasSession]);
+    
+    // Memory Leak Fix: Cleanup typing timeout on unmount
+    useEffect(() => {
+        return () => {
+            if (typingTimeoutRef.current) {
+                clearTimeout(typingTimeoutRef.current);
+                typingTimeoutRef.current = null;
+            }
+        };
+    }, []);
 
     useEffect(() => {
         const ref = activeTab === 'bot' ? botScrollRef.current : scrollRef.current;

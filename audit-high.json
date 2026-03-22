@@ -1,0 +1,189 @@
+﻿{
+  "auditReportVersion": 2,
+  "vulnerabilities": {
+    "@prisma/config": {
+      "name": "@prisma/config",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "effect"
+      ],
+      "effects": [
+        "prisma"
+      ],
+      "range": ">=6.13.0-dev.1",
+      "nodes": [
+        "node_modules/@prisma/config"
+      ],
+      "fixAvailable": {
+        "name": "prisma",
+        "version": "6.12.0",
+        "isSemVerMajor": true
+      }
+    },
+    "@rollup/plugin-terser": {
+      "name": "@rollup/plugin-terser",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "serialize-javascript"
+      ],
+      "effects": [
+        "workbox-build"
+      ],
+      "range": "0.2.0 - 0.4.4",
+      "nodes": [
+        "node_modules/@rollup/plugin-terser"
+      ],
+      "fixAvailable": {
+        "name": "vite-plugin-pwa",
+        "version": "0.19.8",
+        "isSemVerMajor": true
+      }
+    },
+    "effect": {
+      "name": "effect",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1115128,
+          "name": "effect",
+          "dependency": "effect",
+          "title": "Effect `AsyncLocalStorage` context lost/contaminated inside Effect fibers under concurrent load with RPC",
+          "url": "https://github.com/advisories/GHSA-38f7-945m-qr2g",
+          "severity": "high",
+          "cwe": [
+            "CWE-362"
+          ],
+          "cvss": {
+            "score": 7.4,
+            "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:N"
+          },
+          "range": "<3.20.0"
+        }
+      ],
+      "effects": [
+        "@prisma/config"
+      ],
+      "range": "<3.20.0",
+      "nodes": [
+        "node_modules/effect"
+      ],
+      "fixAvailable": {
+        "name": "prisma",
+        "version": "6.12.0",
+        "isSemVerMajor": true
+      }
+    },
+    "prisma": {
+      "name": "prisma",
+      "severity": "high",
+      "isDirect": true,
+      "via": [
+        "@prisma/config"
+      ],
+      "effects": [],
+      "range": ">=6.13.0-dev.1",
+      "nodes": [
+        "node_modules/prisma"
+      ],
+      "fixAvailable": {
+        "name": "prisma",
+        "version": "6.12.0",
+        "isSemVerMajor": true
+      }
+    },
+    "serialize-javascript": {
+      "name": "serialize-javascript",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1113686,
+          "name": "serialize-javascript",
+          "dependency": "serialize-javascript",
+          "title": "Serialize JavaScript is Vulnerable to RCE via RegExp.flags and Date.prototype.toISOString()",
+          "url": "https://github.com/advisories/GHSA-5c6j-r48x-rmvq",
+          "severity": "high",
+          "cwe": [
+            "CWE-96"
+          ],
+          "cvss": {
+            "score": 8.1,
+            "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:H"
+          },
+          "range": "<=7.0.2"
+        }
+      ],
+      "effects": [
+        "@rollup/plugin-terser"
+      ],
+      "range": "<=7.0.2",
+      "nodes": [
+        "node_modules/serialize-javascript"
+      ],
+      "fixAvailable": {
+        "name": "vite-plugin-pwa",
+        "version": "0.19.8",
+        "isSemVerMajor": true
+      }
+    },
+    "vite-plugin-pwa": {
+      "name": "vite-plugin-pwa",
+      "severity": "high",
+      "isDirect": true,
+      "via": [
+        "workbox-build"
+      ],
+      "effects": [],
+      "range": ">=0.20.0",
+      "nodes": [
+        "node_modules/vite-plugin-pwa"
+      ],
+      "fixAvailable": {
+        "name": "vite-plugin-pwa",
+        "version": "0.19.8",
+        "isSemVerMajor": true
+      }
+    },
+    "workbox-build": {
+      "name": "workbox-build",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "@rollup/plugin-terser"
+      ],
+      "effects": [
+        "vite-plugin-pwa"
+      ],
+      "range": ">=7.1.0",
+      "nodes": [
+        "node_modules/workbox-build"
+      ],
+      "fixAvailable": {
+        "name": "vite-plugin-pwa",
+        "version": "0.19.8",
+        "isSemVerMajor": true
+      }
+    }
+  },
+  "metadata": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 7,
+      "critical": 0,
+      "total": 7
+    },
+    "dependencies": {
+      "prod": 462,
+      "dev": 636,
+      "optional": 70,
+      "peer": 0,
+      "peerOptional": 0,
+      "total": 1125
+    }
+  }
+}

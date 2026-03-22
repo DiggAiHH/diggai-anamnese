@@ -14,7 +14,7 @@ interface AnswerRecord {
   timeSpentMs?: number;
 }
 
-let answersStore: AnswerRecord[] = [];
+const answersStore: AnswerRecord[] = [];
 
 const handler: Handler = async (event: HandlerEvent) => {
   const origin = event.headers?.origin || event.headers?.Origin;

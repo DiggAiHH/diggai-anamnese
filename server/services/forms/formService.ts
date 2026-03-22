@@ -99,6 +99,21 @@ export async function incrementUsage(id: string): Promise<CustomFormRecord> {
 
 // ── Stats ───────────────────────────────────────────────────────────
 
+export async function submitForm(
+  formId: string,
+  data: { sessionId: string; answers: Record<string, unknown>; submittedAt?: string },
+) {
+  const db = prisma();
+  await getForm(formId); // Throws if not found
+  await incrementUsage(formId);
+  return {
+    formId,
+    sessionId: data.sessionId,
+    answersCount: Object.keys(data.answers).length,
+    submittedAt: data.submittedAt || new Date().toISOString(),
+  };
+}
+
 export async function getFormStats(praxisId: string) {
   const db = prisma();
   const [total, active, aiGenerated, usageAgg] = await Promise.all([

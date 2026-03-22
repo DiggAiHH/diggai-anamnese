@@ -615,7 +615,7 @@ function AdminProgressBar({ value, max, label, color = 'bg-blue-500' }: { value:
       </div>
       <div className="h-2 bg-[var(--bg-input)] rounded-full overflow-hidden">
         {/* Dynamic width requires inline style - no Tailwind equivalent for computed percentages */}
-        <div className={`h-full ${color} rounded-full transition-all duration-700`} style={{ width: `${pct}%` }} />{/* eslint-disable-line */}
+        <div className={`h-full ${color} rounded-full transition-all duration-700`} style={{ width: `${pct}%` }} />{ }
       </div>
     </div>
   );
@@ -1329,7 +1329,8 @@ function ArchitectureTab() {
 
 // ─── Main Component ────────────────────────────────────
 
-export function AdminDashboard() {
+// Memoized AdminDashboard for performance - heavy component with many tabs and charts
+export const AdminDashboard = React.memo(function AdminDashboard() {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<TabId>('overview');
 
@@ -1418,4 +1419,4 @@ export function AdminDashboard() {
       </footer>
     </div>
   );
-}
+});

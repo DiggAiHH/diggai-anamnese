@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { io, Socket } from 'socket.io-client';
 import { SOCKET_BASE_URL } from '../api/client';
-import { useQueuePosition, useWaitingContent, useTrackContentView, useLikeContent, useTrackQuizAnswer } from '../hooks/useApi';
+import { useQueuePosition, useWaitingContent, useTrackContentView, useLikeContent, useTrackQuizAnswer } from '../hooks/usePatientApi';
 import { QueueStatusCard } from './waiting/QueueStatusCard';
 import { HealthTipCarousel } from './waiting/HealthTipCarousel';
 import { WaitingGames } from './waiting/WaitingGames';
@@ -124,7 +124,19 @@ export const PatientWartezimmer: React.FC<PatientWartezimmerProps> = ({
       setShowMoodCheck(true);
     });
 
-    return () => { socket.disconnect(); };
+    return () => {
+      // Memory Leak Fix: Clear audio ref and remove socket listeners
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      socket.off('connect');
+      socket.off('disconnect');
+      socket.off('queue:position');
+      socket.off('queue:called');
+      socket.off('queue:mood-check');
+      socket.disconnect();
+    };
   }, [sessionId, token, t]);
 
   // Request notification permission

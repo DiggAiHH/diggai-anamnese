@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Server, Plus, ArrowLeftRight, Settings2, BarChart3 } from 'lucide-react';
 import { PvsConnectionWizard, PvsConnectionList } from '../pvs/PvsConnectionWizard';
 import { PvsTransferLog } from '../pvs/PvsTransferLog';
-import { usePvsTransferStats, usePvsConnections, usePvsMappings, usePvsSaveMappings, usePvsResetMappings } from '../../hooks/useApi';
+import { usePvsTransferStats, usePvsConnections, usePvsMappings, usePvsSaveMappings, usePvsResetMappings } from '../../hooks/useOpsApi';
 
 type PvsSubTab = 'connections' | 'wizard' | 'transfers' | 'mappings';
 

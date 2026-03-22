@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { Outlet, NavLink, Navigate } from 'react-router-dom';
 import { LayoutDashboard, BookOpen, Pill, MessageSquare, Settings, Wifi, WifiOff } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { usePwaUnreadCount } from '../../hooks/useApi';
-import { usePwaStore } from '../../stores/pwaStore';
+import { usePwaUnreadCount } from '../../hooks/usePatientApi';
+import { usePwaStore } from '../../store/pwaStore';
 
 const NAV_ITEMS = [
     { to: '/pwa/dashboard', icon: LayoutDashboard, labelKey: 'pwa.nav.home', fallback: 'Home' },

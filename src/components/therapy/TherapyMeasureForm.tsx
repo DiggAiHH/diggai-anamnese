@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Save, Plus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { useTherapyAddMeasure, useTherapyUpdateMeasure } from '../../hooks/useApi';
+import { useTherapyAddMeasure, useTherapyUpdateMeasure } from '../../hooks/useOpsApi';
 
 const MEASURE_TYPES = [
     'MEDICATION', 'PROCEDURE', 'REFERRAL', 'LAB_ORDER',

@@ -222,7 +222,18 @@ export const StaffChat: React.FC<StaffChatProps> = ({ currentUser, patientSessio
       }, 3000);
     });
 
-    return () => { socket.disconnect(); };
+    return () => {
+      // Memory Leak Fix: Clear all typing timeouts and remove socket listeners
+      Object.values(typingTimeoutRef.current).forEach(timeout => clearTimeout(timeout));
+      typingTimeoutRef.current = {};
+      socket.off('connect');
+      socket.off('staff:message');
+      socket.off('arzt:received_message');
+      socket.off('staff:presence');
+      socket.off('staff:typing');
+      socket.off('patient:typing');
+      socket.disconnect();
+    };
   }, [currentUser, isOpen, activeChannelId, muteNotifications]);
 
   // Auto-scroll

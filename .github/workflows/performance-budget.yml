@@ -1,0 +1,897 @@
+name: Performance Budget Validation
+
+on:
+  pull_request:
+    branches: [main, master, develop]
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main, master, develop]
+  workflow_dispatch:
+    inputs:
+      fail_on_violation:
+        description: 'Fail build on budget violation'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+env:
+  NODE_VERSION: '22'
+  FAIL_ON_VIOLATION: ${{ github.event.inputs.fail_on_violation || 'false' }}
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: perf-budget-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ==========================================
+  # Job 1: Frontend Bundle Size Validation
+  # ==========================================
+  bundle-size-check:
+    name: Bundle Size Check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: anamnese-app
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: anamnese-app/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+        env:
+          NODE_ENV: production
+
+      - name: Analyze bundle sizes
+        id: bundle-analysis
+        run: |
+          # Create analysis report
+          echo "## 📦 Bundle Size Analysis" > bundle-report.md
+          echo "" >> bundle-report.md
+          
+          # Load budget configuration
+          BUDGET_FILE="../.github/performance-budget.json"
+          
+          # Function to convert bytes to KB
+          bytes_to_kb() {
+            echo "scale=2; $1 / 1024" | bc
+          }
+          
+          # Function to get file size
+          get_size() {
+            if [ -f "$1" ]; then
+              stat -c%s "$1" 2>/dev/null || echo "0"
+            else
+              echo "0"
+            fi
+          }
+          
+          # Initialize counters
+          TOTAL_WARNINGS=0
+          TOTAL_ERRORS=0
+          
+          echo "### Frontend Bundle Budgets" >> bundle-report.md
+          echo "" >> bundle-report.md
+          echo "| Chunk | Size | Budget | Status |" >> bundle-report.md
+          echo "|-------|------|--------|--------|" >> bundle-report.md
+          
+          # Check entry point (initial JS)
+          ENTRY_JS=$(find dist/assets -name "client-*.js" -o -name "index-*.js" | grep -v vendor | head -1)
+          ENTRY_BUDGET_KB=$(cat $BUDGET_FILE | grep -o '"initialJs": [0-9]*' | grep -o '[0-9]*')
+          ENTRY_SIZE=$(get_size "$ENTRY_JS")
+          ENTRY_SIZE_KB=$(bytes_to_kb $ENTRY_SIZE)
+          
+          if (( $(echo "$ENTRY_SIZE_KB > $ENTRY_BUDGET_KB" | bc -l) )); then
+            if [ "$FAIL_ON_VIOLATION" == "true" ]; then
+              ENTRY_STATUS="❌ FAIL"
+              TOTAL_ERRORS=$((TOTAL_ERRORS + 1))
+            else
+              ENTRY_STATUS="⚠️ WARN"
+              TOTAL_WARNINGS=$((TOTAL_WARNINGS + 1))
+            fi
+          else
+            ENTRY_STATUS="✅ PASS"
+          fi
+          
+          ENTRY_FILENAME=$(basename "$ENTRY_JS" 2>/dev/null || echo "N/A")
+          echo "| Entry JS ($ENTRY_FILENAME) | ${ENTRY_SIZE_KB}KB | ${ENTRY_BUDGET_KB}KB | $ENTRY_STATUS |" >> bundle-report.md
+          
+          # Check CSS
+          CSS_FILE=$(find dist/assets -name "index-*.css" | head -1)
+          CSS_BUDGET_KB=$(cat $BUDGET_FILE | grep -o '"initialCss": [0-9]*' | grep -o '[0-9]*')
+          CSS_SIZE=$(get_size "$CSS_FILE")
+          CSS_SIZE_KB=$(bytes_to_kb $CSS_SIZE)
+          
+          if (( $(echo "$CSS_SIZE_KB > $CSS_BUDGET_KB" | bc -l) )); then
+            if [ "$FAIL_ON_VIOLATION" == "true" ]; then
+              CSS_STATUS="❌ FAIL"
+              TOTAL_ERRORS=$((TOTAL_ERRORS + 1))
+            else
+              CSS_STATUS="⚠️ WARN"
+              TOTAL_WARNINGS=$((TOTAL_WARNINGS + 1))
+            fi
+          else
+            CSS_STATUS="✅ PASS"
+          fi
+          
+          CSS_FILENAME=$(basename "$CSS_FILE" 2>/dev/null || echo "N/A")
+          echo "| Entry CSS ($CSS_FILENAME) | ${CSS_SIZE_KB}KB | ${CSS_BUDGET_KB}KB | $CSS_STATUS |" >> bundle-report.md
+          
+          # Calculate total bundle size
+          TOTAL_SIZE=0
+          for file in dist/assets/*.{js,css}; do
+            if [ -f "$file" ]; then
+              size=$(get_size "$file")
+              TOTAL_SIZE=$((TOTAL_SIZE + size))
+            fi
+          done
+          TOTAL_SIZE_KB=$(bytes_to_kb $TOTAL_SIZE)
+          TOTAL_BUDGET_KB=$(cat $BUDGET_FILE | grep -o '"totalBundle": [0-9]*' | grep -o '[0-9]*')
+          
+          if (( $(echo "$TOTAL_SIZE_KB > $TOTAL_BUDGET_KB" | bc -l) )); then
+            if [ "$FAIL_ON_VIOLATION" == "true" ]; then
+              TOTAL_STATUS="❌ FAIL"
+              TOTAL_ERRORS=$((TOTAL_ERRORS + 1))
+            else
+              TOTAL_STATUS="⚠️ WARN"
+              TOTAL_WARNINGS=$((TOTAL_WARNINGS + 1))
+            fi
+          else
+            TOTAL_STATUS="✅ PASS"
+          fi
+          
+          echo "| **Total Bundle** | **${TOTAL_SIZE_KB}KB** | **${TOTAL_BUDGET_KB}KB** | $TOTAL_STATUS |" >> bundle-report.md
+          
+          # Check lazy-loaded chunks
+          echo "" >> bundle-report.md
+          echo "### Lazy-Loaded Chunks" >> bundle-report.md
+          echo "" >> bundle-report.md
+          echo "| Chunk | Size | Budget | Status |" >> bundle-report.md
+          echo "|-------|------|--------|--------|" >> bundle-report.md
+          
+          LAZY_BUDGET_KB=$(cat $BUDGET_FILE | grep -o '"lazyChunk": [0-9]*' | grep -o '[0-9]*')
+          LAZY_VIOLATIONS=0
+          
+          for file in dist/assets/*.js; do
+            filename=$(basename "$file")
+            # Skip vendor and entry chunks
+            if [[ "$filename" == *"client-"* ]] || [[ "$filename" == *"index-"* ]]; then
+              continue
+            fi
+            
+            size=$(get_size "$file")
+            size_kb=$(bytes_to_kb $size)
+            
+            if (( $(echo "$size_kb > $LAZY_BUDGET_KB" | bc -l) )); then
+              if [ "$FAIL_ON_VIOLATION" == "true" ]; then
+                status="❌ FAIL"
+                TOTAL_ERRORS=$((TOTAL_ERRORS + 1))
+              else
+                status="⚠️ WARN"
+                TOTAL_WARNINGS=$((TOTAL_WARNINGS + 1))
+              fi
+              LAZY_VIOLATIONS=$((LAZY_VIOLATIONS + 1))
+            else
+              status="✅ PASS"
+            fi
+            
+            echo "| $filename | ${size_kb}KB | ${LAZY_BUDGET_KB}KB | $status |" >> bundle-report.md
+          done
+          
+          echo "" >> bundle-report.md
+          echo "### Summary" >> bundle-report.md
+          echo "" >> bundle-report.md
+          echo "- **Total Warnings**: $TOTAL_WARNINGS" >> bundle-report.md
+          echo "- **Total Errors**: $TOTAL_ERRORS" >> bundle-report.md
+          echo "- **Fail on Violation**: $FAIL_ON_VIOLATION" >> bundle-report.md
+          
+          # Output for GitHub Actions
+          echo "total_warnings=$TOTAL_WARNINGS" >> $GITHUB_OUTPUT
+          echo "total_errors=$TOTAL_ERRORS" >> $GITHUB_OUTPUT
+          echo "entry_size_kb=$ENTRY_SIZE_KB" >> $GITHUB_OUTPUT
+          echo "css_size_kb=$CSS_SIZE_KB" >> $GITHUB_OUTPUT
+          echo "total_size_kb=$TOTAL_SIZE_KB" >> $GITHUB_OUTPUT
+          echo "lazy_violations=$LAZY_VIOLATIONS" >> $GITHUB_OUTPUT
+          
+          # Display report
+          cat bundle-report.md
+          
+          # Exit with error if fail_on_violation is true and there are errors
+          if [ "$FAIL_ON_VIOLATION" == "true" ] && [ $TOTAL_ERRORS -gt 0 ]; then
+            echo "::error::Performance budget violations detected!"
+            exit 1
+          fi
+        shell: bash
+
+      - name: Upload bundle report
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundle-size-report
+          path: anamnese-app/bundle-report.md
+          retention-days: 30
+
+      - name: Comment PR with bundle report
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- performance-bundle-report -->';
+            const reportPath = 'anamnese-app/bundle-report.md';
+            
+            if (!fs.existsSync(reportPath)) {
+              console.log('Bundle report not found, skipping PR comment');
+              return;
+            }
+            
+            const report = fs.readFileSync(reportPath, 'utf8');
+            const body = `${marker}\n${report}`;
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            
+            const comments = await github.paginate(
+              github.rest.issues.listComments,
+              { owner, repo, issue_number, per_page: 100 }
+            );
+            
+            const existing = comments.find(c =>
+              c.user && c.user.type === 'Bot' && c.body && c.body.includes(marker)
+            );
+            
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existing.id,
+                body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number,
+                body
+              });
+            }
+
+  # ==========================================
+  # Job 2: Lighthouse CI Performance Check
+  # ==========================================
+  lighthouse-check:
+    name: Lighthouse CI
+    runs-on: ubuntu-latest
+    needs: bundle-size-check
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: anamnese-app/package-lock.json
+
+      - name: Install dependencies
+        working-directory: anamnese-app
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: anamnese-app
+        run: npm run build
+        env:
+          NODE_ENV: production
+
+      - name: Install Lighthouse CI
+        run: npm install -g @lhci/cli@0.14.x
+
+      - name: Run Lighthouse CI
+        id: lighthouse
+        working-directory: anamnese-app
+        run: |
+          # Create lighthouserc config dynamically
+          cat > lighthouserc.json << 'EOF'
+          {
+            "ci": {
+              "collect": {
+                "staticDistDir": "./dist",
+                "url": ["/"],
+                "numberOfRuns": 3,
+                "settings": {
+                  "preset": "desktop"
+                }
+              },
+              "assert": {
+                "preset": "lighthouse:recommended",
+                "assertions": {
+                  "categories:performance": ["warn", { "minScore": 0.8 }],
+                  "categories:accessibility": ["warn", { "minScore": 0.9 }],
+                  "categories:best-practices": ["warn", { "minScore": 0.9 }],
+                  "categories:seo": ["warn", { "minScore": 0.9 }],
+                  "first-contentful-paint": ["warn", { "maxNumericValue": 1800 }],
+                  "largest-contentful-paint": ["warn", { "maxNumericValue": 2500 }],
+                  "interactive": ["warn", { "maxNumericValue": 3800 }],
+                  "total-blocking-time": ["warn", { "maxNumericValue": 200 }],
+                  "cumulative-layout-shift": ["warn", { "maxNumericValue": 0.1 }],
+                  "speed-index": ["warn", { "maxNumericValue": 3400 }]
+                }
+              },
+              "upload": {
+                "target": "temporary-public-storage"
+              }
+            }
+          }
+          EOF
+          
+          # Run Lighthouse CI
+          lhci autorun --config=./lighthouserc.json || true
+          
+          # Create summary report
+          echo "##  lighthouse Performance Report" > lighthouse-report.md
+          echo "" >> lighthouse-report.md
+          
+          if [ -f ".lighthouseci/links.json" ]; then
+            echo "### Results" >> lighthouse-report.md
+            echo "" >> lighthouse-report.md
+            LINKS=$(cat .lighthouseci/links.json)
+            echo "Lighthouse CI has completed. Results available in artifacts." >> lighthouse-report.md
+          else
+            echo "⚠️ Lighthouse CI completed with warnings. Check artifacts for details." >> lighthouse-report.md
+          fi
+          
+          cat lighthouse-report.md
+        shell: bash
+
+      - name: Upload Lighthouse artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-report
+          path: |
+            anamnese-app/.lighthouseci/
+            anamnese-app/lighthouse-report.md
+          retention-days: 30
+
+      - name: Comment PR with Lighthouse report
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- performance-lighthouse-report -->';
+            const reportPath = 'anamnese-app/lighthouse-report.md';
+            
+            if (!fs.existsSync(reportPath)) {
+              console.log('Lighthouse report not found, skipping PR comment');
+              return;
+            }
+            
+            const report = fs.readFileSync(reportPath, 'utf8');
+            const body = `${marker}\n${report}`;
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            
+            const comments = await github.paginate(
+              github.rest.issues.listComments,
+              { owner, repo, issue_number, per_page: 100 }
+            );
+            
+            const existing = comments.find(c =>
+              c.user && c.user.type === 'Bot' && c.body && c.body.includes(marker)
+            );
+            
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existing.id,
+                body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number,
+                body
+              });
+            }
+
+  # ==========================================
+  # Job 3: API Performance Check (k6)
+  # ==========================================
+  api-performance-check:
+    name: API Performance Check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: anamnese-app
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: anamnese_perf_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/anamnese_perf_test
+      JWT_SECRET: test-secret-minimum-32-characters-long-for-performance-testing
+      ENCRYPTION_KEY: perf-encryption-key-exactly-32ch!!
+      NODE_ENV: test
+      PORT: 3001
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: anamnese-app/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup k6
+        run: |
+          sudo gpg -k
+          sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install k6
+
+      - name: Prisma migrate + seed
+        run: |
+          npx prisma migrate deploy
+          npx prisma db seed
+
+      - name: Start API server
+        run: |
+          # Build the server
+          npm run build
+          
+          # Start server in background
+          npm run dev:server &
+          
+          # Wait for server to be ready
+          echo "Waiting for server to start..."
+          for i in {1..30}; do
+            if curl -s http://localhost:3001/api/health > /dev/null 2>&1 || \
+               curl -s http://localhost:3001/health > /dev/null 2>&1 || \
+               curl -s http://localhost:3001 > /dev/null 2>&1; then
+              echo "Server is ready!"
+              break
+            fi
+            sleep 2
+          done
+          
+          # Give it a bit more time to fully initialize
+          sleep 3
+        shell: bash
+
+      - name: Run k6 API performance tests
+        id: k6-test
+        run: |
+          # Load budget configuration
+          BUDGET_FILE="../.github/performance-budget.json"
+          API_RESPONSE_P95=$(cat $BUDGET_FILE | grep -o '"apiResponseP95": [0-9]*' | grep -o '[0-9]*')
+          DB_QUERY_P95=$(cat $BUDGET_FILE | grep -o '"dbQueryP95": [0-9]*' | grep -o '[0-9]*')
+          SOCKET_LATENCY=$(cat $BUDGET_FILE | grep -o '"socketLatency": [0-9]*' | grep -o '[0-9]*')
+          
+          # Create k6 test script
+          cat > performance-test.js << EOF
+          import http from 'k6/http';
+          import { check, sleep, group } from 'k6';
+          import { Trend, Rate, Counter } from 'k6/metrics';
+          
+          // Custom metrics
+          const apiResponseTime = new Trend('api_response_time_p95');
+          const dbQueryTime = new Trend('db_query_time_p95');
+          const socketLatency = new Trend('socket_io_latency');
+          const errorRate = new Rate('errors');
+          const successCounter = new Counter('successful_requests');
+          
+          // Performance budgets (ms)
+          const BUDGET_API_P95 = ${API_RESPONSE_P95};
+          const BUDGET_DB_P95 = ${DB_QUERY_P95};
+          const BUDGET_SOCKET = ${SOCKET_LATENCY};
+          
+          export const options = {
+            stages: [
+              { duration: '30s', target: 10 },  // Ramp up
+              { duration: '1m', target: 10 },   // Steady state
+              { duration: '30s', target: 0 },   // Ramp down
+            ],
+            thresholds: {
+              api_response_time_p95: [
+                \`p(95) < \${BUDGET_API_P95}\`,
+              ],
+              db_query_time_p95: [
+                \`p(95) < \${BUDGET_DB_P95}\`,
+              ],
+              errors: ['rate<0.1'],
+              http_req_duration: ['p(95)<500'],
+            },
+          };
+          
+          const BASE_URL = 'http://localhost:3001';
+          
+          export default function () {
+            group('Health Check', () => {
+              const start = Date.now();
+              const res = http.get(\`\${BASE_URL}/api/health\`, { 
+                tags: { name: 'health_check' } 
+              });
+              const duration = Date.now() - start;
+              
+              apiResponseTime.add(duration);
+              
+              const success = check(res, {
+                'health check status is 200': (r) => r.status === 200,
+                'health check response time < 500ms': (r) => duration < 500,
+              });
+              
+              if (success) {
+                successCounter.add(1);
+              } else {
+                errorRate.add(1);
+              }
+            });
+            
+            sleep(1);
+            
+            group('Static Assets', () => {
+              const start = Date.now();
+              const res = http.get(\`\${BASE_URL}/\`, {
+                tags: { name: 'index_page' }
+              });
+              const duration = Date.now() - start;
+              
+              apiResponseTime.add(duration);
+              
+              const success = check(res, {
+                'index page status is 200': (r) => r.status === 200,
+                'index page response time < 1000ms': (r) => duration < 1000,
+              });
+              
+              if (success) {
+                successCounter.add(1);
+              } else {
+                errorRate.add(1);
+              }
+            });
+            
+            sleep(1);
+            
+            group('API Endpoints', () => {
+              // Test common API endpoints (adjust based on your API structure)
+              const endpoints = [
+                { path: '/api/health', name: 'api_health' },
+              ];
+              
+              endpoints.forEach(endpoint => {
+                const start = Date.now();
+                const res = http.get(\`\${BASE_URL}\${endpoint.path}\`, {
+                  tags: { name: endpoint.name }
+                });
+                const duration = Date.now() - start;
+                
+                apiResponseTime.add(duration);
+                
+                const success = check(res, {
+                  [\`\${endpoint.name} status is 200 or 401/403 (protected)\`]: (r) => 
+                    r.status === 200 || r.status === 401 || r.status === 403,
+                  [\`\${endpoint.name} response time < \${BUDGET_API_P95}ms\`]: (r) => 
+                    duration < BUDGET_API_P95,
+                });
+                
+                if (success) {
+                  successCounter.add(1);
+                } else {
+                  errorRate.add(1);
+                }
+              });
+            });
+            
+            sleep(1);
+          }
+          
+          export function handleSummary(data) {
+            return {
+              'k6-summary.json': JSON.stringify(data, null, 2),
+              stdout: textSummary(data, { indent: ' ', enableColors: false }),
+            };
+          }
+          EOF
+          
+          # Create text summary helper
+          cat > text-summary.js << 'HELPER_EOF'
+          export function textSummary(data, options) {
+            const indent = options && options.indent ? options.indent : '';
+            const enableColors = options && options.enableColors !== undefined ? options.enableColors : true;
+            
+            let summary = '';
+            summary += indent + '╔══════════════════════════════════════════════════════════╗\n';
+            summary += indent + '║              k6 API Performance Test Results              ║\n';
+            summary += indent + '╚══════════════════════════════════════════════════════════╝\n\n';
+            
+            if (data.metrics) {
+              const httpReqDuration = data.metrics.http_req_duration;
+              if (httpReqDuration) {
+                summary += indent + 'HTTP Request Duration:\n';
+                summary += indent + '  avg: ' + (httpReqDuration.avg / 1000).toFixed(2) + 's\n';
+                summary += indent + '  min: ' + (httpReqDuration.min / 1000).toFixed(2) + 's\n';
+                summary += indent + '  med: ' + (httpReqDuration.med / 1000).toFixed(2) + 's\n';
+                summary += indent + '  max: ' + (httpReqDuration.max / 1000).toFixed(2) + 's\n';
+                summary += indent + '  p(95): ' + (httpReqDuration['p(95)'] / 1000).toFixed(2) + 's\n';
+                summary += '\n';
+              }
+              
+              const httpReqs = data.metrics.http_reqs;
+              if (httpReqs) {
+                summary += indent + 'Total Requests: ' + httpReqs.count + '\n';
+              }
+              
+              const httpReqFailed = data.metrics.http_req_failed;
+              if (httpReqFailed) {
+                summary += indent + 'Failed Requests: ' + (httpReqFailed.rate * 100).toFixed(2) + '%\n';
+              }
+            }
+            
+            return summary;
+          }
+          HELPER_EOF
+          
+          # Inject the helper into the test file
+          sed -i '1s/^/import { textSummary } from ".\/text-summary.js";\n/' performance-test.js
+          
+          # Run k6 test
+          echo "Starting k6 performance tests..."
+          k6 run performance-test.js --summary-export=k6-summary.json 2>&1 || true
+          
+          # Generate report
+          echo "## 🔥 API Performance Test Report" > api-performance-report.md
+          echo "" >> api-performance-report.md
+          
+          if [ -f "k6-summary.json" ]; then
+            echo "### Results Summary" >> api-performance-report.md
+            echo "" >> api-performance-report.md
+            
+            # Parse results
+            P95=$(cat k6-summary.json | grep -o '"p(95)":[0-9.]*' | head -1 | cut -d':' -f2 || echo "0")
+            if [ -z "$P95" ] || [ "$P95" = "" ]; then
+              P95="0"
+            fi
+            P95_MS=$(echo "scale=2; $P95 / 1000" | bc || echo "0")
+            
+            echo "| Metric | Value | Budget | Status |" >> api-performance-report.md
+            echo "|--------|-------|--------|--------|" >> api-performance-report.md
+            
+            # Check API response time
+            if (( $(echo "$P95_MS > $API_RESPONSE_P95" | bc -l) )); then
+              if [ "$FAIL_ON_VIOLATION" == "true" ]; then
+                API_STATUS="❌ FAIL"
+              else
+                API_STATUS="⚠️ WARN"
+              fi
+            else
+              API_STATUS="✅ PASS"
+            fi
+            
+            echo "| API Response p95 | ${P95_MS}ms | ${API_RESPONSE_P95}ms | $API_STATUS |" >> api-performance-report.md
+            echo "| DB Query p95 | N/A (measured in-app) | ${DB_QUERY_P95}ms | ⏭️ SKIP |" >> api-performance-report.md
+            echo "| Socket.IO Latency | N/A (requires client) | ${SOCKET_LATENCY}ms | ⏭️ SKIP |" >> api-performance-report.md
+            
+            echo "" >> api-performance-report.md
+            echo "### Raw Metrics" >> api-performance-report.md
+            echo '```json' >> api-performance-report.md
+            cat k6-summary.json | head -100 >> api-performance-report.md
+            echo '```' >> api-performance-report.md
+          else
+            echo "⚠️ k6 test completed but no summary file generated" >> api-performance-report.md
+          fi
+          
+          cat api-performance-report.md
+        shell: bash
+
+      - name: Upload API performance artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-performance-report
+          path: |
+            anamnese-app/api-performance-report.md
+            anamnese-app/k6-summary.json
+          retention-days: 30
+
+      - name: Comment PR with API performance report
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- performance-api-report -->';
+            const reportPath = 'anamnese-app/api-performance-report.md';
+            
+            if (!fs.existsSync(reportPath)) {
+              console.log('API performance report not found, skipping PR comment');
+              return;
+            }
+            
+            const report = fs.readFileSync(reportPath, 'utf8');
+            const body = `${marker}\n${report}`;
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            
+            const comments = await github.paginate(
+              github.rest.issues.listComments,
+              { owner, repo, issue_number, per_page: 100 }
+            );
+            
+            const existing = comments.find(c =>
+              c.user && c.user.type === 'Bot' && c.body && c.body.includes(marker)
+            );
+            
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existing.id,
+                body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number,
+                body
+              });
+            }
+
+  # ==========================================
+  # Job 4: Summary Report
+  # ==========================================
+  performance-summary:
+    name: Performance Summary
+    runs-on: ubuntu-latest
+    needs: [bundle-size-check, lighthouse-check, api-performance-check]
+    if: always() && github.event_name == 'pull_request'
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create summary report
+        id: summary
+        run: |
+          echo "## 🎯 Performance Budget Validation Summary" > summary-report.md
+          echo "" >> summary-report.md
+          echo "| Check | Status |" >> summary-report.md
+          echo "|-------|--------|" >> summary-report.md
+          
+          # Bundle size status
+          BUNDLE_STATUS="${{ needs.bundle-size-check.result }}"
+          if [ "$BUNDLE_STATUS" == "success" ]; then
+            BUNDLE_ICON="✅"
+          elif [ "$BUNDLE_STATUS" == "failure" ]; then
+            BUNDLE_ICON="❌"
+          else
+            BUNDLE_ICON="⏭️"
+          fi
+          echo "| Bundle Size | $BUNDLE_ICON $BUNDLE_STATUS |" >> summary-report.md
+          
+          # Lighthouse status
+          LIGHTHOUSE_STATUS="${{ needs.lighthouse-check.result }}"
+          if [ "$LIGHTHOUSE_STATUS" == "success" ]; then
+            LIGHTHOUSE_ICON="✅"
+          elif [ "$LIGHTHOUSE_STATUS" == "failure" ]; then
+            LIGHTHOUSE_ICON="⚠️"
+          else
+            LIGHTHOUSE_ICON="⏭️"
+          fi
+          echo "| Lighthouse CI | $LIGHTHOUSE_ICON $LIGHTHOUSE_STATUS |" >> summary-report.md
+          
+          # API performance status
+          API_STATUS="${{ needs.api-performance-check.result }}"
+          if [ "$API_STATUS" == "success" ]; then
+            API_ICON="✅"
+          elif [ "$API_STATUS" == "failure" ]; then
+            API_ICON="⚠️"
+          else
+            API_ICON="⏭️"
+          fi
+          echo "| API Performance | $API_ICON $API_STATUS |" >> summary-report.md
+          
+          echo "" >> summary-report.md
+          echo "### Configuration" >> summary-report.md
+          echo "" >> summary-report.md
+          echo "- **Fail on Violation**: $FAIL_ON_VIOLATION" >> summary-report.md
+          echo "- **Budget File**: \`.github/performance-budget.json\`" >> summary-report.md
+          echo "" >> summary-report.md
+          echo "> 📊 Detailed reports are attached as artifacts and commented separately." >> summary-report.md
+          
+          cat summary-report.md
+          
+          # Set job output for GitHub summary
+          echo "bundle_status=$BUNDLE_STATUS" >> $GITHUB_OUTPUT
+          echo "lighthouse_status=$LIGHTHOUSE_STATUS" >> $GITHUB_OUTPUT
+          echo "api_status=$API_STATUS" >> $GITHUB_OUTPUT
+        shell: bash
+
+      - name: Comment PR with summary
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- performance-budget-summary -->';
+            const reportPath = 'summary-report.md';
+            
+            if (!fs.existsSync(reportPath)) {
+              console.log('Summary report not found, skipping PR comment');
+              return;
+            }
+            
+            const report = fs.readFileSync(reportPath, 'utf8');
+            const body = `${marker}\n${report}`;
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            
+            const comments = await github.paginate(
+              github.rest.issues.listComments,
+              { owner, repo, issue_number, per_page: 100 }
+            );
+            
+            const existing = comments.find(c =>
+              c.user && c.user.type === 'Bot' && c.body && c.body.includes(marker)
+            );
+            
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existing.id,
+                body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number,
+                body
+              });
+            }
+
+      - name: Mark workflow status
+        if: env.FAIL_ON_VIOLATION == 'true'
+        run: |
+          BUNDLE_STATUS="${{ needs.bundle-size-check.result }}"
+          LIGHTHOUSE_STATUS="${{ needs.lighthouse-check.result }}"
+          API_STATUS="${{ needs.api-performance-check.result }}"
+          
+          if [ "$BUNDLE_STATUS" == "failure" ] || [ "$LIGHTHOUSE_STATUS" == "failure" ] || [ "$API_STATUS" == "failure" ]; then
+            echo "::error::One or more performance checks failed!"
+            exit 1
+          fi
+        shell: bash

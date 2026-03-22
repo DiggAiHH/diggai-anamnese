@@ -1,0 +1,100 @@
+# Cursor Rules — DiggAI Anamnese Platform
+
+## Identity
+This is DiggAI Anamnese Platform (Service 4 of 4-service DiggAI system).
+Stack: React 19 + TypeScript + Vite + Express 5 + Prisma 6 + PostgreSQL 16.
+Work EXCLUSIVELY in `anamnese-app/`. Do NOT touch sibling folders.
+
+---
+
+## NO-REDUNDANCY PROTOCOL — MANDATORY
+
+Goldene Regel: Alles darf nur einmal gemacht werden. No duplicate work across sessions or agents.
+
+Before creating any file, feature, route, service, or component, run from repo root (Anamnese-kimi/):
+
+```powershell
+# Step 1: Precheck
+powershell -ExecutionPolicy Bypass -File scripts/once-guard.ps1 precheck -Task "<task-key>"
+# Exit 0 = free to proceed
+# Exit 2 = BLOCKED — another agent has claimed this task
+# Exit 3 = BLOCKED — task already completed, artifacts exist
+# Exit 4 = WARNING — target artifact already exists on disk
+
+# Step 2: Claim before starting
+powershell -ExecutionPolicy Bypass -File scripts/once-guard.ps1 claim -Task "<task-key>" -Agent "cursor" -SessionId "<YYYY-MM-DD-topic>"
+
+# Step 3: Read shared knowledge
+# shared/knowledge/knowledge-share.md  — past decisions, lessons learned, artifacts
+# shared/knowledge/task-registry.json  — all tasks (in_progress / completed)
+
+# Step 4: Do the work.
+
+# Step 5: Mark complete with artifacts
+powershell -ExecutionPolicy Bypass -File scripts/once-guard.ps1 complete -Task "<task-key>" -Agent "cursor" -Artifacts @("server/routes/example.ts") -Notes "Brief summary"
+```
+
+If a file already exists on disk: READ IT FIRST. Extend, don't replace.
+Policy doc: `../SESSIONS_ONCE_POLICY.md`
+
+---
+
+## Architecture
+
+- Frontend: `src/` — React 19, Zustand 5, TanStack Query 5, React Router 7
+- Backend: `server/` — Express 5, Prisma 6, Socket.IO 4, JWT, AES-256-GCM
+- DB schema: `prisma/schema.prisma`
+- All API hooks: `src/hooks/useApi.ts` (1500+ lines — read before touching)
+- Medical questions: `src/data/questions.ts` (1246 lines — IDs are canonical, never renumber)
+
+---
+
+## Security Rules (Non-Negotiable)
+
+- NEVER log patient names, emails, diagnoses — use IDs only
+- ALWAYS use `server/services/encryption.ts` (AES-256-GCM) for PII fields
+- ALWAYS use HttpOnly cookies for JWT — never localStorage
+- NEVER bypass `server/middleware/auth.ts` on patient-data routes
+- NEVER hardcode secrets — use `.env`
+
+---
+
+## Code Conventions
+
+- TypeScript strict mode — no `any`
+- Functional React components only, hooks for state
+- All user-facing strings via `useTranslation()` — no hardcoded German text
+- Tailwind utility classes only — no CSS modules
+- TanStack React Query for all API calls
+- Prisma ORM only — no raw SQL
+- All new API endpoints: auth middleware + Zod validation + audit log
+
+---
+
+## i18n (10 languages)
+
+ALL new UI strings need keys in ALL 10 locale files:
+`public/locales/{de,en,tr,ar,uk,es,fa,it,fr,pl}/translation.json`
+German (de) is source of truth. Run `node scripts/generate-i18n.ts` to check.
+
+---
+
+## Forbidden
+
+- No patient data in URLs or query strings
+- No `console.log` of sensitive data in production
+- No raw SQL — Prisma only
+- No new triage logic outside `server/engine/TriageEngine.ts`
+- No TriageEngine changes without clinical sign-off (Dr. Klapproth / Dr. Al-Shdaifat)
+- No git push --force to main
+- No skipping Prisma migrations after schema changes
+
+---
+
+## Brainstorm Flow
+
+New feature ideas go through the 4-agent brainstorm before implementation:
+```powershell
+powershell -ExecutionPolicy Bypass -File ../scripts/agent-brainstorm.ps1 init -Topic "<topic>"
+```
+See `../AGENT_BRAINSTORM_FLOW.md` for full protocol.

@@ -1,22 +1,33 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-import * as multer from 'multer';
-import * as path from 'path';
+import multer from 'multer';
+import { resolve, normalize, sep, extname } from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { prisma } from '../db';
 import { requireAuth } from '../middleware/auth';
+
+// SECURITY: Define upload directory once, resolved to absolute path
+const UPLOAD_DIR = resolve(process.cwd(), 'uploads');
+
+/**
+ * SECURITY: Validates that the requested file path is within the upload directory.
+ * Prevents path traversal attacks like ../../../etc/passwd
+ */
+function isPathSecure(filepath: string): boolean {
+    const normalized = normalize(filepath);
+    return normalized.startsWith(UPLOAD_DIR + sep);
+}
 
 const router = Router();
 
 // Configure Multer storage
 const storage = multer.diskStorage({
     destination: (_req, _file, cb) => {
-        cb(null, 'uploads/'); // Make sure this folder exists
+        cb(null, UPLOAD_DIR); // Use secure absolute path
     },
     filename: (_req, file, cb) => {
         // Generate a secure, random filename to prevent overwriting and path traversal
-        const uniqueName = `${uuidv4()}${path.extname(file.originalname)}`;
+        const uniqueName = `${uuidv4()}${extname(file.originalname)}`;
         cb(null, uniqueName);
     }
 });
@@ -68,14 +79,17 @@ router.post('/', requireAuth, upload.single('document'), async (req: Request, re
 /**
  * GET /api/upload/:filename
  * Lädt ein hochgeladenes Dokument herunter.
+ * SECURITY: Path traversal protection via isPathSecure()
  */
 router.get('/:filename', requireAuth, async (req: Request, res: Response) => {
     try {
         const filename = req.params.filename as string;
-        const filepath = path.join(process.cwd(), 'uploads', filename);
+        // SECURITY: Resolve to absolute path and validate
+        const filepath = resolve(UPLOAD_DIR, filename);
 
         // Security check: ensure path is within uploads directory
-        if (!filepath.startsWith(path.join(process.cwd(), 'uploads'))) {
+        if (!isPathSecure(filepath)) {
+            console.warn(`[Security] Path traversal attempt blocked: ${filename}`);
             res.status(403).json({ error: 'Zugriff verweigert' });
             return;
         }
@@ -84,6 +98,7 @@ router.get('/:filename', requireAuth, async (req: Request, res: Response) => {
         // Audit log
         await prisma.auditLog.create({
             data: {
+                tenantId: req.tenantId || req.auth?.tenantId || 'system',
                 action: 'DOWNLOAD_DOCUMENT',
                 resource: `uploads/${filename}`,
                 metadata: JSON.stringify({ filename })

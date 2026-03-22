@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { FileText, Upload, Share2, Trash2, Loader2, CheckCircle, AlertCircle, RefreshCw, Eye } from 'lucide-react';
-import { useTIEpaStatus } from '../../hooks/useApi';
+import { useTIEpaStatus } from '../../hooks/useOpsApi';
 
 type EpaTab = 'status' | 'documents' | 'share';
 

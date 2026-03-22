@@ -1,0 +1,67 @@
+# Redis für Sessions, Cache, Rate Limiting
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: diggai-takios
+spec:
+  replicas: 1  # Für HA: Redis Cluster mit 6 nodes
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+      - name: redis
+        image: redis:7-alpine
+        ports:
+        - containerPort: 6379
+          name: redis
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        volumeMounts:
+        - name: redis-data
+          mountPath: /data
+        args:
+        - --appendonly
+        - "yes"
+        - --maxmemory
+        - "512mb"
+        - --maxmemory-policy
+        - allkeys-lru
+        livenessProbe:
+          tcpSocket:
+            port: 6379
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - redis-cli
+            - ping
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: redis-data
+        emptyDir: {}  # Für Prod: PersistentVolume
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: diggai-takios
+spec:
+  selector:
+    app: redis
+  ports:
+  - port: 6379
+    targetPort: 6379
+  type: ClusterIP

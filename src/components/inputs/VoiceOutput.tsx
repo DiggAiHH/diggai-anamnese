@@ -265,7 +265,7 @@ export function useVoiceOutput() {
   const toggleTTS = useCallback(() => {
     setTtsEnabled(prev => {
       const next = !prev;
-      try { localStorage.setItem('diggai_tts_enabled', String(next)); } catch {}
+      try { localStorage.setItem('diggai_tts_enabled', String(next)); } catch { /* storage unavailable */ }
       if (!next && isTTSSupported()) {
         window.speechSynthesis.cancel();
       }

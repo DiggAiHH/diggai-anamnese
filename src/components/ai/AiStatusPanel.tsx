@@ -1,6 +1,6 @@
 import { Wifi, WifiOff, Cpu, Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { useAiStatus } from '../../hooks/useApi';
+import { useAiStatus } from '../../hooks/useOpsApi';
 
 export function AiStatusPanel() {
     const { t } = useTranslation();

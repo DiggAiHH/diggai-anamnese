@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MessageSquare, Send, User, Bot, ChevronLeft, Plus, Mail, MailOpen, Loader2, AlertTriangle } from 'lucide-react';
-import { usePwaMessages, usePwaMessageSend, usePwaUnreadCount } from '../../hooks/useApi';
+import { usePwaMessages, usePwaMessageSend, usePwaUnreadCount } from '../../hooks/usePatientApi';
 
 type View = 'list' | 'detail' | 'compose';
 

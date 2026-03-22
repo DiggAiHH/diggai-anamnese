@@ -1,10 +1,37 @@
 import { test, expect } from '@playwright/test';
 
+async function dismissCookieBannerIfPresent(page: import('@playwright/test').Page) {
+  const dialog = page.getByRole('dialog', { name: /Cookie-Einstellungen/i });
+  if (await dialog.isVisible({ timeout: 3000 }).catch(() => false)) {
+    const essentialOnlyButton = dialog.getByRole('button', { name: /Nur Essenzielle/i });
+    if (await essentialOnlyButton.isVisible().catch(() => false)) {
+      await essentialOnlyButton.click();
+    } else {
+      await dialog.getByRole('button', { name: /Alle akzeptieren/i }).click();
+    }
+    await expect(dialog).toBeHidden({ timeout: 5000 });
+  }
+}
+
 test.describe('Checkout & Feedback — Modul 7', () => {
   test('Anonymous feedback form renders and accepts rating', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('cookie_consent', JSON.stringify({
+        essential: true,
+        functional: false,
+        analytics: false,
+        timestamp: new Date().toISOString(),
+        version: '1.0.0',
+      }));
+    });
     await page.goto('/feedback');
+    await dismissCookieBannerIfPresent(page);
     await expect(page).toHaveURL(/feedback/);
     await expect(page.locator('body')).not.toContainText('404');
+    await page.getByRole('button', { name: '4 von 5 Sternen' }).click();
+    await dismissCookieBannerIfPresent(page);
+    await page.getByRole('button', { name: /Feedback absenden/i }).click();
+    await expect(page.getByRole('heading', { name: 'Vielen Dank!' })).toBeVisible();
   });
 
   test('Checkout wizard page loads for valid session', async ({ page }) => {

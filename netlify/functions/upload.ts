@@ -15,7 +15,7 @@ interface UploadedFile {
   uploadedAt: string;
 }
 
-let uploadsStore: UploadedFile[] = [];
+const uploadsStore: UploadedFile[] = [];
 
 const handler: Handler = async (event: HandlerEvent) => {
   const origin = event.headers?.origin || event.headers?.Origin;

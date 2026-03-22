@@ -1,0 +1,44 @@
+{
+  "model": "claude-sonnet-4-20250514",
+  "maxTokens": 8096,
+  "autoApprove": [
+    "read_file",
+    "list_directory",
+    "run_command:npm run lint",
+    "run_command:npm run build",
+    "run_command:npx prisma generate",
+    "run_command:node scripts/generate-i18n.ts",
+    "run_command:node compare-translations.cjs",
+    "run_command:npx playwright test"
+  ],
+  "requireConfirmation": [
+    "delete_file",
+    "modify:server/engine/TriageEngine.ts",
+    "modify:server/engine/QuestionFlowEngine.ts",
+    "modify:prisma/schema.prisma",
+    "modify:src/data/questions.ts",
+    "modify:server/middleware/auth.ts",
+    "modify:server/services/encryption.ts",
+    "run_command:npx prisma migrate",
+    "run_command:docker",
+    "run_command:git push",
+    "run_command:git reset",
+    "run_command:git checkout"
+  ],
+  "forbidden": [
+    "access:C:\\Users\\tubbeTEC\\Downloads\\dr-aroob-ki",
+    "access:C:\\Users\\tubbeTEC\\Downloads\\diggai-monorepo",
+    "access:C:\\Users\\tubbeTEC\\Downloads\\diggai-desktop",
+    "access:C:\\Users\\tubbeTEC\\Downloads\\diggai-agent-core",
+    "commit:.env",
+    "commit:dist/",
+    "commit:anamnese.db",
+    "commit:*.log"
+  ],
+  "notes": {
+    "scope": "EXCLUSIVELY anamnese-app/ — do not touch sibling projects",
+    "medicalSafety": "TriageEngine.ts changes require clinical review by Dr. Klapproth or Dr. Al-Shdaifat",
+    "encryption": "All PII must go through server/services/encryption.ts (AES-256-GCM)",
+    "i18n": "All 10 language files must be updated when adding new UI strings"
+  }
+}

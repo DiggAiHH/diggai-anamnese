@@ -23,7 +23,7 @@ async function checkRedis(): Promise<ServiceHealth> {
   try {
     const { getRedisClient } = await import('../../redis');
     const redis = getRedisClient();
-    if (!redis?.isReady) return { status: 'disconnected', lastChecked: new Date().toISOString() };
+    if (!redis || redis.status !== 'ready') return { status: 'disconnected', lastChecked: new Date().toISOString() };
     await redis.ping();
     return { status: 'connected', latencyMs: Date.now() - start, lastChecked: new Date().toISOString() };
   } catch (e: any) {

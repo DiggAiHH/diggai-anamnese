@@ -61,6 +61,7 @@ async function cleanup() {
     // Audit-Log
     await prisma.auditLog.create({
         data: {
+            tenantId: 'system',
             action: 'DATA_CLEANUP',
             resource: 'sessions',
             metadata: JSON.stringify({

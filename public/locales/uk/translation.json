@@ -2180,5 +2180,92 @@
   "admin.tabs.productivity": "Продуктивність",
   "admin.tabs.architecture": "Архітектура",
   "admin.tabs.changelog": "Журнал змін",
-  "back_home": "Повернутись на головну"
+  "back_home": "Повернутись на головну",
+  "ai": {
+    "applySuggestion": "[UK-TODO] undefined",
+    "assessment": "[UK-TODO] undefined",
+    "availableModels": "[UK-TODO] undefined",
+    "chiefComplaint": "[UK-TODO] undefined",
+    "enterSymptoms": "[UK-TODO] undefined",
+    "history": "[UK-TODO] undefined",
+    "medications": "[UK-TODO] undefined",
+    "notConfigured": "[UK-TODO] undefined",
+    "offline": "[UK-TODO] undefined",
+    "online": "[UK-TODO] undefined",
+    "relevantFindings": "[UK-TODO] undefined",
+    "status": "[UK-TODO] undefined",
+    "suggestError": "[UK-TODO] undefined",
+    "suggestIcd": "[UK-TODO] undefined",
+    "suggestTherapy": "[UK-TODO] undefined",
+    "suggestedMeasures": "[UK-TODO] undefined",
+    "summarize": "[UK-TODO] undefined",
+    "summaryError": "[UK-TODO] undefined"
+  },
+  "pvs": {
+    "connected": "[UK-TODO] undefined",
+    "disconnected": "[UK-TODO] undefined",
+    "fieldMappings": "[UK-TODO] undefined",
+    "linkPatient": "[UK-TODO] undefined",
+    "noConnections": "[UK-TODO] undefined",
+    "searchPatient": "[UK-TODO] undefined",
+    "setupGuide": "[UK-TODO] undefined",
+    "unlinkPatient": "[UK-TODO] undefined"
+  },
+  "therapy": {
+    "addMeasure": "[UK-TODO] undefined",
+    "description": "[UK-TODO] undefined",
+    "dosage": "[UK-TODO] undefined",
+    "dueDate": "[UK-TODO] undefined",
+    "duration": "[UK-TODO] undefined",
+    "exportError": "[UK-TODO] undefined",
+    "exportPvs": "[UK-TODO] undefined",
+    "exportSuccess": "[UK-TODO] undefined",
+    "labParameters": "[UK-TODO] undefined",
+    "measureType": "[UK-TODO] undefined",
+    "measureTypes": {
+      "CUSTOM": "[UK-TODO] undefined",
+      "DOCUMENTATION": "[UK-TODO] undefined",
+      "FOLLOW_UP": "[UK-TODO] undefined",
+      "IMAGING": "[UK-TODO] undefined",
+      "LAB_ORDER": "[UK-TODO] undefined",
+      "LIFESTYLE": "[UK-TODO] undefined",
+      "MEDICATION": "[UK-TODO] undefined",
+      "PROCEDURE": "[UK-TODO] undefined",
+      "REFERRAL": "[UK-TODO] undefined"
+    },
+    "measures": "[UK-TODO] undefined",
+    "measuresTitle": "[UK-TODO] undefined",
+    "medicationName": "[UK-TODO] undefined",
+    "noTimeline": "[UK-TODO] undefined",
+    "notFound": "[UK-TODO] undefined",
+    "notes": "[UK-TODO] undefined",
+    "priorities": {
+      "HIGH": "[UK-TODO] undefined",
+      "LOW": "[UK-TODO] undefined",
+      "NORMAL": "[UK-TODO] undefined",
+      "URGENT": "[UK-TODO] undefined"
+    },
+    "priority": "[UK-TODO] undefined",
+    "referralReason": "[UK-TODO] undefined",
+    "referralTo": "[UK-TODO] undefined",
+    "referralUrgency": "[UK-TODO] undefined",
+    "scheduledDate": "[UK-TODO] undefined",
+    "startDate": "[UK-TODO] undefined",
+    "status": {
+      "ACTIVE": "[UK-TODO] undefined",
+      "CANCELLED": "[UK-TODO] undefined",
+      "COMPLETED": "[UK-TODO] undefined",
+      "DRAFT": "[UK-TODO] undefined",
+      "PAUSED": "[UK-TODO] undefined"
+    },
+    "summary": "[UK-TODO] undefined",
+    "targetEnd": "[UK-TODO] undefined",
+    "title": "[UK-TODO] undefined",
+    "urgency": {
+      "HIGH": "[UK-TODO] undefined",
+      "LOW": "[UK-TODO] undefined",
+      "NORMAL": "[UK-TODO] undefined",
+      "URGENT": "[UK-TODO] undefined"
+    }
+  }
 }

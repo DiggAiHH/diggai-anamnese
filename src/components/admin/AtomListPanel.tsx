@@ -16,7 +16,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical, ToggleLeft, ToggleRight, Search } from 'lucide-react';
-import { useAtomToggle, useAtomsReorder } from '../../hooks/useApi';
+import { useAtomToggle, useAtomsReorder } from '../../hooks/useOpsApi';
 import type { MedicalAtomAdmin } from '../../types/admin';
 
 interface Props {

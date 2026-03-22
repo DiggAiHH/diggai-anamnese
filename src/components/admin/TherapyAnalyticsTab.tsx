@@ -1,5 +1,5 @@
 import { Heart, BarChart3, AlertTriangle, Brain, TrendingUp, Activity } from 'lucide-react';
-import { useTherapyAnalytics } from '../../hooks/useApi';
+import { useTherapyAnalytics } from '../../hooks/useOpsApi';
 import { ClinicalAlertList } from '../therapy/ClinicalAlertBanner';
 
 export function TherapyAnalyticsTab() {

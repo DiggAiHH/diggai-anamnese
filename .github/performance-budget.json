@@ -1,0 +1,146 @@
+{
+  "_comment": "Performance Budget Configuration for DiggAI Anamnese Platform",
+  "_version": "3.0.0",
+  "_lastUpdated": "2026-03-09",
+  
+  "frontend": {
+    "bundle": {
+      "initialJs": {
+        "maxSizeKb": 200,
+        "description": "Maximum size for initial JS chunk (gzipped)",
+        "files": ["client-*.js", "index-*.js"],
+        "exclude": ["vendor-*"]
+      },
+      "initialCss": {
+        "maxSizeKb": 50,
+        "description": "Maximum size for initial CSS (gzipped)",
+        "files": ["index-*.css"]
+      },
+      "totalBundle": {
+        "maxSizeKb": 500,
+        "description": "Maximum total size for all assets (gzipped)"
+      },
+      "lazyChunk": {
+        "maxSizeKb": 100,
+        "description": "Maximum size for lazy-loaded chunks (gzipped)",
+        "files": ["*.js"],
+        "exclude": ["client-*.js", "index-*.js", "vendor-*"]
+      },
+      "vendorChunks": {
+        "maxSizeKb": 150,
+        "description": "Recommended size for vendor chunks",
+        "warningOnly": true
+      }
+    },
+    "lighthouse": {
+      "performance": {
+        "minScore": 0.8,
+        "description": "Minimum Lighthouse Performance score"
+      },
+      "accessibility": {
+        "minScore": 0.9,
+        "description": "Minimum Lighthouse Accessibility score"
+      },
+      "bestPractices": {
+        "minScore": 0.9,
+        "description": "Minimum Lighthouse Best Practices score"
+      },
+      "seo": {
+        "minScore": 0.9,
+        "description": "Minimum Lighthouse SEO score"
+      },
+      "metrics": {
+        "firstContentfulPaint": {
+          "maxMs": 1800,
+          "description": "First Contentful Paint"
+        },
+        "largestContentfulPaint": {
+          "maxMs": 2500,
+          "description": "Largest Contentful Paint"
+        },
+        "timeToInteractive": {
+          "maxMs": 3800,
+          "description": "Time to Interactive"
+        },
+        "totalBlockingTime": {
+          "maxMs": 200,
+          "description": "Total Blocking Time"
+        },
+        "cumulativeLayoutShift": {
+          "maxScore": 0.1,
+          "description": "Cumulative Layout Shift"
+        },
+        "speedIndex": {
+          "maxMs": 3400,
+          "description": "Speed Index"
+        }
+      }
+    }
+  },
+  
+  "api": {
+    "responseTime": {
+      "p95": {
+        "maxMs": 500,
+        "description": "95th percentile API response time"
+      },
+      "p99": {
+        "maxMs": 1000,
+        "description": "99th percentile API response time",
+        "warningOnly": true
+      }
+    },
+    "database": {
+      "queryTime": {
+        "p95": {
+          "maxMs": 100,
+          "description": "95th percentile database query time"
+        },
+        "p99": {
+          "maxMs": 200,
+          "description": "99th percentile database query time",
+          "warningOnly": true
+        }
+      }
+    },
+    "socketIo": {
+      "latency": {
+        "maxMs": 50,
+        "description": "Socket.IO event latency"
+      }
+    },
+    "throughput": {
+      "requestsPerSecond": {
+        "min": 100,
+        "description": "Minimum requests per second",
+        "warningOnly": true
+      }
+    }
+  },
+  
+  "ci": {
+    "settings": {
+      "failOnViolation": false,
+      "description": "Whether to fail the CI build on budget violation (can be overridden via workflow_dispatch)"
+    },
+    "triggers": {
+      "onPullRequest": true,
+      "onPushToMain": true,
+      "onWorkflowDispatch": true
+    },
+    "checks": {
+      "bundleSize": {
+        "enabled": true,
+        "description": "Validate frontend bundle sizes"
+      },
+      "lighthouse": {
+        "enabled": true,
+        "description": "Run Lighthouse CI performance audit"
+      },
+      "apiPerformance": {
+        "enabled": true,
+        "description": "Run k6 API load tests"
+      }
+    }
+  }
+}

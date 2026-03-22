@@ -1,7 +1,7 @@
 import { Fragment, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Wifi, WifiOff, Server, ChevronRight, ChevronLeft, Check, Loader2, AlertCircle } from 'lucide-react';
-import { usePvsConnections, usePvsCreateConnection, usePvsTestConnection, usePvsDeleteConnection } from '../../hooks/useApi';
+import { usePvsConnections, usePvsCreateConnection, usePvsTestConnection, usePvsDeleteConnection } from '../../hooks/useOpsApi';
 import type { PvsConnection } from '../../types/admin';
 
 // ─── PVS Types & Protocols ─────────────────────────────────

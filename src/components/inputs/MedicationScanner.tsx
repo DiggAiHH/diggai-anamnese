@@ -1,7 +1,10 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Camera, X, ScanBarcode, QrCode, ImagePlus, RefreshCw, CheckCircle2, AlertCircle, Search } from 'lucide-react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
-import { createWorker } from 'tesseract.js';
+
+// Tesseract.js is loaded dynamically to reduce initial bundle size (~20MB)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type TesseractWorker = any;
 
 // ─── PZN Demo Database ─────────────────────────────────────
 // Real-world PZN numbers mapped to common medications (demo only)
@@ -187,7 +190,7 @@ export const MedicationScanner: React.FC<MedicationScannerProps> = ({ onResult, 
         setStatus('success');
     }, [stopScanner]);
 
-    // Handle photo OCR
+    // Handle photo OCR with lazy-loaded Tesseract.js
     const handlePhotoUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -197,7 +200,10 @@ export const MedicationScanner: React.FC<MedicationScannerProps> = ({ onResult, 
         setErrorMsg('');
 
         try {
-            const worker = await createWorker('deu+eng', 1, {
+            // Dynamically import Tesseract.js only when needed
+            const { createWorker } = await import('tesseract.js');
+            
+            const worker: TesseractWorker = await createWorker('deu+eng', 1, {
                 logger: m => {
                     if (m.status === 'recognizing text') {
                         setOcrProgress(Math.round(m.progress * 100));
@@ -231,7 +237,7 @@ export const MedicationScanner: React.FC<MedicationScannerProps> = ({ onResult, 
             setStatus('error');
             setErrorMsg('Fehler bei der Texterkennung. Bitte versuchen Sie es erneut.');
         }
-    }, []);
+    }, [])
 
     // Manual PZN lookup
     const handleManualPZN = useCallback(() => {

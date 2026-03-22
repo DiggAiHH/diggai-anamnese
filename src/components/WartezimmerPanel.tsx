@@ -1,7 +1,7 @@
 import React from 'react';
 import { Users, Phone, Stethoscope, CheckCircle, XCircle, Clock, AlertTriangle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { useQueue, useQueueCall, useQueueTreat, useQueueDone, useQueueRemove } from '../hooks/useApi';
+import { useQueue, useQueueCall, useQueueTreat, useQueueDone, useQueueRemove } from '../hooks/useStaffApi';
 
 interface QueueEntry {
     id: string;

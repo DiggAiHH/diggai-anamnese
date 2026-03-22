@@ -1,7 +1,10 @@
 import React, { useRef, useState } from 'react';
 import { Camera, X, RefreshCw, CheckCircle2, AlertCircle } from 'lucide-react';
-import { createWorker } from 'tesseract.js';
 import { useTranslation } from 'react-i18next';
+
+// Tesseract.js is loaded dynamically to reduce initial bundle size (~20MB)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type TesseractWorker = any;
 
 interface CameraScannerProps {
     onScan: (data: { firstname?: string; lastname?: string; dob?: string; insurance?: string; num?: string }) => void;
@@ -95,7 +98,9 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onScan, onClose })
             ctx.filter = 'contrast(150%) grayscale(100%)';
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-            const worker = await createWorker('deu');
+            // Dynamically import Tesseract.js only when needed
+            const { createWorker } = await import('tesseract.js');
+            const worker: TesseractWorker = await createWorker('deu');
 
             // Get base64 image
             const imageData = canvas.toDataURL('image/jpeg');

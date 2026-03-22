@@ -60,7 +60,7 @@ router.post('/ping', async (_req: Request, res: Response) => {
 });
 
 // POST /api/ti/refresh — Full status refresh (ping + update DB)
-router.post('/refresh', requireRole('ADMIN'), async (_req: Request, res: Response) => {
+router.post('/refresh', requireRole('admin'), async (_req: Request, res: Response) => {
   try {
     const status = await updateConnectionStatus();
     res.json(status);
@@ -102,7 +102,7 @@ router.post('/egk/read', async (_req: Request, res: Response) => {
 // ─── Configuration ──────────────────────────────────────────
 
 // GET /api/ti/config — TI connection configuration (masked)
-router.get('/config', requireRole('ADMIN'), async (_req: Request, res: Response) => {
+router.get('/config', requireRole('admin'), async (_req: Request, res: Response) => {
   try {
     const config = getTIConfig();
     if (!config) {

@@ -29,7 +29,7 @@ function generateId(): string {
 }
 
 // We use the global Netlify Blobs API when available, or fall back to returning ephemeral data
-let sessionsCache: PatientSession[] = [];
+const sessionsCache: PatientSession[] = [];
 
 const handler: Handler = async (event: HandlerEvent) => {
   const origin = event.headers?.origin || event.headers?.Origin;

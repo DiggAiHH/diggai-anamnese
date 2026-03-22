@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ArrowRight, Save, RotateCcw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { usePvsFieldMappings, usePvsUpdateFieldMapping } from '../../hooks/useApi';
+import { usePvsFieldMappings, usePvsUpdateFieldMapping } from '../../hooks/useOpsApi';
 
 interface FieldMapping {
     id: string;

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link2, Unlink, RefreshCw, User } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { usePvsPatientLinks, usePvsLinkPatient, usePvsUnlinkPatient } from '../../hooks/useApi';
+import { usePvsPatientLinks, usePvsLinkPatient, usePvsUnlinkPatient } from '../../hooks/useOpsApi';
 import { PvsPatientSearch } from './PvsPatientSearch';
 
 export function PvsPatientLink({ connectionId }: { connectionId: string }) {

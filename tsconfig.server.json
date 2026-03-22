@@ -7,7 +7,7 @@
             "ES2022"
         ],
         "outDir": "./dist/server",
-        "rootDir": "./server",
+        "rootDir": ".",
         "strict": true,
         "esModuleInterop": true,
         "downlevelIteration": true,
@@ -23,11 +23,13 @@
         "sourceMap": true
     },
     "include": [
-        "server/**/*.ts"
+        "server/**/*.ts",
+        "prisma/**/*.ts",
+        "src/theme/types.ts",
+        "src/theme/defaultThemes.ts"
     ],
     "exclude": [
         "node_modules",
-        "dist",
-        "src"
+        "dist"
     ]
 }

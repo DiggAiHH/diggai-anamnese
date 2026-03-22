@@ -1,0 +1,85 @@
+{
+  "product": "Codex Web",
+  "exportType": "functionality-only",
+  "generatedAt": "2026-03-08T05:54:28.477Z",
+  "sourceFile": "docs\\CODEX_WEB_FUNCTIONALITY.md",
+  "setupSteps": [
+    "Open [Codex](https://chatgpt.com/codex).",
+    "Connect your GitHub account so Codex can access repository code.",
+    "Use Codex in your eligible plan (Plus, Pro, Business, Edu, or Enterprise).",
+    "For Enterprise, complete [admin setup](https://developers.openai.com/codex/enterprise/admin-setup) if required."
+  ],
+  "capabilities": [
+    {
+      "name": "Learn about prompting",
+      "description": "Write clearer prompts, apply constraints, and choose detail depth for better coding results."
+    },
+    {
+      "name": "Common workflows",
+      "description": "Use repeatable patterns for task delegation, review, and PR creation."
+    },
+    {
+      "name": "Environment configuration",
+      "description": "Define repository, setup steps, and available tools for cloud execution."
+    },
+    {
+      "name": "IDE cloud delegation",
+      "description": "Start cloud tasks from the IDE extension, monitor progress, and apply diffs locally."
+    },
+    {
+      "name": "GitHub delegation",
+      "description": "Tag `@codex` in issues and pull requests to spawn tasks directly from GitHub."
+    },
+    {
+      "name": "Internet access control",
+      "description": "Control if and when Codex cloud environments can reach the public internet."
+    }
+  ],
+  "resources": [
+    "[Codex pricing / plan coverage](https://developers.openai.com/codex/pricing)",
+    "[Prompting guide](https://developers.openai.com/codex/prompting#prompts)",
+    "[Common workflows](https://developers.openai.com/codex/workflows)",
+    "[Cloud environments](https://developers.openai.com/codex/cloud/environments)",
+    "[IDE cloud delegation](https://developers.openai.com/codex/ide/features#cloud-delegation)",
+    "[GitHub integration](https://developers.openai.com/codex/integrations/github)",
+    "[Cloud internet access](https://developers.openai.com/codex/cloud/internet-access)"
+  ],
+  "links": [
+    {
+      "label": "Codex",
+      "url": "https://chatgpt.com/codex"
+    },
+    {
+      "label": "admin setup",
+      "url": "https://developers.openai.com/codex/enterprise/admin-setup"
+    },
+    {
+      "label": "Codex pricing / plan coverage",
+      "url": "https://developers.openai.com/codex/pricing"
+    },
+    {
+      "label": "Prompting guide",
+      "url": "https://developers.openai.com/codex/prompting#prompts"
+    },
+    {
+      "label": "Common workflows",
+      "url": "https://developers.openai.com/codex/workflows"
+    },
+    {
+      "label": "Cloud environments",
+      "url": "https://developers.openai.com/codex/cloud/environments"
+    },
+    {
+      "label": "IDE cloud delegation",
+      "url": "https://developers.openai.com/codex/ide/features#cloud-delegation"
+    },
+    {
+      "label": "GitHub integration",
+      "url": "https://developers.openai.com/codex/integrations/github"
+    },
+    {
+      "label": "Cloud internet access",
+      "url": "https://developers.openai.com/codex/cloud/internet-access"
+    }
+  ]
+}

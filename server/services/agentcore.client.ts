@@ -98,7 +98,7 @@ class AgentCoreClient {
                 throw new Error(`Agent-Core Fehler ${res.status}: ${body}`);
             }
 
-            const data: AgentCoreTaskResponse = await res.json();
+            const data = await res.json() as AgentCoreTaskResponse;
             this._available = true;
             this._lastCheck = Date.now();
             return data.result;

@@ -36,6 +36,8 @@ export function CompletionCelebration({ show }: { show: boolean }) {
 
   useEffect(() => {
     if (show) {
+      // Respect prefers-reduced-motion for users sensitive to animations
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
       setPieces(generate());
       setVisible(true);
       const timer = setTimeout(() => setVisible(false), 3000);

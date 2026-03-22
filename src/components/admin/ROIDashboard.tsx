@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { TrendingUp, DollarSign, Clock, Users, Settings } from 'lucide-react';
-import { useROIToday, useROIHistory, useROIProjection, useROIConfig, useROIUpdateConfig } from '../../hooks/useApi';
+import { useROIToday, useROIHistory, useROIProjection, useROIConfig, useROIUpdateConfig } from '../../hooks/useOpsApi';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, LineChart, Line, Legend } from 'recharts';
 
 export function ROIDashboard() {

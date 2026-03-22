@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 import * as crypto from 'crypto';
-import { getRedisClient } from '../../redis';
+import { getRedisClient, isRedisReady } from '../../redis';
 import {
   NfcTapPayload,
   NfcTapResult,
@@ -27,11 +27,11 @@ function isTimestampValid(timestamp: number): boolean {
 
 async function isReplay(locationId: string, timestamp: number): Promise<boolean> {
   const redis = getRedisClient();
-  if (!redis?.isReady) return false; // graceful degradation
+  if (!redis || !isRedisReady()) return false; // graceful degradation
   const nonceKey = `nfc:nonce:${locationId}:${timestamp}`;
   const exists = await redis.get(nonceKey);
   if (exists) return true;
-  await redis.setEx(nonceKey, NFC_NONCE_TTL_S, '1');
+  await redis.setex(nonceKey, NFC_NONCE_TTL_S, '1');
   return false;
 }
 

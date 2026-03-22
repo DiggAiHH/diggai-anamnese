@@ -1,0 +1,95 @@
+// ─── Stripe Provider ───────────────────────────────────────
+// Wraps application with Stripe Elements context
+// PCI-Compliant: No card data touches our servers
+
+import { Elements } from '@stripe/react-stripe-js';
+import { loadStripe, type StripeElementsOptions } from '@stripe/stripe-js';
+import { type ReactNode, useMemo } from 'react';
+
+// Load Stripe with publishable key
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
+
+interface StripeProviderProps {
+  children: ReactNode;
+  options?: StripeElementsOptions;
+}
+
+/**
+ * Stripe Elements Provider
+ * 
+ * Usage:
+ * ```tsx
+ * <StripeProvider>
+ *   <CheckoutForm />
+ * </StripeProvider>
+ * ```
+ */
+export function StripeProvider({ children, options }: StripeProviderProps) {
+  const defaultOptions: StripeElementsOptions = useMemo(() => ({
+    appearance: {
+      theme: 'stripe',
+      variables: {
+        colorPrimary: '#3b82f6',
+        colorBackground: '#ffffff',
+        colorText: '#1f2937',
+        colorDanger: '#ef4444',
+        fontFamily: 'system-ui, -apple-system, sans-serif',
+        spacingUnit: '4px',
+        borderRadius: '8px',
+      },
+      rules: {
+        '.Input': {
+          border: '1px solid #e5e7eb',
+          padding: '12px',
+        },
+        '.Input:focus': {
+          border: '2px solid #3b82f6',
+          outline: 'none',
+        },
+      },
+    },
+    loader: 'auto',
+  }), []);
+
+  return (
+    <Elements stripe={stripePromise} options={options || defaultOptions}>
+      {children}
+    </Elements>
+  );
+}
+
+/**
+ * Stripe Provider with Setup Intent
+ * Use this when collecting payment method before creating subscription
+ */
+export function StripeSetupIntentProvider({ 
+  children, 
+  clientSecret 
+}: { 
+  children: ReactNode; 
+  clientSecret: string;
+}) {
+  const options: StripeElementsOptions = useMemo(() => ({
+    clientSecret,
+    appearance: {
+      theme: 'stripe',
+      variables: {
+        colorPrimary: '#3b82f6',
+        colorBackground: '#ffffff',
+        colorText: '#1f2937',
+        colorDanger: '#ef4444',
+        fontFamily: 'system-ui, -apple-system, sans-serif',
+        spacingUnit: '4px',
+        borderRadius: '8px',
+      },
+    },
+  }), [clientSecret]);
+
+  return (
+    <Elements stripe={stripePromise} options={options}>
+      {children}
+    </Elements>
+  );
+}
+
+export default StripeProvider;

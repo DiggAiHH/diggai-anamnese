@@ -111,6 +111,7 @@ router.post('/identify', async (req: Request, res: Response) => {
     // Audit log
     await prisma.auditLog.create({
       data: {
+        tenantId: req.tenantId || req.auth?.tenantId || 'system',
         action: 'PATIENT_IDENTIFY',
         resource: `patients/${patient.id}`,
         ipAddress: ip,
@@ -175,6 +176,7 @@ router.post('/verify-pattern', async (req: Request, res: Response) => {
     // Audit log
     await prisma.auditLog.create({
       data: {
+        tenantId: req.tenantId || req.auth?.tenantId || 'system',
         action: isValid ? 'PATTERN_VERIFY_SUCCESS' : 'PATTERN_VERIFY_FAIL',
         resource: `patients/${patient.id}`,
         ipAddress: ip,
@@ -220,6 +222,7 @@ router.post(
       // Audit log
       await prisma.auditLog.create({
         data: {
+          tenantId: req.tenantId || req.auth?.tenantId || 'system',
           userId: req.auth?.sessionId || null,
           action: 'PATTERN_SET',
           resource: `patients/${patientId}`,
@@ -313,6 +316,7 @@ router.post(
       // Audit log
       await prisma.auditLog.create({
         data: {
+          tenantId: req.tenantId || req.auth?.tenantId || 'system',
           userId,
           action: 'PATIENT_CERTIFY',
           resource: `patients/${patientId}`,

@@ -15,35 +15,35 @@ export async function aggregateSessionContext(sessionId: string): Promise<Sessio
         where: { id: sessionId },
         include: {
             patient: true,
-            answers: { include: { question: true }, orderBy: { answeredAt: 'asc' } },
-            triageResult: true,
+            answers: { orderBy: { answeredAt: 'asc' } },
+            triageEvents: { orderBy: { createdAt: 'desc' }, take: 1 },
         },
     });
 
     const patient = session.patient;
-    const age = patient.birthDate
+    const age = patient?.birthDate
         ? String(Math.floor((Date.now() - new Date(patient.birthDate).getTime()) / 31557600000))
         : 'unbekannt';
 
 
-    const answerLines = session.answers.map(a => {
-        const qText = a.question?.questionText || a.questionId;
-        return `- ${qText}: ${a.value ?? '—'}`;
+    const answerLines = session.answers.map((a: { atomId: string; value: string | null }) => {
+        return `- ${a.atomId}: ${a.value ?? '—'}`;
     });
 
     const symptomParts = session.answers
-        .filter(a => a.value && a.value !== 'nein' && a.value !== 'false')
-        .map(a => {
-            const qText = a.question?.questionText || a.questionId;
-            return `${qText}: ${a.value}`;
+        .filter((a: { value: string | null }) => a.value && a.value !== 'nein' && a.value !== 'false')
+        .map((a: { atomId: string; value: string | null }) => {
+            return `${a.atomId}: ${a.value}`;
         });
 
+    const latestTriage = session.triageEvents[0];
+
     return {
-        gender: patient.gender || 'unbekannt',
+        gender: patient?.gender || 'unbekannt',
         age,
-        language: session.language || 'de',
-        triageLevel: session.triageResult?.level || 'UNKNOWN',
-        triageReason: session.triageResult?.reason || '',
+        language: 'de',
+        triageLevel: latestTriage?.level || 'UNKNOWN',
+        triageReason: latestTriage?.message || '',
         answers: answerLines.join('\n'),
         symptoms: symptomParts.join('; '),
     };

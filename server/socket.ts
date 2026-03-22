@@ -263,7 +263,7 @@ export function setupSocketIO(httpServer: HttpServer): Server {
         socket.on('flow:advance', async (data: { sessionId: string; fromStep: number; toStep: number; reason?: string }) => {
             try {
                 const { sessionId, fromStep, toStep, reason } = data;
-                io.to(`session:${sessionId}`).emit('flow:step-changed', {
+                io?.to(`session:${sessionId}`).emit('flow:step-changed', {
                     sessionId,
                     currentStep: toStep,
                     fromStep,
@@ -279,7 +279,7 @@ export function setupSocketIO(httpServer: HttpServer): Server {
         socket.on('flow:delay', async (data: { sessionId: string; delayMinutes: number; reason: string }) => {
             try {
                 const { sessionId, delayMinutes, reason } = data;
-                io.to(`session:${sessionId}`).emit('flow:delay-update', {
+                io?.to(`session:${sessionId}`).emit('flow:delay-update', {
                     sessionId,
                     delayMinutes,
                     reason,
@@ -294,7 +294,7 @@ export function setupSocketIO(httpServer: HttpServer): Server {
         socket.on('flow:call-patient', async (data: { sessionId: string; targetRoom: string; message?: string }) => {
             try {
                 const { sessionId, targetRoom, message } = data;
-                io.to(`session:${sessionId}`).emit('navigation:guide', {
+                io?.to(`session:${sessionId}`).emit('navigation:guide', {
                     sessionId,
                     type: 'TEXT',
                     content: message || `Bitte kommen Sie jetzt zu ${targetRoom}.`,
@@ -312,7 +312,7 @@ export function setupSocketIO(httpServer: HttpServer): Server {
             try {
                 const { message, target, praxisId } = data;
                 const room = praxisId ? `praxis:${praxisId}` : 'broadcast';
-                io.to(room).emit('chat:broadcast:received', {
+                io?.to(room).emit('chat:broadcast:received', {
                     message,
                     target,
                     sentAt: new Date().toISOString(),

@@ -12,7 +12,7 @@ import {
   useSystemLogs,
   useSystemInfo,
   useSystemBackupSchedule,
-} from '../hooks/useApi';
+} from '../hooks/useOpsApi';
 
 interface BackupEntry {
   id: string;

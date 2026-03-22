@@ -8,6 +8,13 @@ on:
 env:
   NODE_VERSION: '22'
 
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   # ─── Build & Test ──────────────────────────────────────────
   build:
@@ -31,7 +38,7 @@ jobs:
         run: npm run build
 
       - name: Lint
-        run: npm run lint || true
+        run: npm run lint
 
   # ─── Deploy to VPS ─────────────────────────────────────────
   deploy:

@@ -63,14 +63,22 @@ const SCHWEREGRAD_LABELS: Record<number, { text: string; color: string }> = {
   10: { text: 'Unerträglich', color: 'text-red-700' },
 };
 
+function getCsrfTokenFromCookie(): string | null {
+  const match = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
 // ─── Helper: submit to backend (or demo fallback) ─────────────
 
 async function submitPreCheckin(payload: PreCheckinPayload): Promise<PreCheckinResponse> {
+  const csrfToken = getCsrfTokenFromCookie();
+
   const res = await fetch(`${API_BASE_URL}/telemedizin/session/pre-checkin`, {
     method: 'POST',
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${localStorage.getItem('anamnese_token') ?? ''}`,
+      ...(csrfToken ? { 'x-xsrf-token': csrfToken } : {}),
     },
     body: JSON.stringify(payload),
   });

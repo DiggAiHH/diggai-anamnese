@@ -49,4 +49,30 @@ sites.json
 test-results.json
 test-final*.json
 .netlify/
-package-lock.json
+
+# Build & deploy artifacts (safe to delete)
+build_*.txt
+build_final.txt
+deploy-*.txt
+deploy-*.json
+netlify-deploy.log
+netlify-status.txt
+cf-create.txt
+cf-deploy.txt
+
+# Temp files
+*.tmp
+*.zip
+
+# Test artifacts
+test-results/
+coverage/
+
+# Playwright MCP logs (external tooling — not in-app config)
+.playwright-mcp/
+
+# SQLite dev database — never commit
+anamnese.db
+
+# VS Code workspace files — per-developer, not shared
+*.code-workspace

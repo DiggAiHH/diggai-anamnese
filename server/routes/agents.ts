@@ -7,8 +7,12 @@ import { messageBroker, type BrokerMessage } from '../services/messagebroker.ser
 import { auditService } from '../services/audit.service';
 import { agentCoreClient } from '../services/agentcore.client';
 import { createTask } from '../agents/orchestrator.agent';
+import { requireAuth, requireRole } from '../middleware/auth';
 
 const router = Router();
+
+// All agent routes require authentication + admin or arzt role
+router.use(requireAuth, requireRole('admin', 'arzt'));
 
 /** Extract a route param as a guaranteed string (Express 5 compat) */
 function param(req: Request, key: string): string {
@@ -16,6 +20,39 @@ function param(req: Request, key: string): string {
     return Array.isArray(v) ? v[0] : v;
 }
 
+/**
+ * @swagger
+ * /agents:
+ *   get:
+ *     tags: [Agents]
+ *     summary: Listet alle DiggAI-Agenten
+ *     description: Gibt In-Memory-Agenten-Registry und DB-Agenten-Status zurück.
+ *     security:
+ *       - BearerAuth: []
+ *       - CookieAuth: []
+ *     responses:
+ *       200:
+ *         description: Agenten-Liste
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 agents:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       name: { type: string, example: "orchestrator" }
+ *                       online: { type: boolean }
+ *                       busy: { type: boolean }
+ *                 dbAgents:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *       401:
+ *         description: Nicht authentifiziert
+ */
 // ─── GET /api/agents ─────────────────────────────────────────
 // Listet alle Agenten (in-memory Registry + DB-Agenten)
 router.get('/', async (_req: Request, res: Response) => {

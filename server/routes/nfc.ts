@@ -59,7 +59,7 @@ router.get('/checkpoints', requireAuth, async (req: Request, res: Response) => {
 });
 
 // POST /api/nfc/checkpoints — Create checkpoint (admin)
-router.post('/checkpoints', requireAuth, requireRole('ADMIN'), async (req: Request, res: Response) => {
+router.post('/checkpoints', requireAuth, requireRole('admin'), async (req: Request, res: Response) => {
   try {
     const { locationId, praxisId, type, roomName, coordinates, nfcUid, secretRef, isActive } = req.body;
 
@@ -81,7 +81,7 @@ router.post('/checkpoints', requireAuth, requireRole('ADMIN'), async (req: Reque
 });
 
 // PUT /api/nfc/checkpoints/:id — Update checkpoint (admin)
-router.put('/checkpoints/:id', requireAuth, requireRole('ADMIN'), async (req: Request, res: Response) => {
+router.put('/checkpoints/:id', requireAuth, requireRole('admin'), async (req: Request, res: Response) => {
   try {
     const checkpoint = await updateCheckpoint(req.params.id as string, req.body);
     res.json(checkpoint);
@@ -92,7 +92,7 @@ router.put('/checkpoints/:id', requireAuth, requireRole('ADMIN'), async (req: Re
 });
 
 // DELETE /api/nfc/checkpoints/:id — Soft-delete checkpoint (admin)
-router.delete('/checkpoints/:id', requireAuth, requireRole('ADMIN'), async (req: Request, res: Response) => {
+router.delete('/checkpoints/:id', requireAuth, requireRole('admin'), async (req: Request, res: Response) => {
   try {
     await deleteCheckpoint(req.params.id as string);
     res.json({ success: true });

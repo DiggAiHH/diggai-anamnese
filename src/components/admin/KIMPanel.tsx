@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Mail, Send, Inbox, RefreshCw, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
-import { useTIKimStatus } from '../../hooks/useApi';
+import { useTIKimStatus } from '../../hooks/useOpsApi';
 
 type KimTab = 'status' | 'inbox' | 'compose';
 

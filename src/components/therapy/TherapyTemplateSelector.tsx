@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { BookTemplate, Search, Loader2 } from 'lucide-react';
-import { useTherapyTemplates, useTherapyApplyTemplate } from '../../hooks/useApi';
+import { useTherapyTemplates, useTherapyApplyTemplate } from '../../hooks/useOpsApi';
 
 interface TherapyTemplateSelectorProps {
     planId?: string;

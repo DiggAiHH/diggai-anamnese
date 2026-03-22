@@ -1,7 +1,25 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Calendar, Clock, Plus, X, Loader2, CheckCircle } from 'lucide-react';
-import { usePwaAppointments, usePwaAppointmentSlots, usePwaAppointmentCreate, usePwaAppointmentCancel } from '../../hooks/useApi';
+import { usePwaAppointments, usePwaAppointmentSlots, usePwaAppointmentCreate, usePwaAppointmentCancel } from '../../hooks/usePatientApi';
+
+interface Appointment {
+  id: string;
+  type: string;
+  status: string;
+  scheduledAt?: string;
+  requestedAt?: string;
+  requestNotes?: string;
+}
+
+interface AppointmentSlot {
+  time: string;
+  datetime: string;
+}
+
+function asArray<T>(value: unknown): T[] {
+  return Array.isArray(value) ? (value as T[]) : [];
+}
 
 const SERVICES = [
   { key: 'GENERAL', label: 'Allgemeinmedizin' },
@@ -37,6 +55,9 @@ export default function PwaAppointments() {
   const createMutation = usePwaAppointmentCreate();
   const cancelMutation = usePwaAppointmentCancel();
 
+  const appointmentList = asArray<Appointment>(appointments);
+  const slotList = asArray<AppointmentSlot>(slots);
+
   const today = new Date().toISOString().split('T')[0];
 
   function handleBook() {
@@ -47,12 +68,21 @@ export default function PwaAppointments() {
     );
   }
 
+  function getAppointmentDate(apt: Appointment): string {
+    return apt.scheduledAt ?? apt.requestedAt ?? new Date().toISOString();
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 pb-24">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/pwa/dashboard')} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
+          <button
+            onClick={() => navigate('/pwa/dashboard')}
+            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
+            aria-label="Zurück zum Dashboard"
+            title="Zurück zum Dashboard"
+          >
             <ArrowLeft className="w-5 h-5" />
           </button>
           <h1 className="text-lg font-semibold">Termine</h1>
@@ -66,15 +96,15 @@ export default function PwaAppointments() {
       <div className="p-4 space-y-3">
         {isLoading ? (
           <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-blue-500" /></div>
-        ) : (appointments as any[])?.length ? (
-          (appointments as any[]).map((apt: any) => (
+        ) : appointmentList.length ? (
+          appointmentList.map((apt) => (
             <div key={apt.id} className="bg-white dark:bg-gray-900 rounded-2xl p-4 shadow-sm">
               <div className="flex items-start justify-between">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <Calendar className="w-4 h-4 text-gray-400" />
                     <span className="font-medium text-sm">
-                      {new Date(apt.scheduledAt ?? apt.requestedAt).toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'long' })}
+                      {new Date(getAppointmentDate(apt)).toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'long' })}
                     </span>
                   </div>
                   {apt.scheduledAt && (
@@ -118,7 +148,7 @@ export default function PwaAppointments() {
           <div className="bg-white dark:bg-gray-900 rounded-t-3xl w-full max-w-lg p-6 space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold">Termin anfragen</h2>
-              <button onClick={() => setShowBook(false)}><X className="w-5 h-5" /></button>
+              <button onClick={() => setShowBook(false)} aria-label="Modal schließen" title="Modal schließen"><X className="w-5 h-5" /></button>
             </div>
 
             <div>
@@ -135,7 +165,7 @@ export default function PwaAppointments() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Datum</label>
-              <input type="date" min={today} value={date} onChange={e => { setDate(e.target.value); setSelectedSlot(''); }}
+              <input type="date" min={today} value={date} onChange={e => { setDate(e.target.value); setSelectedSlot(''); }} title="Datum auswählen"
                 className="w-full px-3 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 text-sm" />
             </div>
 
@@ -144,9 +174,9 @@ export default function PwaAppointments() {
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Uhrzeit</label>
                 {slotsLoading ? (
                   <div className="flex justify-center py-4"><Loader2 className="w-5 h-5 animate-spin text-blue-500" /></div>
-                ) : (slots as any[])?.length ? (
+                ) : slotList.length ? (
                   <div className="grid grid-cols-3 gap-2">
-                    {(slots as any[]).map((slot: any) => (
+                    {slotList.map((slot) => (
                       <button key={slot.time} onClick={() => setSelectedSlot(slot.datetime)}
                         className={`py-2 rounded-xl text-sm font-medium border transition-colors ${selectedSlot === slot.datetime ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-200 dark:border-gray-700'}`}>
                         {slot.time}

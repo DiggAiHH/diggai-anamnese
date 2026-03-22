@@ -16,7 +16,7 @@ COPY server/ ./server/
 COPY tsconfig*.json ./
 
 # Build server TypeScript
-RUN npx tsc -p tsconfig.server.json || true
+RUN npx tsc -p tsconfig.server.json
 
 # ─── Stage 2: Production ────────────────────────────────────
 FROM node:22-alpine AS production

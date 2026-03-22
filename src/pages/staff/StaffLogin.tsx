@@ -3,7 +3,7 @@ import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Shield, Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { useArztLogin } from '../../hooks/useApi';
+import { useArztLogin } from '../../hooks/useStaffApi';
 import { setAuthToken } from '../../api/client';
 
 export default function StaffLogin() {

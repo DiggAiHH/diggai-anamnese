@@ -1,9 +1,23 @@
 /**
- * QuestionFlowEngine – Zentrale Ablaufsteuerung für den Fragebogen
+ * @module QuestionFlowEngine
+ * @description Zentrale Ablaufsteuerung für den Anamnese-Fragebogen
  *
- * Portiert und erweitert die Frontend-Logik aus questionLogic.ts.
- * Unterstützt: Recursive Routing, Multiselect-Parallelität,
- * Gender/Alter-Gating und Neu/Alt-Patient-Branching.
+ * Berechnet den nächsten Fragebogen-Schritt basierend auf Patientenantworten,
+ * Session-Kontext und konfigurierbaren Routing-Regeln.
+ *
+ * @architecture Drei-Stufen-Routing (Prioritätsreihenfolge):
+ *   1. Option-followUpQuestions — Direkte Folgefragen per Antwort-Option
+ *   2. ConditionalRoute — Bedingte Verzweigungen (rekursiv verschachtelbar)
+ *   3. logic.next — Statischer Standard-Nächste-Schritt
+ *
+ * @multiselect Bei Multiselect-Fragen werden followUpQuestions ALLER gewählten
+ *   Optionen zusammengeführt und nach orderIndex sortiert (Parallelität).
+ *
+ * @gating Gender/Alter-Gating ist per showIf-Regeln konfigurierbar.
+ *   Hardcoded Ausnahme: `8800` (Schwangerschaft) nur für W, Alter 15–50.
+ *
+ * @see src/data/questions.ts — Fragen-Katalog mit logic-Definitionen
+ * @see docs/QUESTION_CATALOG.md — vollständige ID-Referenz
  */
 
 interface AtomOption {

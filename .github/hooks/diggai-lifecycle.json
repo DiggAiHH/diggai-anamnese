@@ -1,0 +1,36 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "type": "command",
+        "command": "node .github/hooks/scripts/security-guard.mjs",
+        "windows": "node .github/hooks/scripts/security-guard.mjs",
+        "timeout": 10
+      }
+    ],
+    "PostToolUse": [
+      {
+        "type": "command",
+        "command": "node .github/hooks/scripts/quality-gate.mjs",
+        "windows": "node .github/hooks/scripts/quality-gate.mjs",
+        "timeout": 15
+      }
+    ],
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": "node .github/hooks/scripts/session-context.mjs",
+        "windows": "node .github/hooks/scripts/session-context.mjs",
+        "timeout": 10
+      }
+    ],
+    "Stop": [
+      {
+        "type": "command",
+        "command": "node .github/hooks/scripts/session-audit.mjs",
+        "windows": "node .github/hooks/scripts/session-audit.mjs",
+        "timeout": 10
+      }
+    ]
+  }
+}

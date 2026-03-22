@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Lightbulb, Send, Cpu, Check, X, FileDown } from 'lucide-react';
-import { useWunschboxList, useWunschboxSubmit, useWunschboxProcess, useWunschboxReview, useWunschboxExport } from '../../hooks/useApi';
+import { useWunschboxList, useWunschboxSubmit, useWunschboxProcess, useWunschboxReview, useWunschboxExport } from '../../hooks/useOpsApi';
 import type { WunschboxEntry, AiParsedChange } from '../../types/admin';
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {

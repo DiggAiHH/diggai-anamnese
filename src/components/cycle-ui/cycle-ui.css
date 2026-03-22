@@ -1,0 +1,536 @@
+/**
+ * Photonic Bridge - Cycle UI Styles
+ * 
+ * Visual styles for the Kimi Cycle Manager Dashboard.
+ * Dark theme with solar/lunar accents.
+ */
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BASE VARIABLES
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* Solar Colors */
+  --sunrise-gold: #f59e0b;
+  --morning-yellow: #eab308;
+  --noon-orange: #f97316;
+  --afternoon-amber: #fbbf24;
+  
+  /* Lunar Colors */
+  --moon-indigo: #6366f1;
+  --moon-purple: #8b5cf6;
+  --darkness-slate: #0f172a;
+  
+  /* Trust Battery Colors */
+  --trust-sovereign: #10b981;
+  --trust-trusted: #22c55e;
+  --trust-watched: #eab308;
+  --trust-restricted: #f97316;
+  --trust-quarantined: #ef4444;
+  
+  /* UI Colors */
+  --bg-primary: #020617;
+  --bg-secondary: #0f172a;
+  --bg-tertiary: #1e293b;
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --border-default: #334155;
+  --border-highlight: #475569;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CYCLE PHASE ANIMATIONS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@keyframes sunrise-glow {
+  0%, 100% { box-shadow: 0 0 20px rgba(245, 158, 11, 0.3); }
+  50% { box-shadow: 0 0 40px rgba(245, 158, 11, 0.5); }
+}
+
+@keyframes noon-pulse {
+  0%, 100% { box-shadow: 0 0 20px rgba(249, 115, 22, 0.3); }
+  50% { box-shadow: 0 0 60px rgba(249, 115, 22, 0.6); }
+}
+
+@keyframes moon-shimmer {
+  0%, 100% { box-shadow: 0 0 20px rgba(99, 102, 241, 0.3); }
+  50% { box-shadow: 0 0 40px rgba(99, 102, 241, 0.5), 0 0 80px rgba(139, 92, 246, 0.3); }
+}
+
+@keyframes yolo-pulse {
+  0%, 100% { box-shadow: 0 0 10px rgba(168, 85, 247, 0.4); }
+  50% { box-shadow: 0 0 30px rgba(168, 85, 247, 0.7); }
+}
+
+@keyframes trust-flash-green {
+  0% { background-color: rgba(16, 185, 129, 0.3); }
+  100% { background-color: transparent; }
+}
+
+@keyframes trust-flash-red {
+  0% { background-color: rgba(239, 68, 68, 0.3); }
+  100% { background-color: transparent; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PHASE-SPECIFIC STYLES
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.cycle-phase-sunrise {
+  animation: sunrise-glow 4s ease-in-out infinite;
+  border-color: var(--sunrise-gold) !important;
+}
+
+.cycle-phase-morning_peak {
+  animation: sunrise-glow 3s ease-in-out infinite;
+  border-color: var(--morning-yellow) !important;
+}
+
+.cycle-phase-solar_noon {
+  animation: noon-pulse 2s ease-in-out infinite;
+  border-color: var(--noon-orange) !important;
+}
+
+.cycle-phase-afternoon {
+  border-color: var(--afternoon-amber) !important;
+}
+
+.cycle-phase-moon_witness {
+  animation: moon-shimmer 4s ease-in-out infinite;
+  border-color: var(--moon-indigo) !important;
+}
+
+.cycle-phase-darkness {
+  border-color: var(--darkness-slate) !important;
+  opacity: 0.7;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   AGENT STATE STYLES
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.agent-state-yolo_mode {
+  animation: yolo-pulse 2s ease-in-out infinite;
+}
+
+.agent-state-confessing {
+  animation: moon-shimmer 3s ease-in-out infinite;
+}
+
+.agent-state-quarantined {
+  border-color: var(--trust-quarantined) !important;
+  background-color: rgba(239, 68, 68, 0.1);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TRUST BATTERY STYLES
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.trust-battery-sovereign {
+  color: var(--trust-sovereign);
+}
+
+.trust-battery-trusted {
+  color: var(--trust-trusted);
+}
+
+.trust-battery-watched {
+  color: var(--trust-watched);
+}
+
+.trust-battery-restricted {
+  color: var(--trust-restricted);
+}
+
+.trust-battery-quarantined {
+  color: var(--trust-quarantined);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.trust-change-positive {
+  animation: trust-flash-green 1s ease-out;
+}
+
+.trust-change-negative {
+  animation: trust-flash-red 1s ease-out;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PROGRESS BAR
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.cycle-progress-container {
+  position: relative;
+  height: 8px;
+  background: linear-gradient(90deg, 
+    var(--sunrise-gold) 0%, 
+    var(--morning-yellow) 20%, 
+    var(--noon-orange) 40%, 
+    var(--afternoon-amber) 60%, 
+    var(--moon-indigo) 80%, 
+    var(--darkness-slate) 100%
+  );
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.cycle-progress-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.3);
+  transition: width 1s ease-out;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SILENT WITNESS OVERLAY
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.silent-witness-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(10px);
+}
+
+.silent-witness-content {
+  text-align: center;
+}
+
+.silent-witness-moon {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--moon-indigo), var(--moon-purple));
+  box-shadow: 0 0 60px var(--moon-indigo);
+  animation: moon-shimmer 4s ease-in-out infinite;
+  margin: 0 auto 2rem;
+}
+
+.silent-witness-text {
+  font-size: 1.5rem;
+  color: var(--text-secondary);
+  letter-spacing: 0.5em;
+  text-transform: uppercase;
+}
+
+.silent-witness-timer {
+  font-size: 3rem;
+  font-weight: 200;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  margin-top: 1rem;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PHOTONIC STREAM VISUALIZATION
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.photon-stream {
+  position: relative;
+  overflow: hidden;
+}
+
+.photon-particle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: white;
+  opacity: 0;
+  animation: photon-travel 2s linear infinite;
+}
+
+@keyframes photon-travel {
+  0% {
+    opacity: 0;
+    transform: translateX(-100%) scale(0.5);
+  }
+  10% {
+    opacity: 1;
+    transform: translateX(-90%) scale(1);
+  }
+  90% {
+    opacity: 1;
+    transform: translateX(90%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(100%) scale(0.5);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   AGENT CARD VARIATIONS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.agent-card {
+  transition: all 0.3s ease;
+}
+
+.agent-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.agent-card.selected {
+  border-color: var(--sunrise-gold);
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.3);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TRUST HISTORY TIMELINE
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.trust-timeline {
+  position: relative;
+  padding-left: 1.5rem;
+}
+
+.trust-timeline::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(180deg, var(--border-default), transparent);
+}
+
+.trust-timeline-item {
+  position: relative;
+  padding-bottom: 1rem;
+}
+
+.trust-timeline-item::before {
+  content: '';
+  position: absolute;
+  left: -1.5rem;
+  top: 0.25rem;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--border-highlight);
+  transform: translateX(-3px);
+}
+
+.trust-timeline-item.positive::before {
+  background: var(--trust-sovereign);
+}
+
+.trust-timeline-item.negative::before {
+  background: var(--trust-quarantined);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE 5 QUESTIONS RITUAL
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.five-questions-container {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.1));
+  border: 1px solid var(--moon-indigo);
+  border-radius: 1rem;
+  padding: 2rem;
+}
+
+.five-questions-title {
+  text-align: center;
+  font-size: 1.25rem;
+  color: var(--moon-purple);
+  margin-bottom: 2rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.question-item {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: rgba(15, 23, 42, 0.5);
+  border-radius: 0.5rem;
+  border-left: 3px solid var(--moon-indigo);
+}
+
+.question-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: var(--moon-indigo);
+  color: white;
+  border-radius: 50%;
+  font-size: 0.75rem;
+  font-weight: bold;
+  margin-right: 0.75rem;
+}
+
+.question-text {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.question-answer {
+  margin-top: 0.75rem;
+  padding-left: 2.25rem;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   REBIRTH CERTIFICATE
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.rebirth-certificate {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(34, 197, 94, 0.1));
+  border: 2px solid var(--trust-sovereign);
+  border-radius: 1rem;
+  padding: 2rem;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.rebirth-certificate::before {
+  content: '✦';
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  font-size: 1.5rem;
+  color: var(--trust-sovereign);
+  opacity: 0.5;
+}
+
+.rebirth-certificate-title {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: var(--trust-sovereign);
+  margin-bottom: 1rem;
+}
+
+.rebirth-certificate-agent {
+  font-size: 1.25rem;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.rebirth-certificate-date {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  margin-bottom: 1.5rem;
+}
+
+.rebirth-oath {
+  font-style: italic;
+  color: var(--text-secondary);
+  border-top: 1px solid var(--border-default);
+  padding-top: 1rem;
+  margin-top: 1rem;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   YOLO MODE INDICATOR
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.yolo-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.75rem;
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(147, 51, 234, 0.2));
+  border: 1px solid rgba(168, 85, 247, 0.5);
+  border-radius: 9999px;
+  color: #d8b4fe;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.yolo-indicator::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  background: #a855f7;
+  border-radius: 50%;
+  animation: yolo-pulse 2s ease-in-out infinite;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ALERT STYLES
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.alert-critical {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid var(--trust-quarantined);
+  color: var(--trust-quarantined);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.alert-warning {
+  background: rgba(249, 115, 22, 0.1);
+  border: 1px solid var(--trust-restricted);
+  color: var(--trust-restricted);
+}
+
+.alert-info {
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid #3b82f6;
+  color: #60a5fa;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   UTILITY CLASSES
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.glow-sunrise {
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.4);
+}
+
+.glow-moon {
+  box-shadow: 0 0 20px rgba(99, 102, 241, 0.4);
+}
+
+.text-gradient-solar {
+  background: linear-gradient(135deg, var(--sunrise-gold), var(--noon-orange));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.text-gradient-lunar {
+  background: linear-gradient(135deg, var(--moon-indigo), var(--moon-purple));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RESPONSIVE ADJUSTMENTS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+  .silent-witness-moon {
+    width: 80px;
+    height: 80px;
+  }
+  
+  .silent-witness-text {
+    font-size: 1rem;
+    letter-spacing: 0.3em;
+  }
+  
+  .silent-witness-timer {
+    font-size: 2rem;
+  }
+}

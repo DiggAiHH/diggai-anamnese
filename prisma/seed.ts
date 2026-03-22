@@ -518,11 +518,17 @@ async function main() {
     console.log(`  ✓ ${LEGACY_QUESTIONS.length} MedicalAtoms eingefügt`);
 
     // 3. Standard-Arzt-Account erstellen
-    const arztExists = await prisma.arztUser.findUnique({ where: { username: 'admin' } });
+    const tenant = await prisma.tenant.upsert({
+        where: { subdomain: 'default' },
+        update: {},
+        create: { subdomain: 'default', name: 'Default Praxis' },
+    });
+    const arztExists = await prisma.arztUser.findFirst({ where: { username: 'admin', tenantId: tenant.id } });
     if (!arztExists) {
         const hash = await bcrypt.hash(process.env.ARZT_PASSWORD || 'CHANGE_ME_IN_ENV', 10);
         await prisma.arztUser.create({
             data: {
+                tenantId: tenant.id,
                 username: 'admin',
                 passwordHash: hash,
                 displayName: 'Dr. Admin',

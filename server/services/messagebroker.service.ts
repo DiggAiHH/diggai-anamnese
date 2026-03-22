@@ -17,7 +17,7 @@ import { EventEmitter } from 'events';
 import { prisma } from '../db';
 
 type Channel = amqplib.Channel;
-type Connection = amqplib.Connection;
+type Connection = amqplib.ChannelModel;
 type ConsumeMessage = amqplib.ConsumeMessage;
 
 const RABBITMQ_URL = process.env.RABBITMQ_URL ?? 'amqp://diggai:changeme@localhost:5672/';
@@ -156,7 +156,7 @@ class MessageBrokerService extends EventEmitter {
                 where: { id: result.taskId },
                 data: {
                     status:       result.success ? 'COMPLETED' : 'FAILED',
-                    outputData:   result.output ? JSON.stringify(result.output) : null,
+                    outputData:   (result.output ?? undefined) as any,
                     errorMessage: result.error ?? null,
                     completedAt:  new Date(),
                     durationMs:   result.durationMs,

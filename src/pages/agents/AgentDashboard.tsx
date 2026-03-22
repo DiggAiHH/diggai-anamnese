@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Bot, CheckCircle2, XCircle, Clock, Loader2, Play, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
-import { useAgentStatus, useAgentTasks, useCreateAgentTask, useAgentMetrics } from '../../hooks/useApi';
+import { useAgentStatus, useAgentTasks, useCreateAgentTask, useAgentMetrics } from '../../hooks/useAgentApi';
 import { toast } from '../../store/toastStore';
 
 // ─── Types ─────────────────────────────────────────────────────
@@ -168,8 +168,9 @@ function CreateTaskDialog({ defaultAgent, onClose }: { defaultAgent?: string; on
                 <h2 className="text-lg font-bold text-[var(--text-primary)] mb-4">Neuer Agent-Task</h2>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
-                        <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Agent</label>
+                        <label htmlFor="agent-task-agent" className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Agent</label>
                         <select
+                            id="agent-task-agent"
                             value={agentName}
                             onChange={e => setAgentName(e.target.value)}
                             className="w-full input-base text-sm"
@@ -182,8 +183,9 @@ function CreateTaskDialog({ defaultAgent, onClose }: { defaultAgent?: string; on
                         </select>
                     </div>
                     <div>
-                        <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Priorität</label>
+                        <label htmlFor="agent-task-priority" className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Priorität</label>
                         <select
+                            id="agent-task-priority"
                             value={priority}
                             onChange={e => setPriority(e.target.value)}
                             className="w-full input-base text-sm"

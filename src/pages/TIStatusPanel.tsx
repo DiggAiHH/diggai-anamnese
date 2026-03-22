@@ -9,7 +9,7 @@ import {
   useTIRefresh,
   useTICards,
   useTIConfig,
-} from '../hooks/useApi';
+} from '../hooks/useOpsApi';
 
 const CONNECTION_COLORS: Record<string, string> = {
   CONNECTED: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',

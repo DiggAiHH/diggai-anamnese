@@ -1,0 +1,24 @@
+#!/bin/sh
+# DiggAI Pre-Push Hook
+# Ensures type safety, tests, and i18n before pushing to remote.
+#
+# Runs:
+# 1. TypeScript check (app + server)
+# 2. Unit tests
+# 3. i18n completeness
+
+set -e
+
+echo "[pre-push] TypeScript check (app)..."
+npx tsc -b tsconfig.app.json tsconfig.node.json --noEmit
+
+echo "[pre-push] TypeScript check (server)..."
+npx tsc -p tsconfig.server.json --noEmit
+
+echo "[pre-push] Running unit tests..."
+npm run test:run
+
+echo "[pre-push] i18n completeness..."
+node scripts/generate-i18n.ts
+
+echo "[pre-push] All checks passed."

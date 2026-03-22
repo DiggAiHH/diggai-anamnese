@@ -80,7 +80,7 @@ export interface SessionState {
 
 export interface SessionActions {
     // Session
-    setSession: (sessionId: string, token: string) => void;
+    setSession: (sessionId: string, token?: string | null) => void;
     setPatientData: (data: { isNewPatient?: boolean; gender?: string; birthDate?: string; selectedService?: string; insuranceType?: string }) => void;
     clearSession: () => void;
 
@@ -141,7 +141,7 @@ export const useSessionStore = create<SessionState & SessionActions>()(
             ...initialState,
 
             // Session
-            setSession: (sessionId, token) => set({ sessionId, token }),
+            setSession: (sessionId, token) => set({ sessionId, token: token ?? null }),
 
             setPatientData: (data) => set((state) => ({
                 ...state,
@@ -234,7 +234,6 @@ export const useSessionStore = create<SessionState & SessionActions>()(
             partialize: (state) => ({
                 // Nur diese Felder persistieren (kein sensitive data!)
                 sessionId: state.sessionId,
-                token: state.token,
                 flowStep: state.flowStep,
                 currentAtomId: state.currentAtomId,
                 atomHistory: state.atomHistory,

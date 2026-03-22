@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { prisma } from '../db';
-import { createToken, requireAuth, requireSessionOwner, setTokenCookie } from '../middleware/auth';
+import { createToken, requireAuth, requireRole, requireSessionOwner, setTokenCookie } from '../middleware/auth';
 import { hashEmail, encrypt } from '../services/encryption';
 import { t, parseLang, LocalizedError } from '../i18n';
 
@@ -16,7 +16,7 @@ import { config as appConfig } from '../config';
  * POST /api/sessions/qr-token
  * MFA/Doctor generates a QR code token for a patient to start a session.
  */
-router.post('/qr-token', requireAuth, (req: Request, res: Response) => {
+router.post('/qr-token', requireAuth, requireRole('arzt', 'mfa', 'admin'), (req: Request, res: Response) => {
     try {
         const { service } = req.body;
         // Generate a fast token valid for 24 hours
@@ -46,8 +46,51 @@ const createSessionSchema = z.object({
 });
 
 /**
- * POST /api/sessions
- * Erstellt eine neue Patienten-Session
+ * @swagger
+ * /sessions:
+ *   post:
+ *     tags: [Sessions]
+ *     summary: Erstellt eine neue Patienten-Session
+ *     description: Erzeugt eine Session und einen anonymen Patienten (falls kein bestehender per E-Mail gefunden).
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [selectedService]
+ *             properties:
+ *               selectedService:
+ *                 type: string
+ *                 example: "Termin / Anamnese"
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 description: Optional — für Returning-Patient-Lookup (wird SHA-256 gehasht)
+ *               isNewPatient:
+ *                 type: boolean
+ *                 default: true
+ *               gender:
+ *                 type: string
+ *                 enum: [M, W, D]
+ *               birthDate:
+ *                 type: string
+ *                 format: date
+ *     responses:
+ *       201:
+ *         description: Session erstellt
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 sessionId: { type: string }
+ *       400:
+ *         description: Validierungsfehler
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
  */
 router.post('/', async (req: Request, res: Response) => {
     try {
@@ -55,18 +98,20 @@ router.post('/', async (req: Request, res: Response) => {
         const { email, isNewPatient, gender, birthDate, selectedService, insuranceType, encryptedName } = validatedData;
 
         // 1. Finde oder erstelle einen "Anonymen" Patient, falls noch keine E-Mail vorliegt
+        const tenantId = req.tenantId || 'default';
         const emailHash = email ? hashEmail(email) : `anonymous - ${Date.now()} -${Math.random()} `;
-        let patient = await prisma.patient.findUnique({ where: { hashedEmail: emailHash } });
+        let patient = await prisma.patient.findFirst({ where: { hashedEmail: emailHash, tenantId } });
 
         if (!patient) {
             patient = await prisma.patient.create({
-                data: { hashedEmail: emailHash },
+                data: { hashedEmail: emailHash, tenantId },
             });
         }
 
         // 2. Erstelle die Session (Demografische Daten dürfen anfangs null/leer sein!)
         const session = await prisma.patientSession.create({
             data: {
+                tenantId,
                 patientId: patient.id,
                 isNewPatient: isNewPatient ?? true,
                 gender: gender || null,
@@ -85,7 +130,6 @@ router.post('/', async (req: Request, res: Response) => {
         setTokenCookie(res, token);
         res.status(201).json({
             sessionId: session.id,
-            token,
             nextAtomIds: ['0000'],
         });
     } catch (err: unknown) {
@@ -243,7 +287,7 @@ router.post('/:id/accident', requireAuth, requireSessionOwner, async (req: Reque
 /**
  * GET /api/sessions/:id/accident
  */
-router.get('/:id/accident', requireAuth, async (req: Request, res: Response) => {
+router.get('/:id/accident', requireAuth, requireSessionOwner, async (req: Request, res: Response) => {
     try {
         const sessionId = req.params.id as string;
         const accident = await prisma.accidentDetails.findUnique({
@@ -320,7 +364,7 @@ router.post('/:id/medications', requireAuth, requireSessionOwner, async (req: Re
  * GET /api/sessions/:id/medications
  * Ruft die Dauermedikation des Patienten ab
  */
-router.get('/:id/medications', requireAuth, async (req: Request, res: Response) => {
+router.get('/:id/medications', requireAuth, requireSessionOwner, async (req: Request, res: Response) => {
     try {
         const sessionId = req.params.id as string;
 
@@ -404,7 +448,7 @@ router.post('/:id/surgeries', requireAuth, requireSessionOwner, async (req: Requ
 /**
  * GET /api/sessions/:id/surgeries
  */
-router.get('/:id/surgeries', requireAuth, async (req: Request, res: Response) => {
+router.get('/:id/surgeries', requireAuth, requireSessionOwner, async (req: Request, res: Response) => {
     try {
         const sessionId = req.params.id as string;
         const session = await prisma.patientSession.findUnique({
@@ -449,7 +493,7 @@ router.post('/refresh-token', requireAuth, async (req: Request, res: Response) =
         });
 
         setTokenCookie(res, newToken);
-        res.json({ token: newToken });
+        res.json({ success: true });
     } catch (err: unknown) {
         console.error('[Sessions] Token-Refresh-Fehler:', err);
         res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.session.token_refresh_failed') });

@@ -30,17 +30,149 @@ export default defineConfig({
     },
   },
   build: {
-    chunkSizeWarningLimit: 1500,
+    chunkSizeWarningLimit: 1000, // Reduced from 1500KB
     rollupOptions: {
       output: {
+        // Optimized manual chunks for better caching and parallel loading
         manualChunks(id: string) {
-          if (id.includes('node_modules/react-dom') || id.includes('node_modules/react/') || id.includes('node_modules/react-router')) return 'vendor-react';
-          if (id.includes('node_modules/@tanstack')) return 'vendor-query';
-          if (id.includes('node_modules/recharts') || id.includes('node_modules/lucide-react')) return 'vendor-ui';
-          if (id.includes('node_modules/socket.io')) return 'vendor-socket';
-          if (id.includes('node_modules/zod') || id.includes('node_modules/zustand')) return 'vendor-state';
+          // React Core - most stable, cached longest
+          if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/')) {
+            return 'vendor-react';
+          }
+          
+          // Router - stable
+          if (id.includes('node_modules/react-router') || id.includes('node_modules/@remix-run')) {
+            return 'vendor-router';
+          }
+          
+          // Data fetching - TanStack Query
+          if (id.includes('node_modules/@tanstack')) {
+            return 'vendor-query';
+          }
+          
+          // State management
+          if (id.includes('node_modules/zustand') || id.includes('node_modules/zod')) {
+            return 'vendor-state';
+          }
+          
+          // i18n - large but necessary
+          if (id.includes('node_modules/i18next') || id.includes('node_modules/react-i18next')) {
+            return 'vendor-i18n';
+          }
+          
+          // Icons - lucide-react (tree-shaken per component)
+          if (id.includes('node_modules/lucide-react')) {
+            return 'vendor-icons';
+          }
+          
+          // Charts - heavy visualization library
+          if (id.includes('node_modules/recharts')) {
+            return 'vendor-charts';
+          }
+          
+          // Realtime - Socket.IO
+          if (id.includes('node_modules/socket.io')) {
+            return 'vendor-socket';
+          }
+          
+          // Animations
+          if (id.includes('node_modules/lottie-react') || id.includes('node_modules/framer-motion')) {
+            return 'vendor-animation';
+          }
+          
+          // Signature and forms
+          if (id.includes('node_modules/signature_pad') || id.includes('node_modules/react-hook-form')) {
+            return 'vendor-forms';
+          }
+          
+          // QR Code generation
+          if (id.includes('node_modules/qrcode.react') || id.includes('node_modules/html5-qrcode')) {
+            return 'vendor-qr';
+          }
+          
+          // Markdown rendering
+          if (id.includes('node_modules/react-markdown') || id.includes('node_modules/remark')) {
+            return 'vendor-markdown';
+          }
+          
+          // OCR - HEAVY: Tesseract.js (~20MB)
+          // This is loaded on-demand only when scanner components are used
+          if (id.includes('node_modules/tesseract.js')) {
+            return 'vendor-ocr';
+          }
+          
+          // Drag and drop
+          if (id.includes('node_modules/@dnd-kit')) {
+            return 'vendor-dnd';
+          }
+          
+          // Date handling
+          if (id.includes('node_modules/date-fns')) {
+            return 'vendor-date';
+          }
+          
+          // Feature-based chunks for app code
+          // Auth features
+          if (id.includes('/src/pages/ArztDashboard') || id.includes('/src/hooks/useStaffApi')) {
+            return 'feature-staff';
+          }
+          
+          // Admin features (heavy dashboard)
+          if (id.includes('/src/pages/AdminDashboard') || id.includes('/src/components/admin/')) {
+            return 'feature-admin';
+          }
+          
+          // MFA features
+          if (id.includes('/src/pages/MFADashboard') || id.includes('/src/components/chat/Mfa')) {
+            return 'feature-mfa';
+          }
+          
+          // PWA Patient features
+          if (id.includes('/src/pages/pwa/')) {
+            return 'feature-pwa';
+          }
+          
+          // Therapy features
+          if (id.includes('/src/components/therapy/')) {
+            return 'feature-therapy';
+          }
+          
+          // Telemedicine features
+          if (id.includes('/src/pages/telemedizin/')) {
+            return 'feature-telemed';
+          }
         },
+        // Ensure smaller chunk files for better caching
+        entryFileNames: 'assets/[name]-[hash].js',
+        chunkFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash][extname]',
       },
     },
+    // Minification options for smaller bundles
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true, // Remove console.* in production
+        drop_debugger: true, // Remove debugger statements
+        pure_funcs: ['console.log', 'console.info', 'console.debug'], // Remove these function calls
+      },
+    },
+    // Source maps for production debugging (optional, can be disabled for smaller deploy)
+    sourcemap: false,
+  },
+  // Optimize dependencies for dev and build
+  optimizeDeps: {
+    exclude: ['tesseract.js'], // Exclude heavy OCR lib from pre-bundling
+    include: [
+      'react',
+      'react-dom',
+      'react-router-dom',
+      '@tanstack/react-query',
+      'zustand',
+      'i18next',
+      'react-i18next',
+      'lucide-react',
+      'socket.io-client',
+    ],
   },
 })

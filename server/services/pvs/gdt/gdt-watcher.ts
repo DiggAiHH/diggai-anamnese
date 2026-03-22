@@ -45,8 +45,8 @@ export class GdtWatcher {
       });
     });
 
-    this.watcher.on('error', (error: Error) => {
-      this.options.onError(error);
+    this.watcher.on('error', (error: unknown) => {
+      this.options.onError(error instanceof Error ? error : new Error(String(error)));
     });
   }
 

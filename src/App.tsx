@@ -2,10 +2,6 @@ import { BrowserRouter, Routes, Route, Navigate, useParams, useNavigate } from '
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useSessionStore } from './store/sessionStore';
 import { useThemeStore } from './store/themeStore';
-import { LandingPage } from './components/LandingPage';
-import { Questionnaire } from './components/Questionnaire';
-import { SessionRecoveryDialog } from './components/SessionRecoveryDialog';
-import { HomeScreen } from './components/HomeScreen';
 import './index.css';
 import { useEffect, lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -15,6 +11,11 @@ import { PWAShell } from './components/pwa/PWAShell';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { StaffShell } from './components/staff/StaffShell';
 import { ToastContainer } from './components/ui/Toast';
+import { preloadPatientFlow } from './lib/routePreloaders';
+const HomeScreen = lazy(() => import('./components/HomeScreen').then(m => ({ default: m.HomeScreen })));
+const LandingPage = lazy(() => import('./components/LandingPage').then(m => ({ default: m.LandingPage })));
+const Questionnaire = lazy(() => import('./components/Questionnaire').then(m => ({ default: m.Questionnaire })));
+const SessionRecoveryDialog = lazy(() => import('./components/SessionRecoveryDialog').then(m => ({ default: m.SessionRecoveryDialog })));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage').then(m => ({ default: m.NotFoundPage })));
 const AgentDashboard = lazy(() => import('./pages/agents/AgentDashboard').then(m => ({ default: m.AgentDashboard })));
 const SystemPanel = lazy(() => import('./pages/SystemPanel').then(m => ({ default: m.SystemPanel })));
@@ -51,6 +52,7 @@ const PwaReminderConfig = lazy(() => import('./pages/pwa/PwaReminderConfig'));
 const HandbuchPage = lazy(() => import('./pages/HandbuchPage').then(m => ({ default: m.HandbuchPage })));
 const DatenschutzPage = lazy(() => import('./pages/DatenschutzPage').then(m => ({ default: m.DatenschutzPage })));
 const ImpressumPage = lazy(() => import('./pages/ImpressumPage').then(m => ({ default: m.ImpressumPage })));
+const Pricing = lazy(() => import('./pages/Pricing').then(m => ({ default: m.Pricing })));
 const StaffLogin = lazy(() => import('./pages/staff/StaffLogin'));
 
 // Suspense fallback for lazy routes
@@ -67,11 +69,13 @@ function DashboardLoading() {
 }
 
 // React Query Client
+// Memory Leak Fix: Added gcTime (cacheTime) to prevent unlimited cache growth
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: 2,
       staleTime: 30 * 1000,
+      gcTime: 5 * 60 * 1000, // 5 minutes - prevents unlimited cache growth
       refetchOnWindowFocus: false,
     },
     mutations: {
@@ -102,15 +106,21 @@ function DataDeletionConfirmRoute() {
 function PatientApp() {
   const flowStep = useSessionStore(state => state.flowStep);
 
+  useEffect(() => {
+    void preloadPatientFlow();
+  }, []);
+
   return (
-    <div className="min-h-screen transition-colors duration-500">
-      {flowStep === 'landing' ? (
-        <LandingPage />
-      ) : (
-        <Questionnaire />
-      )}
-      <SessionRecoveryDialog />
-    </div>
+    <Suspense fallback={<DashboardLoading />}>
+      <div className="min-h-screen transition-colors duration-500">
+        {flowStep === 'landing' ? (
+          <LandingPage />
+        ) : (
+          <Questionnaire />
+        )}
+        <SessionRecoveryDialog />
+      </div>
+    </Suspense>
   );
 }
 
@@ -134,7 +144,7 @@ function App() {
         <main id="main-content">
           <Routes>
           {/* Patientenansicht */}
-          <Route path="/" element={<HomeScreen />} />
+          <Route path="/" element={<Suspense fallback={<DashboardLoading />}><HomeScreen /></Suspense>} />
 
           {/* Patient-Flow */}
           <Route path="/patient" element={<PatientApp />} />
@@ -160,6 +170,9 @@ function App() {
 
           {/* Impressum — §5 DDG (lazy-loaded) */}
           <Route path="/impressum" element={<Suspense fallback={<DashboardLoading />}><ImpressumPage /></Suspense>} />
+
+          {/* Pricing Page */}
+          <Route path="/pricing" element={<Suspense fallback={<DashboardLoading />}><Pricing /></Suspense>} />
 
           {/* Modul 7: NFC & Flow Routes */}
           <Route path="/nfc" element={<Suspense fallback={<DashboardLoading />}><NfcLanding /></Suspense>} />

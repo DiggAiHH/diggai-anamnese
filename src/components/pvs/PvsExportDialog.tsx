@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Upload, Loader2, CheckCircle, XCircle, X } from 'lucide-react';
-import { usePvsConnections, usePvsExportSession } from '../../hooks/useApi';
+import { usePvsConnections, usePvsExportSession } from '../../hooks/useOpsApi';
 
 interface PvsExportDialogProps {
     sessionId: string;

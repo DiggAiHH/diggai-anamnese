@@ -1,0 +1,97 @@
+name: Design Tokens
+
+on:
+  push:
+    paths:
+      - 'src/tokens/tokens.json'
+    branches:
+      - main
+      - develop
+  pull_request:
+    paths:
+      - 'src/tokens/tokens.json'
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+        working-directory: ./anamnese-app
+      
+      - name: Generate Design Tokens
+        run: npm run tokens:generate
+        working-directory: ./anamnese-app
+      
+      - name: Verify token generation
+        run: |
+          test -f src/tokens/tokens.css
+          test -f src/tokens/tokens.tailwind.ts
+          test -f src/tokens/tokens.types.ts
+          test -f src/tokens/tokens.figma.json
+          test -f src/tokens/index.ts
+        working-directory: ./anamnese-app
+      
+      - name: Type check generated files
+        run: npm run type-check
+        working-directory: ./anamnese-app
+        continue-on-error: false
+      
+      - name: Commit generated files
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add src/tokens/
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore: auto-generate design tokens [skip ci]"
+            git push
+          fi
+        working-directory: ./anamnese-app
+
+  validate:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+        working-directory: ./anamnese-app
+      
+      - name: Generate Design Tokens
+        run: npm run tokens:generate
+        working-directory: ./anamnese-app
+      
+      - name: Check for uncommitted changes
+        run: |
+          if git diff --quiet HEAD -- src/tokens/; then
+            echo "✅ All token files are up to date"
+          else
+            echo "❌ Token files are out of date. Please run 'npm run tokens:generate' locally and commit the changes."
+            git diff HEAD -- src/tokens/
+            exit 1
+          fi
+        working-directory: ./anamnese-app

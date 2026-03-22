@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
+import rateLimit from 'express-rate-limit';
 import { prisma } from '../db';
 import { requireAuth, requireSessionOwner } from '../middleware/auth';
 import { encrypt, isPIIAtom } from '../services/encryption';
@@ -9,6 +10,21 @@ import { z } from 'zod';
 
 const router = Router();
 
+// SECURITY: Rate limiting for answer submission (HIGH-002 Fix)
+// Prevents spam/abuse of answer endpoint
+const answerSubmissionLimiter = rateLimit({
+    windowMs: 1 * 60 * 1000, // 1 minute window
+    max: 30, // Max 30 answers per minute per session
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req: Request) => String(req.params.id || req.ip || 'unknown'),
+    handler: (_req: Request, res: Response) => {
+        res.status(429).json({ 
+            error: 'Zu viele Antworten in kurzer Zeit. Bitte warten Sie einen Moment.' 
+        });
+    },
+});
+
 const submitAnswerSchema = z.object({
     atomId: z.string().min(1),
     value: z.any(),
@@ -17,8 +33,9 @@ const submitAnswerSchema = z.object({
 
 /**
  * POST /api/sessions/:id/answers
+ * SECURITY: Rate limited to 30 submissions per minute per session
  */
-router.post('/:id', requireAuth, requireSessionOwner, async (req: Request, res: Response) => {
+router.post('/:id', requireAuth, requireSessionOwner, answerSubmissionLimiter, async (req: Request, res: Response) => {
     try {
         const validated = submitAnswerSchema.parse(req.body);
         const { atomId, value, timeSpentMs } = validated;
@@ -103,9 +120,10 @@ router.post('/:id', requireAuth, requireSessionOwner, async (req: Request, res: 
             if (typeof realEmail === 'string' && realEmail.includes('@')) {
                 const { hashEmail } = await import('../services/encryption');
                 const realHash = hashEmail(realEmail);
-                let realPatient = await prisma.patient.findUnique({ where: { hashedEmail: realHash } });
+                const tenantId = req.tenantId || req.auth?.tenantId || 'system';
+                let realPatient = await prisma.patient.findFirst({ where: { hashedEmail: realHash, tenantId } });
                 if (!realPatient) {
-                    realPatient = await prisma.patient.create({ data: { hashedEmail: realHash } });
+                    realPatient = await prisma.patient.create({ data: { hashedEmail: realHash, tenantId } });
                 }
                 updatedSession = await prisma.patientSession.update({
                     where: { id: sessionId },

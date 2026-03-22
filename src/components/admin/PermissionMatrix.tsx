@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Lock, Check, X } from 'lucide-react';
-import { useAdminPermissions, useAdminRolePermissions, useAdminSetRolePermissions } from '../../hooks/useApi';
+import { useAdminPermissions, useAdminRolePermissions, useAdminSetRolePermissions } from '../../hooks/useOpsApi';
 import type { Permission } from '../../types/admin';
 
 const ROLES = ['ADMIN', 'ARZT', 'MFA'];

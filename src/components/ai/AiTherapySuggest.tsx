@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Sparkles, Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { useAiSuggestTherapy } from '../../hooks/useApi';
+import { useAiSuggestTherapy } from '../../hooks/useOpsApi';
 
 interface AiTherapySuggestProps {
     sessionId: string;

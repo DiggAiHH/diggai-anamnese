@@ -1,5 +1,24 @@
 import { type AiConfig } from './ai-config';
 
+/**
+ * SECURITY: Sanitizes user input before sending to LLM.
+ * Prevents prompt injection attacks by removing control characters
+ * and limiting input length.
+ */
+function sanitizeForLlm(input: string): string {
+    if (typeof input !== 'string') return '';
+    
+    return input
+        // Remove potential prompt control characters
+        .replace(/[<>{}[\]]/g, '')
+        // Remove null bytes
+        .replace(/\x00/g, '')
+        // Remove control characters (except newlines and tabs)
+        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+        // Limit length to prevent DoS
+        .slice(0, 4000);
+}
+
 export interface LlmResponse {
     text: string;
     model: string;
@@ -7,6 +26,23 @@ export interface LlmResponse {
     completionTokens?: number;
     durationMs: number;
 }
+
+type OllamaGenerateResponse = {
+    response?: string;
+    model?: string;
+    prompt_eval_count?: number;
+    eval_count?: number;
+};
+
+type OpenAIChatResponse = {
+    choices?: Array<{ message?: { content?: string } }>;
+    model?: string;
+    usage?: { prompt_tokens?: number; completion_tokens?: number };
+};
+
+type OllamaTagsResponse = {
+    models?: Array<{ name?: string }>;
+};
 
 export async function callLlm(config: AiConfig, prompt: string, systemPrompt?: string): Promise<LlmResponse> {
     const start = Date.now();
@@ -26,14 +62,18 @@ async function callOllama(config: AiConfig, prompt: string, systemPrompt: string
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), config.timeout);
 
+    // SECURITY: Sanitize inputs before sending to LLM (HIGH-003 Fix)
+    const sanitizedPrompt = sanitizeForLlm(prompt);
+    const sanitizedSystemPrompt = systemPrompt ? sanitizeForLlm(systemPrompt) : undefined;
+
     try {
         const res = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 model: config.model,
-                prompt,
-                system: systemPrompt,
+                prompt: sanitizedPrompt,
+                system: sanitizedSystemPrompt,
                 stream: false,
                 options: {
                     temperature: config.temperature,
@@ -48,7 +88,7 @@ async function callOllama(config: AiConfig, prompt: string, systemPrompt: string
             throw new Error(`Ollama error ${res.status}: ${errText}`);
         }
 
-        const data = await res.json();
+        const data = await res.json() as OllamaGenerateResponse;
         return {
             text: data.response || '',
             model: data.model || config.model,
@@ -66,9 +106,13 @@ async function callOpenAi(config: AiConfig, prompt: string, systemPrompt: string
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), config.timeout);
 
+    // SECURITY: Sanitize inputs before sending to LLM (HIGH-003 Fix)
+    const sanitizedPrompt = sanitizeForLlm(prompt);
+    const sanitizedSystemPrompt = systemPrompt ? sanitizeForLlm(systemPrompt) : undefined;
+
     const messages: { role: string; content: string }[] = [];
-    if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
-    messages.push({ role: 'user', content: prompt });
+    if (sanitizedSystemPrompt) messages.push({ role: 'system', content: sanitizedSystemPrompt });
+    messages.push({ role: 'user', content: sanitizedPrompt });
 
     try {
         const res = await fetch(url, {
@@ -91,7 +135,7 @@ async function callOpenAi(config: AiConfig, prompt: string, systemPrompt: string
             throw new Error(`OpenAI-compatible error ${res.status}: ${errText}`);
         }
 
-        const data = await res.json();
+        const data = await res.json() as OpenAIChatResponse;
         return {
             text: data.choices?.[0]?.message?.content || '',
             model: data.model || config.model,
@@ -109,8 +153,8 @@ export async function checkLlmHealth(config: AiConfig): Promise<{ online: boolea
         if (config.provider === 'ollama') {
             const res = await fetch(`${config.endpoint}/api/tags`, { signal: AbortSignal.timeout(5000) });
             if (!res.ok) return { online: false };
-            const data = await res.json();
-            return { online: true, models: data.models?.map((m: any) => m.name) };
+            const data = await res.json() as OllamaTagsResponse;
+            return { online: true, models: data.models?.map((m) => m.name).filter((name): name is string => Boolean(name)) };
         }
         if (config.provider === 'openai') {
             const res = await fetch(`${config.endpoint}/v1/models`, {

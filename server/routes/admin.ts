@@ -2,7 +2,7 @@ import { Router, type Request } from 'express';
 import { prisma } from '../db';
 import { z } from 'zod';
 import * as bcrypt from 'bcryptjs';
-import { requireAuth, requireRole, requirePermission } from '../middleware/auth';
+import { requireAuth, requireRole, requirePermission, requireStrictPermission } from '../middleware/auth';
 import { t, parseLang } from '../i18n';
 
 const router = Router();
@@ -13,6 +13,38 @@ function param(req: Request, key: string): string {
     return Array.isArray(v) ? v[0] : v;
 }
 
+function resolveEffectiveTenant(req: Request):
+    | { ok: true; tenantId: string }
+    | { ok: false; status: 400 | 403; body: { error: string; code: 'TENANT_CONTEXT_REQUIRED' | 'TENANT_SCOPE_VIOLATION' } } {
+    const authTenantId = req.auth?.tenantId;
+    const requestTenantId = req.tenantId;
+
+    if (authTenantId && requestTenantId && authTenantId !== requestTenantId) {
+        return {
+            ok: false,
+            status: 403,
+            body: {
+                error: 'Tenant-Konflikt',
+                code: 'TENANT_SCOPE_VIOLATION',
+            },
+        };
+    }
+
+    const tenantId = requestTenantId || authTenantId;
+    if (!tenantId) {
+        return {
+            ok: false,
+            status: 400,
+            body: {
+                error: 'Tenant-Kontext fehlt',
+                code: 'TENANT_CONTEXT_REQUIRED',
+            },
+        };
+    }
+
+    return { ok: true, tenantId };
+}
+
 // Alle Admin-Routen erfordern Admin-Rolle (except /permissions/check)
 router.use(requireAuth);
 
@@ -20,6 +52,12 @@ router.use(requireAuth);
 
 router.get('/stats', requireRole('admin'), async (req, res) => {
     try {
+        const resolvedTenant = resolveEffectiveTenant(req);
+        if (!resolvedTenant.ok) {
+            res.status(resolvedTenant.status).json(resolvedTenant.body);
+            return;
+        }
+
         const [
             totalPatients,
             totalSessions,
@@ -28,12 +66,12 @@ router.get('/stats', requireRole('admin'), async (req, res) => {
             unresolvedTriageEvents,
             totalUsers,
         ] = await Promise.all([
-            prisma.patient.count(),
-            prisma.patientSession.count(),
-            prisma.patientSession.count({ where: { status: 'ACTIVE' } }),
-            prisma.patientSession.count({ where: { status: 'COMPLETED' } }),
-            prisma.triageEvent.count({ where: { acknowledgedBy: null } }),
-            prisma.arztUser.count(),
+            prisma.patient.count({ where: { tenantId: resolvedTenant.tenantId } }),
+            prisma.patientSession.count({ where: { tenantId: resolvedTenant.tenantId } }),
+            prisma.patientSession.count({ where: { tenantId: resolvedTenant.tenantId, status: 'ACTIVE' } }),
+            prisma.patientSession.count({ where: { tenantId: resolvedTenant.tenantId, status: 'COMPLETED' } }),
+            prisma.triageEvent.count({ where: { acknowledgedBy: null, session: { tenantId: resolvedTenant.tenantId } } }),
+            prisma.arztUser.count({ where: { tenantId: resolvedTenant.tenantId } }),
         ]);
 
         const completionRate = totalSessions > 0
@@ -42,7 +80,7 @@ router.get('/stats', requireRole('admin'), async (req, res) => {
 
         // Avg completion time (completed sessions with completedAt set)
         const completedWithTime = await prisma.patientSession.findMany({
-            where: { status: 'COMPLETED', completedAt: { not: null } },
+            where: { tenantId: resolvedTenant.tenantId, status: 'COMPLETED', completedAt: { not: null } },
             select: { createdAt: true, completedAt: true },
             take: 100,
             orderBy: { completedAt: 'desc' },
@@ -61,7 +99,7 @@ router.get('/stats', requireRole('admin'), async (req, res) => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const sessionsToday = await prisma.patientSession.count({
-            where: { createdAt: { gte: today } },
+            where: { tenantId: resolvedTenant.tenantId, createdAt: { gte: today } },
         });
 
         res.json({
@@ -85,12 +123,18 @@ router.get('/stats', requireRole('admin'), async (req, res) => {
 
 router.get('/sessions/timeline', requireRole('admin'), async (req, res) => {
     try {
+        const resolvedTenant = resolveEffectiveTenant(req);
+        if (!resolvedTenant.ok) {
+            res.status(resolvedTenant.status).json(resolvedTenant.body);
+            return;
+        }
+
         const days = Math.min(Math.max(parseInt(req.query.days as string) || 30, 1), 365);
         const since = new Date();
         since.setDate(since.getDate() - days);
 
         const sessions = await prisma.patientSession.findMany({
-            where: { createdAt: { gte: since } },
+            where: { tenantId: resolvedTenant.tenantId, createdAt: { gte: since } },
             select: { createdAt: true, status: true },
             orderBy: { createdAt: 'asc' },
         });
@@ -116,8 +160,15 @@ router.get('/sessions/timeline', requireRole('admin'), async (req, res) => {
 
 router.get('/analytics/services', requireRole('admin'), async (req, res) => {
     try {
+        const resolvedTenant = resolveEffectiveTenant(req);
+        if (!resolvedTenant.ok) {
+            res.status(resolvedTenant.status).json(resolvedTenant.body);
+            return;
+        }
+
         const services = await prisma.patientSession.groupBy({
             by: ['selectedService'],
+            where: { tenantId: resolvedTenant.tenantId },
             _count: { id: true },
             orderBy: { _count: { id: 'desc' } },
         });
@@ -136,12 +187,21 @@ router.get('/analytics/services', requireRole('admin'), async (req, res) => {
 
 router.get('/analytics/triage', requireRole('admin'), async (req, res) => {
     try {
+        const resolvedTenant = resolveEffectiveTenant(req);
+        if (!resolvedTenant.ok) {
+            res.status(resolvedTenant.status).json(resolvedTenant.body);
+            return;
+        }
+
         const days = Math.min(Math.max(parseInt(req.query.days as string) || 30, 1), 365);
         const since = new Date();
         since.setDate(since.getDate() - days);
 
         const events = await prisma.triageEvent.findMany({
-            where: { createdAt: { gte: since } },
+            where: {
+                createdAt: { gte: since },
+                session: { tenantId: resolvedTenant.tenantId },
+            },
             select: { createdAt: true, level: true, acknowledgedBy: true },
             orderBy: { createdAt: 'asc' },
         });
@@ -168,6 +228,7 @@ router.get('/analytics/triage', requireRole('admin'), async (req, res) => {
 const auditLogQuerySchema = z.object({
     page: z.coerce.number().min(1).default(1),
     limit: z.coerce.number().min(1).max(100).default(25),
+    tenantId: z.string().optional(),
     action: z.string().optional(),
     userId: z.string().optional(),
     dateFrom: z.string().optional(),
@@ -175,10 +236,36 @@ const auditLogQuerySchema = z.object({
     search: z.string().optional(),
 });
 
+const AUDIT_SENSITIVE_QUERY_KEYS = ['token', 'password', 'secret', 'authorization', 'api_key', 'apikey', 'access_token', 'refresh_token'];
+
+function redactSensitiveQueryValues(input: string): string {
+    let output = input;
+    for (const key of AUDIT_SENSITIVE_QUERY_KEYS) {
+        const pattern = new RegExp(`(${key}=)([^&\\s]+)`, 'ig');
+        output = output.replace(pattern, '$1[REDACTED]');
+    }
+    return output;
+}
+
 router.get('/audit-log', requireRole('admin'), requirePermission('admin_audit'), async (req, res) => {
     try {
         const query = auditLogQuerySchema.parse(req.query);
+        const resolvedTenant = resolveEffectiveTenant(req);
+        if (!resolvedTenant.ok) {
+            res.status(resolvedTenant.status).json(resolvedTenant.body);
+            return;
+        }
+
+        if (query.tenantId && query.tenantId !== resolvedTenant.tenantId) {
+            res.status(403).json({
+                error: 'Tenant-Konflikt',
+                code: 'TENANT_SCOPE_VIOLATION',
+            });
+            return;
+        }
+
         const where: any = {};
+        where.tenantId = resolvedTenant.tenantId;
 
         if (query.action) where.action = query.action;
         if (query.userId) where.userId = query.userId;
@@ -188,10 +275,11 @@ router.get('/audit-log', requireRole('admin'), requirePermission('admin_audit'),
             if (query.dateTo) where.createdAt.lte = new Date(query.dateTo);
         }
         if (query.search) {
+            const sanitizedSearch = redactSensitiveQueryValues(query.search);
             where.OR = [
-                { action: { contains: query.search } },
-                { resource: { contains: query.search } },
-                { userId: { contains: query.search } },
+                { action: { contains: sanitizedSearch } },
+                { resource: { contains: sanitizedSearch } },
+                { userId: { contains: sanitizedSearch } },
             ];
         }
 
@@ -205,8 +293,15 @@ router.get('/audit-log', requireRole('admin'), requirePermission('admin_audit'),
             prisma.auditLog.count({ where }),
         ]);
 
+        const sanitizedEntries = entries.map((entry: any) => ({
+            ...entry,
+            resource: typeof entry.resource === 'string'
+                ? redactSensitiveQueryValues(entry.resource)
+                : entry.resource,
+        }));
+
         res.json({
-            entries,
+            entries: sanitizedEntries,
             pagination: {
                 page: query.page,
                 limit: query.limit,
@@ -224,7 +319,16 @@ router.get('/audit-log', requireRole('admin'), requirePermission('admin_audit'),
 
 router.get('/users', requireRole('admin'), requirePermission('admin_users'), async (req, res) => {
     try {
+        const resolvedTenant = resolveEffectiveTenant(req);
+        if (!resolvedTenant.ok) {
+            res.status(resolvedTenant.status).json(resolvedTenant.body);
+            return;
+        }
+
         const users = await prisma.arztUser.findMany({
+            where: {
+                tenantId: resolvedTenant.tenantId,
+            },
             select: {
                 id: true,
                 username: true,
@@ -250,13 +354,20 @@ const createUserSchema = z.object({
     role: z.enum(['ARZT', 'MFA', 'ADMIN']),
 });
 
-router.post('/users', requireRole('admin'), async (req, res) => {
+router.post('/users', requireRole('admin'), requirePermission('admin_users'), async (req, res) => {
     try {
+        const resolvedTenant = resolveEffectiveTenant(req);
+        if (!resolvedTenant.ok) {
+            res.status(resolvedTenant.status).json(resolvedTenant.body);
+            return;
+        }
+
         const data = createUserSchema.parse(req.body);
         const passwordHash = await bcrypt.hash(data.password, 12);
 
         const user = await prisma.arztUser.create({
             data: {
+                tenantId: resolvedTenant.tenantId,
                 username: data.username,
                 passwordHash,
                 displayName: data.displayName,
@@ -284,8 +395,14 @@ const updateUserSchema = z.object({
     pin: z.string().length(4).regex(/^\d{4}$/).optional(),
 });
 
-router.put('/users/:id', requireRole('admin'), async (req, res) => {
+router.put('/users/:id', requireRole('admin'), requirePermission('admin_users'), async (req, res) => {
     try {
+        const resolvedTenant = resolveEffectiveTenant(req);
+        if (!resolvedTenant.ok) {
+            res.status(resolvedTenant.status).json(resolvedTenant.body);
+            return;
+        }
+
         const data = updateUserSchema.parse(req.body);
         const updateData: any = {};
 
@@ -296,7 +413,12 @@ router.put('/users/:id', requireRole('admin'), async (req, res) => {
         if (data.pin) updateData.pinHash = await bcrypt.hash(data.pin, 12);
 
         const user = await prisma.arztUser.update({
-            where: { id: param(req, 'id') },
+            where: {
+                id_tenantId: {
+                    id: param(req, 'id'),
+                    tenantId: resolvedTenant.tenantId,
+                },
+            },
             data: updateData,
             select: { id: true, username: true, displayName: true, role: true, isActive: true },
         });
@@ -312,11 +434,22 @@ router.put('/users/:id', requireRole('admin'), async (req, res) => {
     }
 });
 
-router.delete('/users/:id', requireRole('admin'), async (req, res) => {
+router.delete('/users/:id', requireRole('admin'), requirePermission('admin_users'), async (req, res) => {
     try {
+        const resolvedTenant = resolveEffectiveTenant(req);
+        if (!resolvedTenant.ok) {
+            res.status(resolvedTenant.status).json(resolvedTenant.body);
+            return;
+        }
+
         // Soft delete: deactivate instead of hard delete
         await prisma.arztUser.update({
-            where: { id: param(req, 'id') },
+            where: {
+                id_tenantId: {
+                    id: param(req, 'id'),
+                    tenantId: resolvedTenant.tenantId,
+                },
+            },
             data: { isActive: false },
         });
         res.json({ success: true, message: 'Benutzer deaktiviert' });
@@ -333,8 +466,14 @@ router.delete('/users/:id', requireRole('admin'), async (req, res) => {
 // ─── Permissions Management ─────────────────────────────────
 
 // GET /api/admin/permissions — All available permissions
-router.get('/permissions', requireRole('admin'), async (_req, res) => {
+router.get('/permissions', requireRole('admin'), requireStrictPermission('admin_users'), async (req, res) => {
     try {
+        const resolvedTenant = resolveEffectiveTenant(req);
+        if (!resolvedTenant.ok) {
+            res.status(resolvedTenant.status).json(resolvedTenant.body);
+            return;
+        }
+
         const permissions = await prisma.permission.findMany({
             orderBy: [{ category: 'asc' }, { code: 'asc' }],
             include: { roles: { select: { role: true } } },
@@ -347,10 +486,19 @@ router.get('/permissions', requireRole('admin'), async (_req, res) => {
 });
 
 // GET /api/admin/roles/:role/permissions — Permissions for a role
-router.get('/roles/:role/permissions', requireRole('admin'), async (req, res) => {
+const roleParamSchema = z.string().min(1).max(50).regex(/^[A-Za-z_]+$/);
+
+router.get('/roles/:role/permissions', requireRole('admin'), requireStrictPermission('admin_users'), async (req, res) => {
     try {
+        const role = roleParamSchema.parse(param(req, 'role'));
+        const resolvedTenant = resolveEffectiveTenant(req);
+        if (!resolvedTenant.ok) {
+            res.status(resolvedTenant.status).json(resolvedTenant.body);
+            return;
+        }
+
         const rolePerms = await prisma.rolePermission.findMany({
-            where: { role: param(req, 'role') },
+            where: { role },
             include: { permission: true },
         });
         res.json(rolePerms.map((rp: any) => rp.permission));
@@ -365,11 +513,17 @@ const setRolePermsSchema = z.object({
     permissionIds: z.array(z.string()).min(0),
 });
 
-router.put('/roles/:role/permissions', requireRole('admin'), async (req, res) => {
+router.put('/roles/:role/permissions', requireRole('admin'), requireStrictPermission('admin_users'), async (req, res) => {
     try {
+        const resolvedTenant = resolveEffectiveTenant(req);
+        if (!resolvedTenant.ok) {
+            res.status(resolvedTenant.status).json(resolvedTenant.body);
+            return;
+        }
+
         const { permissionIds } = setRolePermsSchema.parse(req.body);
-        const role = param(req, 'role');
-        const userId = (req as any).user?.userId || 'unknown';
+        const role = roleParamSchema.parse(param(req, 'role'));
+        const userId = req.auth?.userId || 'unknown';
 
         // Delete existing, then re-create
         await prisma.$transaction([
@@ -393,12 +547,23 @@ const setUserPermsSchema = z.object({
     permissionCodes: z.array(z.string()),
 });
 
-router.put('/users/:id/permissions', requireRole('admin'), async (req, res) => {
+router.put('/users/:id/permissions', requireRole('admin'), requirePermission('admin_users'), async (req, res) => {
     try {
+        const resolvedTenant = resolveEffectiveTenant(req);
+        if (!resolvedTenant.ok) {
+            res.status(resolvedTenant.status).json(resolvedTenant.body);
+            return;
+        }
+
         const { permissionCodes } = setUserPermsSchema.parse(req.body);
 
         await prisma.arztUser.update({
-            where: { id: param(req, 'id') },
+            where: {
+                id_tenantId: {
+                    id: param(req, 'id'),
+                    tenantId: resolvedTenant.tenantId,
+                },
+            },
             data: { customPermissions: JSON.stringify(permissionCodes) },
         });
 
@@ -419,10 +584,16 @@ router.get('/permissions/check', async (req, res) => {
         const code = req.query.code as string;
         if (!code) { res.status(400).json({ error: 'code parameter required' }); return; }
 
-        const userRole = (req as any).user?.role;
-        const userId = (req as any).user?.userId;
+        const userRole = req.auth?.role;
+        const normalizedRole = userRole?.toUpperCase();
+        const userId = req.auth?.userId;
 
-        if (userRole === 'admin') {
+        if (!normalizedRole) {
+            res.json({ allowed: false });
+            return;
+        }
+
+        if (normalizedRole === 'ADMIN') {
             res.json({ allowed: true });
             return;
         }
@@ -430,7 +601,7 @@ router.get('/permissions/check', async (req, res) => {
         // Check role permission
         const rolePerm = await prisma.rolePermission.findFirst({
             where: {
-                role: userRole,
+                role: normalizedRole,
                 permission: { code },
             },
         });
@@ -501,7 +672,7 @@ const createContentSchema = z.object({
     language: z.string().max(5).optional(),
 });
 
-router.post('/content', requireRole('admin'), async (req, res) => {
+router.post('/content', requireRole('admin'), requirePermission('admin_content'), async (req, res) => {
     try {
         const data = createContentSchema.parse(req.body);
         const content = await prisma.waitingContent.create({
@@ -518,7 +689,7 @@ router.post('/content', requireRole('admin'), async (req, res) => {
 });
 
 // PUT /api/admin/content/:id — Update content
-router.put('/content/:id', requireRole('admin'), async (req, res) => {
+router.put('/content/:id', requireRole('admin'), requirePermission('admin_content'), async (req, res) => {
     try {
         const data = createContentSchema.partial().parse(req.body);
         const updateData: any = { ...data };
@@ -539,7 +710,7 @@ router.put('/content/:id', requireRole('admin'), async (req, res) => {
 });
 
 // DELETE /api/admin/content/:id — Delete content
-router.delete('/content/:id', requireRole('admin'), async (req, res) => {
+router.delete('/content/:id', requireRole('admin'), requirePermission('admin_content'), async (req, res) => {
     try {
         await prisma.waitingContent.delete({ where: { id: param(req, 'id') } });
         res.json({ success: true });
@@ -551,7 +722,7 @@ router.delete('/content/:id', requireRole('admin'), async (req, res) => {
 });
 
 // POST /api/admin/content/seed — Seed default waiting content
-router.post('/content/seed', requireRole('admin'), async (req, res) => {
+router.post('/content/seed', requireRole('admin'), requirePermission('admin_content'), async (req, res) => {
     try {
         const { seedWaitingContent } = await import('../../prisma/seed-content');
         const created = await seedWaitingContent();

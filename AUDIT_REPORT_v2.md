@@ -1,8 +1,65 @@
 # DiggAI Anamnese — Comprehensive Audit Report (v2)
 
+> **Audit Delta:** 07. März 2026 — zusätzlicher Readiness-Check für Audit- und Zertifizierungsvorbereitung.
+
 **Date:** 2026-03-01  
 **Scope:** `src/` + `server/` — all `.ts` / `.tsx` files  
 **Categories:** Security, Error Handling, UX, Code Quality, Performance, i18n
+
+---
+
+## 0. Readiness Update — 2026-03-07
+
+### Executive Summary
+
+Der aktuelle Workspace ist **noch nicht audit- bzw. zertifizierungsreif**. Ein neuer Validierungslauf am 07.03.2026 zeigt, dass zwar die neu eingeführten VS-Code-Agent-/Prompt-Dateien sauber validieren, das eigentliche Produkt jedoch weiterhin einen signifikanten offenen Fehler- und Testbestand hat.
+
+### Aktueller Nachweisstand
+
+| Bereich | Status | Nachweis |
+|---|---|---|
+| Workspace- / Modul-Instructions | ✅ sauber | `.github/copilot-instructions.md`, `anamnese-app/.github/copilot-instructions.md` ohne Fehler |
+| Custom Agents | ✅ sauber | `security`, `i18n`, `medical`, `planner`, `fullstack` Agent-Dateien validiert |
+| Gesamt-Diagnostik | ❌ offen | `get_errors` meldet **472** bestehende Probleme |
+| Browser-/Interaktionstests | ❌ offen | Playwright `.last-run.json` zeigt `status: failed` und **19** fehlgeschlagene Tests |
+| Zertifizierungsdokumentation | ⚠️ vorbereitet, aber nicht freigabefähig | Reports aktualisiert, jedoch noch mit technischen Blockern |
+
+### Top-Blocker vor Audit / Zertifizierung
+
+1. **Server-Typ- und Prisma-Inkonsistenzen**
+    - `server/services/ai/ai-config.ts`
+    - `server/services/ai/context-aggregator.ts`
+    - `server/services/ai/llm-client.ts`
+    - `server/services/messagebroker.service.ts`
+
+2. **Import-/Projektgrenzenproblem im Server-Build**
+    - `server/routes/admin.ts` importiert `../../prisma/seed-content`, das außerhalb von `tsconfig.server.json` liegt
+
+3. **Form-/Sanitizing-/Upload-Probleme**
+    - `server/routes/forms.ts`
+    - `server/services/sanitize.ts`
+    - `server/routes/upload.ts`
+
+4. **Signatur-Route Typfehler**
+    - `server/routes/signatures.ts` verwendet `req.params.*` nicht ausreichend auf `string` verengt
+
+5. **Accessibility-/Interaction-Defizite im Frontend**
+    - `src/components/chat/MfaChatInterface.tsx`
+    - `src/components/Questionnaire.tsx`
+
+### Bereits im aktuellen Durchlauf verbessert
+
+- Timer-/Idle-Callback-Fix in `src/main.tsx`
+- Timer-/Deferred-UI-Stabilisierung in `src/components/LandingPage.tsx`
+- Vollständiges VS-Code-Master-Prompt-Setup für Praxis OS / Anamnese App mit validierten Agent-Dateien
+
+### Empfohlene Reihenfolge zur Audit-Reife
+
+1. Server Build/Type-Probleme auf 0 reduzieren
+2. Accessibility-Fehler bereinigen
+3. Playwright Full Suite erneut ausführen
+4. Audit-Report und Integrationstest-Report mit finalem grünen Stand aktualisieren
+5. Erst danach formale Audit-/Zertifizierungsunterlagen einfrieren
 
 ---
 

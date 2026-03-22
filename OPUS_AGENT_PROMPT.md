@@ -1,5 +1,8 @@
 # Opus 4.6 Agent Prompt — DiggAI Phase 10 Implementation
 
+> ⚠️ **DEPRECATED** — Diese dateispezifische Phase-10-Anweisung wurde durch `anamnese-app/.github/agents/fullstack-agent.agent.md` ersetzt.
+> Für neue Implementierungen den Fullstack Agent plus `anamnese-app/.github/copilot-instructions.md` verwenden.
+
 > **Zweck:** Dieser Prompt wird an den GitHub Copilot Agent (Claude Opus 4.6) übergeben, um die gesamte Phase 10 Implementation autonom durchzuführen.
 > **Kontext-Dateien:** `.github/copilot-instructions.md`, `claude.md`, `PHASE10_MASTERPLAN.md`
 

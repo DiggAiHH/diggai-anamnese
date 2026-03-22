@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Search, Loader2, Tag } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { useAiIcdSuggest } from '../../hooks/useApi';
+import { useAiIcdSuggest } from '../../hooks/useOpsApi';
 
 interface AiIcdSuggestProps {
     initialSymptoms?: string;

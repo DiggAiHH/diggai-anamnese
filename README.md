@@ -1,257 +1,276 @@
-# Anamnese App – Digitaler Patienten-Fragebogen
+# DiggAI Anamnese Platform
 
-Ein DSGVO-konformes, Full-Stack-System für die digitale Patientenanamnese in Arztpraxen.
+DSGVO-konforme, klinische Patientenaufnahme-Plattform fÃ¼r Arztpraxen in Deutschland.
+Digitalisiert den Anamnese-Prozess mit 270+ medizinischen Fragen, Echtzeit-Triage, KI-gestÃ¼tzter Auswertung und vollstÃ¤ndiger Offline-UnterstÃ¼tzung als Progressive Web App.
 
-![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
-![React](https://img.shields.io/badge/React-19-61DAFB)
-![Express](https://img.shields.io/badge/Express-5-green)
-![SQLite](https://img.shields.io/badge/SQLite-dateibasiert-003B57)
+**Live**: [diggai-drklaproth.netlify.app](https://diggai-drklaproth.netlify.app)
 
 ---
 
-## 🏥 Funktionsumfang
-
-### Patienten-Frontend
-- **10 Service-Flows**: Anamnese, Rezepte, AU, BG-Unfall (NEU!), Überweisung, Absage, Telefon, Befundanforderung, Dateien, Nachricht
-- **270+ medizinische Fragen** mit dynamischer Navigation (13 Fachmodule + Sub-Chains)
-- **Strukturierte Medikamenten-Eingabe** (Wirkstoff + Dosierung + Schema)
-- **Schwangerschafts-Check** (automatisch für W, 15-50 Jahre)
-- **Red Flag System**: Vollbild-Notfall-Overlay bei CRITICAL Alerts (ACS, Suizid, SAH, Syncope)
-- **DSGVO-Einwilligungserklärung** vor dem Start
-- **PDF-Export** mit Unterschriftenfeld (Touch + Maus)
-- **Zurück-Navigation** und Sidebar-Verlauf
-- **10 Sprachen** (DE/EN/TR/AR/UK/ES/FA/IT/FR/PL) inkl. RTL
-- **Cookie-Consent-Banner** (TTDSG §25)
-- **Datenschutzerklärung** (Art. 13/14 DSGVO)
-- **Impressum** (§5 DDG)
-- **DatenschutzGame** – Interaktives Datenschutz-Quiz
-
-### Backend (Express/Prisma)
-- **AES-256-GCM Verschlüsselung** für personenbezogene Daten
-- **JWT Authentication** mit HttpOnly Cookies
-- **10 Triage-Regeln** (4 CRITICAL + 6 WARNING)
-- **Socket.io** für Live-Alerts an das Arzt-Dashboard
-- **HIPAA-konformes Audit Logging**
-- **Prisma ORM** mit SQLite (dateibasiert)
-
-### Arzt-Dashboard (`/arzt`)
-- Session-Übersicht mit Stats
-- Echtzeit-Triage-Events mit "Als gesehen" Markierung
-- Anonymisierte Patientendaten
-- Login: `admin` / `praxis2026`
+![TypeScript](https://img.shields.io/badge/TypeScript-5.9_strict-blue)
+![React](https://img.shields.io/badge/React-19.2-blue)
+![Express](https://img.shields.io/badge/Express-5.2-green)
+![DSGVO](https://img.shields.io/badge/DSGVO-konform-green)
+![HIPAA](https://img.shields.io/badge/HIPAA-Audit_Logging-green)
+![eIDAS](https://img.shields.io/badge/eIDAS-Digitale_Signatur-blue)
+![gematik TI](https://img.shields.io/badge/gematik_TI-ready-orange)
+![License](https://img.shields.io/badge/Lizenz-ProprietÃ¤r-red)
 
 ---
 
-## 🚀 Schnellstart
+## Tech Stack
+
+| Schicht | Technologie |
+|---|---|
+| Frontend | React 19.2, TypeScript 5.9 (strict), Vite 8, Tailwind CSS, Zustand, React Query |
+| Backend | Express 5.2, Node.js 22, Prisma 6 ORM, Socket.IO |
+| Datenbank | PostgreSQL 16 (Prisma), Redis 7 (optional, Cache/Rate-Limit) |
+| Authentifizierung | JWT HS256, HttpOnly Cookies, bcrypt, RBAC (4 Rollen), WebAuthn |
+| VerschlÃ¼sselung | AES-256-GCM (PII), SHA-256 (E-Mail-Pseudonymisierung) |
+| KI / LLM | Ollama (lokal) oder OpenAI-kompatibel, runtime-konfigurierbar |
+| Agenten | DiggAI 5-Agenten-System (Orchestrator, Empfang, Triage, Dokumentation, Abrechnung) |
+| PWA | Manueller Service Worker, Dexie IndexedDB (Offline), Web Push |
+| Hosting | Netlify (Frontend), Docker VPS (Backend) |
+| Testing | Playwright E2E (22 Specs), TypeScript strict type-checking |
+
+---
+
+## Schnellstart (Lokale Entwicklung)
 
 ### Voraussetzungen
-- Node.js 20+
-- SQLite (dateibasiert – keine separate Installation nötig)
 
-### 1. Installation
+- Node.js 22+
+- Docker Desktop
+- Git
+
+### Setup
 
 ```bash
+# 1. Clone und Dependencies installieren
+git clone <repo-url>
 cd anamnese-app
 npm install
-```
 
-### 2. Umgebungsvariablen
+# 2. Umgebungsvariablen konfigurieren
+cp .env.example .env
+# .env bearbeiten: DATABASE_URL, JWT_SECRET (32+ Zeichen), ENCRYPTION_KEY (exakt 32 Zeichen)
 
-Die `.env` Datei ist bereits mit Entwicklungswerten vorkonfiguriert. Für Produktion anpassen:
+# 3. Lokale Infrastruktur starten (PostgreSQL + Redis)
+docker-compose -f docker-compose.local.yml up -d
 
-```env
-DATABASE_URL="file:./dev.db"
-JWT_SECRET="mindestens-32-zeichen-langes-geheimnis"
-ENCRYPTION_KEY="genau-32-zeichen-fuer-aes256-key"
-VITE_API_URL="https://dein-backend.example.com/api"
-```
+# 4. Datenbank-Migrationen ausfÃ¼hren
+npx prisma migrate dev --name init
 
-### 3. Datenbank einrichten
+# 5. Datenbank befÃ¼llen (270+ Fragen + Admin-Nutzer)
+npx prisma db seed
 
-```bash
-# Prisma Client generieren
-npm run db:generate
-
-# Migration ausführen (erstellt alle Tabellen)
-npm run db:migrate
-
-# Seed: 270+ Fragen + Admin-Arzt einfügen
-npm run db:seed
-```
-
-### 4. Starten
-
-```bash
-# Frontend (Port 5173)
+# 6. Entwicklungsserver starten
 npm run dev
-
-# Backend (Port 3001) – in zweitem Terminal
-npm run dev:server
-
-# Oder beides gleichzeitig
-npm run dev:all
+# Frontend: http://localhost:5173
+# Backend:  http://localhost:3001
+# API Docs: http://localhost:3001/api/docs (Swagger UI, dev only)
 ```
 
-### 5. Aufrufen
+### Entwicklungs-Befehle
 
-| Route | Beschreibung |
-|:------|:------------|
-| `http://localhost:5173` | Patienten-Portal |
-| `http://localhost:5173/arzt` | Arzt-Dashboard |
-| `http://localhost:5173/mfa` | MFA-Dashboard |
-| `http://localhost:5173/admin` | Admin-Dashboard |
-| `http://localhost:5173/datenschutz` | Datenschutzerklärung |
-| `http://localhost:5173/impressum` | Impressum |
-| `http://localhost:5173/docs` | Dokumentation |
-| `http://localhost:5173/handbuch` | Handbuch |
-| `http://localhost:3001/api/health` | Backend Health-Check |
+```bash
+npm run dev          # Vite + Express parallel starten
+npm run build        # TypeScript kompilieren + Vite bauen
+npm run lint         # ESLint
+npx prisma studio    # Datenbank-GUI
+npx playwright test  # E2E-Tests (22 Specs)
+node scripts/generate-i18n.ts  # i18n VollstÃ¤ndigkeit prÃ¼fen
+```
 
 ---
 
-## 📁 Projektstruktur
+## Projektstruktur
 
 ```
 anamnese-app/
-├── prisma/
-│   ├── schema.prisma          # Datenbank-Schema (7 Models)
-│   └── seed.ts                # Seed-Daten (270+ Fragen + Arzt)
-├── server/
-│   ├── index.ts               # Express Server Entry Point
-│   ├── config.ts              # Environment Config
-│   ├── socket.ts              # Socket.io Setup
-│   ├── engine/
-│   │   ├── QuestionFlowEngine.ts  # Routing-Logik
-│   │   └── TriageEngine.ts        # 10 Red Flag Regeln
-│   ├── middleware/
-│   │   ├── auth.ts            # JWT + RBAC
-│   │   └── audit.ts           # HIPAA Audit Log
-│   ├── routes/
-│   │   ├── sessions.ts        # Session CRUD
-│   │   ├── answers.ts         # Antwort-Speicherung
-│   │   ├── atoms.ts           # Fragen-API
-│   │   └── arzt.ts            # Dashboard-API
-│   └── services/
-│       └── encryption.ts      # AES-256-GCM + SHA-256
-├── src/
-│   ├── App.tsx                # React Router + Providers
-│   ├── api/
-│   │   └── client.ts          # Axios + JWT Interceptor
-│   ├── store/
-│   │   └── sessionStore.ts    # Zustand State Management
-│   ├── hooks/
-│   │   └── useApi.ts          # React Query Hooks
-│   ├── components/
-│   │   ├── LandingPage.tsx        # Service-Auswahl
-│   │   ├── Questionnaire.tsx      # Haupt-Fragebogen
-│   │   ├── QuestionRenderer.tsx   # Frage-Typen
-│   │   ├── DSGVOConsent.tsx       # Datenschutz-Dialog
-│   │   ├── RedFlagOverlay.tsx     # Notfall-Overlay
-│   │   ├── MedicationManager.tsx  # Medikamenten-Eingabe
-│   │   ├── SchwangerschaftCheck.tsx # Schwangerschafts-Abfrage
-│   │   ├── UnfallBGFlow.tsx       # BG-Unfallmeldung
-│   │   ├── PDFExport.tsx          # Bericht-Export
-│   │   ├── SubmittedPage.tsx      # Bestätigungsseite
-│   │   ├── AnswerSummary.tsx      # Zusammenfassung
-│   │   ├── HistorySidebar.tsx     # Navigations-Verlauf
-│   │   └── ProgressBar.tsx        # Fortschrittsbalken
-│   ├── pages/
-│   │   └── ArztDashboard.tsx      # Arzt-Übersicht
-│   ├── data/
-│   │   └── questions.ts           # 270+ Fragen-Definitionen
-│   ├── utils/
-│   │   └── questionLogic.ts       # Frontend-Logik-Engine
-│   └── types/
-│       └── question.ts            # TypeScript Interfaces
-├── .env                           # Umgebungsvariablen
-├── .env.example                   # Template
-├── tsconfig.server.json           # Backend TS Config
-└── vite.config.ts                 # Vite + API Proxy
+â”œâ”€â”€ src/                      # React Frontend
+â”‚   â”œâ”€â”€ components/           # UI-Komponenten (Fragebogen, Dashboard, Triage)
+â”‚   â”œâ”€â”€ pages/                # Seitenkomponenten (lazy-loaded)
+â”‚   â”œâ”€â”€ data/
+â”‚   â”‚   â”œâ”€â”€ questions.ts      # 270+ Fragen-Katalog (kanonische IDs)
+â”‚   â”‚   â””â”€â”€ new-questions.ts  # Symptom-Erweiterungsmodule
+â”‚   â”œâ”€â”€ hooks/useApi.ts       # React Query Hooks (1500+ Zeilen)
+â”‚   â”œâ”€â”€ types/question.ts     # QuestionAtom TypeScript-Interface
+â”‚   â””â”€â”€ i18n.ts               # 10-Sprachen-Konfiguration
+â”œâ”€â”€ server/                   # Express Backend
+â”‚   â”œâ”€â”€ engine/
+â”‚   â”‚   â”œâ”€â”€ TriageEngine.ts   # Klinische Red-Flag-Erkennung (10 Regeln)
+â”‚   â”‚   â””â”€â”€ QuestionFlowEngine.ts  # Fragebogen-Ablaufsteuerung
+â”‚   â”œâ”€â”€ routes/               # 34 API-Routengruppen
+â”‚   â”œâ”€â”€ middleware/auth.ts    # JWT + RBAC Middleware
+â”‚   â”œâ”€â”€ services/
+â”‚   â”‚   â”œâ”€â”€ encryption.ts     # AES-256-GCM PII-VerschlÃ¼sselung
+â”‚   â”‚   â””â”€â”€ ai/               # LLM-Prompts + AI-Service
+â”‚   â”œâ”€â”€ agents/               # DiggAI 5-Agenten-System
+â”‚   â”œâ”€â”€ jobs/reminderWorker.ts # Medikamenten-Erinnerungen (node-cron)
+â”‚   â””â”€â”€ swagger.ts            # OpenAPI 3.0 Spezifikation
+â”œâ”€â”€ prisma/schema.prisma      # Datenbankschema
+â”œâ”€â”€ public/
+â”‚   â”œâ”€â”€ locales/              # 10 Sprachen (de, en, tr, ar, uk, es, fa, it, fr, pl)
+â”‚   â””â”€â”€ sw.js                 # Service Worker (PWA/Offline)
+â”œâ”€â”€ docs/                     # Technische Dokumentation
+â”œâ”€â”€ docker/                   # Dockerfile + Nginx-Konfig
+â”œâ”€â”€ e2e/                      # Playwright E2E-Tests
+â”œâ”€â”€ docker-compose.local.yml  # Lokale Entwicklung
+â””â”€â”€ docker-compose.prod.yml   # Produktionsumgebung
 ```
 
 ---
 
-## 🔒 Sicherheit
+## Features
 
-| Maßnahme | Implementierung |
-|:---------|:----------------|
-| **Verschlüsselung PII** | AES-256-GCM (Name, Adresse, E-Mail) |
-| **Pseudonymisierung** | SHA-256 Hash der E-Mail |
-| **Auth** | JWT mit Rollen (patient/arzt/admin) |
-| **Transport** | TLS 1.3 (Produktion) |
-| **API-Schutz** | Helmet.js + Rate Limiting (100 req/15min) |
-| **Audit** | HIPAA-konformes Logging aller Zugriffe |
-| **DSGVO** | Einwilligungsdialog + Widerrufsrecht |
-| **Session** | Ablauf nach 24h, Ownership-Prüfung |
+### Patientenaufnahme-Flows (10 Services)
+- **Termin / Anamnese** â€” VollstÃ¤ndige Anamnese mit 270+ Fragen in 13 Fachgebieten
+- **Rezept-Anfrage** â€” Strukturierte Medikamenten-/Rezeptanforderung
+- **AU-Schein** â€” Krankschreibungsantrag mit klinischer BegrÃ¼ndung
+- **Ãœberweisung** â€” Ãœberweisungsanfrage an FachÃ¤rzte
+- **Dateien / Befunde** â€” Anforderung von Befunden und Dokumenten
+- **BG-Unfall** â€” VollstÃ¤ndige Berufsgenossenschafts-Unfall-Dokumentation
+- **Terminabsage, Telefonanfrage, Nachricht, Dokumente** â€” Verwaltungsflows
+
+### 13 Fachgebiets-Module
+Kardiologie, Pulmonologie, Neurologie, Gastroenterologie, Diabetologie,
+Dermatologie, Rheumatologie, Urologie, Ophthalmologie, GynÃ¤kologie,
+Psychiatrie, HNO, OrthopÃ¤die
+
+### Klinische Triage-Engine (10 Regeln)
+Echtzeit-Erkennung von 4 CRITICAL- und 6 WARNING-Szenarien:
+
+| Regel | Schweregrad | AuslÃ¶ser |
+|---|---|---|
+| ACS (Herzinfarkt-Verdacht) | CRITICAL | Brustschmerzen + Atemnot/LÃ¤hmung |
+| SuizidalitÃ¤t | CRITICAL | PHQ-9 + Suizid-Ideation |
+| SAH (Hirnaneurysma) | CRITICAL | Donnerschlagkopfschmerz |
+| Synkope + Arrhythmie | CRITICAL | Bewusstseinsverlust |
+| GI-Blutung | WARNING | Antikoagulanzien + Bauchschmerzen |
+| Diabetischer FuÃŸ | WARNING | Diabetes + FuÃŸbeschwerden |
+| Polypharmazie | WARNING | > 5 gleichzeitige Medikamente |
+| Schwangerschaft + AK | WARNING | Schwanger + Antikoagulanzien |
+| Starker Raucher | WARNING | > 30 Packungsjahre |
+| Duale Antikoagulation | WARNING | 2+ Antikoagulanzien |
+
+CRITICAL-Events lÃ¶sen sofortige Socket.IO-Benachrichtigung am Arzt-Dashboard aus.
+
+### KI-Funktionen
+- TherapievorschlÃ¤ge mit ICD-10-GM Codes (Konfidenz-Score)
+- Klinische Sitzungszusammenfassung (SOAP-Format)
+- Echtzeit-Symptomanalyse wÃ¤hrend der Befragung
+- LLM-Provider runtime-konfigurierbar: Ollama | OpenAI-kompatibel | none
 
 ---
 
-## 🏗️ Produktion
+## Deployment
 
-### Docker Deployment (empfohlen)
+### Frontend (Netlify â€” automatisch)
+
+Push auf `main` â†’ Netlify baut und deployt automatisch:
+```bash
+git push origin main
+```
+
+### Backend (Docker VPS)
 
 ```bash
-# SQLite benötigt keinen separaten DB-Container.
-# Die Datenbankdatei wird automatisch unter prisma/dev.db angelegt.
+# Erstmalig:
+git clone <repo-url> /opt/anamnese-app
+cd /opt/anamnese-app
+cp anamnese-app/.env.example anamnese-app/.env.production
+docker-compose -f docker-compose.prod.yml up -d
+docker-compose -f docker-compose.prod.yml exec backend npx prisma migrate deploy
+docker-compose -f docker-compose.prod.yml exec backend npx prisma db seed
 
-# .env anpassen (DATABASE_URL="file:./dev.db"), dann:
-npm run db:migrate
-npm run db:seed
-npm run build
-npm run dev:server
+# Updates:
+git pull origin main
+docker-compose -f docker-compose.prod.yml up -d --force-recreate
+docker-compose -f docker-compose.prod.yml exec backend npx prisma migrate deploy
 ```
 
-### Netlify Deployment (Frontend)
-
-Diese App wird auf Netlify als statische SPA deployed. Das Backend (Express/Prisma + Socket.io) muss separat laufen.
-
-1. `anamnese-app` als Site mit Netlify verbinden
-2. Build Settings:
-  - Build command: `npm run build`
-  - Publish directory: `dist`
-3. Environment Variables in Netlify setzen:
-  - `VITE_API_URL=https://dein-backend.example.com/api`
-4. Deploy starten und danach direkt testen:
-  - Patient: `/`
-  - Arzt: `/arzt`
-  - MFA: `/mfa`
-
-### Checkliste für Praxis-Einsatz
-
-- [ ] SQLite-Datenbankdatei sicher speichern (z.B. /data/anamnese.db)
-- [ ] `.env` mit echten Secrets konfigurieren
-- [ ] `npm run db:migrate` + `npm run db:seed`
-- [ ] TLS/SSL Zertifikat (Let's Encrypt)
-- [ ] Arzt-Passwort ändern
-- [ ] Praxisname in DSGVOConsent anpassen
-- [ ] Backup-Strategie für SQLite-Datei
-- [ ] Datenschutzbeauftragten benennen
+VollstÃ¤ndige Deployment-Anleitung: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
 
 ---
 
-## 📋 Triage-Regeln
+## Release-Gates (Markt-Readiness)
 
-| # | Name | Level | Auslöser |
-|:--|:-----|:------|:---------|
-| 1 | Akutes Koronarsyndrom | CRITICAL | Brustschmerzen UND (Atemnot ODER Lähmung) |
-| 2 | Suizidalität | CRITICAL | Depression + spezifische Indikatoren |
-| 3 | SAH/Aneurysma | CRITICAL | Kopfschmerzen + Bewusstseinsstörung |
-| 4 | Syncope mit Risiko | CRITICAL | Ohnmacht + Herzrhythmusstörung |
-| 5 | GI-Blutung | WARNING | Blutverdünner + Bauchschmerzen |
-| 6 | Diabetisches Fußsyndrom | WARNING | Diabetes + Fußsyndrom |
-| 7 | Starker Raucher | WARNING | >30 Pack-Years |
-| 8 | Schwangerschaft + Medikamente | WARNING | Schwanger + Blutverdünner |
-| 9 | Polypharmazie | WARNING | >5 Medikamente |
-| 10 | Doppel-Blutverdünner | WARNING | ≥2 Antikoagulantien |
+Vor jedem produktiven Release mÃ¼ssen diese Gates grÃ¼n sein:
+
+1. **Build & Type Safety**
+   - `npm run build` erfolgreich
+   - Keine TypeScript-Fehler im CI-Run
+
+2. **Code Quality**
+   - `npm run lint` erfolgreich (kein `|| true` in CI)
+
+3. **Security-Basis**
+   - `npm audit --audit-level=high` ohne High/Critical Findings
+   - JWT-Secret mit mindestens 32 Zeichen
+   - AES-Key exakt 32 Zeichen (`ENCRYPTION_KEY`)
+   - Kein Standardpasswort in Produktion (`ARZT_PASSWORD`)
+
+4. **BetriebsfÃ¤higkeit**
+   - Health Check `/api/health` liefert `ok` oder nachvollziehbar `degraded`
+   - Prisma Generate/Migrations erfolgreich
+
+5. **Compliance-Dokumentation**
+   - DSGVO-Dokumente aktuell (AVV, DSFA, TOM)
+   - Ã„nderungen an DatenflÃ¼ssen im Audit nachvollziehbar dokumentiert
 
 ---
 
-## 🛠️ Tech Stack
+## DSGVO-Compliance
 
-**Frontend:** React 19, TypeScript (Strict), Vite, Tailwind CSS 4, Zustand, TanStack React Query, React Router DOM, Axios, Socket.io Client  
-**Backend:** Node.js, Express 5, TypeScript, Prisma ORM, JWT, bcryptjs, Socket.io  
-**Datenbank:** SQLite (dateibasiert) mit Prisma ORM  
-**Sicherheit:** AES-256-GCM, SHA-256, Helmet.js, Rate Limiting, HIPAA Audit Trail
+| MaÃŸnahme | Implementierung |
+|---|---|
+| DatenverschlÃ¼sselung | AES-256-GCM fÃ¼r alle PII-Felder (Name, Adresse, E-Mail, Telefon) |
+| Pseudonymisierung | SHA-256 (gesalzen) fÃ¼r E-Mail-Hashing |
+| Audit-Logging | Jeder Patientendaten-Zugriff wird in `AuditLog` protokolliert |
+| Einwilligung | DSGVO-EinwilligungserklÃ¤rung + eIDAS-konforme digitale Signatur |
+| Datensparsamkeit | JWT in HttpOnly-Cookies, keine PII in localStorage |
+| LÃ¶schkonzept | Automatische Session-Ablauf (24h), Hard-Delete-Worker |
+| Datensicherung | Automatische PostgreSQL-Backups via Docker |
+
+Rechtsdokumente: [AVV-Template](docs/AVV_TEMPLATE.md) | [DSFA](docs/DSFA.md) | [TOM](docs/TOM_DOKUMENTATION.md)
 
 ---
 
-*Entwickelt für den sicheren Einsatz in deutschen Arztpraxen. Alle Angaben ohne Gewähr. Vor dem Produktiveinsatz ist eine Prüfung durch einen Datenschutzbeauftragten erforderlich.*
+## DiggAI 4-Service-Architektur
+
+| Service | Name | Technologie | Status |
+|---|---|---|---|
+| Service 1 | Python Agent Core | Python FastAPI | In Entwicklung |
+| Service 2 | Tauri Desktop | Rust + Tauri | Ausstehend |
+| Service 3 | Monorepo | TBD | Ausstehend |
+| **Service 4** | **Anamnese Platform** | **React + Express** | **Produktiv** |
+
+Service 4 kommuniziert mit Service 1 via HTTP (`server/services/agentcore.client.ts`).
+
+---
+
+## Dokumentation
+
+| Dokument | Inhalt |
+|---|---|
+| [CLAUDE.md](CLAUDE.md) | Entwickler-Anweisungen fÃ¼r AI-Agenten |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System-Architektur, API-Routen, Auth-Flow |
+| [docs/QUESTION_CATALOG.md](docs/QUESTION_CATALOG.md) | VollstÃ¤ndige Fragen-ID-Referenz |
+| [docs/TRIAGE_RULES.md](docs/TRIAGE_RULES.md) | Klinische Triage-Regeln (medizinisch) |
+| [docs/AGENT_WORKFLOWS.md](docs/AGENT_WORKFLOWS.md) | Schritt-fÃ¼r-Schritt-Workflows fÃ¼r Entwickler |
+| [docs/DATA_SCHEMA.md](docs/DATA_SCHEMA.md) | Prisma-Modelle, TypeScript-Interfaces |
+| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Deployment-Anleitung + Env-Variablen |
+| [docs/AVV_TEMPLATE.md](docs/AVV_TEMPLATE.md) | Auftragsverarbeitungsvertrag (DSGVO) |
+| [docs/DSFA](docs/DSFA.md) | Datenschutz-FolgenabschÃ¤tzung |
+| [docs/TOM_DOKUMENTATION.md](docs/TOM_DOKUMENTATION.md) | Technisch-organisatorische MaÃŸnahmen |
+
+---
+
+## Kontakt
+
+**DiggAI GmbH**
+E-Mail: support@diggai.de
+
+FÃ¼r Sicherheitsmeldungen: security@diggai.de (PGP bevorzugt)
+

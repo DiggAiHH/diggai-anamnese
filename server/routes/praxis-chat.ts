@@ -17,6 +17,9 @@ import {
 
 const router = Router();
 
+// All praxis-chat routes require authentication
+router.use(requireAuth);
+
 // GET /api/praxis-chat/:sessionId — Get messages for a session
 router.get('/:sessionId', async (req: Request, res: Response) => {
   try {
@@ -53,7 +56,7 @@ router.post('/send', async (req: Request, res: Response) => {
 });
 
 // POST /api/praxis-chat/broadcast — Broadcast to multiple sessions (requires auth)
-router.post('/broadcast', requireAuth, requireRole('ARZT', 'MFA', 'ADMIN'), async (req: Request, res: Response) => {
+router.post('/broadcast', requireRole('arzt', 'mfa', 'admin'), async (req: Request, res: Response) => {
   try {
     const schema = z.object({
       praxisId: z.string().min(1),
@@ -137,7 +140,7 @@ router.delete('/:sessionId', async (req: Request, res: Response) => {
 });
 
 // POST /api/praxis-chat/templates — Create/save a message template
-router.post('/templates', requireAuth, requireRole('ARZT', 'MFA', 'ADMIN'), async (req: Request, res: Response) => {
+router.post('/templates', requireRole('arzt', 'mfa', 'admin'), async (req: Request, res: Response) => {
   try {
     const schema = z.object({
       praxisId: z.string().min(1),

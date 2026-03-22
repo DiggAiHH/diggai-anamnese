@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AlertTriangle, AlertCircle, Info, ShieldAlert, X, Check, MessageSquare } from 'lucide-react';
-import { useTherapyAlertsByPatient, useTherapyAlertRead, useTherapyAlertDismiss, useTherapyAlertAction, useTherapyAlerts } from '../../hooks/useApi';
+import { useTherapyAlertsByPatient, useTherapyAlertRead, useTherapyAlertDismiss, useTherapyAlertAction, useTherapyAlerts } from '../../hooks/useOpsApi';
 import type { ClinicalAlert } from '../../types/admin';
 
 const SEVERITY_CONFIG: Record<string, { icon: ReactNode; color: string; bg: string; border: string }> = {

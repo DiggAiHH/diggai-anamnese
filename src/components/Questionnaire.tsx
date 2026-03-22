@@ -1,7 +1,7 @@
 import { useEffect, useCallback, useState, useMemo, useRef } from 'react';
 import { useSessionStore } from '../store/sessionStore';
 import type { Answer } from '../types/question';
-import { useSubmitAnswer, useSubmitSession, useSubmitAccidentDetails, useSubmitMedications, useSubmitSurgeries, useQueuePosition, useQueueFlowConfig, useWaitingContent } from '../hooks/useApi';
+import { useSubmitAnswer, useSubmitSession, useSubmitAccidentDetails, useSubmitMedications, useSubmitSurgeries, useQueuePosition, useQueueFlowConfig, useWaitingContent } from '../hooks/usePatientApi';
 import { questions as allQuestions } from '../data/questions';
 import { QuestionRenderer } from './QuestionRenderer';
 import { ProgressBar } from './ProgressBar';
@@ -540,7 +540,6 @@ export function Questionnaire() {
                         <button
                             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
                             aria-label={t('Verlauf anzeigen', 'Verlauf anzeigen')}
-                            aria-expanded={isSidebarOpen ? 'true' : 'false'}
                             className="p-2.5 hover:bg-[var(--bg-card)] rounded-xl transition-colors border border-[var(--border-primary)] active:scale-95 shadow-lg shadow-blue-500/5 group"
                         >
                             <History className="w-5 h-5 text-blue-400 group-hover:scale-110 transition-transform" />

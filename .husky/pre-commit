@@ -1,0 +1,24 @@
+#!/bin/sh
+# DiggAI Pre-Commit Hook
+# Goldene Regel: Kein Commit ohne i18n-Vollständigkeitsprüfung
+#
+# Runs:
+# 1. lint-staged (ESLint on staged .ts/.tsx files)
+# 2. i18n completeness check (all 10 locale files must have all keys)
+
+set -e
+
+echo "[pre-commit] Running lint-staged..."
+npx lint-staged
+
+echo "[pre-commit] Checking i18n key completeness..."
+node scripts/generate-i18n.ts
+if [ $? -ne 0 ]; then
+  echo ""
+  echo "ERROR: Missing i18n translation keys detected."
+  echo "Run: node scripts/generate-i18n.ts"
+  echo "Add missing keys to ALL 10 locale files before committing."
+  exit 1
+fi
+
+echo "[pre-commit] All checks passed."

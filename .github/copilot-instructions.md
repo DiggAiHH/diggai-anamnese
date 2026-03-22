@@ -1,5 +1,53 @@
 # DiggAI Anamnese App — Copilot Instructions
 
+## Praxis OS — Vision
+
+**Praxis OS** ist das übergeordnete, privacy-first Praxis-Betriebssystem für deutsche Arztpraxen.
+Die **DiggAI Anamnese App** ist das erste produktive Modul innerhalb dieses Systems.
+
+### 6-Layer Architektur
+
+| Layer | Verantwortung | Beispiele |
+|-------|---------------|-----------|
+| Operating System | Geräte- und Arbeitsplatzbasis | Windows 11 Pro, Hyper-V, WSL |
+| Local Infrastructure | Lokale, datenschutzkritische Dienste | Ollama, Tomedo-Anbindung, Tailscale, Docker |
+| Agent Core | Task-Orchestrierung und Agent-Laufzeit | Heartbeats, Agent Trees, lokale Worker |
+| Cloud Orchestration | Unkritische Automatisierung | GitHub Actions, GitHub Copilot, Integrationen |
+| Frontend & UI | Praxisoberflächen | React, Tailwind, TypeScript, perspektivisch Tauri |
+| Agent Builder | Visuelle Agent-Erstellung | Prompt-Bausteine, Templates, Workflow-Definition |
+
+### Modul-Landkarte
+
+| Modul | Status | Zweck |
+|-------|--------|-------|
+| Anamnese | Aktiv / Produktion | Digitale Patientenaufnahme, Triage, Exporte |
+| Wartezimmer | Teilweise integriert | Queue, Priorisierung, perspektivisch Video-Einstieg |
+| Chat | Teilweise integriert | Team-Chat, Patientenkommunikation, FAQ |
+| Compliance | Geplant | Datenschutz-, Hosting- und Audit-Workflows |
+| Todo | Geplant | Team-Aufgaben, Verantwortlichkeiten, Eskalationen |
+| Gamification | Geplant | DSGVO-Schulung, Motivation, Badges |
+| Agent Builder | Langfristig | Erstellung praxisspezifischer Agenten ohne Code |
+
+### Privacy-First Hybrid Principle
+
+- **PHI / Gesundheitsdaten** werden lokal oder auf DE/EU-konformer Infrastruktur verarbeitet.
+- **Cloud-Automatisierung** darf nur für unkritische Orchestrierung ohne Zugriff auf Roh-Patientendaten genutzt werden.
+- **Lokale KI** ist für patientennahe Intelligenz bevorzugt; externer LLM-Zugriff auf PHI ist ausgeschlossen.
+
+### Business Tiers
+
+| Tier | Zielgruppe | Zielbild |
+|------|------------|----------|
+| Starter | Einzelpraxis | Anamnese + Basis-Workflows |
+| Professional | Gemeinschaftspraxis | Multi-Rollen, Queue, Chat, Auswertungen |
+| Enterprise | MVZ / Klinikverbund | Multi-Standort, Agenten, tiefere Orchestrierung |
+
+### Produkt-Richtung
+
+- Kurzfristig: Web-App-Module mit klaren Grenzen und gemeinsamer Sicherheitsbasis
+- Mittelfristig: modulare Praxis-Workbench
+- Langfristig: **Tauri Desktop App** als zentrales Praxis-Cockpit
+
 ## Projekt-Kontext
 
 **DiggAI** ist eine vollständig digitale, DSGVO-konforme Patientenaufnahme-App (Anamnese) für deutsche Arztpraxen. Sie ersetzt den papierbasierten Anamnesebogen durch ein intelligentes, mehrsprachiges, webbasiertes System.
@@ -183,6 +231,58 @@ router.get('/stats', requireAuth, requireRole('admin'), async (req, res) => {
 }
 ```
 
+### Zustand Store Encryption
+```typescript
+// Persisted stores containing patient or staff context must encrypt payloads
+export const useSecureStore = create<SecureState>()(
+  persist(
+    (set) => ({ ... }),
+    {
+      name: 'diggai-secure-store',
+      storage: encryptedStorage,
+      partialize: (state) => ({ ...state }),
+    },
+  ),
+);
+```
+
+### Prisma Client Extensions
+```typescript
+// Prefer centralized Prisma extensions for audit, tenant scoping, and soft guards
+export const prisma = basePrisma.$extends({
+  query: {
+    $allModels: {
+      async $allOperations({ args, query }) {
+        return query(args);
+      },
+    },
+  },
+});
+```
+
+### Socket.IO Event Typing
+```typescript
+// Shared event contracts should be typed, not stringly-typed ad hoc
+interface ServerToClientEvents {
+  triageAlert: (payload: TriageAlertPayload) => void;
+  queueUpdated: (payload: QueueSnapshot) => void;
+}
+
+interface ClientToServerEvents {
+  joinSession: (sessionId: string) => void;
+}
+```
+
+### Agent Orchestration
+
+- Nutze den **Optimization Agent** für vollautonome Sessions, task-basierte Delegation und lokale Resource-First-Ausführung.
+- Nutze Spezial-Agents gezielt statt eines einzigen Allzweck-Agenten.
+- Starte schwere Validierungsläufe gestaffelt: gezielte Checks → betroffene Specs → Full Suite.
+- Bevorzuge lokale Infrastruktur, MCPs und bestehende Workspace-Artefakte vor externen Abhängigkeiten.
+- Für komplexe Aufgaben ist ein **mindestens 7-stufiger Ausführungsplan** die bevorzugte Struktur.
+- Halte nach größeren Umsetzungs- oder Validierungsphasen eine kompakte Session-Zusammenfassung fest, um Kontextverlust zu vermeiden.
+- Zerlege Aufgaben maximal fein, solange die Teilaufgaben noch operativ sinnvoll und überprüfbar sind.
+
 ---
 
 ## Abgeschlossene Phasen
@@ -311,15 +411,49 @@ die in einer deutschen Arztpraxis rechtlich und technisch betrieben werden darf.
 
 ---
 
+## NO-REDUNDANCY PROTOCOL (MANDATORY FOR ALL AGENTS/SESSIONS)
+
+Goldene Regel: Alles darf nur einmal gemacht werden.
+
+Before creating any file, feature, route, service, or component:
+
+```powershell
+# From repo root (Anamnese-kimi/):
+# 1. Precheck
+powershell -ExecutionPolicy Bypass -File scripts/once-guard.ps1 precheck -Task "<task-key>"
+# Exit 0 = free  |  Exit 2 = IN PROGRESS by another agent  |  Exit 3 = ALREADY DONE
+
+# 2. Claim
+powershell -ExecutionPolicy Bypass -File scripts/once-guard.ps1 claim -Task "<task-key>" -Agent "copilot" -SessionId "<YYYY-MM-DD-topic>"
+
+# 3. Read shared knowledge
+# shared/knowledge/knowledge-share.md   (decisions + lessons learned)
+# shared/knowledge/task-registry.json   (all tasks registry)
+
+# 4. Do the work.
+
+# 5. Complete
+powershell -ExecutionPolicy Bypass -File scripts/once-guard.ps1 complete -Task "<task-key>" -Agent "copilot" -Artifacts @("relative/path/artifact.ts")
+```
+
+Exit 2 = STOP — another agent owns it. Exit 3 = STOP — already done, extend don't rebuild.
+
+Policy: `SESSIONS_ONCE_POLICY.md` | Brainstorm flow: `AGENT_BRAINSTORM_FLOW.md`
+
+---
+
 ## Don'ts
 
 - Kein externes LLM (kein OpenAI, DeepSeek, Kimi) — NLU ist rule-based
+- Kein externer LLM-Zugriff auf PHI/Gesundheitsdaten — patientennahe KI nur lokal oder auf explizit freigegebener DE/EU-Infrastruktur
 - Keine Sprachdaten auf dem Server — Speech Processing ausschließlich im Browser (DSGVO)
 - Kein SQLite — Projekt auf PostgreSQL migriert
 - Kein i18n-Skip — jeder UI-String braucht Keys in allen 10 Locales
 - Kein `any` Type — proper TypeScript types
 - Keine Dependencies ohne Bundle-Size-Check
 - Kein Auth-Middleware-Bypass auf sensiblen Routes
+- Keine modulübergreifende Kopplung ohne klare Vertragsgrenzen — gemeinsame Typen/Contracts statt Copy-Paste
+- Keine Praxis-OS-Module bauen, die nur als einmalige Sonderlösung funktionieren — immer auf Wiederverwendbarkeit für weitere Module achten
 - **Phase 12 neu:** Kein Drittanbieter-Cloud für WebRTC Media-Relay (DSGVO!)
 - **Phase 12 neu:** Signaturdaten NIEMALS unverschlüsselt persistieren
 - **Phase 12 neu:** Videoaufzeichnung NIEMALS ohne explizite Consent-Erfassung starten

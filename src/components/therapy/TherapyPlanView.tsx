@@ -1,6 +1,6 @@
 import { Calendar, FileText, Tag, CheckCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { useTherapyPlan } from '../../hooks/useApi';
+import { useTherapyPlan } from '../../hooks/useOpsApi';
 import { TherapyMeasureCard } from './TherapyMeasureCard';
 import { TherapyStatusBadge } from './TherapyStatusBadge';
 

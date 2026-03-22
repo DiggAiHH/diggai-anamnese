@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Download, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { useTherapyExportPvs } from '../../hooks/useApi';
+import { useTherapyExportPvs } from '../../hooks/useOpsApi';
 
 interface TherapyExportButtonProps {
     planId: string;

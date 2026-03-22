@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ArrowUpRight, ArrowDownLeft, CheckCircle, XCircle, Clock, RotateCw, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
-import { usePvsTransfers, usePvsRetryTransfer, usePvsTransferStats } from '../../hooks/useApi';
+import { usePvsTransfers, usePvsRetryTransfer, usePvsTransferStats } from '../../hooks/useOpsApi';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
     SUCCESS: { label: 'Erfolgreich', color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200', icon: <CheckCircle className="w-3.5 h-3.5" /> },

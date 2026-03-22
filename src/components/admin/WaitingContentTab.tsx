@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { BookOpen, Plus, Edit, Trash2, Eye, EyeOff } from 'lucide-react';
-import { useAdminContentList, useAdminContentCreate, useAdminContentUpdate, useAdminContentDelete } from '../../hooks/useApi';
+import { useAdminContentList, useAdminContentCreate, useAdminContentUpdate, useAdminContentDelete } from '../../hooks/useOpsApi';
 import type { WaitingContentItem } from '../../types/admin';
 
 const CONTENT_TYPES = ['HEALTH_TIP', 'FUN_FACT', 'MINI_QUIZ', 'BREATHING_EXERCISE', 'SEASONAL_INFO', 'PRAXIS_NEWS'];

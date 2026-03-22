@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type Request } from 'express';
 import { z } from 'zod';
 import { prisma } from '../db';
 import { requireAuth, requireRole } from '../middleware/auth';
@@ -11,6 +11,12 @@ import {
     isValidSignatureData,
 } from '../services/signatureService';
 import type { AuthPayload } from '../middleware/auth';
+
+/** Extract a route param as a guaranteed string (Express 5 compat) */
+function param(req: Request, key: string): string {
+    const v = req.params[key];
+    return Array.isArray(v) ? v[0] : v;
+}
 
 const router = Router();
 
@@ -75,7 +81,7 @@ router.post('/', requireAuth, async (req, res) => {
 
 router.get('/:id', requireAuth, requireRole('arzt', 'admin'), async (req, res) => {
     const signature = await prisma.signature.findUnique({
-        where: { id: req.params.id },
+        where: { id: param(req, 'id') },
     });
     if (!signature) return res.status(404).json({ error: 'Unterschrift nicht gefunden' });
 
@@ -96,7 +102,7 @@ router.get('/:id', requireAuth, requireRole('arzt', 'admin'), async (req, res) =
 
 router.get('/patient/:patientId', requireAuth, requireRole('arzt', 'admin'), async (req, res) => {
     const signatures = await prisma.signature.findMany({
-        where: { patientId: req.params.patientId },
+        where: { patientId: param(req, 'patientId') },
         select: {
             id: true, formType: true, signerRole: true,
             documentVersion: true, documentHash: true,
@@ -116,7 +122,7 @@ router.post('/:id/verify', requireAuth, async (req, res) => {
     }
 
     const signature = await prisma.signature.findUnique({
-        where: { id: req.params.id },
+        where: { id: param(req, 'id') },
         select: { documentHash: true },
     });
     if (!signature) return res.status(404).json({ error: 'Unterschrift nicht gefunden' });
@@ -129,14 +135,14 @@ router.post('/:id/verify', requireAuth, async (req, res) => {
 
 router.post('/:id/invalidate', requireAuth, requireRole('arzt', 'admin'), async (req, res) => {
     const { reason } = req.body;
-    const signature = await prisma.signature.findUnique({ where: { id: req.params.id } });
+    const signature = await prisma.signature.findUnique({ where: { id: param(req, 'id') } });
     if (!signature) return res.status(404).json({ error: 'Unterschrift nicht gefunden' });
     if (signature.invalidatedAt) {
         return res.status(409).json({ error: 'Unterschrift bereits widerrufen' });
     }
 
     const updated = await prisma.signature.update({
-        where: { id: req.params.id },
+        where: { id: param(req, 'id') },
         data: { invalidatedAt: new Date(), invalidationReason: reason || 'Kein Grund angegeben' },
         select: { id: true, invalidatedAt: true, invalidationReason: true },
     });

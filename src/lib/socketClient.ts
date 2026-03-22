@@ -6,6 +6,9 @@ import { io, Socket } from 'socket.io-client';
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 let socket: Socket | null = null;
+let reconnectAttempt = 0;
+let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let manualDisconnect = false;
 
 export function getSocket(): Socket {
   if (!socket) {
@@ -15,16 +18,36 @@ export function getSocket(): Socket {
       transports: ['websocket', 'polling'],
     });
 
+    function scheduleReconnect() {
+      if (manualDisconnect || reconnectAttempt >= 10) return;
+      const base = 1000 * Math.pow(2, reconnectAttempt);
+      const jitter = Math.random() * 1000 - 500;
+      const delay = Math.min(base + jitter, 30000);
+      reconnectAttempt++;
+      reconnectTimer = setTimeout(() => {
+        if (!manualDisconnect && socket && !socket.connected) {
+          socket.connect();
+        }
+      }, delay);
+    }
+
     socket.on('connect', () => {
       console.log('[Socket] Connected:', socket!.id);
+      reconnectAttempt = 0;
+      if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
     });
 
     socket.on('disconnect', (reason) => {
       console.log('[Socket] Disconnected:', reason);
+      // io client disconnect = intentional — do not reconnect
+      if (reason !== 'io client disconnect') {
+        scheduleReconnect();
+      }
     });
 
     socket.on('connect_error', (err) => {
       console.error('[Socket] Connection error:', err.message);
+      scheduleReconnect();
     });
   }
   return socket;
@@ -42,6 +65,8 @@ export function connectSocket(token?: string): Socket {
 }
 
 export function disconnectSocket(): void {
+  manualDisconnect = true;
+  if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
   if (socket?.connected) {
     socket.disconnect();
   }

@@ -1,8 +1,7 @@
-// @ts-ignore — redis types may not be installed in all environments
-import { createClient, type RedisClientType } from 'redis';
+import Redis from 'ioredis';
 import { config } from './config';
 
-let redisClient: RedisClientType | null = null;
+let redisClient: Redis | null = null;
 let isConnecting = false;
 
 /**
@@ -14,33 +13,33 @@ export async function initRedis(): Promise<void> {
     isConnecting = true;
 
     try {
-        redisClient = createClient({
-            url: config.redisUrl,
-            socket: {
-                connectTimeout: 5000,
-                reconnectStrategy: (retries: number) => {
-                    if (retries > 10) {
-                        console.warn('[Redis] Max reconnection attempts reached. Using in-memory fallback.');
-                        return new Error('Max retries reached');
-                    }
-                    return Math.min(retries * 500, 5000);
-                },
+        const client = new Redis(config.redisUrl, {
+            connectTimeout: 5000,
+            maxRetriesPerRequest: 3,
+            retryStrategy: (times: number) => {
+                if (times > 10) {
+                    console.warn('[Redis] Max reconnection attempts reached. Using in-memory fallback.');
+                    return null;
+                }
+                return Math.min(times * 500, 5000);
             },
+            lazyConnect: true,
         });
 
-        redisClient.on('error', (err: Error) => {
+        client.on('error', (err: Error) => {
             console.warn('[Redis] Connection error (fallback to in-memory):', err.message);
         });
 
-        redisClient.on('connect', () => {
+        client.on('connect', () => {
             console.log('[Redis] ✅ Connected successfully');
         });
 
-        redisClient.on('reconnecting', () => {
+        client.on('reconnecting', () => {
             console.log('[Redis] 🔄 Reconnecting...');
         });
 
-        await redisClient.connect();
+        await client.connect();
+        redisClient = client;
     } catch (err) {
         console.warn('[Redis] ⚠️ Could not connect (using in-memory fallback):', (err as Error).message);
         redisClient = null;
@@ -50,9 +49,16 @@ export async function initRedis(): Promise<void> {
 }
 
 /**
+ * Prüft ob Redis verbunden und bereit ist.
+ */
+export function isRedisReady(): boolean {
+    return redisClient?.status === 'ready';
+}
+
+/**
  * Redis-Client abrufen. Kann null sein wenn Redis nicht verfügbar.
  */
-export function getRedisClient(): RedisClientType | null {
+export function getRedisClient(): Redis | null {
     return redisClient;
 }
 

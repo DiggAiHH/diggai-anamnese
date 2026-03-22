@@ -1,0 +1,289 @@
+name: Changelog Automation
+
+on:
+  push:
+    branches:
+      - master
+      - main
+    paths-ignore:
+      - 'CHANGELOG.md'
+      - '**.md'
+  pull_request:
+    types: [closed]
+    branches:
+      - master
+      - main
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version für Changelog (optional)'
+        required: false
+        type: string
+      since_tag:
+        description: 'Starte ab diesem Tag (optional)'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  generate-changelog:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || (github.event.pull_request.merged == true && !contains(github.event.pull_request.labels.*.name, 'skip-changelog'))
+    
+    outputs:
+      version: ${{ steps.changelog.outputs.version }}
+      changes_count: ${{ steps.changelog.outputs.changes_count }}
+      has_breaking: ${{ steps.changelog.outputs.has_breaking }}
+      pr_created: ${{ steps.create-pr.outputs.pr_number }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Benötigt für Git-History
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline
+
+      - name: Check GitHub CLI
+        run: |
+          if ! command -v gh &> /dev/null; then
+            echo "::warning::GitHub CLI nicht verfügbar - PR-Details können nicht geladen werden"
+          else
+            echo "✅ GitHub CLI verfügbar"
+            gh --version
+          fi
+
+      - name: Get latest tag
+        id: get-tag
+        run: |
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          echo "tag=${LATEST_TAG}" >> $GITHUB_OUTPUT
+          echo "Latest tag: ${LATEST_TAG:-none}"
+
+      - name: Generate Changelog
+        id: changelog
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          SINCE_TAG="${{ github.event.inputs.since_tag || steps.get-tag.outputs.tag }}"
+          
+          if [ -n "$SINCE_TAG" ]; then
+            echo "📍 Generiere Changelog seit Tag: $SINCE_TAG"
+            node scripts/changelog-automation.mjs --since-tag "$SINCE_TAG" --verbose
+          else
+            echo "📍 Generiere Changelog (seit letztem Tag oder 50 Commits)"
+            node scripts/changelog-automation.mjs --verbose
+          fi
+
+      - name: Check for changes
+        id: check-changes
+        run: |
+          if git diff --quiet HEAD -- CHANGELOG.md; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "ℹ️ Keine Änderungen am Changelog notwendig"
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "✅ Changelog wurde aktualisiert"
+          fi
+
+      - name: Format Changelog
+        if: steps.check-changes.outputs.changed == 'true'
+        run: |
+          # Stelle sicher, dass der Changelog konsistent formatiert ist
+          echo "📝 Formatiere Changelog..."
+
+      - name: Create Pull Request
+        id: create-pr
+        if: steps.check-changes.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: |
+            docs: update CHANGELOG.md
+            
+            Automatisch generiert durch Changelog Automation
+            - ${{ steps.changelog.outputs.changes_count }} Änderungen
+            - Version: ${{ steps.changelog.outputs.version }}
+          branch: automated/changelog-update
+          delete-branch: true
+          title: '📝 Changelog Update ${{ steps.changelog.outputs.version }}'
+          body: |
+            ## 📝 Automatische Changelog-Aktualisierung
+            
+            Dieser PR wurde automatisch durch die Changelog-Automation erstellt.
+            
+            ### 📊 Zusammenfassung
+            - **Version:** `${{ steps.changelog.outputs.version }}`
+            - **Änderungen:** ${{ steps.changelog.outputs.changes_count }}
+            - **Breaking Changes:** ${{ steps.changelog.outputs.has_breaking == 'true' && '⚠️ Ja' || 'Nein' }}
+            
+            ### 🔗 Referenzen
+            - Letzter Tag: ${{ steps.get-tag.outputs.tag || 'none' }}
+            - Workflow Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            
+            ---
+            *Automatisch generiert von @github-actions*
+          labels: |
+            documentation
+            automated
+            skip-changelog
+          draft: false
+
+      - name: Comment on PR
+        if: steps.create-pr.outputs.pull-request-number
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = '${{ steps.create-pr.outputs.pull-request-number }}';
+            const changes = '${{ steps.changelog.outputs.changes_count }}';
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: parseInt(prNumber),
+              body: `✅ Changelog wurde mit ${changes} Änderungen aktualisiert.`
+            });
+
+  # Optional: Automatischer Merge bei nur-Dokumentation-Änderungen
+  auto-merge:
+    runs-on: ubuntu-latest
+    needs: generate-changelog
+    if: needs.generate-changelog.outputs.pr_created && needs.generate-changelog.outputs.has_breaking != 'true'
+    
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Enable auto-merge
+        uses: peter-evans/enable-pull-request-automerge@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          pull-request-number: ${{ needs.generate-changelog.outputs.pr_created }}
+          merge-method: squash
+
+  # Benachrichtigung bei Breaking Changes
+  notify-breaking:
+    runs-on: ubuntu-latest
+    needs: generate-changelog
+    if: needs.generate-changelog.outputs.has_breaking == 'true'
+    
+    steps:
+      - name: Create breaking change issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const version = '${{ needs.generate-changelog.outputs.version }}';
+            
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `⚠️ Breaking Changes in Version ${version}`,
+              body: `Diese Version enthält Breaking Changes, die in der CHANGELOG.md dokumentiert sind.
+              
+Bitte überprüfe die Änderungen vor dem Merge.
+
+- [Changelog PR](#${{ needs.generate-changelog.outputs.pr_created }})
+- [Workflow Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})`,
+              labels: ['breaking-change', 'documentation', 'needs-review']
+            });
+
+  # Validierung des Changelogs
+  validate:
+    runs-on: ubuntu-latest
+    needs: generate-changelog
+    if: always() && needs.generate-changelog.result == 'success'
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: automated/changelog-update
+
+      - name: Validate Changelog format
+        run: |
+          echo "🔍 Validiere Changelog-Format..."
+          
+          # Prüfe auf Keep a Changelog Struktur
+          if [ ! -f CHANGELOG.md ]; then
+            echo "❌ CHANGELOG.md nicht gefunden"
+            exit 1
+          fi
+          
+          # Prüfe auf [Unreleased] Section
+          if ! grep -q "## \[Unreleased\]" CHANGELOG.md; then
+            echo "⚠️  [Unreleased] Section fehlt"
+          else
+            echo "✅ [Unreleased] Section vorhanden"
+          fi
+          
+          # Prüfe auf Version-Header
+          if ! grep -qE "## \[([0-9]+\.[0-9]+\.[0-9]+)\]" CHANGELOG.md; then
+            echo "⚠️  Keine Versions-Header gefunden"
+          else
+            echo "✅ Versions-Header vorhanden"
+          fi
+          
+          echo "✅ Changelog-Validierung abgeschlossen"
+
+  # Release-Integration
+  release:
+    runs-on: ubuntu-latest
+    needs: [generate-changelog, validate]
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.version
+    
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Update version
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          echo "Updating to version: $VERSION"
+          npm version "$VERSION" --no-git-tag-version
+
+      - name: Generate release notes
+        id: release-notes
+        run: |
+          # Extrahiere Release-Notes aus Changelog
+          VERSION="${{ github.event.inputs.version }}"
+          NOTES=$(awk "/## \\[$VERSION\\]/{flag=1;next}/## \\[/{flag=0}flag" CHANGELOG.md | head -n -1)
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          echo "$NOTES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ github.event.inputs.version }}
+          release_name: Release ${{ github.event.inputs.version }}
+          body: ${{ steps.release-notes.outputs.notes }}
+          draft: false
+          prerelease: ${{ contains(github.event.inputs.version, '-') }}

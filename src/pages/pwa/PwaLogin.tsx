@@ -3,8 +3,8 @@ import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Heart, Loader2, Eye, EyeOff } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { usePwaLogin, usePwaRegister } from '../../hooks/useApi';
-import { usePwaStore } from '../../stores/pwaStore';
+import { usePwaLogin, usePwaRegister } from '../../hooks/usePatientApi';
+import { usePwaStore } from '../../store/pwaStore';
 
 type Tab = 'login' | 'register';
 

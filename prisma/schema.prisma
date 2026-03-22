@@ -1,4 +1,4 @@
-// Anamnese App – Prisma Schema
+// Anamnese App – Prisma Schema v3.1.0 (Multi-Tenancy)
 // PostgreSQL für Produktion (Docker Compose mit VPS)
 
 generator client {
@@ -10,12 +10,143 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ─── Multi-Tenancy Core ─────────────────────────────────────
+
+enum TenantPlan {
+  FREE
+  STARTER
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+enum Tier {
+  STARTER
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+  PAST_DUE
+  TRIAL
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+  PENDING_SETUP
+}
+
+model Tenant {
+  id          String       @id @default(uuid())
+  subdomain   String       @unique
+  name        String
+  legalName   String?
+  
+  plan        TenantPlan   @default(STARTER)
+  status      TenantStatus @default(ACTIVE)
+  
+  // White-Labeling
+  primaryColor    String?  @default("#3b82f6")
+  logoUrl         String?
+  customDomain    String?  @unique
+  welcomeMessage  String?
+  
+  // Billing
+  stripeCustomerId      String?
+  stripeSubscriptionId  String?
+  subscriptionExpiresAt DateTime?
+  
+  // Limits
+  maxUsers            Int @default(5)
+  maxPatientsPerMonth Int @default(1000)
+  storageLimitMB      Int @default(1024)
+  
+  // Compliance
+  dsgvoAgreementSigned    Boolean @default(false)
+  dsgvoAgreementSignedAt  DateTime?
+  
+  settings    Json?   @default("{}")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  users       ArztUser[]
+  patients    Patient[]
+  sessions    PatientSession[]
+  subscription Subscription?
+  auditLogs   AuditLog[]
+  theme       TenantTheme?
+  
+  @@index([subdomain])
+  @@index([status])
+  @@index([customDomain])
+}
+
+// ─── Subscription (DiggAI Tarifmodell) ──────────────────────
+
+model Subscription {
+  id            String             @id @default(uuid())
+  praxisId      String             @unique
+  tenant        Tenant             @relation(fields: [praxisId], references: [id], onDelete: Cascade)
+  
+  tier          Tier
+  status        SubscriptionStatus @default(TRIAL)
+  stripeSubId   String?
+  stripeCustId  String?
+  
+  // KI-Nutzungs-Tracking
+  aiQuotaUsed   Int                @default(0)
+  aiQuotaTotal  Int                @default(100) // 100 für Starter, Infinity für andere
+  
+  startedAt     DateTime           @default(now())
+  endsAt        DateTime?
+  
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  
+  @@index([praxisId])
+  @@index([status])
+  @@index([stripeSubId])
+  @@map("subscriptions")
+}
+
+// ─── Tenant Theme (White-Labeling) ──────────────────────────
+
+model TenantTheme {
+  id            String   @id @default(uuid())
+  tenantId      String   @unique
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  
+  // Theme Configuration (JSON)
+  config        Json     @default("{}")
+  
+  // Display Settings
+  defaultMode   String   @default("system") // light, dark, system
+  respectSystemPreference Boolean @default(true)
+  allowPatientThemeSelection Boolean @default(false)
+  
+  // Audit
+  updatedBy     String?
+  updatedAt     DateTime @updatedAt
+  createdAt     DateTime @default(now())
+  
+  @@index([tenantId])
+  @@index([updatedAt])
+  @@map("tenant_themes")
+}
+
 // ─── Patient (Pseudonymisiert) ──────────────────────────────
 
 model Patient {
   id               String    @id @default(uuid())
-  hashedEmail      String    @unique // SHA-256 für Wiedererkennung
-  patientNumber    String?   @unique // Fortlaufende PID (z.B. "P-10001")
+  tenantId         String
+  tenant           Tenant    @relation(fields: [tenantId], references: [id])
+  
+  hashedEmail      String    // SHA-256 für Wiedererkennung
+  patientNumber    String?   // Fortlaufende PID (z.B. "P-10001")
   insuranceNumHash String?   // SHA-256 der Versicherungsnummer
   birthDate        DateTime? // Für schnelle Wiedererkennung
   gender           String?   // M / W / D (gespeichert für Fast-Track)
@@ -53,15 +184,22 @@ model Patient {
   privateEpa       PrivateEPA?
   signatures       Signature[]
 
-  @@index([insuranceNumHash, birthDate])
+  @@unique([tenantId, hashedEmail])
+  @@unique([tenantId, patientNumber])
+  @@unique([id, tenantId])
+  @@index([tenantId])
+  @@index([tenantId, insuranceNumHash, birthDate])
 }
 
 // ─── Session (Eine Fragebogen-Sitzung) ──────────────────────
 
 model PatientSession {
   id              String   @id @default(uuid())
+  tenantId        String
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+  
   patientId       String?
-  patient         Patient? @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  patient         Patient? @relation(fields: [patientId, tenantId], references: [id, tenantId], onDelete: Cascade)
 
   isNewPatient    Boolean?
   gender          String?       // M / W / D
@@ -78,7 +216,7 @@ model PatientSession {
   updatedAt       DateTime      @updatedAt
   completedAt     DateTime?
   assignedArztId  String?
-  assignedArzt    ArztUser? @relation("ArztAssignedSessions", fields: [assignedArztId], references: [id])
+  assignedArzt    ArztUser? @relation("ArztAssignedSessions", fields: [assignedArztId, tenantId], references: [id, tenantId])
 
   // Beziehungen
   answers         Answer[]
@@ -101,8 +239,9 @@ model PatientSession {
   currentFlowId   String?
   flowProgress    PatientFlowProgress?
 
-  @@index([patientId, createdAt])
-  @@index([status])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, patientId, createdAt])
 }
 
 // ─── Accident Details (BG-Daten) ────────────────────────────
@@ -196,7 +335,10 @@ model MedicalAtom {
 
 model ArztUser {
   id           String   @id @default(uuid())
-  username     String   @unique
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+  
+  username     String   // Unique per tenant (not globally)
   passwordHash String   // bcrypt
   pinHash      String?  // bcrypt 4-digit PIN für Quick-Login (Kiosk)
   displayName  String
@@ -216,6 +358,11 @@ model ArztUser {
 
   // Modul 8: Avatar & Voice
   avatar              StaffAvatar?
+  
+  @@unique([tenantId, username])
+  @@unique([id, tenantId])
+  @@index([tenantId])
+  @@index([tenantId, role])
 }
 
 // ─── Digitale Unterschrift (Phase 12 — eIDAS FES) ───────────
@@ -265,6 +412,9 @@ model Signature {
 
 model AuditLog {
   id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  
   userId    String?  // Wer hat die Aktion ausgeführt
   action    String   // CREATE_SESSION, ANSWER_QUESTION, VIEW_SESSION, etc.
   resource  String   // sessions/abc-123, answers/xyz-456
@@ -273,8 +423,10 @@ model AuditLog {
   metadata  String?  // JSON string: Zusätzliche Kontextdaten
   createdAt DateTime @default(now())
 
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, action, createdAt])
   @@index([userId, createdAt])
-  @@index([action, createdAt])
 }
 
 // ─── Chat-Nachrichten (Kommunikations-Log) ──────────────────

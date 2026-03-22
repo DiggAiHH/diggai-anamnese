@@ -18,7 +18,7 @@ import {
   usePwaDiaryCreate,
   usePwaDiaryUpdate,
   usePwaDiaryDelete,
-} from '../../hooks/useApi';
+} from '../../hooks/usePatientApi';
 
 // ── Mood config ──
 

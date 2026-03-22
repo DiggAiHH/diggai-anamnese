@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { CheckCircle, XCircle, Loader2 } from 'lucide-react';
-import { usePwaVerifyEmail } from '../../hooks/useApi';
+import { usePwaVerifyEmail } from '../../hooks/usePatientApi';
 
 export default function PwaEmailVerification() {
   const [params] = useSearchParams();

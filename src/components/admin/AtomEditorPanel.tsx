@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { FileEdit, Save, Plus, Trash2 } from 'lucide-react';
-import { useAtomDraftCreate } from '../../hooks/useApi';
+import { useAtomDraftCreate } from '../../hooks/useOpsApi';
 import { BranchingLogicEditor } from './BranchingLogicEditor';
 import type { MedicalAtomAdmin } from '../../types/admin';
 

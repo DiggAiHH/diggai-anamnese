@@ -1,0 +1,20 @@
+# CODEOWNERS — DiggAI Anamnese Platform
+# Changes to these paths require explicit review from designated owners.
+# Docs: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Triage engine — requires clinical sign-off (Dr. Klapproth / Dr. Al-Shdaifat)
+anamnese-app/server/engine/TriageEngine.ts @DiggAiHH/clinical-review
+anamnese-app/server/engine/QuestionFlowEngine.ts @DiggAiHH/clinical-review
+
+# Medical question catalog — canonical IDs must not change
+anamnese-app/src/data/questions.ts @DiggAiHH/clinical-review
+
+# Database schema — all migrations require senior dev review
+anamnese-app/prisma/schema.prisma @DiggAiHH/senior-dev
+
+# Security-critical files
+anamnese-app/server/middleware/auth.ts @DiggAiHH/senior-dev
+anamnese-app/server/services/encryption.ts @DiggAiHH/senior-dev
+
+# CI/CD pipelines
+anamnese-app/.github/workflows/ @DiggAiHH/senior-dev

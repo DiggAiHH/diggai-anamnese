@@ -3,7 +3,7 @@ import type { Request, Response } from 'express';
 import { prisma } from '../db';
 import * as bcrypt from 'bcryptjs';
 import { createToken, requireAuth, requireRole, blacklistToken, setTokenCookie, clearTokenCookie } from '../middleware/auth';
-import { AIService } from '../services/aiService';
+import { aiEngine } from '../services/ai/ai-engine.service';
 import { decrypt, isPIIAtom } from '../services/encryption';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
@@ -25,18 +25,56 @@ const loginSchema = z.object({
 });
 
 /**
- * POST /api/arzt/login
+ * @swagger
+ * /arzt/login:
+ *   post:
+ *     tags: [Arzt]
+ *     summary: Arzt/MFA/Admin Login
+ *     description: Authentifiziert einen Arztpraxis-Mitarbeiter. Rate-Limited auf 5 Versuche/15min.
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [username, password]
+ *             properties:
+ *               username: { type: string, example: "dr.klaproth" }
+ *               password: { type: string, format: password }
+ *     responses:
+ *       200:
+ *         description: Login erfolgreich — JWT wird als HttpOnly Cookie gesetzt
+ *         headers:
+ *           Set-Cookie:
+ *             description: access_token=<JWT>; HttpOnly; Secure; SameSite=Strict
+ *             schema: { type: string }
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     id: { type: string }
+ *                     username: { type: string }
+ *                     displayName: { type: string }
+ *       401:
+ *         description: Ungültige Anmeldedaten
+ *       429:
+ *         description: Rate-Limit überschritten (5 Versuche/15min)
  */
 router.post('/login', loginRateLimiter, async (req: Request, res: Response) => {
     try {
         const validated = loginSchema.parse(req.body);
         const { username, password } = validated;
 
-        const arzt = await prisma.arztUser.findUnique({
+        const arzt = await prisma.arztUser.findFirst({
             where: { username },
         });
 
-        if (!arzt) {
+        if (!arzt || arzt.isActive === false) {
             res.status(401).json({ error: 'Ungültige Anmeldedaten' });
             return;
         }
@@ -56,7 +94,6 @@ router.post('/login', loginRateLimiter, async (req: Request, res: Response) => {
         setTokenCookie(res, token);
 
         res.json({
-            token,
             user: {
                 id: arzt.id,
                 username: arzt.username,
@@ -64,6 +101,10 @@ router.post('/login', loginRateLimiter, async (req: Request, res: Response) => {
             },
         });
     } catch (err: unknown) {
+        if (err instanceof z.ZodError) {
+            res.status(400).json({ error: 'Ungültige Eingabedaten' });
+            return;
+        }
         console.error('[Arzt] Login-Fehler:', err);
         res.status(500).json({ error: 'Interner Serverfehler' });
     }
@@ -201,6 +242,7 @@ router.get('/sessions/:id', requireAuth, requireRole('arzt', 'admin', 'mfa'), as
         // Audit-Log: Wer schaut sich die Daten an
         await prisma.auditLog.create({
             data: {
+                tenantId: req.tenantId || req.auth?.tenantId || 'system',
                 userId: req.auth?.userId || null,
                 action: 'VIEW_SESSION_DETAIL',
                 resource: `sessions/${sessionId}`,
@@ -317,8 +359,14 @@ router.put('/sessions/:id/status', requireAuth, requireRole('arzt', 'admin', 'mf
 router.get('/sessions/:id/summary', requireAuth, requireRole('arzt', 'admin'), async (req: Request, res: Response) => {
     try {
         const sessionId = req.params.id as string;
-        const summary = await AIService.generateClinicalSummary(sessionId);
-        res.json(summary);
+        const result = await aiEngine.summarizeSession(sessionId);
+        res.json({
+            summary: result.summary.historyOfPresentIllness || result.summary.chiefComplaint,
+            icdCodes: (result.summary.suggestedIcdCodes || []).map(code => ({ code, label: code })),
+            generatedAt: new Date(),
+            aiModel: result.aiModel,
+            mode: result.mode,
+        });
     } catch (err: unknown) {
         console.error('[Arzt] AI-Summary-Fehler:', err);
         res.status(500).json({ error: 'Interner Serverfehler' });

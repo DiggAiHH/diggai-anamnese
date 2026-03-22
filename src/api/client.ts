@@ -1,6 +1,45 @@
-﻿import axios from 'axios';
+﻿import axios, { type AxiosRequestConfig, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios';
 import { questions } from '../data/questions';
 import { isDemoMode } from '../store/modeStore';
+
+// =============================================================================
+// REQUEST DEDUPLICATION
+// =============================================================================
+
+/**
+ * Cache für ausstehende Requests zur Deduplication.
+ * Identische parallele Requests (gleiche URL + Methode + Body) teilen sich
+ * die gleiche Response, um Netzwerk-Overhead zu reduzieren.
+ */
+const pendingRequests = new Map<string, Promise<AxiosResponse<unknown>>>();
+
+/**
+ * Generiert einen eindeutigen Schlüssel für einen Request basierend auf
+ * Methode, URL, Query-Parametern und Body.
+ *
+ * @param config - Die Axios Request Konfiguration
+ * @returns Ein eindeutiger String-Key für den Request
+ */
+function getRequestKey(config: AxiosRequestConfig | InternalAxiosRequestConfig): string {
+    const method = (config.method || 'GET').toUpperCase();
+    const url = config.url || '';
+    const params = JSON.stringify(config.params || {});
+    const data = typeof config.data === 'string' ? config.data : JSON.stringify(config.data || {});
+    return `${method}:${url}:${params}:${data}`;
+}
+
+/**
+ * Entfernt einen Request aus dem Pending-Cache.
+ * Wird im Response- und Error-Interceptor aufgerufen.
+ *
+ * @param config - Die Axios Request Konfiguration
+ */
+function clearPendingRequest(config: AxiosRequestConfig | InternalAxiosRequestConfig): void {
+    const key = getRequestKey(config);
+    pendingRequests.delete(key);
+}
+
+
 
 export const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 export const SOCKET_BASE_URL = API_BASE_URL.replace(/\/api\/?$/, '');
@@ -20,7 +59,7 @@ if (isDemoMode()) {
 }
 
 /**
- * Axios-Client mit JWT-Interceptor fÃ¼r die Backend-API
+ * Axios-Client mit JWT-Interceptor fuer die Backend-API
  */
 const apiClient = axios.create({
     baseURL: API_BASE_URL,
@@ -31,55 +70,127 @@ const apiClient = axios.create({
     withCredentials: true, // Send httpOnly cookies with every request
 });
 
+/**
+ * Führt einen deduplizierten Request aus.
+ * Identische parallele Requests (gleiche URL + Methode + Body) teilen sich
+ * die gleiche Response, um Netzwerk-Overhead zu reduzieren.
+ *
+ * Der erste Request wird ausgeführt, alle parallelen identischen Requests
+ * warten auf das gleiche Promise. Nach Abschluss wird der Cache-Eintrag
+ * automatisch gelöscht. Fehler werden an alle wartenden Requests weitergegeben.
+ *
+ * @template T - Der erwartete Response-Datentyp
+ * @param config - Die Axios Request Konfiguration
+ * @returns Ein Promise mit der Axios Response
+ *
+ * @example
+ * ```typescript
+ * // Diese zwei Requests werden zusammengeführt:
+ * const [res1, res2] = await Promise.all([
+ *   deduplicatedRequest<User>({ method: 'GET', url: '/users/123' }),
+ *   deduplicatedRequest<User>({ method: 'GET', url: '/users/123' })
+ * ]);
+ * // res1 === res2 (gleiche Response-Referenz)
+ * ```
+ */
+export function deduplicatedRequest<T = unknown>(config: AxiosRequestConfig): Promise<AxiosResponse<T>> {
+    const key = getRequestKey(config);
+
+    // Prüfen, ob ein identischer Request bereits läuft
+    const pending = pendingRequests.get(key) as Promise<AxiosResponse<T>> | undefined;
+    if (pending) {
+        return pending;
+    }
+
+    // Neuen Request erstellen und im Cache speichern
+    const promise = apiClient.request<T>(config).finally(() => {
+        // Request aus dem Cache entfernen (nach Erfolg oder Fehler)
+        clearPendingRequest(config);
+    });
+
+    pendingRequests.set(key, promise);
+    return promise;
+}
+
 // JWT Token Management
 let currentToken: string | null = null;
 
 export function setAuthToken(token: string | null): void {
     currentToken = token;
-    if (token) {
-        localStorage.setItem('anamnese_token', token);
-    } else {
-        localStorage.removeItem('anamnese_token');
-    }
 }
 
 export function getAuthToken(): string | null {
-    if (!currentToken) {
-        currentToken = localStorage.getItem('anamnese_token');
-    }
     return currentToken;
 }
 
-// Request Interceptor â€“ JWT automatisch anfÃ¼gen
+// SECURITY: Get CSRF token from cookie for state-changing requests
+function getCsrfTokenFromCookie(): string | null {
+    const match = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
+    return match ? decodeURIComponent(match[1]) : null;
+}
+
+// Request Interceptor – JWT automatisch anfuegen + CSRF Token
 apiClient.interceptors.request.use(
     (config) => {
         const token = getAuthToken();
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
+
+        // SECURITY: Add CSRF token for state-changing requests (HIGH-001 Fix)
+        const safeMethods = ['get', 'head', 'options'];
+        if (config.method && !safeMethods.includes(config.method.toLowerCase())) {
+            const csrfToken = getCsrfTokenFromCookie();
+            if (csrfToken) {
+                config.headers['x-xsrf-token'] = csrfToken;
+            }
+        }
+
         return config;
     },
     (error) => Promise.reject(error)
 );
 
-// Response Interceptor – Fehlerbehandlung mit Token-Refresh
+// Response Interceptor – Fehlerbehandlung mit Token-Refresh + Deduplication Cleanup
 let isRefreshing = false;
-let failedQueue: Array<{ resolve: (token: string) => void; reject: (err: unknown) => void }> = [];
+let failedQueue: Array<{ resolve: () => void; reject: (err: unknown) => void }> = [];
 
-function processQueue(error: unknown, token: string | null = null) {
+function processQueue(error: unknown) {
     failedQueue.forEach(promise => {
-        if (token) {
-            promise.resolve(token);
-        } else {
+        if (error) {
             promise.reject(error);
+        } else {
+            promise.resolve();
         }
     });
     failedQueue = [];
 }
 
+/**
+ * Type Guard für AbortError
+ * Prüft ob ein Fehler ein AbortError ist (vom AbortController)
+ */
+function isAbortError(error: unknown): boolean {
+    if (error instanceof Error) {
+        return error.name === 'AbortError' || error.name === 'CanceledError';
+    }
+    // Axios specific check
+    if (typeof error === 'object' && error !== null) {
+        const err = error as { code?: string; name?: string };
+        return err.code === 'ERR_CANCELED' || err.name === 'CanceledError';
+    }
+    return false;
+}
+
 apiClient.interceptors.response.use(
     (response) => response,
     async (error) => {
+        
+        // AbortError soll nicht als Fehler angezeigt werden - Silent reject
+        if (isAbortError(error)) {
+            return Promise.reject(error);
+        }
+        
         const originalRequest = error.config;
 
         if (error.response?.status === 401 && !originalRequest._retry) {
@@ -100,8 +211,10 @@ apiClient.interceptors.response.use(
                 // Queue this request until refresh completes
                 return new Promise((resolve, reject) => {
                     failedQueue.push({
-                        resolve: (token: string) => {
-                            originalRequest.headers.Authorization = `Bearer ${token}`;
+                        resolve: () => {
+                            if (originalRequest.headers?.Authorization) {
+                                delete originalRequest.headers.Authorization;
+                            }
                             resolve(apiClient(originalRequest));
                         },
                         reject,
@@ -114,13 +227,20 @@ apiClient.interceptors.response.use(
 
             try {
                 const { data } = await apiClient.post('/sessions/refresh-token');
-                const newToken = data.token;
-                setAuthToken(newToken);
-                originalRequest.headers.Authorization = `Bearer ${newToken}`;
-                processQueue(null, newToken);
+                const newToken: string | undefined = data?.token;
+                if (newToken) {
+                    setAuthToken(newToken);
+                    originalRequest.headers.Authorization = `Bearer ${newToken}`;
+                } else {
+                    setAuthToken(null);
+                    if (originalRequest.headers?.Authorization) {
+                        delete originalRequest.headers.Authorization;
+                    }
+                }
+                processQueue(null);
                 return apiClient(originalRequest);
             } catch (refreshError) {
-                processQueue(refreshError, null);
+                processQueue(refreshError);
                 setAuthToken(null);
                 localStorage.removeItem('anamnese_session_id');
                 import('../store/sessionStore').then(({ useSessionStore }) => {
@@ -135,7 +255,8 @@ apiClient.interceptors.response.use(
             }
         }
         // Show error toast for non-auth errors (401 is handled above via redirect)
-        if (error.response?.status !== 401) {
+        // ABER: Keine Toast für AbortError (vom AbortController)
+        if (error.response?.status !== 401 && !isAbortError(error)) {
             const status = error.response?.status;
             const msg: string = error.response?.data?.error
                 ?? error.response?.data?.message
@@ -205,7 +326,96 @@ type DemoDb = {
     sessions: Record<string, DemoSession>;
 };
 
+type DemoFeedbackEntry = {
+    id: string;
+    praxisId: string;
+    sessionId?: string;
+    rating: number;
+    text?: string;
+    categories: string[];
+    containsThreats: boolean;
+    escalationStatus: 'NONE' | 'REVIEW' | 'ESCALATED';
+    createdAt: string;
+};
+
 const DEMO_DB_KEY = 'anamnese_demo_db_v1';
+const DEMO_FEEDBACK_KEY = 'anamnese_demo_feedback_v1';
+const DEMO_FEEDBACK_CATEGORY_LABELS: Record<string, string> = {
+    wartezeit: 'Wartezeit',
+    kommunikation: 'Kommunikation',
+    freundlichkeit: 'Freundlichkeit',
+    organisation: 'Organisation',
+    hygiene: 'Hygiene',
+    kompetenz: 'Kompetenz',
+};
+const DEFAULT_DEMO_FEEDBACK: DemoFeedbackEntry[] = [
+    {
+        id: 'fb_demo_1',
+        praxisId: 'default',
+        sessionId: 'sess_demo_anna',
+        rating: 5,
+        text: 'Sehr freundlich, kaum Wartezeit und die Schritte waren sofort verständlich.',
+        categories: ['freundlichkeit', 'organisation', 'wartezeit'],
+        containsThreats: false,
+        escalationStatus: 'NONE',
+        createdAt: '2026-03-08T08:25:00.000Z',
+    },
+    {
+        id: 'fb_demo_2',
+        praxisId: 'default',
+        sessionId: 'sess_demo_emir',
+        rating: 4,
+        text: 'Die digitale Anmeldung war super einfach, nur im Wartezimmer hätte ich gerne noch etwas mehr Orientierung gehabt.',
+        categories: ['organisation', 'kommunikation'],
+        containsThreats: false,
+        escalationStatus: 'NONE',
+        createdAt: '2026-03-08T10:12:00.000Z',
+    },
+    {
+        id: 'fb_demo_3',
+        praxisId: 'default',
+        sessionId: 'sess_demo_lena',
+        rating: 5,
+        text: 'Mehrsprachige Hinweise waren hilfreich und das Team war sehr empathisch.',
+        categories: ['kommunikation', 'freundlichkeit'],
+        containsThreats: false,
+        escalationStatus: 'NONE',
+        createdAt: '2026-03-07T15:05:00.000Z',
+    },
+    {
+        id: 'fb_demo_4',
+        praxisId: 'default',
+        sessionId: 'sess_demo_karl',
+        rating: 3,
+        text: 'Die Behandlung war gut, aber die Wartezeit war heute etwas länger als angekündigt.',
+        categories: ['wartezeit', 'kompetenz'],
+        containsThreats: false,
+        escalationStatus: 'NONE',
+        createdAt: '2026-03-07T12:45:00.000Z',
+    },
+    {
+        id: 'fb_demo_5',
+        praxisId: 'default',
+        sessionId: 'sess_demo_mina',
+        rating: 4,
+        text: 'Sehr sauber, angenehme Atmosphäre und insgesamt gut organisiert.',
+        categories: ['hygiene', 'organisation'],
+        containsThreats: false,
+        escalationStatus: 'NONE',
+        createdAt: '2026-03-06T09:40:00.000Z',
+    },
+    {
+        id: 'fb_demo_6',
+        praxisId: 'default',
+        sessionId: 'sess_demo_omer',
+        rating: 2,
+        text: 'Bitte die Wartezeit klarer kommunizieren. Das Arztgespräch selbst war kompetent.',
+        categories: ['wartezeit', 'kommunikation', 'kompetenz'],
+        containsThreats: false,
+        escalationStatus: 'REVIEW',
+        createdAt: '2026-03-05T16:20:00.000Z',
+    },
+];
 
 function demoId(prefix: string): string {
     if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
@@ -229,6 +439,77 @@ function readDemoDb(): DemoDb {
 
 function writeDemoDb(db: DemoDb): void {
     localStorage.setItem(DEMO_DB_KEY, JSON.stringify(db));
+}
+
+function cloneDemoFeedbackEntry(entry: DemoFeedbackEntry): DemoFeedbackEntry {
+    return {
+        ...entry,
+        categories: [...entry.categories],
+    };
+}
+
+function readDemoFeedback(): DemoFeedbackEntry[] {
+    try {
+        const raw = localStorage.getItem(DEMO_FEEDBACK_KEY);
+        if (!raw) return DEFAULT_DEMO_FEEDBACK.map(cloneDemoFeedbackEntry);
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed) || parsed.length === 0) {
+            return DEFAULT_DEMO_FEEDBACK.map(cloneDemoFeedbackEntry);
+        }
+        return parsed.map((entry) => ({
+            id: String(entry?.id || demoId('fb')),
+            praxisId: String(entry?.praxisId || 'default'),
+            sessionId: entry?.sessionId ? String(entry.sessionId) : undefined,
+            rating: Number(entry?.rating || 0),
+            text: entry?.text ? String(entry.text) : undefined,
+            categories: Array.isArray(entry?.categories) ? entry.categories.map(String) : [],
+            containsThreats: Boolean(entry?.containsThreats),
+            escalationStatus: entry?.escalationStatus === 'ESCALATED' || entry?.escalationStatus === 'REVIEW' ? entry.escalationStatus : 'NONE',
+            createdAt: String(entry?.createdAt || new Date().toISOString()),
+        }));
+    } catch {
+        return DEFAULT_DEMO_FEEDBACK.map(cloneDemoFeedbackEntry);
+    }
+}
+
+function writeDemoFeedback(entries: DemoFeedbackEntry[]): void {
+    localStorage.setItem(DEMO_FEEDBACK_KEY, JSON.stringify(entries));
+}
+
+function getDemoFeedbackStats(praxisId: string) {
+    const feedback = readDemoFeedback().filter((entry) => !praxisId || entry.praxisId === praxisId);
+
+    if (feedback.length === 0) {
+        return {
+            total: 0,
+            averageRating: 0,
+            escalatedCount: 0,
+            categories: [] as Array<{ name: string; count: number; avgRating: number }>,
+        };
+    }
+
+    const categoriesMap = new Map<string, { count: number; totalRating: number }>();
+    for (const entry of feedback) {
+        for (const category of entry.categories) {
+            const current = categoriesMap.get(category) || { count: 0, totalRating: 0 };
+            current.count += 1;
+            current.totalRating += entry.rating;
+            categoriesMap.set(category, current);
+        }
+    }
+
+    return {
+        total: feedback.length,
+        averageRating: Math.round((feedback.reduce((sum, entry) => sum + entry.rating, 0) / feedback.length) * 10) / 10,
+        escalatedCount: feedback.filter((entry) => entry.escalationStatus !== 'NONE').length,
+        categories: Array.from(categoriesMap.entries())
+            .map(([category, stats]) => ({
+                name: DEMO_FEEDBACK_CATEGORY_LABELS[category] || category,
+                count: stats.count,
+                avgRating: Math.round((stats.totalRating / stats.count) * 10) / 10,
+            }))
+            .sort((a, b) => b.count - a.count),
+    };
 }
 
 function getDemoSessionOrThrow(sessionId: string): DemoSession {
@@ -560,7 +841,7 @@ export const api = {
             const session = getDemoSessionOrThrow(sessionId);
             return {
                 summary: {
-                    summary: `Demo-Zusammenfassung fÃ¼r ${session.selectedService}.`,
+                    summary: `Demo-Zusammenfassung fuer ${session.selectedService}.`,
                     icdCodes: [
                         { code: 'Z00.0', label: 'Allgemeinuntersuchung' },
                     ],
@@ -631,15 +912,35 @@ export const api = {
         return response.data;
     },
 
-    // Export (entschlÃ¼sselte Daten â€“ nur fÃ¼r Arzt/MFA)
-    exportSessionPDF: (sessionId: string) => {
-        const token = getAuthToken();
-        window.open(`${API_BASE_URL}/export/sessions/${sessionId}/export/pdf?token=${token}`, '_blank');
+    // Export (entschluesselte Daten â€“ nur fuer Arzt/MFA)
+    exportSessionPDF: async (sessionId: string) => {
+        const response = await apiClient.get(`/export/sessions/${sessionId}/export/pdf`, {
+            responseType: 'blob',
+        });
+
+        const blobUrl = URL.createObjectURL(response.data as Blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = `Anamnese_${sessionId}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(blobUrl);
     },
 
-    exportSessionCSV: (sessionId: string) => {
-        const token = getAuthToken();
-        window.open(`${API_BASE_URL}/export/sessions/${sessionId}/export/csv?token=${token}`, '_blank');
+    exportSessionCSV: async (sessionId: string) => {
+        const response = await apiClient.get(`/export/sessions/${sessionId}/export/csv`, {
+            responseType: 'blob',
+        });
+
+        const blobUrl = URL.createObjectURL(response.data as Blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = `Anamnese_${sessionId}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(blobUrl);
     },
 
     exportSessionJSON: async (sessionId: string) => {
@@ -1791,19 +2092,45 @@ export const api = {
     // ─── Modul 7: Feedback & Checkout ───────────────────────────
 
     feedbackSubmit: async (data: { praxisId: string; sessionId?: string; rating: number; text?: string; categories?: string[] }) => {
-        if (isDemoMode()) return { id: 'demo-fb-1', acknowledged: true, escalated: false };
+        if (isDemoMode()) {
+            const containsThreats = /(anzeige|beschwerde|droh|anwalt|gefährlich|katastroph|nie wieder)/i.test(data.text || '');
+            const entry: DemoFeedbackEntry = {
+                id: demoId('fb'),
+                praxisId: data.praxisId,
+                sessionId: data.sessionId,
+                rating: data.rating,
+                text: data.text?.trim() || undefined,
+                categories: (data.categories || []).filter(Boolean),
+                containsThreats,
+                escalationStatus: containsThreats || data.rating <= 2 ? 'REVIEW' : 'NONE',
+                createdAt: new Date().toISOString(),
+            };
+            writeDemoFeedback([entry, ...readDemoFeedback()]);
+            return { id: entry.id, acknowledged: true, escalated: entry.escalationStatus !== 'NONE' };
+        }
         const response = await apiClient.post('/feedback/anonymous', data);
         return response.data;
     },
     feedbackList: async (params?: { praxisId?: string; escalated?: boolean; limit?: number }) => {
-        if (isDemoMode()) return [
-            { id: 'fb1', praxisId: 'demo', rating: 4, text: 'Sehr freundlich', categories: ['Kommunikation'], containsThreats: false, escalationStatus: 'NONE', createdAt: new Date().toISOString() },
-        ];
+        if (isDemoMode()) {
+            let feedback = readDemoFeedback();
+            if (params?.praxisId) {
+                feedback = feedback.filter((entry) => entry.praxisId === params.praxisId);
+            }
+            if (params?.escalated !== undefined) {
+                feedback = feedback.filter((entry) => params.escalated ? entry.escalationStatus !== 'NONE' : entry.escalationStatus === 'NONE');
+            }
+            feedback = feedback.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
+            if (params?.limit) {
+                feedback = feedback.slice(0, params.limit);
+            }
+            return feedback;
+        }
         const response = await apiClient.get('/feedback', { params });
         return response.data;
     },
     feedbackStats: async (praxisId: string) => {
-        if (isDemoMode()) return { total: 42, averageRating: 4.2, escalatedCount: 1, categories: [{ name: 'Wartezeit', count: 15, avgRating: 3.5 }, { name: 'Kommunikation', count: 20, avgRating: 4.5 }] };
+        if (isDemoMode()) return getDemoFeedbackStats(praxisId);
         const response = await apiClient.get('/feedback/stats', { params: { praxisId } });
         return response.data;
     },

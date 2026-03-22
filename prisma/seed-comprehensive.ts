@@ -596,12 +596,20 @@ async function main() {
     const passwordHash = await bcrypt.hash(password, 12);
     const pinHash = await bcrypt.hash('1234', 12);
 
+    // Ensure default tenant
+    const tenant = await prisma.tenant.upsert({
+        where: { subdomain: 'default' },
+        update: {},
+        create: { subdomain: 'default', name: 'Default Praxis' },
+    });
+
     const staffUsers: Record<string, string> = {};
     for (const user of STAFF_USERS) {
         const created = await prisma.arztUser.upsert({
-            where: { username: user.username },
+            where: { tenantId_username: { tenantId: tenant.id, username: user.username } },
             update: { displayName: user.displayName, role: user.role, pinHash, isActive: true },
             create: {
+                tenantId: tenant.id,
                 username: user.username,
                 passwordHash,
                 pinHash,
@@ -629,6 +637,7 @@ async function main() {
         // Create Patient
         const patient = await prisma.patient.create({
             data: {
+                tenantId: tenant.id,
                 hashedEmail: hashEmail(profile.email),
             },
         });
@@ -643,6 +652,7 @@ async function main() {
         const session = await prisma.patientSession.create({
             data: {
                 id: sessionId,
+                tenantId: tenant.id,
                 patientId: patient.id,
                 isNewPatient: profile.isNewPatient,
                 gender: profile.gender,

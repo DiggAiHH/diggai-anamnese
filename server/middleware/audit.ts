@@ -57,15 +57,19 @@ export function auditLogger(req: Request, res: Response, next: NextFunction): vo
     // Hook into response finish to capture status code
     res.on('finish', () => {
         const duration = Date.now() - startTime;
+        const authContext = req as Express.Request;
+        const actorSessionId = authContext.auth?.userId ? null : authContext.auth?.sessionId || null;
         const logEntry = {
-            userId: (req as Express.Request).auth?.userId || (req as Express.Request).auth?.sessionId || null,
+            tenantId: req.tenantId || authContext.auth?.tenantId || 'system',
+            userId: authContext.auth?.userId || null,
             action: `${req.method} ${req.path}`,
-            resource: req.originalUrl.substring(0, 500), // Truncate long URLs
+            resource: `${req.baseUrl || ''}${req.path}`.substring(0, 500),
             ipAddress: req.ip || req.socket.remoteAddress || 'unknown',
             userAgent: sanitizeString(req.headers['user-agent'] || 'unknown'),
             metadata: JSON.stringify({
                 method: req.method,
                 query: sanitizeObject(req.query as Record<string, unknown>),
+                actorSessionId,
                 statusCode: res.statusCode,
                 durationMs: duration,
                 timestamp: new Date().toISOString(),

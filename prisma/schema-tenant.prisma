@@ -1,0 +1,226 @@
+// Multi-Tenancy Schema Extension for DiggAI Anamnese Platform
+// Merge this into schema.prisma for SaaS deployment
+
+// ─── TENANT MASTER (Multi-Tenancy Core) ─────────────────────
+
+enum TenantPlan {
+  FREE
+  STARTER
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+  PENDING_SETUP
+}
+
+model Tenant {
+  id          String       @id @default(uuid())
+  subdomain   String       @unique // praxis-dr-mueller
+  name        String       // Dr. Müller Praxis
+  legalName   String?      // Rechtlicher Firmenname
+  
+  // Plan & Billing
+  plan        TenantPlan   @default(STARTER)
+  status      TenantStatus @default(ACTIVE)
+  
+  // White-Labeling
+  primaryColor    String?  @default("#3b82f6")
+  logoUrl         String?
+  customDomain    String?  @unique
+  welcomeMessage  String?
+  
+  // Contact Info (for invoices/legal)
+  contactEmail    String?
+  contactPhone    String?
+  contactAddress  String?
+  taxId           String?
+  
+  // Stripe Integration
+  stripeCustomerId      String?
+  stripeSubscriptionId  String?
+  subscriptionExpiresAt DateTime?
+  
+  // Limits (enforced in application layer)
+  maxUsers            Int @default(5)
+  maxPatientsPerMonth Int @default(1000)
+  storageLimitMB      Int @default(1024) // 1GB default
+  
+  // Compliance
+  dsgvoAgreementSigned    Boolean @default(false)
+  dsgvoAgreementSignedAt  DateTime?
+  dsgvoAgreementSignedBy  String?
+  
+  // Settings JSON for extensibility
+  settings    Json?   @default("{}")
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  users       ArztUser[]
+  patients    Patient[]
+  sessions    PatientSession[]
+  auditLogs   AuditLog[]
+  
+  @@index([subdomain])
+  @@index([status])
+  @@index([customDomain])
+  @@index([plan])
+}
+
+// ─── TENANT-AWARE MODEL EXTENSIONS ──────────────────────────
+// Add these fields to existing models in schema.prisma:
+
+/*
+model Patient {
+  // ... existing fields ...
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  
+  @@index([tenantId])
+}
+
+model PatientSession {
+  // ... existing fields ...
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  
+  @@index([tenantId])
+  @@index([tenantId, status])
+}
+
+model ArztUser {
+  // ... existing fields ...
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  
+  // Change: username should be unique per tenant, not globally
+  // @@unique([tenantId, username]) // Replace existing @unique on username
+  
+  @@index([tenantId])
+  @@index([tenantId, role])
+}
+
+model Answer {
+  // ... existing fields ...
+  tenantId    String
+  
+  @@index([tenantId])
+}
+
+model TriageEvent {
+  // ... existing fields ...
+  tenantId    String
+  
+  @@index([tenantId])
+  @@index([tenantId, level])
+}
+
+model AuditLog {
+  // ... existing fields ...
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
+}
+
+model QueueEntry {
+  // ... existing fields ...
+  tenantId    String
+  
+  @@index([tenantId])
+  @@index([tenantId, status])
+}
+
+model Signature {
+  // ... existing fields ...
+  tenantId    String
+  
+  @@index([tenantId])
+}
+
+model PatientMedication {
+  // ... existing fields ...
+  tenantId    String
+  
+  @@index([tenantId])
+}
+
+model PatientSurgery {
+  // ... existing fields ...
+  tenantId    String
+  
+  @@index([tenantId])
+}
+
+model ChatMessage {
+  // ... existing fields ...
+  tenantId    String
+  
+  @@index([tenantId])
+}
+
+model TherapyPlan {
+  // ... existing fields ...
+  tenantId    String
+  
+  @@index([tenantId])
+}
+
+model ClinicalAlert {
+  // ... existing fields ...
+  tenantId    String
+  
+  @@index([tenantId])
+}
+
+model PvsConnection {
+  // ... existing fields ...
+  tenantId    String  @unique // One PVS per tenant
+  
+  @@index([tenantId])
+}
+
+model WaitingContent {
+  // ... existing fields ...
+  tenantId    String? // null = global content
+  
+  @@index([tenantId])
+}
+
+model TherapyTemplate {
+  // ... existing fields ...
+  tenantId    String? // null = global templates
+  isGlobal    Boolean @default(false)
+  
+  @@index([tenantId])
+  @@index([isGlobal])
+}
+
+model AtomDraft {
+  // ... existing fields ...
+  tenantId    String
+  
+  @@index([tenantId])
+}
+
+model ROISnapshot {
+  // ... existing fields ...
+  tenantId    String
+  
+  @@index([tenantId])
+  @@index([tenantId, date])
+}
+
+model WunschboxEntry {
+  // ... existing fields ...
+  tenantId    String
+  
+  @@index([tenantId])
+}
+*/

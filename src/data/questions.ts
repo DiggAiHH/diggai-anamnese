@@ -1,5 +1,5 @@
 import type { Question } from '../types/question';
-import { newQuestions } from './new-questions';
+import { newQuestions } from './new-questions.ts';
 
 export const questions: Question[] = [
     // ==================== KAPITEL 1: IDENTIFIKATION & BESUCHSSTATUS ====================

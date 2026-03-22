@@ -1,7 +1,26 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Bell, BellOff, Plus, Trash2, Loader2, BarChart2 } from 'lucide-react';
-import { usePwaReminders, usePwaReminderAdherence, usePwaReminderCreate, usePwaReminderToggle, usePwaReminderDelete } from '../../hooks/useApi';
+import { usePwaReminders, usePwaReminderAdherence, usePwaReminderCreate, usePwaReminderToggle, usePwaReminderDelete } from '../../hooks/usePatientApi';
+
+interface Reminder {
+  id: string;
+  isActive: boolean;
+  scheduleLabel: string;
+  pushTitle?: string;
+  medication?: { name?: string };
+}
+
+interface ReminderAdherence {
+  taken?: number;
+  skipped?: number;
+  missed?: number;
+  adherenceRate?: number;
+}
+
+function asArray<T>(value: unknown): T[] {
+  return Array.isArray(value) ? (value as T[]) : [];
+}
 
 const SCHEDULE_PRESETS = [
   { label: 'Morgens 8:00', cron: '0 8 * * *' },
@@ -22,6 +41,10 @@ export default function PwaReminderConfig() {
   const toggleMutation = usePwaReminderToggle();
   const deleteMutation = usePwaReminderDelete();
 
+  const reminderList = asArray<Reminder>(reminders);
+  const adherenceStats = (adherence as ReminderAdherence | undefined) ?? undefined;
+  const adherencePercent = Math.round(((adherenceStats?.adherenceRate ?? 0) * 100));
+
   function handleCreate() {
     if (!form.medicationId) return;
     createMutation.mutate(
@@ -39,16 +62,28 @@ export default function PwaReminderConfig() {
       {/* Header */}
       <div className="sticky top-0 z-10 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/pwa/dashboard')} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
+          <button
+            onClick={() => navigate('/pwa/dashboard')}
+            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
+            aria-label="Zurück zum Dashboard"
+            title="Zurück zum Dashboard"
+          >
             <ArrowLeft className="w-5 h-5" />
           </button>
           <h1 className="text-lg font-semibold">Medikamenten-Erinnerungen</h1>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => setShowStats(!showStats)} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
+          <button
+            onClick={() => setShowStats(!showStats)}
+            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
+            aria-label="Statistik anzeigen"
+            title="Statistik anzeigen"
+          >
             <BarChart2 className="w-5 h-5 text-gray-500" />
           </button>
           <button onClick={() => setShowCreate(true)}
+            aria-label="Neue Erinnerung"
+            title="Neue Erinnerung"
             className="flex items-center gap-1 px-3 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700">
             <Plus className="w-4 h-4" />
           </button>
@@ -61,9 +96,9 @@ export default function PwaReminderConfig() {
           <h3 className="font-semibold mb-3 text-sm">Einnahme-Statistik (letzte 30 Tage)</h3>
           <div className="grid grid-cols-3 gap-3">
             {[
-              { label: 'Genommen', value: (adherence as any).taken ?? 0, color: 'text-green-600' },
-              { label: 'Übersprungen', value: (adherence as any).skipped ?? 0, color: 'text-yellow-600' },
-              { label: 'Verpasst', value: (adherence as any).missed ?? 0, color: 'text-red-600' },
+              { label: 'Genommen', value: adherenceStats?.taken ?? 0, color: 'text-green-600' },
+              { label: 'Übersprungen', value: adherenceStats?.skipped ?? 0, color: 'text-yellow-600' },
+              { label: 'Verpasst', value: adherenceStats?.missed ?? 0, color: 'text-red-600' },
             ].map(s => (
               <div key={s.label} className="text-center">
                 <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
@@ -71,15 +106,18 @@ export default function PwaReminderConfig() {
               </div>
             ))}
           </div>
-          {(adherence as any).adherenceRate != null && (
+          {adherenceStats?.adherenceRate != null && (
             <div className="mt-3">
               <div className="flex justify-between text-xs text-gray-500 mb-1">
                 <span>Einnahmequote</span>
-                <span>{Math.round((adherence as any).adherenceRate * 100)}%</span>
+                <span>{adherencePercent}%</span>
               </div>
-              <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded-full">
-                <div className="h-2 bg-green-500 rounded-full" style={{ width: `${Math.round((adherence as any).adherenceRate * 100)}%` }} />
-              </div>
+              <progress
+                className="w-full h-2 rounded-full overflow-hidden accent-green-500"
+                max={100}
+                value={adherencePercent}
+                aria-label="Einnahmequote"
+              />
             </div>
           )}
         </div>
@@ -88,8 +126,8 @@ export default function PwaReminderConfig() {
       <div className="p-4 space-y-3">
         {isLoading ? (
           <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-blue-500" /></div>
-        ) : (reminders as any[])?.length ? (
-          (reminders as any[]).map((r: any) => (
+        ) : reminderList.length ? (
+          reminderList.map((r) => (
             <div key={r.id} className="bg-white dark:bg-gray-900 rounded-2xl p-4 shadow-sm">
               <div className="flex items-start justify-between">
                 <div className="space-y-1 flex-1 min-w-0">
@@ -103,10 +141,14 @@ export default function PwaReminderConfig() {
                 <div className="flex items-center gap-2 ml-3">
                   <button onClick={() => toggleMutation.mutate({ id: r.id, active: !r.isActive })}
                     disabled={toggleMutation.isPending}
+                    aria-label={r.isActive ? 'Erinnerung deaktivieren' : 'Erinnerung aktivieren'}
+                    title={r.isActive ? 'Erinnerung deaktivieren' : 'Erinnerung aktivieren'}
                     className={`p-2 rounded-lg transition-colors ${r.isActive ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300' : 'bg-gray-100 text-gray-400 dark:bg-gray-800'}`}>
                     {r.isActive ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
                   </button>
                   <button onClick={() => deleteMutation.mutate(r.id)} disabled={deleteMutation.isPending}
+                    aria-label="Erinnerung löschen"
+                    title="Erinnerung löschen"
                     className="p-2 rounded-lg text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -131,7 +173,7 @@ export default function PwaReminderConfig() {
           <div className="bg-white dark:bg-gray-900 rounded-t-3xl w-full max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold">Neue Erinnerung</h2>
-              <button onClick={() => setShowCreate(false)} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">✕</button>
+              <button onClick={() => setShowCreate(false)} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800" aria-label="Modal schließen" title="Modal schließen">✕</button>
             </div>
 
             <div>
@@ -159,6 +201,8 @@ export default function PwaReminderConfig() {
                 <p className="text-xs text-gray-400">Erinnerung als Notification senden</p>
               </div>
               <button onClick={() => setForm(f => ({ ...f, pushEnabled: !f.pushEnabled }))}
+                aria-label={form.pushEnabled ? 'Push deaktivieren' : 'Push aktivieren'}
+                title={form.pushEnabled ? 'Push deaktivieren' : 'Push aktivieren'}
                 className={`w-12 h-6 rounded-full transition-colors ${form.pushEnabled ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'}`}>
                 <span className={`block w-5 h-5 bg-white rounded-full shadow transition-transform mx-0.5 ${form.pushEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
               </button>

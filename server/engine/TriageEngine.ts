@@ -1,8 +1,23 @@
 /**
- * Triage Engine – Klinische Red-Flag-Erkennung
+ * @module TriageEngine
+ * @description Klinische Red-Flag-Erkennung — Real-time Triage-Auswertung
  *
- * Wertet Antworten in Echtzeit aus und gibt Warnungen/Notfälle zurück.
- * Regeln sind konfigurierbar aber hartkodiert für medizinische Sicherheit.
+ * Wertet Patientenantworten in Echtzeit aus und erkennt klinische Warnsignale
+ * (Red Flags), die sofortige ärztliche Aufmerksamkeit erfordern.
+ *
+ * @architecture
+ * - Wird nach JEDER Antwortübermittlung aufgerufen: `POST /api/answers`
+ * - CRITICAL-Events → Socket.IO `triage:alert` an alle ARZT/MFA-Clients (<2s)
+ * - Ergebnisse werden als `TriageEvent`-Datenbankeinträge persistiert
+ * - Frontend: `src/components/RedFlagOverlay.tsx` für CRITICAL-UI
+ *
+ * @medical-safety ⚠️  ÄNDERUNGEN ERFORDERN KLINISCHEN SIGN-OFF
+ * 1. Schriftliche Änderungsanforderung mit medizinischer Begründung
+ * 2. Sign-off Dr. Klapproth (Arztpraxis) — PFLICHT für alle Regel-Typen
+ * 3. Sign-off Dr. Al-Shdaifat (DiggAI Medical Advisor) — PFLICHT für CRITICAL
+ * 4. Update docs/TRIAGE_RULES.md + e2e/questionnaire-flow.spec.ts
+ *
+ * @see docs/TRIAGE_RULES.md — vollständige Regelreferenz mit klinischer Begründung
  */
 
 export interface TriageResult {

@@ -1,6 +1,6 @@
 import { Wifi, WifiOff, AlertCircle, RefreshCw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { usePvsConnections } from '../../hooks/useApi';
+import { usePvsConnections } from '../../hooks/useOpsApi';
 
 export function PvsConnectionStatus({ connectionId }: { connectionId?: string }) {
     const { t } = useTranslation();

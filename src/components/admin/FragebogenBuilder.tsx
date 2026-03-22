@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Layers, GripVertical, ToggleLeft, ToggleRight, FileEdit, Trash2, Upload } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../api/client';
-import { useAtomToggle, useAtomDraftCreate, useAtomDraftsList, useAtomDraftPublish, useAtomDraftDelete } from '../../hooks/useApi';
+import { useAtomToggle, useAtomDraftCreate, useAtomDraftsList, useAtomDraftPublish, useAtomDraftDelete } from '../../hooks/useOpsApi';
 import type { MedicalAtomAdmin, AtomDraft } from '../../types/admin';
 
 export function FragebogenBuilder() {

@@ -8,16 +8,16 @@ import { createServer } from 'http';
 import { config } from './config';
 import { setupSocketIO } from './socket';
 import { auditLogger } from './middleware/audit';
-import { initRedis, getRedisClient, closeRedis } from './redis';
+import { initRedis, getRedisClient, isRedisReady, closeRedis } from './redis';
 
 // Routes
+import stripeWebhookRoutes from './routes/stripe-webhooks';
 import sessionRoutes from './routes/sessions';
 import answerRoutes from './routes/answers';
 import atomRoutes from './routes/atoms';
 import arztRoutes from './routes/arzt';
 import mfaRoutes from './routes/mfa';
 import chatRoutes from './routes/chats';
-import paymentsRoutes from './routes/payments';
 import exportRoutes from './routes/export';
 import uploadRoutes from './routes/upload';
 import queueRoutes from './routes/queue';
@@ -44,7 +44,18 @@ import epaRoutes from './routes/epa';
 import todoRoutes from './routes/todos';
 import signatureRoutes from './routes/signatures';
 import agentRoutes from './routes/agents';
+import subscriptionRoutes from './routes/subscriptions';
+import billingRoutes from './routes/billing';
+import themeRoutes from './routes/theme.routes';
 import { messageBroker } from './services/messagebroker.service';
+
+// Swagger API Docs (dev only — NOT mounted in production)
+let swaggerUi: typeof import('swagger-ui-express') | null = null;
+let swaggerSpec: object | null = null;
+if (process.env.NODE_ENV !== 'production') {
+    import('swagger-ui-express').then(m => { swaggerUi = m.default; }).catch(() => {});
+    import('./swagger').then(m => { swaggerSpec = m.swaggerSpec; }).catch(() => {});
+}
 
 const app = express();
 const httpServer = createServer(app);
@@ -119,6 +130,9 @@ const uploadLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 30, message: { 
 // Patient portal limiter — protects login/register/password-reset from brute force
 const pwaLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100, message: { error: 'Zu viele Anfragen. Bitte warten Sie einen Moment.' } });
 
+// Stripe Webhooks - MÜSSEN vor express.json() kommen für raw body
+app.use('/api/webhooks', express.raw({ type: 'application/json' }), stripeWebhookRoutes);
+
 // Body Parser
 app.use(express.json({ limit: '10mb' }));
 
@@ -132,6 +146,15 @@ app.use(sanitizeBody);
 // HIPAA Audit Logging
 app.use(auditLogger);
 
+// SECURITY: CSRF Protection — Double-Submit Cookie Pattern (HIGH-001 Fix)
+import { setCsrfCookie, validateCsrf } from './middleware/csrf';
+app.use(setCsrfCookie);  // Set CSRF token cookie on every request
+app.use(validateCsrf);   // Validate CSRF token on state-changing requests
+
+// Multi-Tenancy: Resolve tenant from subdomain/custom domain
+import { resolveTenant } from './middleware/tenant';
+app.use(resolveTenant);
+
 // ─── API Routes ─────────────────────────────────────────────
 
 app.use('/api/sessions', sessionRoutes);
@@ -140,7 +163,6 @@ app.use('/api/atoms', atomRoutes);
 app.use('/api/arzt', authLimiter, arztRoutes);
 app.use('/api/mfa', authLimiter, mfaRoutes); // H-04 FIX: authLimiter hinzugefügt
 app.use('/api/chats', chatRoutes);
-app.use('/api/payments', paymentsRoutes);
 app.use('/api/export', exportRoutes);
 app.use('/api/upload', uploadLimiter, uploadRoutes);
 app.use('/api/queue', queueRoutes);
@@ -167,6 +189,9 @@ app.use('/api/epa', authLimiter, epaRoutes);
 app.use('/api/todos', authLimiter, todoRoutes);
 app.use('/api/signatures', authLimiter, signatureRoutes);
 app.use('/api/agents', agentRoutes);
+app.use('/api/subscriptions', subscriptionRoutes);
+app.use('/api/billing', billingRoutes);
+app.use('/api', themeRoutes);
 
 // Health Check — includes DB + Redis connectivity
 app.get('/api/health', async (_req, res) => {
@@ -186,7 +211,7 @@ app.get('/api/health', async (_req, res) => {
     }
 
     // Check Redis connectivity
-    if (redis?.isReady) {
+    if (redis && isRedisReady()) {
         try {
             await redis.ping();
             redisStatus = 'connected';
@@ -210,6 +235,20 @@ app.get('/api/health', async (_req, res) => {
         reminderWorker: 'running',
     });
 });
+
+// ─── Swagger API Docs (dev only) ────────────────────────────
+
+if (process.env.NODE_ENV !== 'production') {
+    // Mounted after routes so all @swagger annotations are already registered
+    setTimeout(() => {
+        if (swaggerUi && swaggerSpec) {
+            app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+                customSiteTitle: 'DiggAI Anamnese API',
+            }));
+            console.log('[Swagger] API docs available at http://localhost:3001/api/docs');
+        }
+    }, 100);
+}
 
 // ─── Socket.io ──────────────────────────────────────────────
 
@@ -241,11 +280,21 @@ import { startROISnapshotJob, stopROISnapshotJob } from './jobs/roiSnapshot';
 import { startReminderWorker, stopReminderWorker } from './jobs/reminderWorker';
 import { startHardDeleteWorker } from './jobs/hardDeleteWorker';
 import { startAgentOrchestrator } from './agents/orchestrator.agent';
+import { startBackupScheduler, stopBackupScheduler } from './jobs/backupScheduler';
+import { startEscalationWorker, stopEscalationWorker } from './jobs/escalationWorker';
+import { startComplianceReporter, stopComplianceReporter } from './jobs/complianceReporter';
+import { startQueueAutoDispatch, stopQueueAutoDispatch } from './jobs/queueAutoDispatch';
+import { startBillingReconciler, stopBillingReconciler } from './jobs/billingReconciler';
 try { startDatabaseCleanupJob(); } catch (err) { console.error('[Server] Failed to start cleanup job:', err); }
 try { startROISnapshotJob(); } catch (err) { console.error('[Server] Failed to start ROI snapshot job:', err); }
 try { startReminderWorker(); } catch (err) { console.error('[Server] Failed to start reminder worker:', err); }
 try { startHardDeleteWorker(); } catch (err) { console.error('[Server] Failed to start hard-delete worker:', err); }
 try { startAgentOrchestrator(); } catch (err) { console.error('[Server] Failed to start agent orchestrator:', err); }
+try { startBackupScheduler(); } catch (err) { console.error('[Server] Failed to start backup scheduler:', err); }
+try { startEscalationWorker(); } catch (err) { console.error('[Server] Failed to start escalation worker:', err); }
+try { startComplianceReporter(); } catch (err) { console.error('[Server] Failed to start compliance reporter:', err); }
+try { startQueueAutoDispatch(); } catch (err) { console.error('[Server] Failed to start queue auto-dispatch:', err); }
+try { startBillingReconciler(); } catch (err) { console.error('[Server] Failed to start billing reconciler:', err); }
 
 // RabbitMQ — verbindet sich mit Agent-Core (non-blocking, graceful degradation)
 messageBroker.connect().catch(err =>
@@ -260,6 +309,11 @@ process.on('SIGTERM', async () => {
     console.log('[Server] SIGTERM received, shutting down gracefully...');
     try { stopReminderWorker(); } catch (err) { console.error('[Server] Error stopping reminder worker:', err); }
     try { stopROISnapshotJob(); } catch (err) { console.error('[Server] Error stopping ROI snapshot job:', err); }
+    try { stopBackupScheduler(); } catch (err) { console.error('[Server] Error stopping backup scheduler:', err); }
+    try { stopEscalationWorker(); } catch (err) { console.error('[Server] Error stopping escalation worker:', err); }
+    try { stopComplianceReporter(); } catch (err) { console.error('[Server] Error stopping compliance reporter:', err); }
+    try { stopQueueAutoDispatch(); } catch (err) { console.error('[Server] Error stopping queue auto-dispatch:', err); }
+    try { stopBillingReconciler(); } catch (err) { console.error('[Server] Error stopping billing reconciler:', err); }
     await messageBroker.disconnect().catch(() => {});
     await closeRedis();
     httpServer.close(() => process.exit(0));

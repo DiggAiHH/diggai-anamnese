@@ -5,8 +5,15 @@ const prisma = new PrismaClient();
 async function main() {
     console.log('Starte Seeding von Beispieldaten...');
 
+    // Ensure default tenant exists
+    const tenant = await prisma.tenant.upsert({
+        where: { subdomain: 'default' },
+        update: {},
+        create: { subdomain: 'default', name: 'Default Praxis' },
+    });
+
     // 1. Suche Ärzte (sollten durch seed-users.ts schon da sein)
-    const admin = await prisma.arztUser.findUnique({ where: { username: 'admin' } });
+    const admin = await prisma.arztUser.findFirst({ where: { username: 'admin', tenantId: tenant.id } });
 
     if (!admin) {
         console.error('Fehler: Admin-User nicht gefunden. Bitte zuerst seed-users.ts ausführen.');
@@ -15,9 +22,10 @@ async function main() {
 
     // 2. Erstelle eine Beispiel-Patientin
     const patient = await prisma.patient.upsert({
-        where: { hashedEmail: 'patient-1-hash' },
+        where: { tenantId_hashedEmail: { tenantId: tenant.id, hashedEmail: 'patient-1-hash' } },
         update: {},
         create: {
+            tenantId: tenant.id,
             hashedEmail: 'patient-1-hash',
         }
     });
@@ -25,6 +33,7 @@ async function main() {
     // 3. Erstelle eine abgeschlossene Session
     const session1 = await prisma.patientSession.create({
         data: {
+            tenantId: tenant.id,
             patientId: patient.id,
             status: 'COMPLETED',
             selectedService: 'TERMIN',
@@ -40,6 +49,7 @@ async function main() {
     // 4. Erstelle eine aktive Session mit Red Flag
     const session2 = await prisma.patientSession.create({
         data: {
+            tenantId: tenant.id,
             patientId: patient.id,
             status: 'ACTIVE',
             selectedService: 'NOTFALL',

@@ -12,12 +12,34 @@ import type {
 
 const prisma = (globalThis as any).__prisma;
 
+function createEpaScopeViolationError(): Error & { status: number; code: string } {
+  const err = new Error('Forbidden') as Error & { status: number; code: string };
+  err.status = 403;
+  err.code = 'EPA_SCOPE_VIOLATION';
+  return err;
+}
+
 // ─── EPA lifecycle ───────────────────────────────────────────────────
 
 export async function getOrCreateEPA(
   patientId: string,
   consentVersion: string,
+  scope?: { tenantId?: string },
 ): Promise<PrivateEPARecord> {
+  if (scope?.tenantId) {
+    const scopedPatient = await prisma.patient.findFirst({
+      where: {
+        id: patientId,
+        tenantId: scope.tenantId,
+      },
+      select: { id: true },
+    });
+
+    if (!scopedPatient) {
+      throw createEpaScopeViolationError();
+    }
+  }
+
   const existing = await prisma.privateEPA.findUnique({ where: { patientId } });
   if (existing) return existing;
 
@@ -53,8 +75,42 @@ export async function getDocument(
   return prisma.epaDocument.findUnique({ where: { id: docId } });
 }
 
+export async function getDocumentScoped(
+  docId: string,
+  scope: { tenantId: string },
+): Promise<EpaDocumentRecord | null> {
+  return prisma.epaDocument.findFirst({
+    where: {
+      id: docId,
+      epa: {
+        patient: {
+          tenantId: scope.tenantId,
+        },
+      },
+    },
+  });
+}
+
 export async function deleteDocument(docId: string): Promise<void> {
   await prisma.epaDocument.delete({ where: { id: docId } });
+}
+
+export async function deleteDocumentScoped(
+  docId: string,
+  scope: { tenantId: string },
+): Promise<boolean> {
+  const result = await prisma.epaDocument.deleteMany({
+    where: {
+      id: docId,
+      epa: {
+        patient: {
+          tenantId: scope.tenantId,
+        },
+      },
+    },
+  });
+
+  return result.count > 0;
 }
 
 // ─── Shares ──────────────────────────────────────────────────────────
@@ -91,6 +147,29 @@ export async function getShares(epaId: string): Promise<EpaShareRecord[]> {
 export async function revokeShare(shareId: string): Promise<EpaShareRecord> {
   return prisma.epaShare.update({
     where: { id: shareId },
+    data: { revokedAt: new Date() },
+  });
+}
+
+export async function revokeShareScoped(
+  shareId: string,
+  scope: { tenantId: string },
+): Promise<EpaShareRecord | null> {
+  const share = await prisma.epaShare.findFirst({
+    where: {
+      id: shareId,
+      epa: {
+        patient: {
+          tenantId: scope.tenantId,
+        },
+      },
+    },
+  });
+
+  if (!share) return null;
+
+  return prisma.epaShare.update({
+    where: { id: share.id },
     data: { revokedAt: new Date() },
   });
 }
@@ -143,7 +222,22 @@ function anonymizeContent(raw: string): string {
 
 export async function createAnonymizedExport(
   input: CreateExportInput,
+  scope?: { tenantId?: string },
 ): Promise<AnonymizedExportRecord> {
+  if (scope?.tenantId) {
+    const scopedPatient = await prisma.patient.findFirst({
+      where: {
+        id: input.patientId,
+        tenantId: scope.tenantId,
+      },
+      select: { id: true },
+    });
+
+    if (!scopedPatient) {
+      throw createEpaScopeViolationError();
+    }
+  }
+
   // Load patient documents
   const epa = await prisma.privateEPA.findUnique({
     where: { patientId: input.patientId },
@@ -178,5 +272,24 @@ export async function getExport(
   if (!record) return null;
   if (record.expiresAt < new Date()) return null;
 
+  return record;
+}
+
+export async function getExportScoped(
+  exportId: string,
+  scope: { tenantId: string },
+): Promise<AnonymizedExportRecord | null> {
+  const record = await getExport(exportId);
+  if (!record) return null;
+
+  const scopedPatient = await prisma.patient.findFirst({
+    where: {
+      id: record.patientId,
+      tenantId: scope.tenantId,
+    },
+    select: { id: true },
+  });
+
+  if (!scopedPatient) return null;
   return record;
 }

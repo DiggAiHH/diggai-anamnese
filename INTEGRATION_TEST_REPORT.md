@@ -1,11 +1,47 @@
 # DiggAI Anamnese App — Integrationstest-Bericht
 
+> **Update-Stand:** 07. März 2026 — zusätzlicher Validierungsdurchlauf für Audit-/Zertifizierungsvorbereitung durchgeführt.
+
 **Datum:** 03. März 2026  
 **Version:** 14.0 (Phase 14)  
 **Deployment:** Netlify (diggai-klaproth.netlify.app)  
 **Deploy ID:** `69a751ff1f79b7362d6cba9d`  
 **Git Commit:** `3b0a021` (master)  
 **Tester:** Automated Integration Suite  
+
+---
+
+## 0. Validierungs-Snapshot vom 07. März 2026
+
+Zusätzlich zum unten dokumentierten erfolgreichen Stand vom 03. März 2026 wurde am **07. März 2026** ein neuer lokaler Validierungsdurchlauf auf dem aktuellen Workspace-Stand ausgeführt.
+
+| Check | Ergebnis | Bewertung |
+|---|---|---|
+| Custom VS Code Agent-Dateien | ✅ validiert | Neue `.github/agents/*.agent.md` und beide `copilot-instructions.md` ohne Fehler |
+| Editor-Diagnostik Gesamtprojekt | ⚠️ nicht sauber | `get_errors` meldet aktuell **472** bestehende Probleme im Workspace |
+| Playwright Full Suite | ❌ fehlgeschlagen | `.last-run.json` meldet `status: failed` mit **19 fehlgeschlagenen Tests** |
+| Interaktions-/Security-Artefakte | ⚠️ vorhanden | Fehlgeschlagene Artefakte liegen unter `test-results/` |
+| Lokale Frontend-Korrektur | ✅ durchgeführt | Timer-/Idle-Callback-Fix in `src/main.tsx` und `src/components/LandingPage.tsx` umgesetzt |
+
+### Wesentliche Erkenntnisse aus dem 07.03.2026-Lauf
+
+1. **Audit-/Zertifizierungsreife ist aktuell noch nicht erreicht.**
+2. Die neu eingeführten VS-Code-Master-Prompts und Agent-Dateien sind technisch sauber validiert.
+3. Die eigentlichen Produkt-Blocker liegen derzeit im bestehenden App-/Server-Code, nicht in den neuen Prompt-Dateien.
+4. Die derzeitige Playwright-Suite schlägt auf aktuellem Workspace-Stand fehl; die letzte vollständig grüne Referenz in diesem Report bleibt deshalb der Stand vom **03.03.2026**.
+
+### Aktuelle Hauptblocker für Freigabe
+
+- TypeScript-/Prisma-Probleme in mehreren Server-Modulen (`server/services/ai/*`, `messagebroker.service.ts`, `routes/forms.ts`, `routes/signatures.ts`)
+- Root-Dir-/Projektgrenzenproblem bei `server/routes/admin.ts` → Import von `prisma/seed-content.ts`
+- Accessibility-Probleme in einzelnen UI-Komponenten (`MfaChatInterface.tsx`, `Questionnaire.tsx`)
+- Fehlgeschlagene Playwright-Security-/Interaction-Tests
+
+### Empfehlung vor Audit / Zertifizierung
+
+- Zuerst den bestehenden Fehlerbestand im Workspace systematisch abbauen
+- Danach Build, Lint und Playwright Full Suite erneut vollständig fahren
+- Erst bei sauberem Diagnostik- und Teststand eine finale Zertifizierungsdokumentation einfrieren
 
 ---
 

@@ -185,7 +185,7 @@ router.post(
   wrap(async (req, res) => {
     const SubmitSchema = z.object({
       sessionId: z.string().min(1),
-      answers: z.record(z.unknown()),
+      answers: z.record(z.string(), z.unknown()),
       submittedAt: z.string().datetime().optional(),
     });
     const data = SubmitSchema.parse(req.body);

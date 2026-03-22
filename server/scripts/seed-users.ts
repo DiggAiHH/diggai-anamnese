@@ -8,11 +8,19 @@ const prisma = new PrismaClient();
 async function main() {
     const passwordHash = await bcrypt.hash(config.arztDefaultPassword, 10);
 
+    // Ensure default tenant exists
+    const tenant = await prisma.tenant.upsert({
+        where: { subdomain: 'default' },
+        update: {},
+        create: { subdomain: 'default', name: 'Default Praxis' },
+    });
+
     // Arzt User
     await prisma.arztUser.upsert({
-        where: { username: 'admin' },
+        where: { tenantId_username: { tenantId: tenant.id, username: 'admin' } },
         update: { role: 'ARZT', passwordHash },
         create: {
+            tenantId: tenant.id,
             username: 'admin',
             passwordHash,
             displayName: 'Dr. Schmidt',
@@ -22,9 +30,10 @@ async function main() {
 
     // MFA User
     await prisma.arztUser.upsert({
-        where: { username: 'mfa' },
+        where: { tenantId_username: { tenantId: tenant.id, username: 'mfa' } },
         update: { role: 'MFA', passwordHash },
         create: {
+            tenantId: tenant.id,
             username: 'mfa',
             passwordHash,
             displayName: 'MFA Team',

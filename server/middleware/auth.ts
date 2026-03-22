@@ -1,21 +1,51 @@
+/**
+ * @module auth
+ * @description JWT-Authentifizierung und RBAC-Autorisierungs-Middleware
+ *
+ * Implementiert ein vierstufiges Sicherheitsmodell für alle /api/* Endpunkte:
+ *
+ * @security
+ * - Algorithm Pinning: Nur HS256 (verhindert Algorithm Confusion Attacks)
+ * - Token Blacklist: Redis (primär) + In-Memory-Map (Fallback) für Logout-Invalidierung
+ * - HttpOnly Cookie: JWT wird als `access_token` Cookie gesetzt (XSS-immun)
+ * - Fail-closed: Bei Blacklist-Fehlern → 503 statt 200 (DSGVO/HIPAA deny-by-default)
+ *
+ * @rbac RBAC Rollen und Zugriffsbereiche:
+ * | Rolle   | Zugriff                                                              |
+ * |---------|----------------------------------------------------------------------|
+ * | patient | Eigene Sessions, eigene Antworten, PWA-Portal                        |
+ * | arzt    | Alle Sessions, Triage-Dashboard, Therapiepläne, Chat                 |
+ * | mfa     | Queue-Management, Session-Zuweisung, Chat                            |
+ * | admin   | Alles + Benutzerverwaltung, Systemkonfiguration, Fragen-Editor       |
+ *
+ * @middleware-chain Typische Route-Absicherung:
+ * ```typescript
+ * router.get('/data', requireAuth, requireRole('arzt', 'admin'), handler);
+ * router.get('/session/:id', requireAuth, requireSessionOwner, handler);
+ * router.post('/action', requireAuth, requirePermission('manage:sessions'), handler);
+ * ```
+ */
 import { Request, Response, NextFunction } from 'express';
 import * as jwt from 'jsonwebtoken';
 const { sign, verify } = jwt;
 import type { Secret, SignOptions } from 'jsonwebtoken';
 import { config } from '../config';
-import { getRedisClient } from '../redis';
+import { getRedisClient, isRedisReady } from '../redis';
 
 export interface AuthPayload {
     sessionId?: string;
     userId?: string;
+    tenantId?: string;
     role: 'patient' | 'arzt' | 'mfa' | 'admin';
     jti?: string; // JWT ID für Token-Blacklist
 }
 
+// MED-001 FIX: Properly typed Request with cookies
 declare global {
     namespace Express {
         interface Request {
             auth?: AuthPayload;
+            cookies?: Record<string, string | undefined>;
         }
     }
 }
@@ -32,14 +62,18 @@ setInterval(() => {
 }, 15 * 60 * 1000);
 
 /**
- * Token auf die Blacklist setzen (z.B. bei Logout)
- * Nutzt Redis wenn verfügbar, sonst In-Memory Fallback
+ * Setzt ein JWT auf die Blacklist (z.B. bei Logout oder Token-Widerruf).
+ * Nutzt Redis wenn verfügbar (bevorzugt), sonst In-Memory Map als Fallback.
+ *
+ * @param jti - JWT ID (aus Token-Payload `jti` Feld)
+ * @param expiresInMs - Restlebensdauer des Tokens in Millisekunden (TTL in Redis)
+ * @returns Promise<void> — kein Rückgabewert, Fehler werden intern behandelt
  */
 export async function blacklistToken(jti: string, expiresInMs: number): Promise<void> {
     const redis = getRedisClient();
-    if (redis?.isReady) {
+    if (redis && isRedisReady()) {
         try {
-            await redis.set(`bl:${jti}`, '1', { EX: Math.ceil(expiresInMs / 1000) });
+            await redis.set(`bl:${jti}`, '1', 'EX', Math.ceil(expiresInMs / 1000));
             return;
         } catch (err) {
             console.warn('[Auth] Redis blacklist write failed, using fallback:', err);
@@ -50,11 +84,14 @@ export async function blacklistToken(jti: string, expiresInMs: number): Promise<
 }
 
 /**
- * Prüfe ob Token auf der Blacklist steht
+ * Prüft ob ein Token-JTI auf der Blacklist steht (widerrufen wurde).
+ *
+ * @param jti - JWT ID aus dem Token-Payload
+ * @returns true wenn der Token widerrufen wurde und abgelehnt werden muss
  */
 export async function isTokenBlacklisted(jti: string): Promise<boolean> {
     const redis = getRedisClient();
-    if (redis?.isReady) {
+    if (redis && isRedisReady()) {
         try {
             const result = await redis.get(`bl:${jti}`);
             return result !== null;
@@ -66,7 +103,11 @@ export async function isTokenBlacklisted(jti: string): Promise<boolean> {
 }
 
 /**
- * JWT-Token erstellen — mit Algorithm Pinning (HS256) und JTI
+ * Erstellt ein signiertes JWT mit HS256 und einzigartiger JTI.
+ * Algorithm Pinning verhindert Algorithm Confusion Attacks (CVE-2022-21449 Klasse).
+ *
+ * @param payload - Zu signierende Daten (userId, role, sessionId etc.)
+ * @returns Signierter JWT-String (nicht Base64-decodiert im Client speichern!)
  */
 export function createToken(payload: AuthPayload): string {
     const jti = crypto.randomUUID();
@@ -102,7 +143,13 @@ export function clearTokenCookie(res: Response): void {
 }
 
 /**
- * JWT-Validierung Middleware — mit Algorithm Pinning + Blacklist-Check (Redis)
+ * Validiert JWT aus Authorization-Header oder HttpOnly-Cookie.
+ * Überprüft: Signatur, Algorithm (HS256), Ablaufdatum, Token-Blacklist.
+ *
+ * @access Alle authentifizierten Routen
+ * @middleware Muss VOR `requireRole`, `requireSessionOwner` und `requirePermission` stehen
+ * @sets req.auth - AuthPayload mit userId, role, sessionId nach erfolgreicher Validierung
+ * @responds 401 bei fehlendem/ungültigem Token, 503 bei Blacklist-Fehler (fail-closed)
  */
 export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
     // 1. Try Authorization header (API clients, mobile)
@@ -113,8 +160,8 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     }
 
     // 2. Fallback to httpOnly cookie (browser clients)
-    if (!token && (req as any).cookies?.access_token) {
-        token = (req as any).cookies.access_token;
+    if (!token && req.cookies?.access_token) {
+        token = req.cookies.access_token;
     }
 
     if (!token) {
@@ -151,7 +198,15 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 }
 
 /**
- * Rollen-Prüfung Middleware
+ * RBAC-Middleware: Erlaubt nur Requests von Nutzern mit einer der angegebenen Rollen.
+ * Muss NACH `requireAuth` in der Middleware-Chain stehen.
+ *
+ * @param roles - Erlaubte Rollen (z.B. 'arzt', 'admin', 'mfa')
+ * @returns Express Middleware Factory
+ * @responds 403 wenn die Rolle des authentifizierten Nutzers nicht in `roles` enthalten ist
+ *
+ * @example
+ * router.get('/sessions', requireAuth, requireRole('arzt', 'admin'), handler);
  */
 export function requireRole(...roles: string[]) {
     return (req: Request, res: Response, next: NextFunction): void => {
@@ -164,7 +219,12 @@ export function requireRole(...roles: string[]) {
 }
 
 /**
- * Session-Eigentum prüfen (Patient darf nur eigene Session bearbeiten)
+ * Stellt sicher, dass ein Patient nur auf seine eigene Session zugreifen kann.
+ * Ärzte (arzt/admin) dürfen alle Sessions sehen — diese Prüfung wird für sie übersprungen.
+ *
+ * @access patient (nur eigene Session via req.auth.sessionId), arzt, admin (alle Sessions)
+ * @requires req.params.id — Session-ID aus dem URL-Parameter
+ * @responds 403 wenn Patient auf fremde Session zugreift
  */
 export function requireSessionOwner(req: Request, res: Response, next: NextFunction): void {
     if (!req.auth) {
@@ -189,11 +249,19 @@ export function requireSessionOwner(req: Request, res: Response, next: NextFunct
 }
 
 /**
- * Permission-basierte Zugriffskontrolle
- * Prüft ob die Rolle des Users (oder individuelle Zusatz-Rechte) den angegebenen Permission-Code hat.
- * Nutzt Prisma: RolePermission + ArztUser.customPermissions
+ * Feingranulare Permission-Middleware für komplexe Zugriffsszenarien.
+ * Überprüft `RolePermission`-Tabelle (Rollen-Berechtigungen) UND
+ * `ArztUser.customPermissions` (individuelle Zusatzrechte).
+ * Admins haben immer alle Berechtigungen (Kurzschluss-Optimierung).
+ *
+ * @param permissionCode - Berechtigungs-Code (z.B. 'manage:sessions', 'export:pdf')
+ * @returns Express Middleware Factory (async)
+ * @responds 403 bei fehlender Berechtigung, 503 bei DB-Fehler (fail-closed für DSGVO/HIPAA)
+ *
+ * @example
+ * router.delete('/session/:id', requireAuth, requirePermission('delete:session'), handler);
  */
-export function requirePermission(permissionCode: string) {
+function createPermissionMiddleware(permissionCode: string, allowAdminBypass: boolean) {
     return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         if (!req.auth) {
             res.status(401).json({ error: 'Nicht authentifiziert' });
@@ -201,15 +269,14 @@ export function requirePermission(permissionCode: string) {
         }
 
         // Admins always have all permissions
-        if (req.auth.role === 'admin') {
+        if (allowAdminBypass && req.auth.role === 'admin') {
             next();
             return;
         }
 
         try {
             // Lazy import to avoid circular deps
-            const { prisma: _p } = await import('../db');
-            const prisma = _p as any;
+            const { prisma } = await import('../db');
 
             const role = req.auth.role.toUpperCase(); // ARZT, MFA, etc.
 
@@ -252,3 +319,14 @@ export function requirePermission(permissionCode: string) {
         }
     };
 }
+
+export function requirePermission(permissionCode: string) {
+    return createPermissionMiddleware(permissionCode, true);
+}
+
+export function requireStrictPermission(permissionCode: string) {
+    return createPermissionMiddleware(permissionCode, false);
+}
+
+/** Convenience alias: requireRole('admin') for routes that only need admin access */
+export const requireAdmin = requireRole('admin');

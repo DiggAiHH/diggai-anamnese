@@ -9,6 +9,13 @@ on:
 env:
   NODE_VERSION: '22'
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
@@ -19,31 +26,42 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-          cache-dependency-path: anamnese-app/package-lock.json
 
       - name: Install dependencies
-        working-directory: anamnese-app
-        run: npm ci
+        run: npm install
 
       - name: TypeScript check
-        working-directory: anamnese-app
         run: npx tsc -b
 
+      - name: TypeScript check (server)
+        run: npx tsc -p tsconfig.server.json --noEmit
+
       - name: Lint
-        working-directory: anamnese-app
-        run: npm run lint || true
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm run test:run
 
       - name: Build frontend
-        working-directory: anamnese-app
         run: npm run build
 
       - name: Prisma generate
-        working-directory: anamnese-app
         run: npx prisma generate
+
+      - name: i18n completeness check
+        run: node scripts/generate-i18n.ts
+
+      - name: Prisma migration status
+        env:
+          DATABASE_URL: "${{ secrets.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/test?schema=public' }}"
+        run: npx prisma migrate status || echo "Warning - Could not check migration status (no DB in CI)"
+
+      - name: Security audit (high+)
+        run: npm audit --audit-level=high
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: dist
-          path: anamnese-app/dist/
+          path: dist/
           retention-days: 7

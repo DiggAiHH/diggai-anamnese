@@ -5,19 +5,31 @@ import {
   getOrCreateEPA,
   addDocument,
   getDocuments,
-  getDocument,
-  deleteDocument,
+  getDocumentScoped,
+  deleteDocumentScoped,
   createShare,
   getShares,
-  revokeShare,
+  revokeShareScoped,
   accessByToken,
   createAnonymizedExport,
-  getExport,
+  getExportScoped,
 } from '../services/epa';
 
 const router = Router();
 
-// All ePA routes require authentication (patient data — must be protected)
+// ─── Public access (no auth) ────────────────────────────────────────
+
+router.get('/access/:token', async (req: Request, res: Response) => {
+  try {
+    const result = await accessByToken(req.params.token as string);
+    if (!result) return res.status(404).json({ error: 'Invalid or expired token' });
+    res.json(result);
+  } catch (err) {
+    handleError(res, err);
+  }
+});
+
+// All other ePA routes require authentication (patient data — must be protected)
 router.use(requireAuth);
 
 // ─── Zod schemas ─────────────────────────────────────────────────────
@@ -69,16 +81,54 @@ function handleError(res: Response, err: unknown) {
   if (err instanceof z.ZodError) {
     return res.status(400).json({ error: 'Validation failed', details: err.issues });
   }
-  const message = err instanceof Error ? err.message : 'Internal server error';
-  return res.status(500).json({ error: message });
+
+  if (typeof err === 'object' && err !== null) {
+    const maybeStatus = Reflect.get(err, 'status');
+    const maybeCode = Reflect.get(err, 'code');
+    if (typeof maybeStatus === 'number' && maybeStatus >= 400 && maybeStatus < 600) {
+      if (typeof maybeCode === 'string') {
+        return res.status(maybeStatus).json({ error: 'Forbidden', code: maybeCode });
+      }
+      return res.status(maybeStatus).json({ error: 'Internal server error' });
+    }
+  }
+
+  return res.status(500).json({ error: 'Internal server error' });
+}
+
+function getEffectiveTenantId(req: Request, res: Response): string | null {
+  const authTenantId = req.auth?.tenantId;
+  const requestTenantId = req.tenantId;
+
+  if (requestTenantId && authTenantId && requestTenantId !== authTenantId) {
+    res.status(403).json({
+      error: 'Tenant scope violation',
+      code: 'TENANT_SCOPE_VIOLATION',
+    });
+    return null;
+  }
+
+  const tenantId = requestTenantId || authTenantId;
+  if (!tenantId) {
+    res.status(400).json({
+      error: 'Tenant context required',
+      code: 'TENANT_CONTEXT_REQUIRED',
+    });
+    return null;
+  }
+
+  return tenantId;
 }
 
 // ─── EPA ─────────────────────────────────────────────────────────────
 
 router.get('/:patientId', async (req: Request, res: Response) => {
   try {
+    const tenantId = getEffectiveTenantId(req, res);
+    if (!tenantId) return;
+
     const { consentVersion } = ConsentQuerySchema.parse(req.query);
-    const epa = await getOrCreateEPA(req.params.patientId as string, consentVersion);
+    const epa = await getOrCreateEPA(req.params.patientId as string, consentVersion, { tenantId });
     res.json(epa);
   } catch (err) {
     handleError(res, err);
@@ -89,7 +139,10 @@ router.get('/:patientId', async (req: Request, res: Response) => {
 
 router.post('/:patientId/documents', async (req: Request, res: Response) => {
   try {
-    const epa = await getOrCreateEPA(req.params.patientId as string, '1.0');
+    const tenantId = getEffectiveTenantId(req, res);
+    if (!tenantId) return;
+
+    const epa = await getOrCreateEPA(req.params.patientId as string, '1.0', { tenantId });
     const body = CreateDocumentSchema.parse(req.body);
     const doc = await addDocument({ ...body, epaId: epa.id });
     res.status(201).json(doc);
@@ -100,7 +153,10 @@ router.post('/:patientId/documents', async (req: Request, res: Response) => {
 
 router.get('/:patientId/documents', async (req: Request, res: Response) => {
   try {
-    const epa = await getOrCreateEPA(req.params.patientId as string, '1.0');
+    const tenantId = getEffectiveTenantId(req, res);
+    if (!tenantId) return;
+
+    const epa = await getOrCreateEPA(req.params.patientId as string, '1.0', { tenantId });
     const type = req.query.type
       ? DocumentTypeEnum.parse(req.query.type)
       : undefined;
@@ -113,7 +169,10 @@ router.get('/:patientId/documents', async (req: Request, res: Response) => {
 
 router.get('/document/:docId', async (req: Request, res: Response) => {
   try {
-    const doc = await getDocument(req.params.docId as string);
+    const tenantId = getEffectiveTenantId(req, res);
+    if (!tenantId) return;
+
+    const doc = await getDocumentScoped(req.params.docId as string, { tenantId });
     if (!doc) return res.status(404).json({ error: 'Document not found' });
     res.json(doc);
   } catch (err) {
@@ -123,7 +182,11 @@ router.get('/document/:docId', async (req: Request, res: Response) => {
 
 router.delete('/document/:docId', async (req: Request, res: Response) => {
   try {
-    await deleteDocument(req.params.docId as string);
+    const tenantId = getEffectiveTenantId(req, res);
+    if (!tenantId) return;
+
+    const deleted = await deleteDocumentScoped(req.params.docId as string, { tenantId });
+    if (!deleted) return res.status(404).json({ error: 'Document not found' });
     res.status(204).end();
   } catch (err) {
     handleError(res, err);
@@ -134,7 +197,10 @@ router.delete('/document/:docId', async (req: Request, res: Response) => {
 
 router.post('/:patientId/shares', async (req: Request, res: Response) => {
   try {
-    const epa = await getOrCreateEPA(req.params.patientId as string, '1.0');
+    const tenantId = getEffectiveTenantId(req, res);
+    if (!tenantId) return;
+
+    const epa = await getOrCreateEPA(req.params.patientId as string, '1.0', { tenantId });
     const body = CreateShareSchema.parse(req.body);
     const share = await createShare({ ...body, epaId: epa.id });
     res.status(201).json(share);
@@ -145,7 +211,10 @@ router.post('/:patientId/shares', async (req: Request, res: Response) => {
 
 router.get('/:patientId/shares', async (req: Request, res: Response) => {
   try {
-    const epa = await getOrCreateEPA(req.params.patientId as string, '1.0');
+    const tenantId = getEffectiveTenantId(req, res);
+    if (!tenantId) return;
+
+    const epa = await getOrCreateEPA(req.params.patientId as string, '1.0', { tenantId });
     const shares = await getShares(epa.id);
     res.json(shares);
   } catch (err) {
@@ -155,20 +224,12 @@ router.get('/:patientId/shares', async (req: Request, res: Response) => {
 
 router.post('/share/:shareId/revoke', async (req: Request, res: Response) => {
   try {
-    const share = await revokeShare(req.params.shareId as string);
+    const tenantId = getEffectiveTenantId(req, res);
+    if (!tenantId) return;
+
+    const share = await revokeShareScoped(req.params.shareId as string, { tenantId });
+    if (!share) return res.status(404).json({ error: 'Share not found' });
     res.json(share);
-  } catch (err) {
-    handleError(res, err);
-  }
-});
-
-// ─── Public access (no auth) ────────────────────────────────────────
-
-router.get('/access/:token', async (req: Request, res: Response) => {
-  try {
-    const result = await accessByToken(req.params.token as string);
-    if (!result) return res.status(404).json({ error: 'Invalid or expired token' });
-    res.json(result);
   } catch (err) {
     handleError(res, err);
   }
@@ -178,8 +239,11 @@ router.get('/access/:token', async (req: Request, res: Response) => {
 
 router.post('/export/anonymized', async (req: Request, res: Response) => {
   try {
+    const tenantId = getEffectiveTenantId(req, res);
+    if (!tenantId) return;
+
     const body = CreateExportSchema.parse(req.body);
-    const exp = await createAnonymizedExport(body);
+    const exp = await createAnonymizedExport(body, { tenantId });
     res.status(201).json(exp);
   } catch (err) {
     handleError(res, err);
@@ -188,7 +252,10 @@ router.post('/export/anonymized', async (req: Request, res: Response) => {
 
 router.get('/export/:exportId', async (req: Request, res: Response) => {
   try {
-    const exp = await getExport(req.params.exportId as string);
+    const tenantId = getEffectiveTenantId(req, res);
+    if (!tenantId) return;
+
+    const exp = await getExportScoped(req.params.exportId as string, { tenantId });
     if (!exp) return res.status(404).json({ error: 'Export not found or expired' });
     res.json(exp);
   } catch (err) {

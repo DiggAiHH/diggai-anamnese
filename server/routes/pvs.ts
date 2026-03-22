@@ -14,16 +14,62 @@ import type { PvsConnectionData, PatientSessionFull } from '../services/pvs/type
 const router = Router();
 const prisma: any = new PrismaClient();
 
+function getEffectiveTenantId(req: any, res: any): string | null {
+  const authTenantId = req.auth?.tenantId as string | undefined;
+  const requestTenantId = req.tenantId as string | undefined;
+
+  if (requestTenantId && authTenantId && requestTenantId !== authTenantId) {
+    res.status(403).json({
+      error: 'Tenant scope violation',
+      code: 'PVS_SCOPE_VIOLATION',
+    });
+    return null;
+  }
+
+  const tenantId = requestTenantId || authTenantId;
+  if (!tenantId) {
+    res.status(400).json({
+      error: 'Tenant context required',
+      code: 'TENANT_CONTEXT_REQUIRED',
+    });
+    return null;
+  }
+
+  return tenantId;
+}
+
+async function findActiveConnectionsForTenant(tenantId: string) {
+  return prisma.pvsConnection.findMany({
+    where: { isActive: true, praxisId: tenantId },
+    include: { _count: { select: { transferLogs: true, fieldMappings: true } } },
+    orderBy: { createdAt: 'desc' },
+  });
+}
+
+async function findActiveConnectionForTenant(tenantId: string) {
+  return prisma.pvsConnection.findFirst({
+    where: { isActive: true, praxisId: tenantId },
+  });
+}
+
+async function findConnectionByIdForTenant(id: string, tenantId: string) {
+  return prisma.pvsConnection.findFirst({
+    where: {
+      id,
+      praxisId: tenantId,
+    },
+  });
+}
+
 // â”€â”€â”€ 1-6: PVS Connection CRUD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // 1. GET /connection â€” Aktive PVS-Verbindung abrufen
 router.get('/connection', requireAuth, requireRole('admin'), async (_req, res) => {
   try {
-    const connections = await prisma.pvsConnection.findMany({
-      where: { isActive: true },
-      include: { _count: { select: { transferLogs: true, fieldMappings: true } } },
-      orderBy: { createdAt: 'desc' },
-    });
+    const tenantId = getEffectiveTenantId(_req, res);
+    if (!tenantId) return;
+
+    const connections = await findActiveConnectionsForTenant(tenantId);
     res.json(connections);
   } catch (err) {
     res.status(500).json({ error: 'Verbindungen konnten nicht geladen werden' });
@@ -54,8 +100,11 @@ const createConnectionSchema = z.object({
 
 router.post('/connection', requireAuth, requireRole('admin'), async (req, res) => {
   try {
+    const tenantId = getEffectiveTenantId(req, res);
+    if (!tenantId) return;
+
     const data = createConnectionSchema.parse(req.body);
-    const praxisId = 'praxis-default'; // Single-praxis MVP
+    const praxisId = tenantId;
 
     const connection = await prisma.pvsConnection.upsert({
       where: { praxisId },
@@ -82,10 +131,18 @@ router.post('/connection', requireAuth, requireRole('admin'), async (req, res) =
 // 3. PUT /connection/:id â€” Verbindung aktualisieren
 router.put('/connection/:id', requireAuth, requireRole('admin'), async (req, res) => {
   try {
+    const tenantId = getEffectiveTenantId(req, res);
+    if (!tenantId) return;
+
     const id = req.params.id as string;
+    const scopedConnection = await findConnectionByIdForTenant(id, tenantId);
+    if (!scopedConnection) {
+      return res.status(404).json({ error: 'Verbindung nicht gefunden' });
+    }
+
     const data = createConnectionSchema.partial().parse(req.body);
     const connection = await prisma.pvsConnection.update({
-      where: { id },
+      where: { id: scopedConnection.id },
       data: { ...data, updatedAt: new Date() },
     });
 
@@ -104,8 +161,15 @@ router.put('/connection/:id', requireAuth, requireRole('admin'), async (req, res
 // 4. POST /connection/:id/test â€” Verbindung testen
 router.post('/connection/:id/test', requireAuth, requireRole('admin'), async (req, res) => {
   try {
+    const tenantId = getEffectiveTenantId(req, res);
+    if (!tenantId) return;
+
     const id = req.params.id as string;
-    const connection = await prisma.pvsConnection.findUniqueOrThrow({ where: { id } });
+    const connection = await findConnectionByIdForTenant(id, tenantId);
+    if (!connection) {
+      return res.status(404).json({ error: 'Verbindung nicht gefunden' });
+    }
+
     const connData = connection as unknown as PvsConnectionData;
     const result = await pvsRouter.testConnection(connData);
 
@@ -126,12 +190,20 @@ router.post('/connection/:id/test', requireAuth, requireRole('admin'), async (re
 // 5. DELETE /connection/:id â€” Verbindung deaktivieren
 router.delete('/connection/:id', requireAuth, requireRole('admin'), async (req, res) => {
   try {
+    const tenantId = getEffectiveTenantId(req, res);
+    if (!tenantId) return;
+
     const id = req.params.id as string;
+    const scopedConnection = await findConnectionByIdForTenant(id, tenantId);
+    if (!scopedConnection) {
+      return res.status(404).json({ error: 'Verbindung nicht gefunden' });
+    }
+
     await prisma.pvsConnection.update({
-      where: { id },
+      where: { id: scopedConnection.id },
       data: { isActive: false },
     });
-    await pvsRouter.removeAdapter(id);
+    await pvsRouter.removeAdapter(scopedConnection.id);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Verbindung konnte nicht deaktiviert werden' });
@@ -141,8 +213,15 @@ router.delete('/connection/:id', requireAuth, requireRole('admin'), async (req, 
 // 6. GET /connection/:id/capabilities â€” Adapter-FÃ¤higkeiten
 router.get('/connection/:id/capabilities', requireAuth, requireRole('admin'), async (req, res) => {
   try {
+    const tenantId = getEffectiveTenantId(req, res);
+    if (!tenantId) return;
+
     const id = req.params.id as string;
-    const connection = await prisma.pvsConnection.findUniqueOrThrow({ where: { id } });
+    const connection = await findConnectionByIdForTenant(id, tenantId);
+    if (!connection) {
+      return res.status(404).json({ error: 'Verbindung nicht gefunden' });
+    }
+
     const capabilities = pvsRouter.getCapabilities(connection.pvsType);
     res.json(capabilities);
   } catch (err) {
@@ -153,8 +232,11 @@ router.get('/connection/:id/capabilities', requireAuth, requireRole('admin'), as
 // â”€â”€â”€ 7-9: Transfer Operations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // 7. POST /export/session/:sessionId â€” Anamnese an PVS exportieren
-router.post('/export/session/:sessionId', requireAuth, async (req, res) => {
+router.post('/export/session/:sessionId', requireAuth, requireRole('arzt', 'mfa', 'admin'), async (req, res) => {
   try {
+    const tenantId = getEffectiveTenantId(req, res);
+    if (!tenantId) return;
+
     const sessionId = req.params.sessionId as string;
 
     // Load full session data
@@ -167,10 +249,15 @@ router.post('/export/session/:sessionId', requireAuth, async (req, res) => {
       },
     });
 
+    if (session.tenantId !== tenantId) {
+      return res.status(403).json({
+        error: 'Tenant scope violation',
+        code: 'PVS_SCOPE_VIOLATION',
+      });
+    }
+
     // Get active connection
-    const connection = await prisma.pvsConnection.findFirst({
-      where: { isActive: true },
-    });
+    const connection = await findActiveConnectionForTenant(tenantId);
     if (!connection) {
       return res.status(400).json({ error: 'Keine aktive PVS-Verbindung' });
     }
@@ -227,7 +314,7 @@ router.post('/export/session/:sessionId', requireAuth, async (req, res) => {
         errorMessage: result.error,
         completedAt: result.success ? new Date() : undefined,
         durationMs: 0,
-        initiatedBy: (req as any).user?.id || 'system',
+        initiatedBy: req.auth?.userId || 'system',
       },
     });
 
@@ -259,6 +346,9 @@ router.post('/export/session/:sessionId', requireAuth, async (req, res) => {
 // 8. POST /export/batch â€” Mehrere Sessions exportieren
 router.post('/export/batch', requireAuth, requireRole('admin'), async (req, res) => {
   try {
+    const tenantId = getEffectiveTenantId(req, res);
+    if (!tenantId) return;
+
     const { sessionIds } = z.object({ sessionIds: z.array(z.string()) }).parse(req.body);
     const results: Array<{ sessionId: string; success: boolean; error?: string }> = [];
 
@@ -274,7 +364,12 @@ router.post('/export/batch', requireAuth, requireRole('admin'), async (req, res)
           continue;
         }
 
-        const connection = await prisma.pvsConnection.findFirst({ where: { isActive: true } });
+        if (session.tenantId !== tenantId) {
+          results.push({ sessionId, success: false, error: 'Tenant scope violation' });
+          continue;
+        }
+
+        const connection = await findActiveConnectionForTenant(tenantId);
         if (!connection) {
           results.push({ sessionId, success: false, error: 'Keine aktive PVS-Verbindung' });
           continue;
@@ -325,11 +420,14 @@ router.post('/export/batch', requireAuth, requireRole('admin'), async (req, res)
 });
 
 // 9. POST /import/patient â€” Patient aus PVS importieren
-router.post('/import/patient', requireAuth, async (req, res) => {
+router.post('/import/patient', requireAuth, requireRole('arzt', 'mfa', 'admin'), async (req, res) => {
   try {
+    const tenantId = getEffectiveTenantId(req, res);
+    if (!tenantId) return;
+
     const { pvsPatientId } = z.object({ pvsPatientId: z.string() }).parse(req.body);
 
-    const connection = await prisma.pvsConnection.findFirst({ where: { isActive: true } });
+    const connection = await findActiveConnectionForTenant(tenantId);
     if (!connection) return res.status(400).json({ error: 'Keine aktive PVS-Verbindung' });
 
     const connData = connection as unknown as PvsConnectionData;
@@ -347,7 +445,7 @@ router.post('/import/patient', requireAuth, async (req, res) => {
         entityId: pvsPatientId,
         pvsReferenceId: pvsPatientId,
         completedAt: new Date(),
-        initiatedBy: (req as any).user?.id || 'system',
+        initiatedBy: req.auth?.userId || 'system',
       },
     });
 
@@ -362,8 +460,14 @@ router.post('/import/patient', requireAuth, async (req, res) => {
 // 10. GET /patient-link/:patientId â€” PVS-VerknÃ¼pfung abrufen
 router.get('/patient-link/:patientId', requireAuth, async (req, res) => {
   try {
+    const tenantId = getEffectiveTenantId(req, res);
+    if (!tenantId) return;
+
     const links = await prisma.pvsPatientLink.findMany({
-      where: { patientId: req.params.patientId as string },
+      where: {
+        patientId: req.params.patientId as string,
+        patient: { tenantId },
+      },
     });
     res.json(links);
   } catch (err) {
@@ -372,14 +476,26 @@ router.get('/patient-link/:patientId', requireAuth, async (req, res) => {
 });
 
 // 11. POST /patient-link â€” Patient mit PVS verknÃ¼pfen
-router.post('/patient-link', requireAuth, async (req, res) => {
+router.post('/patient-link', requireAuth, requireRole('arzt', 'mfa', 'admin'), async (req, res) => {
   try {
+    const tenantId = getEffectiveTenantId(req, res);
+    if (!tenantId) return;
+
     const data = z.object({
       patientId: z.string(),
       pvsType: z.enum(['CGM_M1', 'MEDATIXX', 'MEDISTAR', 'T2MED', 'X_ISYNET', 'DOCTOLIB', 'TURBOMED', 'FHIR_GENERIC']),
       pvsPatientId: z.string(),
       pvsPatientNr: z.string().optional(),
     }).parse(req.body);
+
+    const patient = await prisma.patient.findFirst({
+      where: { id: data.patientId, tenantId },
+      select: { id: true },
+    });
+
+    if (!patient) {
+      return res.status(403).json({ error: 'Tenant scope violation', code: 'PVS_SCOPE_VIOLATION' });
+    }
 
     const link = await prisma.pvsPatientLink.create({ data });
     res.status(201).json(link);
@@ -394,7 +510,20 @@ router.post('/patient-link', requireAuth, async (req, res) => {
 // 12. DELETE /patient-link/:id â€” VerknÃ¼pfung lÃ¶sen
 router.delete('/patient-link/:id', requireAuth, requireRole('admin'), async (req, res) => {
   try {
-    await prisma.pvsPatientLink.delete({ where: { id: req.params.id as string } });
+    const tenantId = getEffectiveTenantId(req, res);
+    if (!tenantId) return;
+
+    const removed = await prisma.pvsPatientLink.deleteMany({
+      where: {
+        id: req.params.id as string,
+        patient: { tenantId },
+      },
+    });
+
+    if (removed.count === 0) {
+      return res.status(404).json({ error: 'Verknüpfung nicht gefunden' });
+    }
+
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'VerknÃ¼pfung konnte nicht gelÃ¶scht werden' });
@@ -406,12 +535,16 @@ router.delete('/patient-link/:id', requireAuth, requireRole('admin'), async (req
 // 13. GET /transfers â€” Transfer-Historie
 router.get('/transfers', requireAuth, requireRole('admin'), async (req, res) => {
   try {
+    const tenantId = getEffectiveTenantId(req, res);
+    if (!tenantId) return;
+
     const page = parseInt(req.query.page as string) || 1;
     const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
     const status = req.query.status as string | undefined;
     const direction = req.query.direction as string | undefined;
 
     const where: Record<string, unknown> = {};
+    where.connection = { praxisId: tenantId };
     if (status) where.status = status;
     if (direction) where.direction = direction;
 
@@ -432,11 +565,56 @@ router.get('/transfers', requireAuth, requireRole('admin'), async (req, res) => 
   }
 });
 
+// 14. GET /transfers/stats — Transfer-Statistiken
+router.get('/transfers/stats', requireAuth, requireRole('admin'), async (_req, res) => {
+  try {
+    const tenantId = getEffectiveTenantId(_req, res);
+    if (!tenantId) return;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const [total, todayCount, failed, byStatus] = await Promise.all([
+      prisma.pvsTransferLog.count({ where: { connection: { praxisId: tenantId } } }),
+      prisma.pvsTransferLog.count({ where: { createdAt: { gte: today }, connection: { praxisId: tenantId } } }),
+      prisma.pvsTransferLog.count({ where: { status: 'FAILED', connection: { praxisId: tenantId } } }),
+      prisma.pvsTransferLog.groupBy({
+        by: ['status'],
+        where: { connection: { praxisId: tenantId } },
+        _count: true,
+      }),
+    ]);
+
+    const successRate = total > 0
+      ? Math.round(((total - failed) / total) * 100)
+      : 100;
+
+    res.json({
+      total,
+      today: todayCount,
+      failed,
+      successRate,
+      byStatus: byStatus.reduce((acc: any, s: any) => {
+        acc[s.status] = s._count;
+        return acc;
+      }, {} as Record<string, number>),
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Statistiken konnten nicht geladen werden' });
+  }
+});
+
 // 14. GET /transfers/:id â€” Transfer-Details
 router.get('/transfers/:id', requireAuth, requireRole('admin'), async (req, res) => {
   try {
-    const transfer = await prisma.pvsTransferLog.findUniqueOrThrow({
-      where: { id: req.params.id as string },
+    const tenantId = getEffectiveTenantId(req, res);
+    if (!tenantId) return;
+
+    const transfer = await prisma.pvsTransferLog.findFirstOrThrow({
+      where: {
+        id: req.params.id as string,
+        connection: { praxisId: tenantId },
+      },
       include: { connection: true },
     });
     res.json(transfer);
@@ -448,8 +626,14 @@ router.get('/transfers/:id', requireAuth, requireRole('admin'), async (req, res)
 // 15. POST /transfers/:id/retry â€” Fehlgeschlagenen Transfer wiederholen
 router.post('/transfers/:id/retry', requireAuth, requireRole('admin'), async (req, res) => {
   try {
-    const transfer = await prisma.pvsTransferLog.findUniqueOrThrow({
-      where: { id: req.params.id as string },
+    const tenantId = getEffectiveTenantId(req, res);
+    if (!tenantId) return;
+
+    const transfer = await prisma.pvsTransferLog.findFirstOrThrow({
+      where: {
+        id: req.params.id as string,
+        connection: { praxisId: tenantId },
+      },
       include: { connection: true },
     });
 
@@ -522,15 +706,19 @@ router.post('/transfers/:id/retry', requireAuth, requireRole('admin'), async (re
 // 16. GET /transfers/stats â€” Transfer-Statistiken
 router.get('/transfers/stats', requireAuth, requireRole('admin'), async (_req, res) => {
   try {
+    const tenantId = getEffectiveTenantId(_req, res);
+    if (!tenantId) return;
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     const [total, todayCount, failed, byStatus] = await Promise.all([
-      prisma.pvsTransferLog.count(),
-      prisma.pvsTransferLog.count({ where: { createdAt: { gte: today } } }),
-      prisma.pvsTransferLog.count({ where: { status: 'FAILED' } }),
+      prisma.pvsTransferLog.count({ where: { connection: { praxisId: tenantId } } }),
+      prisma.pvsTransferLog.count({ where: { createdAt: { gte: today }, connection: { praxisId: tenantId } } }),
+      prisma.pvsTransferLog.count({ where: { status: 'FAILED', connection: { praxisId: tenantId } } }),
       prisma.pvsTransferLog.groupBy({
         by: ['status'],
+        where: { connection: { praxisId: tenantId } },
         _count: true,
       }),
     ]);
@@ -559,8 +747,16 @@ router.get('/transfers/stats', requireAuth, requireRole('admin'), async (_req, r
 // 17. GET /mappings/:connectionId â€” Feld-Mappings abrufen
 router.get('/mappings/:connectionId', requireAuth, requireRole('admin'), async (req, res) => {
   try {
+    const tenantId = getEffectiveTenantId(req, res);
+    if (!tenantId) return;
+
+    const connection = await findConnectionByIdForTenant(req.params.connectionId as string, tenantId);
+    if (!connection) {
+      return res.status(404).json({ error: 'Verbindung nicht gefunden' });
+    }
+
     const mappings = await prisma.pvsFieldMapping.findMany({
-      where: { connectionId: req.params.connectionId as string },
+      where: { connectionId: connection.id },
       orderBy: [{ diggaiModel: 'asc' }, { diggaiField: 'asc' }],
     });
     res.json(mappings);
@@ -572,7 +768,15 @@ router.get('/mappings/:connectionId', requireAuth, requireRole('admin'), async (
 // 18. PUT /mappings/:connectionId â€” Custom-Mappings speichern
 router.put('/mappings/:connectionId', requireAuth, requireRole('admin'), async (req, res) => {
   try {
-    const connectionId = req.params.connectionId as string;
+    const tenantId = getEffectiveTenantId(req, res);
+    if (!tenantId) return;
+
+    const scopedConnection = await findConnectionByIdForTenant(req.params.connectionId as string, tenantId);
+    if (!scopedConnection) {
+      return res.status(404).json({ error: 'Verbindung nicht gefunden' });
+    }
+
+    const connectionId = scopedConnection.id;
     const { mappings } = z.object({
       mappings: z.array(z.object({
         diggaiModel: z.string(),
@@ -612,8 +816,16 @@ router.put('/mappings/:connectionId', requireAuth, requireRole('admin'), async (
 // 19. POST /mappings/:connectionId/reset â€” Auf Defaults zurÃ¼cksetzen
 router.post('/mappings/:connectionId/reset', requireAuth, requireRole('admin'), async (req, res) => {
   try {
-    const connectionId = req.params.connectionId as string;
-    const connection = await prisma.pvsConnection.findUniqueOrThrow({ where: { id: connectionId } });
+    const tenantId = getEffectiveTenantId(req, res);
+    if (!tenantId) return;
+
+    const scopedConnection = await findConnectionByIdForTenant(req.params.connectionId as string, tenantId);
+    if (!scopedConnection) {
+      return res.status(404).json({ error: 'Verbindung nicht gefunden' });
+    }
+
+    const connectionId = scopedConnection.id;
+    const connection = scopedConnection;
 
     // Delete all custom mappings
     await prisma.pvsFieldMapping.deleteMany({ where: { connectionId } });
@@ -653,6 +865,9 @@ router.post('/mappings/:connectionId/reset', requireAuth, requireRole('admin'), 
 // 20. POST /mappings/preview â€” Mapping-Vorschau (Dry-Run)
 router.post('/mappings/preview', requireAuth, requireRole('admin'), async (req, res) => {
   try {
+    const tenantId = getEffectiveTenantId(req, res);
+    if (!tenantId) return;
+
     const { sessionId, connectionId } = z.object({
       sessionId: z.string(),
       connectionId: z.string(),
@@ -663,9 +878,14 @@ router.post('/mappings/preview', requireAuth, requireRole('admin'), async (req, 
       include: { patient: true, answers: true, triageEvents: true },
     });
 
-    const connection = await prisma.pvsConnection.findUniqueOrThrow({
-      where: { id: connectionId },
-    });
+    if (session.tenantId !== tenantId) {
+      return res.status(403).json({ error: 'Tenant scope violation', code: 'PVS_SCOPE_VIOLATION' });
+    }
+
+    const connection = await findConnectionByIdForTenant(connectionId, tenantId);
+    if (!connection) {
+      return res.status(404).json({ error: 'Verbindung nicht gefunden' });
+    }
 
     const { buildBefundtext } = await import('../services/pvs/mapping-engine.js');
 

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, TrendingUp, TrendingDown, Minus, Loader2 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { usePwaDiaryTrends } from '../../hooks/useApi';
+import { usePwaDiaryTrends } from '../../hooks/usePatientApi';
 
 const METRICS = [
   { key: 'mood', label: 'Stimmung' },
@@ -32,7 +32,12 @@ export default function PwaDiaryTrends() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 pb-24">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-4 py-3 flex items-center gap-3">
-        <button onClick={() => navigate('/pwa/diary')} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
+        <button
+          onClick={() => navigate('/pwa/diary')}
+          className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
+          aria-label="Zurück zum Tagebuch"
+          title="Zurück zum Tagebuch"
+        >
           <ArrowLeft className="w-5 h-5" />
         </button>
         <h1 className="text-lg font-semibold">Verlaufstrends</h1>

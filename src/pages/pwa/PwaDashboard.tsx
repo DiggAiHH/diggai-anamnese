@@ -14,8 +14,8 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { usePwaDashboard, usePwaUnreadCount, usePwaMeasureComplete } from '../../hooks/useApi';
-import { usePwaStore } from '../../stores/pwaStore';
+import { usePwaDashboard, usePwaUnreadCount, usePwaMeasureComplete } from '../../hooks/usePatientApi';
+import { usePwaStore } from '../../store/pwaStore';
 
 const QUICK_ACTIONS = [
   { key: 'pwa.nav.diary', icon: BookOpen, to: '/pwa/diary', color: 'bg-emerald-100 text-emerald-600' },

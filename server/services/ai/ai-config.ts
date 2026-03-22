@@ -19,11 +19,11 @@ const DEFAULTS: AiConfig = {
 };
 
 export async function getAiConfig(): Promise<AiConfig> {
-    const settings = await prisma.systemSetting.findMany({
+    const settings = await prisma.systemConfig.findMany({
         where: { category: 'llm' },
     });
 
-    const map = new Map<string, string>(settings.map(s => [s.key, s.value]));
+    const map = new Map<string, string>(settings.map((s: { key: string; value: string }) => [s.key, s.value]));
 
     return {
         provider: (map.get('llm.provider') as AiConfig['provider']) || DEFAULTS.provider,

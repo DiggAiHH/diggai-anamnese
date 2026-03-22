@@ -1,3 +1,31 @@
+/**
+ * @module encryption
+ * @description AES-256-GCM Verschlüsselung und Pseudonymisierung für PII-Daten
+ *
+ * @security Alle Funktionen dieses Moduls implementieren DSGVO Art. 32, HIPAA §164.312
+ *   und BSI TR-03161 Anforderungen für medizinische Datenverschlüsselung.
+ *
+ * @algorithm AES-256-GCM (Authenticated Encryption with Associated Data)
+ *   - Schlüssel: 256-bit (genau 32 Bytes, aus env ENCRYPTION_KEY)
+ *   - IV: zufällige 12 Bytes per Verschlüsselungsvorgang (nie wiederverwenden)
+ *   - Auth-Tag: 16 Bytes GCM-Authentifizierungstag (Tamper-Detection)
+ *   - Speicherformat: `<iv_hex>:<authTag_hex>:<ciphertext_hex>`
+ *
+ * @rules
+ * - NEVER log decrypted PII values — use patient ID in logs instead
+ * - NEVER store plaintext PII in database columns without `encrypted` prefix
+ * - NEVER call decrypt() in a loop without try/catch — handle per-field errors
+ *
+ * @example
+ * // Store PII:
+ * const encryptedName = encrypt(patientName);  // → "a1b2c3...:d4e5f6...:7890ab..."
+ *
+ * // Retrieve PII:
+ * const name = decrypt(patient.encryptedName);
+ *
+ * // Pseudonymize email for lookup:
+ * const hash = hashEmail(email);  // deterministic, salted SHA-256
+ */
 import * as crypto from 'crypto';
 import { config } from '../config';
 
@@ -21,8 +49,13 @@ const EMAIL_HASH_SALT = crypto.createHash('sha256')
 
 
 /**
- * AES-256-GCM Verschlüsselung für PII (Personenbezogene Daten)
- * NHS/HIPAA-konform
+ * Verschlüsselt einen Klartext-String mit AES-256-GCM.
+ * Jeder Aufruf erzeugt eine einmalige IV — gleicher Plaintext erzeugt unterschiedliche Ciphertexte.
+ *
+ * @security HIPAA/DSGVO-konform. Nur für PII-Felder verwenden (Name, Adresse, E-Mail, Telefon).
+ * @param plaintext - Zu verschlüsselnder Klartext (darf NICHT leer sein)
+ * @returns Verschlüsselter String im Format `<iv_hex>:<authTag_hex>:<ciphertext_hex>`
+ * @throws {Error} Wenn ENCRYPTION_KEY nicht gesetzt oder ungültig ist (beim Laden des Moduls)
  */
 export function encrypt(plaintext: string): string {
     const iv = crypto.randomBytes(IV_LENGTH);
@@ -38,7 +71,13 @@ export function encrypt(plaintext: string): string {
 }
 
 /**
- * AES-256-GCM Entschlüsselung
+ * Entschlüsselt einen AES-256-GCM verschlüsselten String.
+ * Verifiziert automatisch den GCM Auth-Tag — wirft Fehler bei Manipulation.
+ *
+ * @security Der GCM Auth-Tag schützt vor Tampering. Fehler beim Entschlüsseln = Daten kompromittiert.
+ * @param ciphertext - Verschlüsselter String im Format `<iv_hex>:<authTag_hex>:<ciphertext_hex>`
+ * @returns Entschlüsselter Klartext
+ * @throws {Error} Bei ungültigem Format, falschem Schlüssel oder manipulierten Daten
  */
 export function decrypt(ciphertext: string): string {
     const parts = ciphertext.split(':');
@@ -60,8 +99,14 @@ export function decrypt(ciphertext: string): string {
 }
 
 /**
- * SHA-256 Hash für E-Mail (Pseudonymisierung)
- * H-02 FIX: Mit Salt versehen gegen Rainbow-Table-Angriffe
+ * Pseudonymisiert eine E-Mail-Adresse via gesalzenem SHA-256.
+ * Das Ergebnis ist deterministisch — gleiche E-Mail → gleicher Hash (für Lookup).
+ * Der Salt wird aus ENCRYPTION_KEY abgeleitet, verhindert Rainbow-Table-Angriffe.
+ *
+ * @security Erfüllt DSGVO Art. 4(5) Pseudonymisierungsanforderung.
+ *   Der Hash ist NICHT umkehrbar ohne den Salt (ENCRYPTION_KEY).
+ * @param email - E-Mail-Adresse (wird vor dem Hashing normalisiert: lowercase + trim)
+ * @returns Salted SHA-256 Hash als Hex-String (64 Zeichen)
  */
 export function hashEmail(email: string): string {
     return crypto.createHash('sha256')
@@ -70,8 +115,10 @@ export function hashEmail(email: string): string {
 }
 
 /**
- * Prüft ob ein Feld als PII markiert ist und verschlüsselt werden muss
- * PII-Atome: Name, Vorname, Adresse, E-Mail, Telefon
+ * Whitelist der Frage-IDs, deren Antworten PII enthalten und AES-256-GCM verschlüsselt
+ * in `Answer.encryptedValue` gespeichert werden müssen (nicht in `Answer.value`).
+ *
+ * @see docs/DATA_SCHEMA.md — PII fields section
  */
 const PII_ATOM_IDS = new Set([
     '0001', // Nachname
@@ -85,6 +132,17 @@ const PII_ATOM_IDS = new Set([
     '9011', // Bestätigungs-Telefon
 ]);
 
+/**
+ * Prüft ob eine Frage-ID PII enthält und verschlüsselt gespeichert werden muss.
+ *
+ * @param atomId - Kanonische Frage-ID (z.B. '0001', '3003')
+ * @returns true wenn die Antwort verschlüsselt in `Answer.encryptedValue` gespeichert werden muss
+ *
+ * @example
+ * if (isPIIAtom(atomId)) {
+ *   await prisma.answer.create({ data: { encryptedValue: encrypt(value), value: '[encrypted]' } });
+ * }
+ */
 export function isPIIAtom(atomId: string): boolean {
     return PII_ATOM_IDS.has(atomId);
 }

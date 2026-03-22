@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Shield, X, Check } from 'lucide-react';
-import { useAdminPermissions, useAdminSetUserPermissions } from '../../hooks/useApi';
+import { useAdminPermissions, useAdminSetUserPermissions } from '../../hooks/useOpsApi';
 import type { ArztUser, Permission } from '../../types/admin';
 
 interface Props {

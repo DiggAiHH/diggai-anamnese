@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Shield, LogOut, Users, UserPlus, FileText, CheckCircle, Activity, LayoutDashboard, Search, Filter, ClipboardList, MessageSquare, Send, X, QrCode } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { io, type Socket } from 'socket.io-client';
-import { useArztLogin, useMfaSessions, useMfaDoctors, useMfaAssignDoctor, useChatMessages, useGenerateQrToken } from '../hooks/useApi';
+import { useArztLogin, useMfaSessions, useMfaDoctors, useMfaAssignDoctor, useChatMessages, useGenerateQrToken } from '../hooks/useStaffApi';
 import { setAuthToken, SOCKET_BASE_URL } from '../api/client';
 import { QRCodeSVG } from 'qrcode.react';
 import { useTranslation } from 'react-i18next';
@@ -57,7 +57,8 @@ interface MfaDoctorsResponse {
     doctors?: MfaDoctor[];
 }
 
-export const MFADashboard: React.FC = () => {
+// Memory Leak Fix: Wrapped with React.memo to prevent unnecessary re-renders on parent updates
+export const MFADashboard: React.FC = React.memo(function MFADashboard() {
     const { t } = useTranslation();
     const [token, setToken] = useState<string | null>(localStorage.getItem('mfa_token'));
     const [activeChatId, setActiveChatId] = useState<string | null>(null);
@@ -84,6 +85,10 @@ export const MFADashboard: React.FC = () => {
         });
 
         return () => {
+            // Memory Leak Fix: Remove event listeners before disconnect
+            socket.off('connect');
+            socket.off('triage:alert');
+            socket.off('session:complete');
             socket.disconnect();
         };
     }, [token, queryClient]);
@@ -248,7 +253,7 @@ export const MFADashboard: React.FC = () => {
             )}
         </div>
     );
-};
+});  // Memory Leak Fix: Closing React.memo wrapper
 
 const MfaQrModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     const { t } = useTranslation();
@@ -370,6 +375,9 @@ const MFAChatModal: React.FC<MFAChatModalProps> = ({ sessionId, onClose }) => {
         });
 
         return () => {
+            // Memory Leak Fix: Remove socket listeners before disconnect
+            socket.off('connect');
+            socket.off('arzt:received_message');
             socket.disconnect();
         };
     }, [sessionId]);

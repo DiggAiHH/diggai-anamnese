@@ -26,8 +26,8 @@ import {
   usePwaDevices,
   usePwaChangePassword,
   usePwaSetPin,
-} from '../../hooks/useApi';
-import { usePwaStore } from '../../stores/pwaStore';
+} from '../../hooks/usePatientApi';
+import { usePwaStore } from '../../store/pwaStore';
 
 const LANGUAGES = [
   { code: 'de', label: 'Deutsch' },

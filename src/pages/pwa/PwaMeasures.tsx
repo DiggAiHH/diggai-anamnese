@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pill, Check, SkipForward, Clock, AlertTriangle, ChevronDown, Loader2, Activity, Droplets, Dumbbell } from 'lucide-react';
-import { usePwaMeasures, usePwaMeasureTrackings, usePwaMeasureComplete, usePwaMeasureSkip } from '../../hooks/useApi';
+import { usePwaMeasures, usePwaMeasureTrackings, usePwaMeasureComplete, usePwaMeasureSkip } from '../../hooks/usePatientApi';
 
 const TYPE_ICON: Record<string, React.ElementType> = {
   MEDICATION: Pill,

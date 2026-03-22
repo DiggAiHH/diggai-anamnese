@@ -6,6 +6,32 @@ import { decrypt, isPIIAtom } from '../services/encryption';
 
 const router = Router();
 
+function getEffectiveTenantId(req: Request, res: Response): string | null {
+    const requestTenantId = req.tenantId;
+    const authTenantId = req.auth?.tenantId;
+
+    if (requestTenantId && authTenantId && requestTenantId !== authTenantId) {
+        res.status(403).json({ error: 'Tenant scope violation', code: 'EXPORT_SCOPE_VIOLATION' });
+        return null;
+    }
+
+    const tenantId = requestTenantId || authTenantId;
+    if (!tenantId) {
+        res.status(400).json({ error: 'Tenant context required', code: 'TENANT_CONTEXT_REQUIRED' });
+        return null;
+    }
+
+    return tenantId;
+}
+
+function rejectTokenQueryParameter(req: Request, res: Response, next: () => void) {
+    if (typeof req.query.token !== 'undefined') {
+        return res.status(400).json({ error: 'Token query parameter is not allowed' });
+    }
+
+    next();
+}
+
 // ─── H-05 FIX: HTML Escaping gegen XSS in PDF-Export ────────
 function escapeHtml(str: string): string {
     return str
@@ -21,10 +47,25 @@ function escapeCsvValue(str: string): string {
     // Remove formula chars that could be interpreted by Excel
     let safe = str.replace(/;/g, ',').replace(/\n/g, ' ').replace(/\r/g, '');
     // Prefix formula-start characters with a single quote
-    if (/^[=+\-@\t\r]/.test(safe)) {
+    if (/^\s*[=+\-@\t\r]/.test(safe)) {
         safe = `'${safe}`;
     }
     return safe;
+}
+
+function sanitizeFilenamePart(str: string): string {
+    const cleaned = str
+        .replace(/[\r\n\t]/g, ' ')
+        .replace(/[^a-zA-Z0-9_-]+/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_+|_+$/g, '');
+    return cleaned.slice(0, 64) || 'Patient';
+}
+
+function buildExportFilename(patientName: string, extension: 'csv' | 'html'): string {
+    const date = new Date().toISOString().slice(0, 10);
+    const safeName = sanitizeFilenamePart(patientName);
+    return `Anamnese_${safeName}_${date}.${extension}`;
 }
 
 // ─── Helper: Entschlüsselte Antworten aufbereiten ────────────
@@ -37,7 +78,24 @@ interface DecryptedAnswer {
     answeredAt: Date;
 }
 
-async function getDecryptedSessionData(sessionId: string) {
+interface ExportScopeContext {
+    role?: string;
+    userId?: string;
+    tenantId?: string;
+}
+
+class ExportRouteError extends Error {
+    public readonly status: number;
+    public readonly code: string;
+
+    constructor(status: number, code: string, message: string) {
+        super(message);
+        this.status = status;
+        this.code = code;
+    }
+}
+
+async function getDecryptedSessionData(sessionId: string, scope?: ExportScopeContext) {
     const session = await prisma.patientSession.findUnique({
         where: { id: sessionId },
         include: {
@@ -46,7 +104,18 @@ async function getDecryptedSessionData(sessionId: string) {
         },
     });
 
-    if (!session) throw new Error('Session nicht gefunden');
+    if (!session) {
+        throw new ExportRouteError(404, 'EXPORT_SESSION_NOT_FOUND', 'Session nicht gefunden');
+    }
+
+    const effectiveTenantId = scope?.tenantId;
+    if (effectiveTenantId && session.tenantId !== effectiveTenantId) {
+        throw new ExportRouteError(403, 'EXPORT_SCOPE_VIOLATION', 'Kein Zugriff auf diese Sitzung');
+    }
+
+    if (scope?.role === 'arzt' && scope.userId && session.assignedArztId && session.assignedArztId !== scope.userId) {
+        throw new ExportRouteError(403, 'EXPORT_SCOPE_VIOLATION', 'Kein Zugriff auf diese Sitzung');
+    }
 
     // Alle Fragen laden für die Texte
     const atoms = await prisma.medicalAtom.findMany();
@@ -144,9 +213,18 @@ const SECTION_LABELS: Record<string, string> = {
 
 // ─── CSV Export ──────────────────────────────────────────────
 
-router.get('/sessions/:id/export/csv', requireAuth, requireRole('arzt', 'admin', 'mfa'), async (req: Request, res: Response) => {
+router.get('/sessions/:id/export/csv', rejectTokenQueryParameter, requireAuth, requireRole('arzt', 'admin', 'mfa'), async (req: Request, res: Response) => {
     try {
-        const { session, patientName, decryptedAnswers, triageEvents } = await getDecryptedSessionData(req.params.id as string);
+        const tenantId = getEffectiveTenantId(req, res);
+        if (!tenantId) return;
+
+        const role = req.auth?.role;
+        const userId = req.auth?.userId;
+        const { session, patientName, decryptedAnswers, triageEvents } = await getDecryptedSessionData(req.params.id as string, {
+            role,
+            userId,
+            tenantId,
+        });
 
         // BOM für Excel UTF-8 Erkennung
         const BOM = '\uFEFF';
@@ -156,13 +234,13 @@ router.get('/sessions/:id/export/csv', requireAuth, requireRole('arzt', 'admin',
 
         // Header
         lines.push(`Anamnese-Bericht${SEP}${SEP}${SEP}`);
-        lines.push(`Patient${SEP}${patientName}${SEP}${SEP}`);
-        lines.push(`Geschlecht${SEP}${session.gender || '-'}${SEP}${SEP}`);
-        lines.push(`Geburtsdatum${SEP}${session.birthDate ? new Date(session.birthDate).toLocaleDateString('de-DE') : '-'}${SEP}${SEP}`);
-        lines.push(`Versicherung${SEP}${session.insuranceType || '-'}${SEP}${SEP}`);
-        lines.push(`Anliegen${SEP}${session.selectedService}${SEP}${SEP}`);
-        lines.push(`Status${SEP}${session.status}${SEP}${SEP}`);
-        lines.push(`Erstellt am${SEP}${new Date(session.createdAt).toLocaleString('de-DE')}${SEP}${SEP}`);
+        lines.push(`Patient${SEP}${escapeCsvValue(patientName)}${SEP}${SEP}`);
+        lines.push(`Geschlecht${SEP}${escapeCsvValue(session.gender || '-')}${SEP}${SEP}`);
+        lines.push(`Geburtsdatum${SEP}${escapeCsvValue(session.birthDate ? new Date(session.birthDate).toLocaleDateString('de-DE') : '-')}${SEP}${SEP}`);
+        lines.push(`Versicherung${SEP}${escapeCsvValue(session.insuranceType || '-')}${SEP}${SEP}`);
+        lines.push(`Anliegen${SEP}${escapeCsvValue(session.selectedService)}${SEP}${SEP}`);
+        lines.push(`Status${SEP}${escapeCsvValue(session.status)}${SEP}${SEP}`);
+        lines.push(`Erstellt am${SEP}${escapeCsvValue(new Date(session.createdAt).toLocaleString('de-DE'))}${SEP}${SEP}`);
         lines.push(`Exportiert am${SEP}${new Date().toLocaleString('de-DE')}${SEP}${SEP}`);
         lines.push('');
         lines.push(`Sektion${SEP}Frage${SEP}Antwort${SEP}Beantwortet am`);
@@ -182,7 +260,7 @@ router.get('/sessions/:id/export/csv', requireAuth, requireRole('arzt', 'admin',
             lines.push('');
             lines.push(`Triage-Alarme${SEP}${SEP}${SEP}`);
             for (const t of triageEvents) {
-                lines.push(`${t.level}${SEP}${t.message}${SEP}Frage ${t.atomId}${SEP}${new Date(t.createdAt).toLocaleString('de-DE')}`);
+                lines.push(`${escapeCsvValue(t.level)}${SEP}${escapeCsvValue(t.message)}${SEP}${escapeCsvValue(`Frage ${t.atomId}`)}${SEP}${escapeCsvValue(new Date(t.createdAt).toLocaleString('de-DE'))}`);
             }
         }
 
@@ -191,17 +269,22 @@ router.get('/sessions/:id/export/csv', requireAuth, requireRole('arzt', 'admin',
         // Audit-Log
         await prisma.auditLog.create({
             data: {
+                tenantId: req.tenantId || req.auth?.tenantId || 'system',
                 userId: req.auth?.userId || null,
                 action: 'EXPORT_CSV',
                 resource: `sessions/${session.id}`,
-                metadata: JSON.stringify({ patientName, format: 'csv' }),
+                metadata: JSON.stringify({ format: 'csv', sessionId: session.id }),
             },
         });
 
         res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-        res.setHeader('Content-Disposition', `attachment; filename="Anamnese_${patientName.replace(/\s/g, '_')}_${new Date().toISOString().slice(0, 10)}.csv"`);
+        res.setHeader('Content-Disposition', `attachment; filename="${buildExportFilename(patientName, 'csv')}"`);
         res.send(csvContent);
     } catch (err: unknown) {
+        if (err instanceof ExportRouteError) {
+            res.status(err.status).json({ error: err.message, code: err.code });
+            return;
+        }
         console.error('[Export] CSV-Fehler:', err);
         res.status(500).json({ error: 'Export fehlgeschlagen' });
     }
@@ -209,9 +292,18 @@ router.get('/sessions/:id/export/csv', requireAuth, requireRole('arzt', 'admin',
 
 // ─── HTML/PDF Export ─────────────────────────────────────────
 
-router.get('/sessions/:id/export/pdf', requireAuth, requireRole('arzt', 'admin', 'mfa'), async (req: Request, res: Response) => {
+router.get('/sessions/:id/export/pdf', rejectTokenQueryParameter, requireAuth, requireRole('arzt', 'admin', 'mfa'), async (req: Request, res: Response) => {
     try {
-        const { session, patientName, decryptedAnswers, triageEvents } = await getDecryptedSessionData(req.params.id as string);
+        const tenantId = getEffectiveTenantId(req, res);
+        if (!tenantId) return;
+
+        const role = req.auth?.role;
+        const userId = req.auth?.userId;
+        const { session, patientName, decryptedAnswers, triageEvents } = await getDecryptedSessionData(req.params.id as string, {
+            role,
+            userId,
+            tenantId,
+        });
 
         // Antworten nach Sektion gruppieren
         const sections = new Map<string, DecryptedAnswer[]>();
@@ -322,17 +414,22 @@ router.get('/sessions/:id/export/pdf', requireAuth, requireRole('arzt', 'admin',
         // Audit-Log
         await prisma.auditLog.create({
             data: {
+                tenantId: req.tenantId || req.auth?.tenantId || 'system',
                 userId: req.auth?.userId || null,
                 action: 'EXPORT_PDF',
                 resource: `sessions/${session.id}`,
-                metadata: JSON.stringify({ patientName, format: 'pdf' }),
+                metadata: JSON.stringify({ format: 'pdf', sessionId: session.id }),
             },
         });
 
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
-        res.setHeader('Content-Disposition', `inline; filename="Anamnese_${patientName.replace(/\s/g, '_')}_${new Date().toISOString().slice(0, 10)}.html"`);
+        res.setHeader('Content-Disposition', `inline; filename="${buildExportFilename(patientName, 'html')}"`);
         res.send(html);
     } catch (err: unknown) {
+        if (err instanceof ExportRouteError) {
+            res.status(err.status).json({ error: err.message, code: err.code });
+            return;
+        }
         console.error('[Export] PDF-Fehler:', err);
         res.status(500).json({ error: 'Export fehlgeschlagen' });
     }
@@ -340,12 +437,22 @@ router.get('/sessions/:id/export/pdf', requireAuth, requireRole('arzt', 'admin',
 
 // ─── JSON Export (raw decrypted data) ─────────────────────────
 
-router.get('/sessions/:id/export/json', requireAuth, requireRole('arzt', 'admin'), async (req: Request, res: Response) => {
+router.get('/sessions/:id/export/json', rejectTokenQueryParameter, requireAuth, requireRole('arzt', 'admin'), async (req: Request, res: Response) => {
     try {
-        const data = await getDecryptedSessionData(req.params.id as string);
+        const tenantId = getEffectiveTenantId(req, res);
+        if (!tenantId) return;
+
+        const role = req.auth?.role;
+        const userId = req.auth?.userId;
+        const data = await getDecryptedSessionData(req.params.id as string, {
+            role,
+            userId,
+            tenantId,
+        });
 
         await prisma.auditLog.create({
             data: {
+                tenantId: req.tenantId || req.auth?.tenantId || 'system',
                 userId: req.auth?.userId || null,
                 action: 'EXPORT_JSON',
                 resource: `sessions/${data.session.id}`,
@@ -369,6 +476,10 @@ router.get('/sessions/:id/export/json', requireAuth, requireRole('arzt', 'admin'
             exportedAt: new Date(),
         });
     } catch (err: unknown) {
+        if (err instanceof ExportRouteError) {
+            res.status(err.status).json({ error: err.message, code: err.code });
+            return;
+        }
         console.error('[Export] JSON-Fehler:', err);
         res.status(500).json({ error: 'Export fehlgeschlagen' });
     }
