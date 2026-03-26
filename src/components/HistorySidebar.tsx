@@ -1,6 +1,7 @@
 import React from 'react';
 import { CheckCircle2, ChevronRight, History, Edit3 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { NavLink } from 'react-router-dom';
 import type { Question, Answer } from '../types/question';
 
 interface HistorySidebarProps {
@@ -138,11 +139,18 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({
                 </div>
 
                 {/* Footer Info */}
-                <div className="p-6 border-t border-[var(--border-primary)] bg-[var(--bg-secondary)]">
-                    <p className="text-[10px] text-gray-500 uppercase tracking-widest font-bold mb-2">{t('security', 'Sicherheit')}</p>
-                    <div className="flex items-center gap-2 text-gray-400">
-                        <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                        <span className="text-[11px]">{t('encryptionActive', 'Verschlüsselte Übertragung aktiv')}</span>
+                <div className="p-6 border-t border-[var(--border-primary)] bg-[var(--bg-secondary)] space-y-4">
+                    <div>
+                        <p className="text-[10px] text-gray-500 uppercase tracking-widest font-bold mb-2">{t('security', 'Sicherheit')}</p>
+                        <div className="flex items-center gap-2 text-gray-400">
+                            <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                            <span className="text-[11px]">{t('encryptionActive', 'Verschlüsselte Übertragung aktiv')}</span>
+                        </div>
+                    </div>
+                    
+                    <div className="pt-4 border-t border-[var(--border-primary)]/50 flex items-center justify-between text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                        <NavLink to="/impressum" className="hover:text-blue-400 transition-colors">{t('landing.impressum', 'Impressum')}</NavLink>
+                        <NavLink to="/datenschutz" className="hover:text-blue-400 transition-colors">{t('landing.datenschutz', 'Datenschutz')}</NavLink>
                     </div>
                 </div>
             </div>

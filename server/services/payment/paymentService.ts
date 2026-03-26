@@ -25,7 +25,16 @@ export async function createPaymentIntent(input: CreatePaymentIntentInput) {
 
   // In production: call Stripe/Adyen to create real intent
   // For now: create local transaction record with simulated intent
-  const providerIntentId = `pi_${crypto.randomUUID().replace(/-/g, '').slice(0, 24)}`;
+  
+  // Factoring Mode (z.B. Nelly.ai)
+  const useFactoring = input.metadata?.factoring === true;
+  let providerIntentId = `pi_${crypto.randomUUID().replace(/-/g, '').slice(0, 24)}`;
+  
+  if (useFactoring) {
+    providerIntentId = `factoring_nelly_${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`;
+    console.log(`[Payment] Using Medical Factoring for transaction to guarantee payment`);
+  }
+
   const clientSecret = `${providerIntentId}_secret_${crypto.randomBytes(16).toString('hex')}`;
 
   const transaction = await prisma.paymentTransaction.create({

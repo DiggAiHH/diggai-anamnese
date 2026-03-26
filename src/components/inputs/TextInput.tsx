@@ -1,6 +1,6 @@
+import React, { memo, useCallback } from 'react';
 import { VoiceInputButton } from './VoiceInput';
 import { isSpeechSupported } from '../../utils/speechSupport';
-import { useCallback } from 'react';
 
 interface TextInputProps {
     value: string;
@@ -10,17 +10,35 @@ interface TextInputProps {
     className?: string;
 }
 
-export const TextInput: React.FC<TextInputProps> = ({ value, onChange, placeholder, type = 'text', className = '' }) => {
+/**
+ * TextInput Component - Optimized with React.memo and useCallback
+ * 
+ * A text input component with optional voice input support.
+ * Memoized to prevent unnecessary re-renders.
+ */
+export const TextInput: React.FC<TextInputProps> = memo(function TextInput({
+    value,
+    onChange,
+    placeholder,
+    type = 'text',
+    className = ''
+}) {
+    // Memoized voice transcript handler
     const handleVoiceTranscript = useCallback((text: string) => {
         onChange(value ? `${value} ${text}` : text);
     }, [value, onChange]);
+
+    // Memoized change handler
+    const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+        onChange(e.target.value);
+    }, [onChange]);
 
     return (
         <div className="relative flex items-center gap-2">
             <input
                 type={type}
                 value={value}
-                onChange={(e) => onChange(e.target.value)}
+                onChange={handleChange}
                 placeholder={placeholder}
                 className={`input-base ${className} ${isSpeechSupported() ? 'pr-12' : ''}`}
                 autoComplete={type === 'email' ? 'email' : type === 'tel' ? 'tel' : 'name'}
@@ -33,4 +51,7 @@ export const TextInput: React.FC<TextInputProps> = ({ value, onChange, placehold
             )}
         </div>
     );
-};
+});
+
+// Named export for backward compatibility
+export default TextInput;

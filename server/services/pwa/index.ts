@@ -45,3 +45,15 @@ export {
   syncOfflineData,
   getChangesSince,
 } from './sync.service';
+
+// Messaging service
+export {
+  sendMessage,
+  listMessages,
+  getMessage,
+  getUnreadCount,
+  markAsRead,
+  archiveMessage,
+  deleteMessage,
+  sendProviderMessage,
+} from './messaging.service';

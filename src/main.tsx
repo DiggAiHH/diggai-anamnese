@@ -2,6 +2,9 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
 import './i18n';
+import './styles/skeleton.css';
+import { trackWebVitals } from './lib/performance-monitor';
+import { initSentry } from './lib/sentry';
 
 import { Suspense } from 'react';
 
@@ -19,6 +22,12 @@ createRoot(document.getElementById('root')!).render(
     </ErrorBoundary>
   </StrictMode>,
 )
+
+// Initialize Sentry error tracking
+initSentry();
+
+// Initialize performance monitoring
+trackWebVitals();
 
 // Register Service Worker for offline PWA support + auto-update
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {

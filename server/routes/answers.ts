@@ -17,7 +17,7 @@ const answerSubmissionLimiter = rateLimit({
     max: 30, // Max 30 answers per minute per session
     standardHeaders: true,
     legacyHeaders: false,
-    keyGenerator: (req: Request) => String(req.params.id || req.ip || 'unknown'),
+    keyGenerator: (req: Request) => req.params.id || 'anonymous',
     handler: (_req: Request, res: Response) => {
         res.status(429).json({ 
             error: 'Zu viele Antworten in kurzer Zeit. Bitte warten Sie einen Moment.' 

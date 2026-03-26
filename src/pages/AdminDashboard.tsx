@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   LayoutDashboard, Shield, Activity, FileText, Zap, Globe, Database,
@@ -13,17 +13,26 @@ import {
   PolarAngleAxis, PolarRadiusAxis, AreaChart, Area, Legend
 } from 'recharts';
 
-// Admin Tab Components
-import { UserManagementTab } from '../components/admin/UserManagementTab';
-import { PermissionMatrix } from '../components/admin/PermissionMatrix';
-import { ROIDashboard } from '../components/admin/ROIDashboard';
+// Admin Tab Components - lazy loaded for code splitting
 import { FullscreenButton } from '../components/FullscreenButton';
-import { FragebogenBuilder } from '../components/admin/FragebogenBuilder';
-import { WunschboxTab } from '../components/admin/WunschboxTab';
-import { WaitingContentTab } from '../components/admin/WaitingContentTab';
-import { AuditLogTab } from '../components/admin/AuditLogTab';
-import { PvsAdminPanel } from '../components/admin/PvsAdminPanel';
-import { TherapyAnalyticsTab } from '../components/admin/TherapyAnalyticsTab';
+
+// Lazy load heavy tab components for better initial load performance
+const UserManagementTab = React.lazy(() => import('../components/admin/UserManagementTab').then(m => ({ default: m.UserManagementTab })));
+const PermissionMatrix = React.lazy(() => import('../components/admin/PermissionMatrix').then(m => ({ default: m.PermissionMatrix })));
+const ROIDashboard = React.lazy(() => import('../components/admin/ROIDashboard').then(m => ({ default: m.ROIDashboard })));
+const FragebogenBuilder = React.lazy(() => import('../components/admin/FragebogenBuilder').then(m => ({ default: m.FragebogenBuilder })));
+const WunschboxTab = React.lazy(() => import('../components/admin/WunschboxTab').then(m => ({ default: m.WunschboxTab })));
+const WaitingContentTab = React.lazy(() => import('../components/admin/WaitingContentTab').then(m => ({ default: m.WaitingContentTab })));
+const AuditLogTab = React.lazy(() => import('../components/admin/AuditLogTab').then(m => ({ default: m.AuditLogTab })));
+const PvsAdminPanel = React.lazy(() => import('../components/admin/PvsAdminPanel').then(m => ({ default: m.PvsAdminPanel })));
+const TherapyAnalyticsTab = React.lazy(() => import('../components/admin/TherapyAnalyticsTab').then(m => ({ default: m.TherapyAnalyticsTab })));
+
+// Tab fallback loader
+const TabLoader = () => (
+  <div className="flex items-center justify-center py-20">
+    <div className="w-8 h-8 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+  </div>
+);
 
 // ─── Types ─────────────────────────────────────────────
 interface FlowNode {
@@ -51,7 +60,7 @@ interface SecurityLayer {
   color: string;
 }
 
-// ─── Data ──────────────────────────────────────────────
+// ─── Static Data (memoized outside component) ──────────────────────────────────────────
 const TABS = [
   { id: 'overview', label: 'Übersicht', icon: <LayoutDashboard size={18} /> },
   { id: 'users', label: 'Mitarbeiter', icon: <Users size={18} /> },
@@ -412,9 +421,9 @@ const CUSTOM_TOOLTIP_STYLE = {
   boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
 };
 
-// ─── Sub-Components ────────────────────────────────────
+// ─── Memoized Sub-Components ────────────────────────────────────
 
-function GlassCard({ children, className = '', onClick }: { children: React.ReactNode; className?: string; onClick?: () => void }) {
+const GlassCard = memo(function GlassCard({ children, className = '', onClick }: { children: React.ReactNode; className?: string; onClick?: () => void }) {
   return (
     <div
       className={`rounded-2xl border border-[var(--border-primary)] bg-[var(--bg-card)] backdrop-blur-xl p-5 transition-all duration-300 hover:border-[var(--border-hover)] ${onClick ? 'cursor-pointer hover:scale-[1.02]' : ''} ${className}`}
@@ -426,9 +435,9 @@ function GlassCard({ children, className = '', onClick }: { children: React.Reac
       {children}
     </div>
   );
-}
+});
 
-const StatCardComponent = React.memo(function StatCardComponent({ stat }: { stat: StatCard }) {
+const StatCardComponent = memo(function StatCardComponent({ stat }: { stat: StatCard }) {
   return (
     <GlassCard className="relative overflow-hidden group">
       <div className={`absolute inset-0 bg-gradient-to-br ${stat.color} opacity-5 group-hover:opacity-10 transition-opacity`} />
@@ -446,7 +455,7 @@ const StatCardComponent = React.memo(function StatCardComponent({ stat }: { stat
   );
 });
 
-function FlowDiagram() {
+const FlowDiagram = memo(function FlowDiagram() {
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set(['root', 'beschwerden']));
 
   const toggleNode = (id: string) => {
@@ -457,7 +466,8 @@ function FlowDiagram() {
     });
   };
 
-  const flowData: FlowNode[] = [
+  // Memoized flow data to prevent recreation on re-renders
+  const flowData = useMemo<FlowNode[]>(() => [
     {
       id: 'landing', label: '🏥 Landing Page', type: 'start',
       children: [
@@ -553,7 +563,7 @@ function FlowDiagram() {
         { id: 'zusammenfassung', label: '📄 Zusammenfassung + PDF-Export', type: 'end' },
       ]
     },
-  ];
+  ], []);
 
   const renderNode = (node: FlowNode, depth: number = 0) => {
     const hasChildren = node.children && node.children.length > 0;
@@ -603,9 +613,9 @@ function FlowDiagram() {
       {flowData.map(node => renderNode(node, 0))}
     </div>
   );
-}
+});
 
-function AdminProgressBar({ value, max, label, color = 'bg-blue-500' }: { value: number; max: number; label: string; color?: string }) {
+const AdminProgressBar = memo(function AdminProgressBar({ value, max, label, color = 'bg-blue-500' }: { value: number; max: number; label: string; color?: string }) {
   const pct = Math.round((value / max) * 100);
   return (
     <div className="space-y-1">
@@ -619,11 +629,11 @@ function AdminProgressBar({ value, max, label, color = 'bg-blue-500' }: { value:
       </div>
     </div>
   );
-}
+});
 
-// ─── Tab Contents ──────────────────────────────────────
+// ─── Tab Contents (memoized) ──────────────────────────────────────
 
-function OverviewTab() {
+const OverviewTab = memo(function OverviewTab() {
   return (
     <div className="space-y-8">
       {/* Stat Cards */}
@@ -790,9 +800,9 @@ function OverviewTab() {
       </div>
     </div>
   );
-}
+});
 
-function FlowTab() {
+const FlowTab = memo(function FlowTab() {
   return (
     <div className="space-y-6">
       <GlassCard>
@@ -842,9 +852,9 @@ function FlowTab() {
       </GlassCard>
     </div>
   );
-}
+});
 
-function SecurityTab() {
+const SecurityTab = memo(function SecurityTab() {
   return (
     <div className="space-y-6">
       {/* Security Layers */}
@@ -921,9 +931,9 @@ function SecurityTab() {
       </GlassCard>
     </div>
   );
-}
+});
 
-function ExportTab() {
+const ExportTab = memo(function ExportTab() {
   return (
     <div className="space-y-6">
       {/* Export Formats */}
@@ -995,12 +1005,16 @@ function ExportTab() {
       </GlassCard>
     </div>
   );
-}
+});
 
-function ProductivityTab() {
-  const totalPaper = PRODUCTIVITY_ROWS.reduce((a, r) => a + parseInt(r.paper), 0);
-  const totalDigital = PRODUCTIVITY_ROWS.reduce((a, r) => a + parseFloat(r.digital), 0);
-  const totalSaved = totalPaper - totalDigital;
+const ProductivityTab = memo(function ProductivityTab() {
+  // Memoize calculations
+  const totals = useMemo(() => {
+    const totalPaper = PRODUCTIVITY_ROWS.reduce((a, r) => a + parseInt(r.paper), 0);
+    const totalDigital = PRODUCTIVITY_ROWS.reduce((a, r) => a + parseFloat(r.digital), 0);
+    const totalSaved = totalPaper - totalDigital;
+    return { totalPaper, totalDigital, totalSaved };
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -1032,9 +1046,9 @@ function ProductivityTab() {
             <tfoot>
               <tr className="border-t-2 border-[var(--accent)]">
                 <td className="py-3 px-4 font-bold text-[var(--text-primary)]">GESAMT</td>
-                <td className="py-3 px-4 text-center font-bold text-red-400">{totalPaper} Min</td>
-                <td className="py-3 px-4 text-center font-bold text-green-400">{totalDigital} Min</td>
-                <td className="py-3 px-4 text-center font-bold text-blue-400">-{Math.round((totalSaved / totalPaper) * 100)}%</td>
+                <td className="py-3 px-4 text-center font-bold text-red-400">{totals.totalPaper} Min</td>
+                <td className="py-3 px-4 text-center font-bold text-green-400">{totals.totalDigital} Min</td>
+                <td className="py-3 px-4 text-center font-bold text-blue-400">-{Math.round((totals.totalSaved / totals.totalPaper) * 100)}%</td>
               </tr>
             </tfoot>
           </table>
@@ -1105,23 +1119,30 @@ function ProductivityTab() {
       </GlassCard>
     </div>
   );
-}
+});
 
-function ChangelogTab() {
+const ChangelogTab = memo(function ChangelogTab() {
+  // Memoize changelog stats
+  const stats = useMemo(() => ({
+    deployCount: DEPLOY_HISTORY.length,
+    changeCount: DEPLOY_HISTORY.reduce((a, d) => a + d.changes.length, 0),
+    latestVersion: DEPLOY_HISTORY[0]?.version || '—',
+  }), []);
+
   return (
     <div className="space-y-6">
       {/* Header Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <GlassCard className="text-center">
-          <p className="text-3xl font-bold text-blue-400">{DEPLOY_HISTORY.length}</p>
+          <p className="text-3xl font-bold text-blue-400">{stats.deployCount}</p>
           <p className="text-sm text-[var(--text-secondary)]">Deployments</p>
         </GlassCard>
         <GlassCard className="text-center">
-          <p className="text-3xl font-bold text-green-400">{DEPLOY_HISTORY.reduce((a, d) => a + d.changes.length, 0)}</p>
+          <p className="text-3xl font-bold text-green-400">{stats.changeCount}</p>
           <p className="text-sm text-[var(--text-secondary)]">Änderungen gesamt</p>
         </GlassCard>
         <GlassCard className="text-center">
-          <p className="text-3xl font-bold text-purple-400">{DEPLOY_HISTORY[0]?.version || '—'}</p>
+          <p className="text-3xl font-bold text-purple-400">{stats.latestVersion}</p>
           <p className="text-sm text-[var(--text-secondary)]">Aktuelle Version</p>
         </GlassCard>
       </div>
@@ -1190,9 +1211,9 @@ function ChangelogTab() {
       </div>
     </div>
   );
-}
+});
 
-function ArchitectureTab() {
+const ArchitectureTab = memo(function ArchitectureTab() {
   return (
     <div className="space-y-6">
       {/* Tech Stack */}
@@ -1325,27 +1346,28 @@ function ArchitectureTab() {
       </GlassCard>
     </div>
   );
-}
+});
 
 // ─── Main Component ────────────────────────────────────
 
 // Memoized AdminDashboard for performance - heavy component with many tabs and charts
-export const AdminDashboard = React.memo(function AdminDashboard() {
+export const AdminDashboard = memo(function AdminDashboard() {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<TabId>('overview');
 
-  const tabContent = useMemo(() => {
+  // Wrap tab content rendering with Suspense for lazy-loaded components
+  const renderTabContent = () => {
     switch (activeTab) {
       case 'overview': return <OverviewTab />;
-      case 'users': return <UserManagementTab />;
-      case 'fragebogen': return <FragebogenBuilder />;
-      case 'roi': return <ROIDashboard />;
-      case 'wunschbox': return <WunschboxTab />;
-      case 'content': return <WaitingContentTab />;
-      case 'permissions': return <PermissionMatrix />;
-      case 'audit': return <AuditLogTab />;
-      case 'pvs': return <PvsAdminPanel />;
-      case 'therapy': return <TherapyAnalyticsTab />;
+      case 'users': return <React.Suspense fallback={<TabLoader />}><UserManagementTab /></React.Suspense>;
+      case 'fragebogen': return <React.Suspense fallback={<TabLoader />}><FragebogenBuilder /></React.Suspense>;
+      case 'roi': return <React.Suspense fallback={<TabLoader />}><ROIDashboard /></React.Suspense>;
+      case 'wunschbox': return <React.Suspense fallback={<TabLoader />}><WunschboxTab /></React.Suspense>;
+      case 'content': return <React.Suspense fallback={<TabLoader />}><WaitingContentTab /></React.Suspense>;
+      case 'permissions': return <React.Suspense fallback={<TabLoader />}><PermissionMatrix /></React.Suspense>;
+      case 'audit': return <React.Suspense fallback={<TabLoader />}><AuditLogTab /></React.Suspense>;
+      case 'pvs': return <React.Suspense fallback={<TabLoader />}><PvsAdminPanel /></React.Suspense>;
+      case 'therapy': return <React.Suspense fallback={<TabLoader />}><TherapyAnalyticsTab /></React.Suspense>;
       case 'flow': return <FlowTab />;
       case 'security': return <SecurityTab />;
       case 'export': return <ExportTab />;
@@ -1353,7 +1375,7 @@ export const AdminDashboard = React.memo(function AdminDashboard() {
       case 'architecture': return <ArchitectureTab />;
       case 'changelog': return <ChangelogTab />;
     }
-  }, [activeTab]);
+  };
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
@@ -1407,7 +1429,7 @@ export const AdminDashboard = React.memo(function AdminDashboard() {
 
       {/* Content */}
       <main className="max-w-7xl mx-auto px-4 py-6" role="tabpanel" id={`panel-${activeTab}`} aria-label={TABS.find(tab => tab.id === activeTab)?.label}>
-        {tabContent}
+        {renderTabContent()}
       </main>
 
       {/* Footer */}

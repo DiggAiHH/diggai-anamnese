@@ -1,22 +1,109 @@
 import { type AiConfig } from './ai-config';
 
 /**
+ * SECURITY: Patterns for detecting prompt injection attempts
+ * These patterns identify common jailbreak and prompt manipulation techniques
+ */
+const INJECTION_PATTERNS = [
+    /ignore\s+(previous|all|the)\s+(instructions?|prompt|context)/i,
+    /system\s*prompt/i,
+    /override\s+(instructions?|rules?)/i,
+    /disregard\s+(previous|all)/i,
+    /\bDAN\b|\bdo\s+anything\s+now\b/i,
+    /jailbreak/i,
+    /\[\s*insert\s+/i,
+    /\{\s*system\s*\}/i,
+    /new\s+command:/i,
+    /you\s+are\s+now/i,
+    /from\s+now\s+on/i,
+    /forget\s+(everything|all|previous)/i,
+    /pretend\s+you\s+are/i,
+    /act\s+as\s+(if\s+you\s+are)?/i,
+    /roleplay\s+as/i,
+    /\[\/system\]/i,
+    /\[\/user\]/i,
+    /\[\/assistant\]/i,
+    /<\|system\|>/i,
+    /<\|user\|>/i,
+    /<\|assistant\|>/i,
+];
+
+const MAX_INPUT_LENGTH = 4000;
+
+/**
+ * SECURITY: Detects potential prompt injection attempts in user input
+ * @param input - The user input to analyze
+ * @returns Detection result with pattern information
+ */
+export function detectPromptInjection(input: string): { 
+    detected: boolean; 
+    pattern?: string; 
+    matches: string[];
+} {
+    const matches: string[] = [];
+    
+    for (const pattern of INJECTION_PATTERNS) {
+        if (pattern.test(input)) {
+            matches.push(pattern.source);
+        }
+    }
+    
+    return {
+        detected: matches.length > 0,
+        pattern: matches.length > 0 ? matches[0] : undefined,
+        matches,
+    };
+}
+
+/**
  * SECURITY: Sanitizes user input before sending to LLM.
  * Prevents prompt injection attacks by removing control characters
  * and limiting input length.
+ * 
+ * Enhanced with injection detection (HIGH-003 Fix)
  */
-function sanitizeForLlm(input: string): string {
-    if (typeof input !== 'string') return '';
+export function sanitizeForLlm(input: string): { 
+    sanitized: string; 
+    blocked: boolean; 
+    warnings: string[];
+} {
+    const warnings: string[] = [];
     
-    return input
+    if (typeof input !== 'string') {
+        return { 
+            sanitized: '', 
+            blocked: true, 
+            warnings: ['Input must be a string'] 
+        };
+    }
+    
+    // Check for injection attempts
+    const injectionCheck = detectPromptInjection(input);
+    if (injectionCheck.detected) {
+        warnings.push(`Potential prompt injection detected: ${injectionCheck.matches.join(', ')}`);
+        // Log security event (don't expose details to user)
+        console.warn(`[Security] Prompt injection attempt detected: ${injectionCheck.matches.length} pattern(s)`);
+    }
+    
+    let sanitized = input
         // Remove potential prompt control characters
         .replace(/[<>{}[\]]/g, '')
         // Remove null bytes
         .replace(/\x00/g, '')
         // Remove control characters (except newlines and tabs)
-        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
-        // Limit length to prevent DoS
-        .slice(0, 4000);
+        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+    
+    // Check length limit to prevent DoS
+    if (sanitized.length > MAX_INPUT_LENGTH) {
+        warnings.push(`Input truncated from ${sanitized.length} to ${MAX_INPUT_LENGTH} characters`);
+        sanitized = sanitized.slice(0, MAX_INPUT_LENGTH);
+    }
+    
+    return {
+        sanitized,
+        blocked: injectionCheck.detected,
+        warnings,
+    };
 }
 
 export interface LlmResponse {
@@ -66,14 +153,19 @@ async function callOllama(config: AiConfig, prompt: string, systemPrompt: string
     const sanitizedPrompt = sanitizeForLlm(prompt);
     const sanitizedSystemPrompt = systemPrompt ? sanitizeForLlm(systemPrompt) : undefined;
 
+    // SECURITY: Block requests with detected injection attempts
+    if (sanitizedPrompt.blocked) {
+        console.warn('[Security] Blocking LLM request due to detected prompt injection');
+    }
+
     try {
         const res = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 model: config.model,
-                prompt: sanitizedPrompt,
-                system: sanitizedSystemPrompt,
+                prompt: sanitizedPrompt.sanitized,
+                system: sanitizedSystemPrompt?.sanitized,
                 stream: false,
                 options: {
                     temperature: config.temperature,
@@ -110,9 +202,14 @@ async function callOpenAi(config: AiConfig, prompt: string, systemPrompt: string
     const sanitizedPrompt = sanitizeForLlm(prompt);
     const sanitizedSystemPrompt = systemPrompt ? sanitizeForLlm(systemPrompt) : undefined;
 
+    // SECURITY: Block requests with detected injection attempts
+    if (sanitizedPrompt.blocked) {
+        console.warn('[Security] Blocking LLM request due to detected prompt injection');
+    }
+
     const messages: { role: string; content: string }[] = [];
-    if (sanitizedSystemPrompt) messages.push({ role: 'system', content: sanitizedSystemPrompt });
-    messages.push({ role: 'user', content: sanitizedPrompt });
+    if (sanitizedSystemPrompt?.sanitized) messages.push({ role: 'system', content: sanitizedSystemPrompt.sanitized });
+    messages.push({ role: 'user', content: sanitizedPrompt.sanitized });
 
     try {
         const res = await fetch(url, {

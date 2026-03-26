@@ -1,0 +1,87 @@
+groups:
+  - name: anamnese-alerts
+    interval: 30s
+    rules:
+      # Critical: High Error Rate (>1% 5xx errors)
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(http_requests_total{status_code=~"5.."}[5m])) 
+          / sum(rate(http_requests_total[5m])) > 0.01
+        for: 2m
+        labels:
+          severity: critical
+          service: anamnese
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value | humanizePercentage }} over the last 5 minutes"
+          runbook_url: "https://wiki.diggai.de/runbooks/high-error-rate"
+
+      # Critical: Database Down
+      - alert: DatabaseDown
+        expr: up{job="postgres"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: database
+        annotations:
+          summary: "Database is down"
+          description: "PostgreSQL database is not responding"
+
+      # Critical: Redis Down
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: cache
+        annotations:
+          summary: "Redis is down"
+          description: "Redis cache is not responding"
+
+      # Warning: High Response Time (p95 > 500ms)
+      - alert: HighResponseTime
+        expr: |
+          histogram_quantile(0.95, 
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le)
+          ) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          service: anamnese
+        annotations:
+          summary: "High response time detected"
+          description: "95th percentile response time is {{ $value }}s"
+
+      # Warning: High Memory Usage (>85%)
+      - alert: HighMemoryUsage
+        expr: process_resident_memory_bytes / os_total_memory_bytes > 0.85
+        for: 5m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is at {{ $value | humanizePercentage }}"
+
+      # Warning: Low Disk Space (<20% free)
+      - alert: LowDiskSpace
+        expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) < 0.2
+        for: 5m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: "Low disk space"
+          description: "Disk has only {{ $value | humanizePercentage }} free space"
+
+      # Info: Triage Alert Spike
+      - alert: TriageAlertSpike
+        expr: |
+          increase(triage_alerts_total[1h]) > 10
+        for: 0m
+        labels:
+          severity: info
+          service: anamnese
+        annotations:
+          summary: "Unusual triage alert activity"
+          description: "{{ $value }} triage alerts in the last hour"

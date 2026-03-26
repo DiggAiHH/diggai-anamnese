@@ -30,8 +30,9 @@ import { LanguageSelector } from './LanguageSelector';
 import { ThemeToggle } from './ThemeToggle';
 import { ModeToggle } from './ModeToggle';
 import { FontSizeControl } from './FontSizeControl';
-import { CompletionCelebration } from './Celebrations';
+import { CelebrationOverlay as CompletionCelebration } from './Celebrations';
 import { KioskToggle } from './KioskToggle';
+import { SimpleModeToggle } from './SimpleModeToggle';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { SessionTimeoutWarning } from './SessionTimeoutWarning';
 import { InfoBreak } from './waiting/InfoBreak';
@@ -89,6 +90,17 @@ const ESTIMATED_TIME_NUMBERS: Record<string, string> = {
 
 import { useTranslation } from 'react-i18next';
 
+/**
+ * Questionnaire Component - Phase 3: Layout & Whitespace
+ * 
+ * Psychology-Based Design (Miller's Law + Progressive Disclosure):
+ * - Simple Mode: 1 question per screen (stressed/overwhelmed users)
+ * - Normal Mode: Max 3-4 questions per screen (standard users)
+ * - 40% whitespace target for reduced cognitive load
+ * - 48px minimum touch targets for thumb reach
+ * - 20px border radius for friendly, approachable UI
+ * - 32px padding for cognitive breathing room
+ */
 export function Questionnaire() {
     const { t } = useTranslation();
     const store = useSessionStore();
@@ -168,8 +180,6 @@ export function Questionnaire() {
         }
         return age;
     }, [patientBirthDate]);
-
-    // Alter berechnen (wird nicht mehr mit useMemo als State abgeleitet, reicht direkt als Konstante)
 
     // Prüfe ob aktuelle Frage die Medikamenten-Frage ist
     const isMedicationQuestion = state.currentQuestionId === '8900';
@@ -528,28 +538,34 @@ export function Questionnaire() {
             />
 
             <main className="flex-1 relative flex flex-col min-w-0">
-                {/* Background effects */}
+                {/* Background effects - subtle for 40% whitespace target */}
                 <div className="absolute inset-0 overflow-hidden pointer-events-none">
                     <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] rounded-full bg-blue-500/10 blur-[120px]" />
                     <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] rounded-full bg-indigo-500/10 blur-[120px]" />
                 </div>
 
-                {/* Header */}
-                <header className="relative z-10 px-6 lg:px-12 py-6 flex items-center justify-between border-b border-[var(--border-primary)] backdrop-blur-md bg-[var(--bg-overlay)] text-[var(--text-primary)]">
-                    <div className="flex items-center gap-6">
+                {/* Header - Simplified Navigation (Max 5 items per Miller's Law) */}
+                <header className="relative z-10 px-6 lg:px-8 py-4 flex items-center justify-between border-b border-[var(--border-primary)] backdrop-blur-md bg-[var(--bg-overlay)] text-[var(--text-primary)]">
+                    {/* Left: History + Service Info (Max 2 items) */}
+                    <div className="flex items-center gap-4">
                         <button
                             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
                             aria-label={t('Verlauf anzeigen', 'Verlauf anzeigen')}
-                            className="p-2.5 hover:bg-[var(--bg-card)] rounded-xl transition-colors border border-[var(--border-primary)] active:scale-95 shadow-lg shadow-blue-500/5 group"
+                            className="
+                                p-3 min-h-[48px] min-w-[48px]  /* 48px touch target */
+                                hover:bg-[var(--bg-card)] rounded-[20px]  /* 20px radius */
+                                transition-colors border border-[var(--border-primary)] 
+                                active:scale-95 shadow-lg shadow-blue-500/5 group
+                            "
                         >
                             <History className="w-5 h-5 text-blue-400 group-hover:scale-110 transition-transform" />
                         </button>
-                        <div className="flex items-center gap-4">
-                            <div className={`p-2.5 ${theme.bgClass} rounded-xl border ${theme.borderClass} shadow-lg shadow-black/20`}>
-                                <theme.icon className={`w-6 h-6 ${theme.colorClass}`} />
+                        <div className="flex items-center gap-3">
+                            <div className={`p-2.5 ${theme.bgClass} rounded-[16px] border ${theme.borderClass} shadow-lg shadow-black/20`}>
+                                <theme.icon className={`w-5 h-5 ${theme.colorClass}`} />
                             </div>
-                            <div>
-                                <h1 className="text-xl font-bold tracking-tight">{t(state.selectedReason || 'Anamnese')}</h1>
+                            <div className="hidden sm:block">
+                                <h1 className="text-lg font-bold tracking-tight">{t(state.selectedReason || 'Anamnese')}</h1>
                                 <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">
                                     {patientName ? `${patientName} – ` : ''}{t('Frage')} {totalAnswered + 1}/{totalEstimated}
                                 </p>
@@ -557,8 +573,10 @@ export function Questionnaire() {
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-4">
-                        <div className="hidden sm:flex items-center gap-6 px-4 py-2 bg-[var(--bg-card)] rounded-full border border-[var(--border-primary)]">
+                    {/* Right: Controls (Max 3 items visible on mobile, 5 on desktop) */}
+                    <div className="flex items-center gap-2">
+                        {/* Time & Security - Hidden on small screens */}
+                        <div className="hidden md:flex items-center gap-4 px-4 py-2 bg-[var(--bg-card)] rounded-full border border-[var(--border-primary)]">
                             <div className="flex items-center gap-2">
                                 <Clock className="w-3.5 h-3.5 text-gray-500" />
                                 <span className="text-xs font-medium text-[var(--text-secondary)]">{t('Dauer')}: <span className="text-[var(--text-primary)]">{t(estTime)}</span></span>
@@ -569,14 +587,28 @@ export function Questionnaire() {
                                 <span className="text-xs font-medium text-green-500/70 uppercase tracking-wider">{t('Sicher')}</span>
                             </div>
                         </div>
-                        <ModeToggle />
-                        <FontSizeControl />
-                        <LanguageSelector />
-                        <ThemeToggle />
-                        <KioskToggle />
+
+                        {/* Simple Mode Toggle - Phase 3 Feature */}
+                        <SimpleModeToggle />
+
+                        {/* Other Controls - Hidden on mobile */}
+                        <div className="hidden sm:flex items-center gap-2">
+                            <ModeToggle />
+                            <FontSizeControl />
+                            <LanguageSelector />
+                            <ThemeToggle />
+                            <KioskToggle />
+                        </div>
+
+                        {/* Home/Exit Button */}
                         <button
                             onClick={handleReset}
-                            className="p-2.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)] rounded-xl transition-all border border-transparent hover:border-[var(--border-primary)]"
+                            className="
+                                p-3 min-h-[48px] min-w-[48px]  /* 48px touch target */
+                                text-[var(--text-muted)] hover:text-[var(--text-primary)] 
+                                hover:bg-[var(--bg-card)] rounded-[20px]  /* 20px radius */
+                                transition-all border border-transparent hover:border-[var(--border-primary)]
+                            "
                             title={t('Abbrechen & Home')}
                         >
                             <Home className="w-5 h-5" />
@@ -584,11 +616,14 @@ export function Questionnaire() {
                     </div>
                 </header>
 
-                {/* Main Content */}
+                {/* Main Content - Progressive Disclosure Based on Simple Mode */}
                 <div className="flex-1 overflow-y-auto custom-scrollbar relative z-10 text-[var(--text-primary)]">
-                    <div className="max-w-3xl mx-auto px-6 lg:px-12 py-12">
-                        {/* Progress */}
-                        <div className="mb-12">
+                    <div className={`
+                        mx-auto px-6 lg:px-8 py-8 
+                        ${store.simpleMode ? 'max-w-2xl' : 'max-w-3xl'}  /* Narrower in simple mode for focus */
+                    `}>
+                        {/* Progress - Increased spacing for breathing room */}
+                        <div className="mb-10">
                             <ProgressBar
                                 progress={progress}
                                 colorClass={theme.colorClass}
@@ -625,18 +660,33 @@ export function Questionnaire() {
                             </div>
                         )}
 
-                        {/* Frage-Inhalt */}
-                        <div className="min-h-[400px]" aria-live="polite" aria-atomic="true">
+                        {/* Question Content - Single Focus in Simple Mode */}
+                        <div 
+                            className={`
+                                min-h-[400px] 
+                                ${store.simpleMode ? 'flex flex-col items-center justify-center' : ''}
+                            `} 
+                            aria-live="polite" 
+                            aria-atomic="true"
+                        >
                             {/* Schwangerschafts-Check */}
                             {isSchwangerschaftQuestion ? (
-                                <SchwangerschaftCheck
-                                    onAnswer={(value) => handleAnswer('8800', value)}
-                                    initialValue={state.answers['8800']?.value as string}
-                                />
+                                <div className={`
+                                    bg-[var(--bg-card)] rounded-[20px] p-8 border border-[var(--border-primary)]
+                                    ${store.simpleMode ? 'w-full max-w-lg shadow-xl' : ''}
+                                `}>
+                                    <SchwangerschaftCheck
+                                        onAnswer={(value) => handleAnswer('8800', value)}
+                                        initialValue={state.answers['8800']?.value as string}
+                                    />
+                                </div>
                             ) : isMedicationQuestion ? (
                                 /* Strukturierte Medikamenten-Eingabe */
-                                <div className="space-y-6">
-                                    <div>
+                                <div className={`
+                                    space-y-6
+                                    ${store.simpleMode ? 'w-full max-w-lg' : ''}
+                                `}>
+                                    <div className="bg-[var(--bg-card)] rounded-[20px] p-8 border border-[var(--border-primary)]">
                                         <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-2">
                                             {currentQuestion.question}
                                         </h2>
@@ -654,7 +704,7 @@ export function Questionnaire() {
                                         }}
                                     />
                                     {/* Fallback Freitext */}
-                                    <div className="mt-4">
+                                    <div className="bg-[var(--bg-card)] rounded-[20px] p-6 border border-[var(--border-primary)]">
                                         <label className="text-xs text-[var(--text-muted)] block mb-2">
                                             {t('medFreetextLabel', 'Oder als Freitext eingeben:')}
                                         </label>
@@ -663,52 +713,70 @@ export function Questionnaire() {
                                             onChange={(e) => handleAnswer('8900', e.target.value)}
                                             placeholder="z.B. Ramipril 5mg morgens, Metformin 850mg 2x täglich"
                                             rows={3}
-                                            className="w-full px-4 py-3 bg-[var(--bg-input)] border border-[var(--border-primary)] rounded-xl text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-all resize-none"
+                                            className="w-full px-4 py-3 bg-[var(--bg-input)] border border-[var(--border-primary)] rounded-[16px] text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-all resize-none"
                                         />
                                     </div>
                                 </div>
                             ) : currentQuestion.type === 'surgery-form' ? (
-                                <div className="space-y-6">
-                                    <SurgeryManager
-                                        value={surgeries}
-                                        onChange={(surgs) => {
-                                            setSurgeries(surgs);
-                                            // Auch als Freitext speichern
-                                            const text = surgs.map(s => `${s.surgeryName} (${s.date})`).join('; ');
-                                            handleAnswer(currentQuestion.id, text || '');
+                                <div className={`
+                                    space-y-6
+                                    ${store.simpleMode ? 'w-full max-w-lg' : ''}
+                                `}>
+                                    <div className="bg-[var(--bg-card)] rounded-[20px] p-8 border border-[var(--border-primary)]">
+                                        <SurgeryManager
+                                            value={surgeries}
+                                            onChange={(surgs) => {
+                                                setSurgeries(surgs);
+                                                // Auch als Freitext speichern
+                                                const text = surgs.map(s => `${s.surgeryName} (${s.date})`).join('; ');
+                                                handleAnswer(currentQuestion.id, text || '');
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+                            ) : currentQuestion.type === 'patient-identify' ? (
+                                <div className={`
+                                    bg-[var(--bg-card)] rounded-[20px] p-8 border border-[var(--border-primary)]
+                                    ${store.simpleMode ? 'w-full max-w-lg shadow-xl' : ''}
+                                `}>
+                                    <PatientIdentify
+                                        onIdentified={(patient) => {
+                                            // Store patient data and advance
+                                            handleAnswer(currentQuestion.id, JSON.stringify({
+                                                patientId: patient.patientId,
+                                                patientNumber: patient.patientNumber,
+                                                name: patient.name,
+                                            }));
+                                        }}
+                                        onFallback={() => {
+                                            // Patient not found → mark as fallback and go to manual flow
+                                            handleAnswer(currentQuestion.id, 'fallback');
+                                        }}
+                                        onError={(msg) => {
+                                            console.error('Patient identify error:', msg);
                                         }}
                                     />
                                 </div>
-                            ) : currentQuestion.type === 'patient-identify' ? (
-                                <PatientIdentify
-                                    onIdentified={(patient) => {
-                                        // Store patient data and advance
-                                        handleAnswer(currentQuestion.id, JSON.stringify({
-                                            patientId: patient.patientId,
-                                            patientNumber: patient.patientNumber,
-                                            name: patient.name,
-                                        }));
-                                    }}
-                                    onFallback={() => {
-                                        // Patient not found → mark as fallback and go to manual flow
-                                        handleAnswer(currentQuestion.id, 'fallback');
-                                    }}
-                                    onError={(msg) => {
-                                        console.error('Patient identify error:', msg);
-                                    }}
-                                />
                             ) : state.currentQuestionId === '9999' ? (
                                 <IGelServices />
                             ) : (
-                                /* Standard-Frage */
-                                <div>
+                                /* Standard-Frage with Simple Mode Support */
+                                <div className={`
+                                    ${store.simpleMode ? 'w-full max-w-lg' : ''}
+                                `}>
                                     {/* Optional Camera Scanner Button for demographics */}
                                     {(currentQuestion.id === '0001' || currentQuestion.id === '0011' || currentQuestion.id === '0003' || currentQuestion.id === '2000') && (
-                                        <div className="mb-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-2xl">
+                                        <div className="mb-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-[20px]">
                                             <div className="flex items-start gap-3">
                                                 <button
                                                     onClick={() => setShowCameraScanner(true)}
-                                                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-medium transition-all shadow-lg shadow-blue-500/20 shrink-0"
+                                                    className="
+                                                        flex items-center gap-2 px-4 py-3 
+                                                        min-h-[48px]  /* 48px touch target */
+                                                        bg-blue-600 hover:bg-blue-500 text-white 
+                                                        rounded-[16px] text-sm font-medium 
+                                                        transition-all shadow-lg shadow-blue-500/20 shrink-0
+                                                    "
                                                 >
                                                     <Camera className="w-4 h-4" />
                                                     {t('Kamera')}
@@ -722,46 +790,87 @@ export function Questionnaire() {
                                             </div>
                                         </div>
                                     )}
-                                    <QuestionRenderer
-                                        question={currentQuestion}
-                                        value={state.answers[state.currentQuestionId!]?.value as string}
-                                        onAnswer={(value) => handleAnswer(currentQuestion.id, value as string | string[] | boolean | number | Record<string, unknown> | null)}
-                                        error={localError}
-                                    />
+                                    
+                                    {/* Question Card - Enhanced spacing in Simple Mode */}
+                                    <div className={`
+                                        bg-[var(--bg-card)] rounded-[20px] border border-[var(--border-primary)]
+                                        ${store.simpleMode ? 'p-8 lg:p-10 shadow-xl' : 'p-6 lg:p-8'}
+                                    `}>
+                                        {/* Simple Mode: More prominent question display */}
+                                        {store.simpleMode && (
+                                            <div className="mb-8 text-center">
+                                                <span className="inline-block px-3 py-1 mb-4 text-xs font-bold uppercase tracking-wider text-blue-400 bg-blue-500/10 rounded-full">
+                                                    {t('question.label', 'Frage')} {totalAnswered + 1} {t('question.of', 'von')} {totalEstimated}
+                                                </span>
+                                                <h2 className="text-xl lg:text-2xl font-bold text-[var(--text-primary)] leading-relaxed">
+                                                    {currentQuestion.question}
+                                                </h2>
+                                                {currentQuestion.description && (
+                                                    <p className="mt-3 text-sm text-[var(--text-muted)]">
+                                                        {currentQuestion.description}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        )}
+                                        
+                                        <QuestionRenderer
+                                            question={currentQuestion}
+                                            value={state.answers[state.currentQuestionId!]?.value as string}
+                                            onAnswer={(value) => handleAnswer(currentQuestion.id, value as string | string[] | boolean | number | Record<string, unknown> | null)}
+                                            error={localError}
+                                            simpleMode={store.simpleMode}  /* Pass simple mode for child components */
+                                        />
+                                    </div>
                                 </div>
                             )}
                         </div>
 
-                        {/* Navigation Buttons – inline under question */}
-                        <div className="mt-8 flex items-center justify-between">
+                        {/* Navigation - 48px Touch Targets, Psychology-Optimized */}
+                        <div className="mt-10 flex items-center justify-between gap-4">
                             <button
                                 onClick={handleGoBack}
-                                className={`flex items-center gap-3 px-6 py-3.5 rounded-2xl font-semibold transition-all
+                                className={`
+                                    flex items-center gap-3 
+                                    min-h-[48px] min-w-[48px] px-6 py-3  /* 48px touch target */
+                                    rounded-[20px] font-semibold text-sm  /* 20px radius */
+                                    transition-all duration-200
+                                    active:scale-[0.98]
                                     ${state.questionHistory.length === 0
                                         ? 'opacity-0 pointer-events-none'
                                         : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)] border border-[var(--border-primary)] hover:border-[var(--border-hover)]'
-                                    }`}
+                                    }
+                                `}
+                                aria-label={t('Zurück')}
                             >
                                 <ArrowLeft className="w-5 h-5" />
-                                <span>{t('Zurück')}</span>
+                                <span className="hidden sm:inline">{t('Zurück')}</span>
                             </button>
 
                             <button
                                 onClick={handleNext}
-                                className="btn-primary group flex items-center gap-3 px-10 py-4 rounded-2xl font-bold transition-all shadow-lg hover:scale-[1.02] active:scale-[0.98]"
+                                className="
+                                    btn-primary group flex items-center gap-3 
+                                    min-h-[48px] min-w-[48px] px-8 py-4  /* 48px touch target, extra padding for primary */
+                                    rounded-[20px] font-bold text-sm  /* 20px radius */
+                                    transition-all shadow-lg hover:shadow-xl
+                                    hover:scale-[1.02] active:scale-[0.98]
+                                "
+                                aria-label={isLastQuestion ? t('Absenden') : t('Weiter')}
                             >
                                 <span>{isLastQuestion ? t('Absenden') : t('Weiter')}</span>
                                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                             </button>
                         </div>
 
-                        {/* Privacy Reassurance */}
+                        {/* Privacy Reassurance - Increased spacing */}
                         {!isLastQuestion && (
-                            <div className="mt-8 p-4 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-primary)] flex items-center gap-4">
-                                <div className="p-2 bg-green-500/10 rounded-xl border border-green-500/20">
-                                    <ShieldCheck className="w-4 h-4 text-green-400" />
+                            <div className="mt-10 p-4 rounded-[20px] bg-[var(--bg-card)] border border-[var(--border-primary)] flex items-center gap-4">
+                                <div className="p-2.5 bg-green-500/10 rounded-[16px] border border-green-500/20 shrink-0">
+                                    <ShieldCheck className="w-5 h-5 text-green-400" />
                                 </div>
-                                <p className="text-xs text-[var(--text-muted)] font-medium">{t('dataProtectionDetail', 'AES-256 verschlüsselt • DSGVO-konform • Ausschließlich medizinische Nutzung')}</p>
+                                <p className="text-xs text-[var(--text-muted)] font-medium leading-relaxed">
+                                    {t('dataProtectionDetail', 'AES-256 verschlüsselt • DSGVO-konform • Ausschließlich medizinische Nutzung')}
+                                </p>
                             </div>
                         )}
                     </div>

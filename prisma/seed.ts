@@ -521,23 +521,78 @@ async function main() {
     const tenant = await prisma.tenant.upsert({
         where: { subdomain: 'default' },
         update: {},
-        create: { subdomain: 'default', name: 'Default Praxis' },
+        create: { subdomain: 'default', name: 'Zentrum für Allgemeinmedizin' },
     });
-    const arztExists = await prisma.arztUser.findFirst({ where: { username: 'admin', tenantId: tenant.id } });
-    if (!arztExists) {
-        const hash = await bcrypt.hash(process.env.ARZT_PASSWORD || 'CHANGE_ME_IN_ENV', 10);
-        await prisma.arztUser.create({
+    
+    const arztPasswordHash = await bcrypt.hash(process.env.ARZT_PASSWORD || 'praxis2026', 10);
+    const demoPasswordHash = await bcrypt.hash('arzt1234', 10);
+    const mfaPasswordHash = await bcrypt.hash('mfa1234', 10);
+
+    // Standard Admin
+    await prisma.arztUser.upsert({
+        where: { tenantId_username: { tenantId: tenant.id, username: 'admin' } },
+        update: { passwordHash: arztPasswordHash },
+        create: {
+            tenantId: tenant.id,
+            username: 'admin',
+            passwordHash: arztPasswordHash,
+            displayName: 'Dr. Admin',
+            role: 'ADMIN',
+        },
+    });
+
+    // Demo Arzt
+    await prisma.arztUser.upsert({
+        where: { tenantId_username: { tenantId: tenant.id, username: 'arzt' } },
+        update: { passwordHash: demoPasswordHash },
+        create: {
+            tenantId: tenant.id,
+            username: 'arzt',
+            passwordHash: demoPasswordHash,
+            displayName: 'Dr. Klaproth',
+            role: 'ARZT',
+        },
+    });
+
+    // Demo MFA
+    await prisma.arztUser.upsert({
+        where: { tenantId_username: { tenantId: tenant.id, username: 'mfa' } },
+        update: { passwordHash: mfaPasswordHash },
+        create: {
+            tenantId: tenant.id,
+            username: 'mfa',
+            passwordHash: mfaPasswordHash,
+            displayName: 'MFA Team',
+            role: 'MFA',
+        },
+    });
+
+    console.log('  ✓ Staff-Accounts erstellt: admin, arzt, mfa');
+
+    // 4. Dummy Patient Sessions für Dashboard-Demo
+    const dummyPatients = [
+        { name: 'Max Mustermann', service: 'Termin / Anamnese', status: 'ACTIVE' },
+        { name: 'Erika Musterfrau', service: 'Medikamente / Rezepte', status: 'COMPLETED' },
+        { name: 'Hans Georg', service: 'AU (Krankschreibung)', status: 'ACTIVE' },
+    ];
+
+    for (const p of dummyPatients) {
+        // Mock encryption for seed (base64 is enough for seed visibility in dashboard)
+        const encryptedName = Buffer.from(p.name).toString('base64');
+        await prisma.patientSession.create({
             data: {
                 tenantId: tenant.id,
-                username: 'admin',
-                passwordHash: hash,
-                displayName: 'Dr. Admin',
-            },
+                selectedService: p.service,
+                status: p.status,
+                encryptedName,
+                isNewPatient: true,
+                gender: 'M',
+            }
         });
-        console.log('  ✓ Standard-Arzt "admin" erstellt (Passwort aus ARZT_PASSWORD env)');
     }
+    console.log(`  ✓ ${dummyPatients.length} Dummy-Sessions erstellt`);
 
-    console.log(`\n✅ Seed abgeschlossen: ${LEGACY_QUESTIONS.length} Fragen + 1 Arzt-Account`);
+    console.log(`\n✅ Seed erfolgreich: ${LEGACY_QUESTIONS.length} Fragen + 3 Staff-Accounts + Demo-Daten`);
 
     // Modul 1+2 Seeds
     await seedWaitingContent();

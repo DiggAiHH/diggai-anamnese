@@ -98,6 +98,7 @@ router.post('/login', loginRateLimiter, async (req: Request, res: Response) => {
                 id: arzt.id,
                 username: arzt.username,
                 displayName: arzt.displayName,
+                role: arzt.role,
             },
         });
     } catch (err: unknown) {
@@ -106,6 +107,44 @@ router.post('/login', loginRateLimiter, async (req: Request, res: Response) => {
             return;
         }
         console.error('[Arzt] Login-Fehler:', err);
+        res.status(500).json({ error: 'Interner Serverfehler' });
+    }
+});
+
+router.get('/me', requireAuth, requireRole('arzt', 'mfa', 'admin'), async (req: Request, res: Response) => {
+    try {
+        if (!req.auth?.userId) {
+            res.status(401).json({ error: 'Authentifizierung erforderlich' });
+            return;
+        }
+
+        const arzt = await prisma.arztUser.findUnique({
+            where: { id: req.auth.userId },
+            select: {
+                id: true,
+                username: true,
+                displayName: true,
+                role: true,
+                isActive: true,
+            },
+        });
+
+        if (!arzt || arzt.isActive === false) {
+            clearTokenCookie(res);
+            res.status(401).json({ error: 'Ungültiger Benutzer' });
+            return;
+        }
+
+        res.json({
+            user: {
+                id: arzt.id,
+                username: arzt.username,
+                displayName: arzt.displayName,
+                role: arzt.role,
+            },
+        });
+    } catch (err: unknown) {
+        console.error('[Arzt] Me-Fehler:', err);
         res.status(500).json({ error: 'Interner Serverfehler' });
     }
 });

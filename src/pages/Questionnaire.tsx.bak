@@ -1,0 +1,663 @@
+import React, { useState, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  Heart, 
+  ChevronRight, 
+  ChevronLeft, 
+  CheckCircle, 
+  Shield, 
+  Clock, 
+  Lock,
+  Sparkles,
+  FileCheck,
+  ArrowRight,
+  HelpCircle
+} from 'lucide-react';
+import { StepProgress } from '../components/ui/Progress';
+import { Button } from '../components/ui/Button';
+import { questions } from '../data/questions';
+import type { Question, Option } from '../types/question';
+
+// ─── Types ─────────────────────────────────────────────
+
+type QuestionnaireStep = 'welcome' | 'questions' | 'review' | 'complete';
+
+interface Answer {
+  questionId: string;
+  value: unknown;
+  timestamp: number;
+}
+
+// ─── Welcome Screen Component ──────────────────────────
+
+const WelcomeScreen = React.memo(function WelcomeScreen({
+    onStart,
+    estimatedTime = 5
+}: {
+    onStart: () => void;
+    estimatedTime?: number;
+}) {
+    const { t } = useTranslation();
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
+            className="min-h-[60vh] flex flex-col items-center justify-center px-6 py-12"
+        >
+            {/* Trust Badge */}
+            <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ delay: 0.2, duration: 0.4 }}
+                className="flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--accent-primary)]/10 border border-[var(--accent-primary)]/30 mb-8"
+            >
+                <Shield className="w-4 h-4 text-[var(--accent-primary)]" />
+                <span className="text-sm font-bold text-[var(--accent-primary)] uppercase tracking-widest">
+                    {t('questionnaire.welcome.secure', 'DSGVO-konform')}
+                </span>
+            </motion.div>
+
+            {/* Main Content */}
+            <div className="text-center max-w-lg mx-auto">
+                <motion.div
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ delay: 0.1, duration: 0.5, type: 'spring' }}
+                    className="w-24 h-24 rounded-3xl bg-gradient-to-br from-[var(--accent-primary)] to-[var(--accent-secondary)] flex items-center justify-center mx-auto mb-8 shadow-2xl shadow-[var(--accent-primary)]/20 rotate-3 group-hover:rotate-0 transition-transform"
+                >
+                    <Heart className="w-12 h-12 text-white" />
+                </motion.div>
+
+                <motion.h1
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2, duration: 0.4 }}
+                    className="text-4xl sm:text-5xl font-black text-[var(--text-primary)] mb-4 tracking-tighter leading-[1.1]"
+                >
+                    {t('questionnaire.welcome.title', 'Ihre digitale Anamnese')}
+                </motion.h1>
+
+                <motion.p
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3, duration: 0.4 }}
+                    className="text-lg text-[var(--text-secondary)] mb-10 leading-relaxed font-medium"
+                >
+                    {t('questionnaire.welcome.subtitle', 'Helfen Sie uns, Sie besser zu verstehen. Sicher, verschlüsselt und schnell.')}
+                </motion.p>
+
+                {/* Benefits */}
+                <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.4, duration: 0.4 }}
+                    className="flex flex-wrap justify-center gap-4 mb-12"
+                >
+                    {[
+                        { icon: Clock, text: t('questionnaire.welcome.time', '{{time}} Min.', { time: estimatedTime }), color: 'text-blue-400' },
+                        { icon: Lock, text: t('questionnaire.welcome.privacy', 'Verschlüsselt'), color: 'text-[var(--accent-primary)]' },
+                        { icon: Sparkles, text: t('questionnaire.welcome.ai', 'KI-Assistiert'), color: 'text-purple-400' },
+                    ].map((item, index) => (
+                        <div
+                            key={index}
+                            className="flex items-center gap-2.5 px-5 py-2.5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-primary)] shadow-sm"
+                        >
+                            <item.icon className={`w-4 h-4 ${item.color}`} />
+                            <span className="text-xs font-black text-[var(--text-primary)] uppercase tracking-wider">{item.text}</span>
+                        </div>
+                    ))}
+                </motion.div>
+
+                {/* Single CTA */}
+                <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.5, duration: 0.4 }}
+                >
+                    <Button
+                        onClick={handleStart}
+                        size="lg"
+                        className="group w-full sm:w-auto px-10 py-5 text-xl font-black rounded-3xl bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] text-white transition-all duration-300 shadow-2xl shadow-[var(--accent-primary)]/30 active:scale-95 border-b-4 border-black/20"
+                    >
+                        <span>{t('questionnaire.welcome.start', 'Anamnese starten')}</span>
+                        <ArrowRight className="w-6 h-6 ml-3 group-hover:translate-x-2 transition-transform" />
+                    </Button>
+                </motion.div>
+            </div>
+        </motion.div>
+    );
+});
+
+// ─── Question Card Component ───────────────────────────
+
+const QuestionCard = React.memo(function QuestionCard({
+    question,
+    value,
+    onAnswer,
+    isActive,
+}: {
+    question: Question;
+    value: unknown;
+    onAnswer: (value: unknown) => void;
+    isActive: boolean;
+}) {
+    const { t } = useTranslation();
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, scale: 0.98, y: 10 }}
+            animate={{ opacity: isActive ? 1 : 0, scale: isActive ? 1 : 0.98, y: isActive ? 0 : 10 }}
+            exit={{ opacity: 0, scale: 0.98, y: -10 }}
+            transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
+            className="w-full"
+        >
+            <div className="bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-[2.5rem] p-8 sm:p-12 shadow-2xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-[var(--accent-primary)]/5 rounded-full blur-[100px] -mr-32 -mt-32" />
+                
+                <div className="relative z-10">
+                    <h3 className="text-2xl sm:text-3xl font-black text-[var(--text-primary)] mb-6 tracking-tight leading-tight">
+                        {t(question.textKey || question.text || 'question.default')}
+                    </h3>
+
+                    {question.subtitle && (
+                        <p className="text-[var(--text-secondary)] mb-10 text-lg font-medium opacity-70">
+                            {t(question.subtitle)}
+                        </p>
+                    )}
+
+                    {/* Answer Input */}
+                    <div className="space-y-4">
+                        {question.type === 'choice' && (question.options as Option[] | undefined)?.map((option) => (
+                            <button
+                                key={option.id}
+                                onClick={() => onAnswer(option.id)}
+                                className={`
+                                w-full flex items-center justify-between gap-4 p-6 rounded-3xl border-2 transition-all duration-200 text-left group
+                                ${value === option.id
+                                        ? 'bg-[var(--accent-primary)]/10 border-[var(--accent-primary)] text-[var(--text-primary)] shadow-lg shadow-[var(--accent-primary)]/10'
+                                        : 'bg-[var(--bg-primary)] border-[var(--border-primary)] text-[var(--text-secondary)] hover:border-[var(--text-muted)]'
+                                    }
+                                `}
+                            >
+                                <span className="text-lg font-bold">{t(option.labelKey || option.label || '')}</span>
+                                <div className={`
+                                w-8 h-8 rounded-full border-4 flex items-center justify-center transition-all
+                                ${value === option.id ? 'border-[var(--accent-primary)] scale-110' : 'border-[var(--border-primary)] group-hover:border-[var(--text-muted)]'}
+                                `}>
+                                    {value === option.id && (
+                                        <div className="w-3 h-3 rounded-full bg-[var(--accent-primary)]" />
+                                    )}
+                                </div>
+                            </button>
+                        ))}
+
+                        {question.type === 'text' && (
+                            <textarea
+                                value={(value as string) || ''}
+                                autoFocus
+                                onChange={(e) => onAnswer(e.target.value)}
+                                placeholder={t('questionnaire.placeholder', 'Schreiben Sie hier...')}
+                                className="w-full h-48 px-6 py-5 bg-[var(--bg-primary)] border-2 border-[var(--border-primary)] rounded-3xl text-[var(--text-primary)] text-lg font-medium placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--accent-primary)] focus:ring-4 focus:ring-[var(--accent-primary)]/10 transition-all resize-none shadow-inner"
+                            />
+                        )}
+
+                        {question.type === 'boolean' && (
+                            <div className="grid grid-cols-2 gap-6">
+                                {[
+                                    { value: true, label: t('common.yes', 'Ja'), color: 'hover:border-green-500/50 active:bg-green-500/10' },
+                                    { value: false, label: t('common.no', 'Nein'), color: 'hover:border-red-500/50 active:bg-red-500/10' },
+                                ].map((option) => (
+                                    <button
+                                        key={String(option.value)}
+                                        onClick={() => onAnswer(option.value)}
+                                        className={`
+                                        p-8 rounded-[2rem] border-2 transition-all duration-300 text-center flex flex-col items-center gap-3
+                                        ${value === option.value
+                                                ? 'bg-[var(--accent-primary)] border-[var(--accent-primary)] text-white shadow-xl shadow-[var(--accent-primary)]/20 scale-105 z-10'
+                                                : `bg-[var(--bg-primary)] border-[var(--border-primary)] text-[var(--text-secondary)] ${option.color}`
+                                            }
+                                        `}
+                                    >
+                                        <span className="text-2xl font-black uppercase tracking-widest">{option.label}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </motion.div>
+    );
+});
+
+// ─── Review Screen Component ───────────────────────────
+
+const ReviewScreen = React.memo(function ReviewScreen({
+    answers,
+    questions,
+    onEdit,
+    onSubmit,
+    isSubmitting,
+}: {
+    answers: Answer[];
+    questions: Question[];
+    onEdit: (questionId: string) => void;
+    onSubmit: () => void;
+    isSubmitting: boolean;
+}) {
+    const { t } = useTranslation();
+
+    const getAnswerDisplay = useCallback((answer: Answer) => {
+        const question = questions.find(q => q.id === answer.questionId);
+        if (!question) return String(answer.value);
+
+        if (question.type === 'choice') {
+            const option = (question.options as Option[] | undefined)?.find((o: Option) => o.id === answer.value);
+            return option ? t(option.labelKey || option.label || '') : String(answer.value);
+        }
+
+        if (question.type === 'boolean') {
+            return answer.value ? t('common.yes', 'Ja') : t('common.no', 'Nein');
+        }
+
+        return String(answer.value);
+    }, [questions, t]);
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.5 }}
+            className="max-w-2xl mx-auto"
+        >
+            <div className="text-center mb-12">
+                <div className="w-20 h-20 rounded-3xl bg-blue-500/10 flex items-center justify-center mx-auto mb-6 shadow-sm border border-blue-500/20">
+                    <FileCheck className="w-10 h-10 text-blue-500" />
+                </div>
+                <h2 className="text-4xl font-black text-[var(--text-primary)] mb-4 tracking-tight">
+                    {t('questionnaire.review.title', 'Zusammenfassung')}
+                </h2>
+                <p className="text-[var(--text-secondary)] text-lg font-medium opacity-60">
+                    {t('questionnaire.review.subtitle', 'Überprüfen Sie Ihre Angaben vor dem Absenden.')}
+                </p>
+            </div>
+
+            <div className="space-y-4 mb-12">
+                {answers.map((answer, index) => {
+                    const question = questions.find(q => q.id === answer.questionId);
+                    if (!question) return null;
+
+                    return (
+                        <motion.div
+                            key={answer.questionId}
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: index * 0.03 }}
+                            className="group flex items-start gap-6 p-6 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-primary)] hover:border-[var(--accent-primary)]/50 transition-all shadow-sm"
+                        >
+                            <div className="w-10 h-10 rounded-2xl bg-[var(--bg-primary)] flex items-center justify-center shrink-0 font-black text-xs text-[var(--text-muted)] border border-[var(--border-primary)]">
+                                {index + 1}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)] mb-1">
+                                    {t(question.textKey || question.text || 'question.default')}
+                                </p>
+                                <p className="text-lg font-bold text-[var(--text-primary)] truncate">
+                                    {getAnswerDisplay(answer)}
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => onEdit(answer.questionId)}
+                                className="px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider text-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/10 transition-colors"
+                            >
+                                {t('common.edit', 'Ändern')}
+                            </button>
+                        </motion.div>
+                    );
+                })}
+            </div>
+
+            <Button
+                onClick={onSubmit}
+                disabled={isSubmitting}
+                size="lg"
+                className="w-full h-20 rounded-3xl bg-[var(--accent-primary)] text-white text-xl font-black tracking-tight shadow-2xl shadow-[var(--accent-primary)]/30 transition-all active:scale-[0.98] flex items-center justify-center gap-4"
+            >
+                {isSubmitting ? (
+                    <>
+                        <RefreshCw className="w-7 h-7 animate-spin" />
+                        <span>{t('questionnaire.review.submitting', 'Wird gesendet...')}</span>
+                    </>
+                ) : (
+                    <>
+                        <CheckCircle className="w-7 h-7" />
+                        <span>{t('questionnaire.review.submit', 'Anamnese jetzt absenden')}</span>
+                    </>
+                )}
+            </Button>
+        </motion.div>
+    );
+});
+
+// ─── Completion Screen Component ───────────────────────
+
+const CompletionScreen = React.memo(function CompletionScreen() {
+    const { t } = useTranslation();
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
+            className="min-h-[70vh] flex flex-col items-center justify-center px-6 py-12 text-center"
+        >
+            {/* Success Animation */}
+            <motion.div
+                initial={{ scale: 0, rotate: -20 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{ delay: 0.2, type: 'spring', stiffness: 200, damping: 15 }}
+                className="w-32 h-32 rounded-[2.5rem] bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center mb-10 shadow-2xl shadow-green-500/40 relative"
+            >
+                <div className="absolute inset-0 bg-white/20 rounded-[2.5rem] animate-ping opacity-20" />
+                <CheckCircle className="w-16 h-16 text-white relative z-10" />
+            </motion.div>
+
+            <motion.h2
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3, duration: 0.5 }}
+                className="text-4xl sm:text-5xl font-black text-[var(--text-primary)] mb-6 tracking-tighter"
+            >
+                {t('questionnaire.complete.title', 'Fertig!')}
+            </motion.h2>
+
+            <motion.p
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4, duration: 0.5 }}
+                className="text-xl text-[var(--text-secondary)] max-w-lg mb-12 leading-relaxed font-medium opacity-80"
+            >
+                {t('questionnaire.complete.message', 'Ihre Daten wurden sicher übermittelt. Wir bereiten alles für Ihren Termin vor.')}
+            </motion.p>
+
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5, duration: 0.5 }}
+                className="flex items-center gap-3 px-6 py-3 rounded-2xl bg-green-500/10 border border-green-500/20"
+            >
+                <Shield className="w-5 h-5 text-green-500" />
+                <span className="text-sm font-black text-green-500 uppercase tracking-widest">
+                    {t('questionnaire.complete.secure', 'E2E Verschlüsselt')}
+                </span>
+            </motion.div>
+
+            <motion.button
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 1, duration: 0.8 }}
+                onClick={() => window.close()}
+                className="mt-16 text-xs font-black uppercase tracking-[0.2em] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors underline underline-offset-8"
+            >
+                {t('questionnaire.complete.redirect', 'Fenster schließen')}
+            </motion.button>
+        </motion.div>
+    );
+});
+
+// ─── Help Button Component ─────────────────────────────
+
+const HelpButton = React.memo(function HelpButton() {
+    const { t } = useTranslation();
+    const [isOpen, setIsOpen] = useState(false);
+
+    return (
+        <div className="fixed bottom-8 right-8 z-50">
+            <AnimatePresence>
+                {isOpen && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 20, scale: 0.9, filter: 'blur(10px)' }}
+                        animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
+                        exit={{ opacity: 0, y: 20, scale: 0.9, filter: 'blur(10px)' }}
+                        className="absolute bottom-20 right-0 w-80 bg-[var(--bg-card)]/80 backdrop-blur-2xl border border-[var(--border-primary)] rounded-[2rem] p-8 shadow-2xl shadow-black/40"
+                    >
+                        <h4 className="text-xl font-black text-[var(--text-primary)] mb-3 tracking-tight">
+                            {t('questionnaire.help.title', 'Hilfe benötigt?')}
+                        </h4>
+                        <p className="text-sm text-[var(--text-secondary)] mb-6 font-medium leading-relaxed opacity-70">
+                            {t('questionnaire.help.text', 'Bei Fragen zum Fragebogen wenden Sie sich bitte an unser Team vor Ort oder rufen Sie uns an.')}
+                        </p>
+                        <button
+                            onClick={() => setIsOpen(false)}
+                            className="w-full py-4 rounded-2xl bg-[var(--bg-primary)] text-[var(--text-primary)] text-sm font-black uppercase tracking-widest hover:bg-[var(--border-primary)] transition-colors border border-[var(--border-primary)]"
+                        >
+                            {t('common.close', 'Verstanden')}
+                        </button>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+            <button
+                onClick={() => setIsOpen(!isOpen)}
+                className={`w-16 h-16 rounded-3xl flex items-center justify-center shadow-2xl transition-all hover:scale-110 active:scale-90 border-b-4 ${isOpen
+                        ? 'bg-[var(--bg-card)] text-[var(--text-primary)] border-[var(--border-primary)]'
+                        : 'bg-[var(--accent-primary)] text-white border-black/20'
+                    }`}
+                aria-label={t('questionnaire.help.aria', 'Hilfe öffnen')}
+            >
+                {isOpen ? <ChevronDown className="w-8 h-8" /> : <HelpCircle className="w-8 h-8" />}
+            </button>
+        </div>
+    );
+});
+
+// ─── Main Questionnaire Component ──────────────────────
+
+export const Questionnaire: React.FC = React.memo(function Questionnaire() {
+    const { t } = useTranslation();
+    const [step, setStep] = useState<QuestionnaireStep>('welcome');
+    const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+    const [answers, setAnswers] = useState<Answer[]>([]);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Filter questions for progressive disclosure
+    const visibleQuestions = useMemo(() => {
+        return questions.slice(0, 40); // Increased for better demonstration
+    }, []);
+
+    const currentQuestion = visibleQuestions[currentQuestionIndex];
+    const progress = ((currentQuestionIndex) / visibleQuestions.length) * 100;
+    const currentStepNumber = Math.min(currentQuestionIndex + 1, visibleQuestions.length);
+
+    const handleStart = useCallback(() => {
+        setStep('questions');
+    }, []);
+
+    const handleAnswer = useCallback((value: unknown) => {
+        setAnswers(prev => {
+            const existingIndex = prev.findIndex(a => a.questionId === currentQuestion.id);
+            const newAnswer: Answer = {
+                questionId: currentQuestion.id,
+                value,
+                timestamp: Date.now(),
+            };
+
+            if (existingIndex >= 0) {
+                const updated = [...prev];
+                updated[existingIndex] = newAnswer;
+                return updated;
+            }
+            return [...prev, newAnswer];
+        });
+
+        // Auto-advance after short delay for better UX
+        setTimeout(() => {
+            if (currentQuestionIndex < visibleQuestions.length - 1) {
+                setCurrentQuestionIndex(prev => prev + 1);
+            } else {
+                setStep('review');
+            }
+        }, 400);
+    }, [currentQuestion, currentQuestionIndex, visibleQuestions.length]);
+
+    const handleBack = useCallback(() => {
+        if (currentQuestionIndex > 0) {
+            setCurrentQuestionIndex(prev => prev - 1);
+        }
+    }, [currentQuestionIndex]);
+
+    const handleEdit = useCallback((questionId: string) => {
+        const index = visibleQuestions.findIndex(q => q.id === questionId);
+        if (index >= 0) {
+            setCurrentQuestionIndex(index);
+            setStep('questions');
+        }
+    }, [visibleQuestions]);
+
+    const handleSubmit = useCallback(async () => {
+        setIsSubmitting(true);
+        // Simulate API call with luxury delay
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        setIsSubmitting(false);
+        setStep('complete');
+    }, []);
+
+    const stepLabels = useMemo(() => [
+        t('questionnaire.steps.info', 'Identität'),
+        t('questionnaire.steps.symptoms', 'Beschwerden'),
+        t('questionnaire.steps.history', 'Vorgeschichte'),
+        t('questionnaire.steps.review', 'Abschluss'),
+    ], [t]);
+
+    return (
+        <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] selection:bg-[var(--accent-primary)]/30 selection:text-[var(--text-primary)]">
+            {/* Header */}
+            <header className="border-b border-[var(--border-primary)] bg-[var(--bg-card)]/50 backdrop-blur-2xl sticky top-0 z-40 transition-all duration-500">
+                <div className="max-w-5xl mx-auto px-8 h-20 flex items-center justify-between">
+                    <div className="flex items-center gap-4 group cursor-pointer">
+                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[var(--accent-primary)] to-[var(--accent-secondary)] flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                            <Heart className="w-6 h-6 text-white" />
+                        </div>
+                        <div>
+                            <h1 className="text-xl font-black tracking-tighter leading-none group-hover:text-[var(--accent-primary)] transition-colors">{t('app.name', 'DiggAI')}</h1>
+                            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-[var(--text-muted)] mt-1 opacity-60">Anamnese-Portal</p>
+                        </div>
+                    </div>
+                    {step === 'questions' && (
+                        <div className="flex items-center gap-6">
+                            <div className="hidden sm:flex flex-col items-end">
+                                <span className="text-[10px] uppercase font-black tracking-widest text-[var(--text-muted)]">{t('questionnaire.step', 'Schritt')}</span>
+                                <span className="text-sm font-black text-[var(--accent-primary)]">{currentStepNumber} <span className="text-[var(--text-muted)] font-bold">/ {visibleQuestions.length}</span></span>
+                            </div>
+                            <div className="w-10 h-10 rounded-full border-4 border-white/5 border-t-[var(--accent-primary)] animate-softPulse" />
+                        </div>
+                    )}
+                </div>
+            </header>
+
+            {/* Main Content */}
+            <main className="max-w-5xl mx-auto px-8 py-12">
+                <AnimatePresence mode="wait">
+                    {step === 'welcome' && (
+                        <WelcomeScreen key="welcome" onStart={handleStart} />
+                    )}
+
+                    {step === 'questions' && (
+                        <motion.div
+                            key="questions"
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className="space-y-10"
+                        >
+                            {/* Progress Indicator */}
+                            <div className="bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-[2.5rem] p-10 shadow-sm relative overflow-hidden group">
+                                <div className="absolute top-0 left-0 h-1 bg-[var(--accent-primary)] shadow-[0_0_20px_rgba(var(--accent-primary-rgb),0.5)] transition-all duration-700 ease-out" style={{ width: `${progress}%` }} />
+                                
+                                <StepProgress
+                                    steps={4}
+                                    currentStep={Math.min(Math.floor((currentQuestionIndex / visibleQuestions.length) * 4), 3)}
+                                    labels={stepLabels}
+                                    variant="calm"
+                                />
+                                
+                                <div className="mt-8 flex items-end justify-between">
+                                    <div className="space-y-1">
+                                         <span className="text-[10px] uppercase font-black tracking-widest text-[var(--text-muted)] opacity-60">{t('questionnaire.progress', 'Bearbeitungsstand')}</span>
+                                         <p className="text-sm font-black text-[var(--text-primary)]">{Math.round(progress)}% <span className="text-xs text-[var(--text-muted)] font-bold ml-1">vollständig</span></p>
+                                    </div>
+                                    <div className="h-4 w-32 bg-[var(--bg-primary)] rounded-full border border-[var(--border-primary)] overflow-hidden p-1 shadow-inner">
+                                        <motion.div
+                                            className="h-full bg-gradient-to-r from-[var(--accent-primary)] to-[var(--accent-secondary)] rounded-full"
+                                            initial={{ width: 0 }}
+                                            animate={{ width: `${progress}%` }}
+                                            transition={{ duration: 0.8, ease: "circOut" }}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Question Card */}
+                            <AnimatePresence mode="wait">
+                                {currentQuestion && (
+                                    <QuestionCard
+                                        key={currentQuestion.id}
+                                        question={currentQuestion}
+                                        value={answers.find(a => a.questionId === currentQuestion.id)?.value}
+                                        onAnswer={handleAnswer}
+                                        isActive={true}
+                                    />
+                                )}
+                            </AnimatePresence>
+
+                            {/* Navigation */}
+                            <div className="flex items-center justify-between pt-4">
+                                <Button
+                                    variant="ghost"
+                                    onClick={handleBack}
+                                    disabled={currentQuestionIndex === 0}
+                                    className="px-8 h-14 rounded-2xl font-black uppercase tracking-widest text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)] transition-all flex items-center gap-2 group"
+                                >
+                                    <ChevronLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+                                    {t('common.back', 'Voriges')}
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    onClick={() => setStep('review')}
+                                    className="px-8 h-14 rounded-2xl font-black uppercase tracking-widest text-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/10 transition-all flex items-center gap-2 group"
+                                >
+                                    {t('questionnaire.skipToReview', 'Übersicht')}
+                                    <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                                </Button>
+                            </div>
+                        </motion.div>
+                    )}
+
+                    {step === 'review' && (
+                        <ReviewScreen
+                            key="review"
+                            answers={answers}
+                            questions={visibleQuestions}
+                            onEdit={handleEdit}
+                            onSubmit={handleSubmit}
+                            isSubmitting={isSubmitting}
+                        />
+                    )}
+
+                    {step === 'complete' && (
+                        <CompletionScreen key="complete" />
+                    )}
+                </AnimatePresence>
+            </main>
+
+            {/* Help Button */}
+            {step !== 'complete' && <HelpButton />}
+        </div>
+    );
+});
+
+export default Questionnaire;

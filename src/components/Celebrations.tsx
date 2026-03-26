@@ -1,142 +1,176 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { CheckCircle2, Sparkles } from 'lucide-react';
 
-interface ConfettiPiece {
-  id: number;
-  x: number;
+// Psychology-based celebration colors (calming, not overstimulating)
+const CELEBRATION_COLORS = [
+  '#4A90E2', // Serene Blue - trust
+  '#81B29A', // Sage Green - healing
+  '#F4A261', // Warm Amber - warmth
+  '#5E8B9E', // Dusty Blue - calm
+  '#A8D5BA', // Soft Mint - balance
+  '#C7C3E6', // Light Lavender - peaceful
+];
+
+interface ConfettiPieceProps {
   delay: number;
   color: string;
-  size: number;
-  rotation: number;
+  x: number;
 }
 
-/**
- * CompletionCelebration — Lightweight confetti animation at 100% progress.
- * Pure CSS + JS, zero dependencies.
- */
-export function CompletionCelebration({ show }: { show: boolean }) {
-  const [pieces, setPieces] = useState<ConfettiPiece[]>([]);
-  const [visible, setVisible] = useState(false);
+function ConfettiPiece({ delay, color, x }: ConfettiPieceProps) {
+  return (
+    <motion.div
+      className="absolute w-2 h-2 rounded-sm"
+      style={{ 
+        backgroundColor: color,
+        left: `${x}%`,
+        top: '-10px'
+      }}
+      initial={{ y: 0, rotate: 0, opacity: 1 }}
+      animate={{ 
+        y: ['0vh', '100vh'],
+        rotate: [0, 720],
+        opacity: [1, 1, 0]
+      }}
+      transition={{ 
+        duration: 2.5, 
+        delay, 
+        ease: 'easeIn' 
+      }}
+    />
+  );
+}
 
-  const colors = useMemo(() => ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f43f5e', '#22c55e'], []);
+interface CelebrationOverlayProps {
+  show: boolean;
+  onComplete?: () => void;
+}
 
-  const generate = useCallback(() => {
-    const newPieces: ConfettiPiece[] = [];
-    for (let i = 0; i < 50; i++) {
-      newPieces.push({
-        id: i,
-        x: Math.random() * 100,
-        delay: Math.random() * 0.6,
-        color: colors[Math.floor(Math.random() * colors.length)],
-        size: 6 + Math.random() * 8,
-        rotation: Math.random() * 360,
-      });
-    }
-    return newPieces;
-  }, [colors]);
-
+export function CelebrationOverlay({ show, onComplete }: CelebrationOverlayProps) {
+  const [pieces, setPieces] = useState<Array<{ id: number; color: string; x: number; delay: number }>>([]);
+  
   useEffect(() => {
     if (show) {
-      // Respect prefers-reduced-motion for users sensitive to animations
-      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-      setPieces(generate());
-      setVisible(true);
-      const timer = setTimeout(() => setVisible(false), 3000);
+      // Generate confetti pieces with psychology-based colors
+      const newPieces = Array.from({ length: 30 }, (_, i) => ({
+        id: Date.now() + i,
+        color: CELEBRATION_COLORS[i % CELEBRATION_COLORS.length],
+        x: Math.random() * 100,
+        delay: Math.random() * 0.5,
+      }));
+      setPieces(newPieces);
+      
+      const timer = setTimeout(() => {
+        setPieces([]);
+        onComplete?.();
+      }, 3000);
+      
       return () => clearTimeout(timer);
     }
-  }, [show, generate]);
-
-  if (!visible || pieces.length === 0) return null;
-
+  }, [show, onComplete]);
+  
+  if (!show) return null;
+  
   return (
-    <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden" aria-hidden="true">
-      {pieces.map(p => (
-        <div
-          key={p.id}
-          className="absolute confetti-piece"
-          style={{
-            left: `${p.x}%`,
-            top: '-10px',
-            width: p.size,
-            height: p.size * 0.6,
-            backgroundColor: p.color,
-            borderRadius: '2px',
-            animationDelay: `${p.delay}s`,
-            transform: `rotate(${p.rotation}deg)`,
-          }}
+    <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
+      {pieces.map(piece => (
+        <ConfettiPiece
+          key={piece.id}
+          delay={piece.delay}
+          color={piece.color}
+          x={piece.x}
         />
       ))}
     </div>
   );
 }
 
-/**
- * AnswerCheckmark — Small check animation shown briefly after answering.
- */
-export function AnswerCheckmark({ show }: { show: boolean }) {
-  const [visible, setVisible] = useState(false);
-
-  // Derive visibility from prop instead of syncing via effect
-  useEffect(() => {
-    if (!show) return;
-    setVisible(true);
-    const timer = setTimeout(() => setVisible(false), 800);
-    return () => clearTimeout(timer);
-  }, [show]);
-
-  if (!visible) return null;
-
-  return (
-    <div className="inline-flex items-center gap-1.5 text-emerald-400 animate-in" aria-hidden="true">
-      <svg className="w-5 h-5 checkmark-animate" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M5 13l4 4L19 7" className="checkmark-path" />
-      </svg>
-      <span className="text-xs font-semibold">✓</span>
-    </div>
-  );
+interface CompletionCheckmarkProps {
+  progress: number;
+  className?: string;
 }
 
-/**
- * ProgressRing — Circular progress indicator for compact display.
- */
-export function ProgressRing({ progress, size = 40, strokeWidth = 3 }: { progress: number; size?: number; strokeWidth?: number }) {
-  const radius = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (Math.min(progress, 100) / 100) * circumference;
-
-  const color = progress >= 100 ? '#10b981' : progress >= 60 ? '#3b82f6' : '#f59e0b';
-
+export function CompletionCheckmark({ progress, className = '' }: CompletionCheckmarkProps) {
+  // Psychology-based progress colors
+  const color = progress >= 100 
+    ? '#81B29A' // Sage green for complete
+    : progress >= 60 
+      ? '#4A90E2' // Serene blue for good progress
+      : '#F4A261'; // Warm amber for starting
+      
+  const bgColor = progress >= 100 
+    ? 'rgba(129, 178, 154, 0.15)'
+    : progress >= 60 
+      ? 'rgba(74, 144, 226, 0.15)'
+      : 'rgba(244, 162, 97, 0.15)';
+  
   return (
-    <div className="relative inline-flex items-center justify-center" style={{ width: size, height: size }}>
-      <svg width={size} height={size} className="-rotate-90">
-        {/* Background circle */}
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          stroke="var(--border-primary)"
-          strokeWidth={strokeWidth}
-        />
-        {/* Progress arc */}
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          stroke={color}
-          strokeWidth={strokeWidth}
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
-          strokeLinecap="round"
-          className="transition-all duration-500 ease-out"
-        />
-      </svg>
-      <span
-        className="absolute text-[9px] font-bold"
+    <motion.div
+      className={`flex items-center justify-center rounded-full ${className}`}
+      style={{ 
+        backgroundColor: bgColor,
+        width: '48px',
+        height: '48px'
+      }}
+      initial={{ scale: 0 }}
+      animate={{ scale: 1 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+    >
+      <CheckCircle2 
+        className="w-6 h-6"
         style={{ color }}
-      >
-        {Math.round(progress)}%
+      />
+    </motion.div>
+  );
+}
+
+interface ProgressCelebrationProps {
+  progress: number;
+  className?: string;
+}
+
+export function ProgressCelebration({ progress, className = '' }: ProgressCelebrationProps) {
+  const [showSparkle, setShowSparkle] = useState(false);
+  
+  useEffect(() => {
+    if (progress > 0 && progress % 25 === 0) {
+      setShowSparkle(true);
+      const timer = setTimeout(() => setShowSparkle(false), 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [progress]);
+  
+  // Psychology-based color
+  const sparkleColor = progress >= 75 
+    ? '#81B29A' 
+    : progress >= 50 
+      ? '#4A90E2' 
+      : '#5E8B9E';
+  
+  return (
+    <div className={`relative inline-flex items-center ${className}`}>
+      <span className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
+        {progress}%
       </span>
+      <AnimatePresence>
+        {showSparkle && (
+          <motion.div
+            className="absolute -right-6"
+            initial={{ opacity: 0, scale: 0.5 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.5 }}
+            transition={{ duration: 0.3 }}
+          >
+            <Sparkles 
+              className="w-4 h-4"
+              style={{ color: sparkleColor }}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
+
+export default CelebrationOverlay;

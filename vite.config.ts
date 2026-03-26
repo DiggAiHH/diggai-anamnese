@@ -1,15 +1,24 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { visualizer } from 'rollup-plugin-visualizer';
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    // Bundle analyzer (only when ANALYZE env var is set)
+    process.env.ANALYZE === 'true' && visualizer({
+      open: true,
+      filename: 'dist/stats.html',
+      gzipSize: true,
+      brotliSize: true,
+      template: 'treemap',
+    }),
     // VitePWA removed: injectRegister: null + filename: 'sw-workbox.js' generated dead code.
     // Service worker is manually registered in main.tsx using public/sw.js.
-  ],
+  ].filter(Boolean),
   server: {
     port: 5173,
     host: true,
@@ -75,8 +84,8 @@ export default defineConfig({
             return 'vendor-socket';
           }
           
-          // Animations
-          if (id.includes('node_modules/lottie-react') || id.includes('node_modules/framer-motion')) {
+          // Animations - Lottie only (framer-motion removed - unused)
+          if (id.includes('node_modules/lottie-react')) {
             return 'vendor-animation';
           }
           
@@ -85,9 +94,14 @@ export default defineConfig({
             return 'vendor-forms';
           }
           
-          // QR Code generation
-          if (id.includes('node_modules/qrcode.react') || id.includes('node_modules/html5-qrcode')) {
-            return 'vendor-qr';
+          // QR Code libraries - split for better loading
+          // qrcode.react is used for QR generation (lightweight)
+          if (id.includes('node_modules/qrcode.react')) {
+            return 'vendor-qr-generator';
+          }
+          // html5-qrcode is used for QR scanning (heavy, camera-based)
+          if (id.includes('node_modules/html5-qrcode')) {
+            return 'vendor-qr-scanner';
           }
           
           // Markdown rendering
@@ -155,8 +169,18 @@ export default defineConfig({
         drop_console: true, // Remove console.* in production
         drop_debugger: true, // Remove debugger statements
         pure_funcs: ['console.log', 'console.info', 'console.debug'], // Remove these function calls
+        passes: 2, // Multiple passes for better optimization
+      },
+      mangle: {
+        safari10: true, // Fix for Safari 10/11
+      },
+      format: {
+        comments: false, // Remove all comments
       },
     },
+    // CSS optimization
+    cssMinify: 'lightningcss',
+    cssCodeSplit: true,
     // Source maps for production debugging (optional, can be disabled for smaller deploy)
     sourcemap: false,
   },

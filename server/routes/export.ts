@@ -277,6 +277,16 @@ router.get('/sessions/:id/export/csv', rejectTokenQueryParameter, requireAuth, r
             },
         });
 
+        // Usage tracking (non-blocking)
+        import('../services/serviceUsageService').then(({ logServiceUsage }) => {
+            logServiceUsage({
+                tenantId: req.tenantId || req.auth?.tenantId || 'default',
+                sessionId: session.id,
+                serviceType: 'CSV_EXPORT',
+                actionName: 'CSV-Export erstellt',
+            }).catch(() => {});
+        }).catch(() => {});
+
         res.setHeader('Content-Type', 'text/csv; charset=utf-8');
         res.setHeader('Content-Disposition', `attachment; filename="${buildExportFilename(patientName, 'csv')}"`);
         res.send(csvContent);
@@ -422,6 +432,16 @@ router.get('/sessions/:id/export/pdf', rejectTokenQueryParameter, requireAuth, r
             },
         });
 
+        // Usage tracking (non-blocking)
+        import('../services/serviceUsageService').then(({ logServiceUsage }) => {
+            logServiceUsage({
+                tenantId: req.tenantId || req.auth?.tenantId || 'default',
+                sessionId: session.id,
+                serviceType: 'PDF_EXPORT',
+                actionName: 'PDF-Bericht erstellt',
+            }).catch(() => {});
+        }).catch(() => {});
+
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
         res.setHeader('Content-Disposition', `inline; filename="${buildExportFilename(patientName, 'html')}"`);
         res.send(html);
@@ -459,6 +479,16 @@ router.get('/sessions/:id/export/json', rejectTokenQueryParameter, requireAuth, 
                 metadata: JSON.stringify({ format: 'json' }),
             },
         });
+
+        // Usage tracking (non-blocking)
+        import('../services/serviceUsageService').then(({ logServiceUsage }) => {
+            logServiceUsage({
+                tenantId: req.tenantId || req.auth?.tenantId || 'default',
+                sessionId: data.session.id,
+                serviceType: 'JSON_EXPORT',
+                actionName: 'JSON-Export erstellt',
+            }).catch(() => {});
+        }).catch(() => {});
 
         res.json({
             patient: {

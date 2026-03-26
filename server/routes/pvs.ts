@@ -9,6 +9,8 @@ import { z } from 'zod';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { pvsRouter } from '../services/pvs/pvs-router.service.js';
 import { countExportFields } from '../services/pvs/mapping-engine.js';
+import { pvsDetectionService } from '../services/pvs/auto-config/index.js';
+import { smartSyncService } from '../services/pvs/sync/index.js';
 import type { PvsConnectionData, PatientSessionFull } from '../services/pvs/types.js';
 
 const router = Router();
@@ -78,7 +80,7 @@ router.get('/connection', requireAuth, requireRole('admin'), async (_req, res) =
 
 // 2. POST /connection â€” PVS-Verbindung konfigurieren
 const createConnectionSchema = z.object({
-  pvsType: z.enum(['CGM_M1', 'MEDATIXX', 'MEDISTAR', 'T2MED', 'X_ISYNET', 'DOCTOLIB', 'TURBOMED', 'FHIR_GENERIC']),
+  pvsType: z.enum(['CGM_M1', 'MEDATIXX', 'MEDISTAR', 'T2MED', 'X_ISYNET', 'DOCTOLIB', 'TURBOMED', 'FHIR_GENERIC', 'ALBIS', 'TOMEDO', 'MEDISTAR', 'T2MED', 'X_ISYNET']),
   protocol: z.enum(['GDT', 'BDT', 'FHIR', 'REST', 'KIM']).default('GDT'),
   pvsVersion: z.string().optional(),
   gdtImportDir: z.string().optional(),
@@ -483,7 +485,7 @@ router.post('/patient-link', requireAuth, requireRole('arzt', 'mfa', 'admin'), a
 
     const data = z.object({
       patientId: z.string(),
-      pvsType: z.enum(['CGM_M1', 'MEDATIXX', 'MEDISTAR', 'T2MED', 'X_ISYNET', 'DOCTOLIB', 'TURBOMED', 'FHIR_GENERIC']),
+      pvsType: z.enum(['CGM_M1', 'MEDATIXX', 'MEDISTAR', 'T2MED', 'X_ISYNET', 'DOCTOLIB', 'TURBOMED', 'FHIR_GENERIC', 'ALBIS', 'TOMEDO', 'MEDISTAR', 'T2MED', 'X_ISYNET']),
       pvsPatientId: z.string(),
       pvsPatientNr: z.string().optional(),
     }).parse(req.body);
@@ -930,6 +932,151 @@ router.post('/mappings/preview', requireAuth, requireRole('admin'), async (req, 
       return res.status(400).json({ error: 'Validierungsfehler', details: err.issues });
     }
     res.status(500).json({ error: 'Vorschau konnte nicht erstellt werden' });
+  }
+});
+
+// ─── 21-24: Auto-Config & Smart Sync ─────────────────────────────────────
+
+// 21. POST /detect — Automatische PVS-Erkennung
+router.post('/detect', requireAuth, requireRole('admin'), async (_req, res) => {
+  try {
+    const tenantId = getEffectiveTenantId(_req, res);
+    if (!tenantId) return;
+
+    const detectedSystems = await pvsDetectionService.detectLocalPVS();
+
+    // Map to simplified response format
+    const results = detectedSystems.map(system => ({
+      pvsType: system.type,
+      protocol: system.protocol,
+      confidence: system.confidence,
+      detectedPaths: system.detectedPaths,
+      detectedUrls: system.detectedUrls,
+      version: system.version,
+      suggestedConfig: system.suggestedConfig,
+    }));
+
+    res.json({
+      detected: results.length,
+      systems: results,
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'PVS-Erkennung fehlgeschlagen', message: (err as Error).message });
+  }
+});
+
+// 22. POST /detect/test — Erkannte Konfiguration testen
+router.post('/detect/test', requireAuth, requireRole('admin'), async (req, res) => {
+  try {
+    const tenantId = getEffectiveTenantId(req, res);
+    if (!tenantId) return;
+
+    const { pvsType, detectedPaths, detectedUrls, suggestedConfig } = req.body;
+
+    const mockDetected = {
+      type: pvsType,
+      protocol: detectedPaths ? 'GDT' : 'FHIR',
+      confidence: 75,
+      detectedPaths,
+      detectedUrls,
+      suggestedConfig,
+    };
+
+    const testResult = await pvsDetectionService.testDetectedSystem(mockDetected as any);
+
+    res.json({
+      works: testResult.works,
+      message: testResult.message,
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Test fehlgeschlagen', message: (err as Error).message });
+  }
+});
+
+// 23. POST /connection/:id/sync/start — Smart Sync starten
+router.post('/connection/:id/sync/start', requireAuth, requireRole('admin'), async (req, res) => {
+  try {
+    const tenantId = getEffectiveTenantId(req, res);
+    if (!tenantId) return;
+
+    const id = req.params.id as string;
+    const connection = await findConnectionByIdForTenant(id, tenantId);
+    if (!connection) {
+      return res.status(404).json({ error: 'Verbindung nicht gefunden' });
+    }
+
+    if (!connection.isActive) {
+      return res.status(400).json({ error: 'Verbindung ist nicht aktiv' });
+    }
+
+    const connData = connection as unknown as PvsConnectionData;
+    await smartSyncService.startWatching(connData);
+
+    res.json({ success: true, message: 'Synchronisation gestartet', connectionId: id });
+  } catch (err) {
+    res.status(500).json({ error: 'Sync konnte nicht gestartet werden', message: (err as Error).message });
+  }
+});
+
+// 24. POST /connection/:id/sync/stop — Smart Sync stoppen
+router.post('/connection/:id/sync/stop', requireAuth, requireRole('admin'), async (req, res) => {
+  try {
+    const tenantId = getEffectiveTenantId(req, res);
+    if (!tenantId) return;
+
+    const id = req.params.id as string;
+    const connection = await findConnectionByIdForTenant(id, tenantId);
+    if (!connection) {
+      return res.status(404).json({ error: 'Verbindung nicht gefunden' });
+    }
+
+    smartSyncService.stopWatching(id);
+
+    res.json({ success: true, message: 'Synchronisation gestoppt', connectionId: id });
+  } catch (err) {
+    res.status(500).json({ error: 'Sync konnte nicht gestoppt werden', message: (err as Error).message });
+  }
+});
+
+// 25. GET /connection/:id/sync/stats — Sync-Statistiken
+router.get('/connection/:id/sync/stats', requireAuth, requireRole('admin'), async (req, res) => {
+  try {
+    const tenantId = getEffectiveTenantId(req, res);
+    if (!tenantId) return;
+
+    const id = req.params.id as string;
+    const connection = await findConnectionByIdForTenant(id, tenantId);
+    if (!connection) {
+      return res.status(404).json({ error: 'Verbindung nicht gefunden' });
+    }
+
+    const stats = smartSyncService.getStats(id);
+
+    if (!stats) {
+      return res.json({
+        connectionId: id,
+        status: 'not_watching',
+        message: 'Keine aktive Überwachung für diese Verbindung',
+      });
+    }
+
+    res.json({
+      connectionId: id,
+      status: 'watching',
+      stats: {
+        totalTransfers: stats.totalTransfers,
+        successfulTransfers: stats.successfulTransfers,
+        failedTransfers: stats.failedTransfers,
+        successRate: stats.totalTransfers > 0
+          ? Math.round((stats.successfulTransfers / stats.totalTransfers) * 100)
+          : 100,
+        averageDurationMs: Math.round(stats.averageDuration),
+        lastSyncAt: stats.lastSyncAt,
+        pendingTransfers: stats.pendingTransfers,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Statistiken konnten nicht geladen werden', message: (err as Error).message });
   }
 });
 

@@ -33,6 +33,7 @@ export {
   highContrastTheme,
   medicalProfessionalTheme,
   minimalTheme,
+  simpleModeTheme,
   themeTemplates,
   generateDarkTheme,
   mergeThemes,

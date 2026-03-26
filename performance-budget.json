@@ -1,0 +1,41 @@
+{
+  "$schema": "https://raw.githubusercontent.com/GoogleChrome/lighthouse/master/lighthouse-core/config/budget-schema.json",
+  "budgets": [
+    {
+      "path": "/*",
+      "resourceSizes": [
+        { "resourceType": "script", "budget": 300 },
+        { "resourceType": "stylesheet", "budget": 50 },
+        { "resourceType": "image", "budget": 200 },
+        { "resourceType": "font", "budget": 100 },
+        { "resourceType": "total", "budget": 800 }
+      ],
+      "resourceCounts": [
+        { "resourceType": "script", "budget": 15 },
+        { "resourceType": "stylesheet", "budget": 5 },
+        { "resourceType": "total", "budget": 50 }
+      ],
+      "timings": [
+        { "metric": "interactive", "budget": 3500 },
+        { "metric": "first-contentful-paint", "budget": 1500 },
+        { "metric": "largest-contentful-paint", "budget": 2500 },
+        { "metric": "max-potential-fid", "budget": 200 },
+        { "metric": "cumulative-layout-shift", "budget": 0.1 },
+        { "metric": "total-blocking-time", "budget": 200 },
+        { "metric": "speed-index", "budget": 2300 }
+      ]
+    },
+    {
+      "path": "/pwa/*",
+      "resourceSizes": [
+        { "resourceType": "script", "budget": 200 },
+        { "resourceType": "total", "budget": 500 }
+      ],
+      "timings": [
+        { "metric": "interactive", "budget": 2500 },
+        { "metric": "first-contentful-paint", "budget": 1200 },
+        { "metric": "largest-contentful-paint", "budget": 2000 }
+      ]
+    }
+  ]
+}

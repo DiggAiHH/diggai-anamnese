@@ -1,5 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import Lottie, { type LottieRefCurrentProps } from 'lottie-react';
+import LottieReact, { type LottieRefCurrentProps } from 'lottie-react';
+
+// lottie-react default export is the component itself in Vite ESM builds.
+// The previous `.default` shim resolved to the module namespace (an object),
+// triggering React Error #130 ("expected string/function, got object").
+const Lottie = typeof LottieReact === 'function'
+    ? LottieReact
+    : (LottieReact as any)?.default ?? null;
 
 interface LottieStationProps {
     /** Path to the Lottie JSON file relative to public/ */
@@ -63,14 +70,18 @@ export function LottieStation({ animationPath, label, isActive = true, className
 
     return (
         <div aria-hidden="true" className={className}>
-            <Lottie
-                lottieRef={lottieRef}
-                animationData={animationData}
-                loop
-                autoplay={isActive}
-                style={{ width: '100%', height: '100%' }}
-                rendererSettings={{ preserveAspectRatio: 'xMidYMid slice' }}
-            />
+            {Lottie ? (
+                <Lottie
+                    lottieRef={lottieRef}
+                    animationData={animationData}
+                    loop
+                    autoplay={isActive}
+                    style={{ width: '100%', height: '100%' }}
+                    rendererSettings={{ preserveAspectRatio: 'xMidYMid slice' }}
+                />
+            ) : (
+                <div className="w-16 h-16 rounded-full bg-white/5 border border-white/10" />
+            )}
         </div>
     );
 }

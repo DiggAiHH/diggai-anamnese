@@ -5,6 +5,13 @@ import { requireAuth, requireRole } from '../middleware/auth';
 import { hashEmail } from '../services/encryption';
 import { z } from 'zod';
 import * as bcrypt from 'bcryptjs';
+import {
+  getCache,
+  setCache,
+  invalidateCache,
+  getPatientCacheKey,
+  SHORT_TTL,
+} from '../services/cache.service';
 
 const router = Router();
 
@@ -26,16 +33,16 @@ const identifyAttempts = new Map<string, { count: number; resetAt: number }>();
 function checkRateLimit(ip: string): boolean {
   const now = Date.now();
   const entry = identifyAttempts.get(ip);
-  
+
   if (!entry || now > entry.resetAt) {
     identifyAttempts.set(ip, { count: 1, resetAt: now + 10 * 60 * 1000 }); // 10 min window
     return true;
   }
-  
+
   if (entry.count >= 5) {
     return false; // Too many attempts
   }
-  
+
   entry.count++;
   return true;
 }
@@ -56,7 +63,7 @@ const identifySchema = z.object({
 router.post('/identify', async (req: Request, res: Response) => {
   try {
     const ip: string = clientIp(req) || req.socket.remoteAddress || 'unknown';
-    
+
     if (!checkRateLimit(ip)) {
       res.status(429).json({
         error: 'Zu viele Versuche. Bitte warten Sie 10 Minuten.',
@@ -64,16 +71,16 @@ router.post('/identify', async (req: Request, res: Response) => {
       });
       return;
     }
-    
+
     const data = identifySchema.parse(req.body);
     const insuranceHash = hashEmail(data.insuranceNumber); // Same SHA-256 util
     const birthDateObj = new Date(data.birthDate);
-    
+
     if (isNaN(birthDateObj.getTime())) {
       res.status(400).json({ error: 'Ungültiges Geburtsdatum', found: false });
       return;
     }
-    
+
     // Build where clause
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const where: any = {
@@ -83,12 +90,12 @@ router.post('/identify', async (req: Request, res: Response) => {
         lt: new Date(birthDateObj.setHours(23, 59, 59, 999)),
       },
     };
-    
+
     // Optional: narrow by patient number
     if (data.patientNumber) {
       where.patientNumber = data.patientNumber;
     }
-    
+
     const patient = await prisma.patient.findFirst({
       where,
       select: {
@@ -101,13 +108,13 @@ router.post('/identify', async (req: Request, res: Response) => {
         verifiedAt: true,
       },
     });
-    
+
     if (!patient) {
       // Don't reveal whether insurance number exists (prevent enumeration)
       res.json({ found: false });
       return;
     }
-    
+
     // Audit log
     await prisma.auditLog.create({
       data: {
@@ -119,7 +126,7 @@ router.post('/identify', async (req: Request, res: Response) => {
         metadata: JSON.stringify({ method: 'insuranceNumber+birthDate' }),
       },
     });
-    
+
     res.json({
       found: true,
       patient: {
@@ -152,27 +159,27 @@ const verifyPatternSchema = z.object({
 router.post('/verify-pattern', async (req: Request, res: Response) => {
   try {
     const ip: string = clientIp(req) || req.socket.remoteAddress || 'unknown';
-    
+
     if (!checkRateLimit(ip)) {
       res.status(429).json({ error: 'Zu viele Versuche', verified: false });
       return;
     }
-    
+
     const data = verifyPatternSchema.parse(req.body);
-    
+
     const patient = await prisma.patient.findUnique({
       where: { id: data.patientId },
       select: { id: true, securityPattern: true },
     });
-    
+
     if (!patient || !patient.securityPattern) {
       res.json({ verified: false });
       return;
     }
-    
+
     // Compare: client sends SHA-256 of pattern, server stores bcrypt of SHA-256
     const isValid = await bcrypt.compare(data.patternHash, patient.securityPattern);
-    
+
     // Audit log
     await prisma.auditLog.create({
       data: {
@@ -183,7 +190,7 @@ router.post('/verify-pattern', async (req: Request, res: Response) => {
         userAgent: ua(req),
       },
     });
-    
+
     res.json({ verified: isValid });
   } catch (err) {
     console.error('[Patients] Pattern verify error:', err);
@@ -210,15 +217,18 @@ router.post(
     try {
       const patientId = String(req.params.id);
       const data = setPatternSchema.parse(req.body);
-      
+
       // Hash the SHA-256 with bcrypt for storage
       const bcryptHash = await bcrypt.hash(data.patternHash, 12);
-      
+
       await prisma.patient.update({
         where: { id: patientId },
         data: { securityPattern: bcryptHash },
       });
-      
+
+      // Invalidate patient cache
+      await invalidateCache(getPatientCacheKey(patientId));
+
       // Audit log
       await prisma.auditLog.create({
         data: {
@@ -231,7 +241,7 @@ router.post(
           metadata: JSON.stringify({ setBy: req.auth?.role }),
         },
       });
-      
+
       res.json({ success: true });
     } catch (err) {
       console.error('[Patients] Set pattern error:', err);
@@ -262,44 +272,44 @@ router.post(
     try {
       const sessionId = String(req.params.sessionId);
       const data = certifySchema.parse(req.body);
-      
+
       // Find session
       const session = await prisma.patientSession.findUnique({
         where: { id: sessionId },
         include: { patient: true },
       });
-      
+
       if (!session) {
         res.status(404).json({ error: 'Session nicht gefunden' });
         return;
       }
-      
+
       const insuranceHash = hashEmail(data.insuranceNumber);
       const birthDateObj = new Date(data.birthDate);
-      
+
       // Generate next patient number
       const lastPatient = await prisma.patient.findFirst({
         where: { patientNumber: { not: null } },
         orderBy: { patientNumber: 'desc' },
         select: { patientNumber: true },
       });
-      
+
       let nextNum = 10001;
       if (lastPatient?.patientNumber) {
         const match = lastPatient.patientNumber.match(/P-(\d+)/);
         if (match) nextNum = parseInt(match[1], 10) + 1;
       }
       const patientNumber = `P-${nextNum}`;
-      
+
       // Update patient record
       const patientId = session.patientId;
       if (!patientId) {
         res.status(400).json({ error: 'Session hat keinen Patienten' });
         return;
       }
-      
+
       const userId = req.auth?.sessionId || 'system';
-      
+
       await prisma.patient.update({
         where: { id: patientId },
         data: {
@@ -312,7 +322,10 @@ router.post(
           encryptedName: data.patientName || session.encryptedName,
         },
       });
-      
+
+      // Invalidate patient cache
+      await invalidateCache(getPatientCacheKey(patientId));
+
       // Audit log
       await prisma.auditLog.create({
         data: {
@@ -329,7 +342,7 @@ router.post(
           }),
         },
       });
-      
+
       res.json({
         success: true,
         patientNumber,
@@ -342,11 +355,11 @@ router.post(
   }
 );
 
-// ─── Get Patient Info (for MFA dashboard) ───────────────────
+// ─── Get Patient Info (for MFA dashboard) with Caching ───────
 
 /**
  * GET /api/patients/:id
- * Get patient details (MFA/Arzt only).
+ * Get patient details (MFA/Arzt only) - Cached for performance
  */
 router.get(
   '/:id',
@@ -354,8 +367,20 @@ router.get(
   requireRole('mfa', 'admin', 'arzt'),
   async (req: Request, res: Response) => {
     try {
+      const patientId = String(req.params.id);
+      const cacheKey = getPatientCacheKey(patientId);
+
+      // Try cache first (only non-PII metadata is cached)
+      const cached = await getCache(cacheKey);
+      if (cached) {
+        res.setHeader('X-Cache', 'HIT');
+        res.json(cached);
+        return;
+      }
+
+      // Fetch from database (excluding PII fields)
       const patient = await prisma.patient.findUnique({
-        where: { id: String(req.params.id) },
+        where: { id: patientId },
         select: {
           id: true,
           patientNumber: true,
@@ -367,12 +392,16 @@ router.get(
           _count: { select: { sessions: true } },
         },
       });
-      
+
       if (!patient) {
         res.status(404).json({ error: 'Patient nicht gefunden' });
         return;
       }
-      
+
+      // Store in cache (short TTL for patient data - 5 minutes)
+      await setCache(cacheKey, patient, SHORT_TTL);
+
+      res.setHeader('X-Cache', 'MISS');
       res.json(patient);
     } catch (err) {
       console.error('[Patients] Get error:', err);

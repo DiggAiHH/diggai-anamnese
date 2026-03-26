@@ -79,7 +79,7 @@ export function VoiceMessagePlayer({ audioUrl, duration: initialDuration, classN
               className="flex-1 rounded-full transition-colors duration-150"
               style={{
                 height: `${w}px`,
-                backgroundColor: barProgress <= progress ? '#3b82f6' : '#d1d5db',
+                backgroundColor: barProgress <= progress ? '#4A90E2' : '#D9D9D9',
               }}
             />
           );

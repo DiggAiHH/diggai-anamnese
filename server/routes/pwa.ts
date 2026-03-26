@@ -25,13 +25,29 @@ import {
   softDeleteAccount,
   exportAccountData,
 } from '../services/pwa/auth.service';
-import { getTrends, syncOfflineDiary, exportDiary } from '../services/pwa/diary.service';
+import { getTrends, syncOfflineDiary, exportDiary, MetricType, PeriodType } from '../services/pwa/diary.service';
+import {
+  getReminders,
+  createReminder,
+  updateReminder,
+  deleteReminder,
+  getAdherenceStats,
+} from '../services/pwa/reminder.service';
 import {
   getVapidPublicKey,
   subscribeDevice,
   unsubscribeDevice,
   sendNotification,
 } from '../services/pwa/push.service';
+import {
+  sendMessage,
+  listMessages,
+  getMessage,
+  getUnreadCount,
+  markAsRead,
+  archiveMessage,
+  deleteMessage,
+} from '../services/pwa/messaging.service';
 
 const router = Router();
 
@@ -149,6 +165,7 @@ const measureSkipSchema = z.object({
 const messageCreateSchema = z.object({
   subject: z.string().optional(),
   body: z.string().min(1),
+  parentId: z.string().uuid().optional(), // Thread reply
 });
 
 const consentUpdateSchema = z.array(z.object({
@@ -307,12 +324,7 @@ router.get('/dashboard', requirePatientAuth, async (req: Request, res: Response)
     });
 
     // Unread messages count
-    const unreadMessages = await prisma.patientMessage.count({
-      where: {
-        accountId,
-        isRead: false,
-      },
-    });
+    const unreadMessages = await getUnreadCount(prisma, accountId).catch(() => 0 as number);
 
     // Last 5 diary entries
     const recentDiary = await prisma.diaryEntry.findMany({
@@ -322,10 +334,10 @@ router.get('/dashboard', requirePatientAuth, async (req: Request, res: Response)
     });
 
     // Recent alerts (unresolved therapy alerts for patient)
-    const alertRecords = await prisma.therapyAlert.findMany({
+    const alertRecords = await prisma.clinicalAlert.findMany({
       where: {
-        plan: { patientId },
-        resolvedAt: null,
+        patientId,
+        isDismissed: false,
       },
       orderBy: { createdAt: 'desc' },
       take: 5,
@@ -671,29 +683,21 @@ router.post('/measures/:id/skip', requirePatientAuth, async (req: Request, res: 
 
 
 // ═══════════════════════════════════════════════════════════════
-// 5. MESSAGES
+// 5. MESSAGES — Encrypted patient ↔ provider messaging
 // ═══════════════════════════════════════════════════════════════
 
-// GET /messages — Nachrichten-Liste (paginiert)
+// GET /messages — Nachrichten-Liste (paginiert, optional gefiltert)
 router.get('/messages', requirePatientAuth, async (req: Request, res: Response) => {
   try {
     const prisma = getPrisma(req);
     const accountId = getAccountId(req);
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
-    const skip = (page - 1) * limit;
+    const category = req.query.category as string | undefined;
+    const unreadOnly = req.query.unread === 'true';
 
-    const [messages, total] = await Promise.all([
-      prisma.patientMessage.findMany({
-        where: { accountId },
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take: limit,
-      }),
-      prisma.patientMessage.count({ where: { accountId } }),
-    ]);
-
-    res.json({ messages, total, page, limit });
+    const result = await listMessages(prisma, { accountId, page, limit, category, unreadOnly });
+    res.json(result);
   } catch (err: any) {
     console.error('[pwa] messages list error:', err);
     res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.pwa.messages_load_failed') });
@@ -705,11 +709,7 @@ router.get('/messages/unread-count', requirePatientAuth, async (req: Request, re
   try {
     const prisma = getPrisma(req);
     const accountId = getAccountId(req);
-
-    const count = await prisma.patientMessage.count({
-      where: { accountId, isRead: false },
-    });
-
+    const count = await getUnreadCount(prisma, accountId);
     res.json({ count });
   } catch (err: any) {
     console.error('[pwa] unread count error:', err);
@@ -717,27 +717,13 @@ router.get('/messages/unread-count', requirePatientAuth, async (req: Request, re
   }
 });
 
-// GET /messages/:id — Einzelne Nachricht (als gelesen markieren)
+// GET /messages/:id — Einzelne Nachricht mit Thread (auto-gelesen)
 router.get('/messages/:id', requirePatientAuth, async (req: Request, res: Response) => {
   try {
     const prisma = getPrisma(req);
     const accountId = getAccountId(req);
-
-    const message = await prisma.patientMessage.findFirst({
-      where: { id: req.params.id, accountId },
-    });
+    const message = await getMessage(prisma, req.params.id as string, accountId);
     if (!message) return res.status(404).json({ error: t(parseLang(req.headers['accept-language']), 'errors.not_found') });
-
-    // Mark as read if currently unread
-    if (!message.isRead) {
-      await prisma.patientMessage.update({
-        where: { id: message.id },
-        data: { isRead: true, readAt: new Date() },
-      });
-      message.isRead = true;
-      message.readAt = new Date();
-    }
-
     res.json(message);
   } catch (err: any) {
     console.error('[pwa] message get error:', err);
@@ -745,7 +731,7 @@ router.get('/messages/:id', requirePatientAuth, async (req: Request, res: Respon
   }
 });
 
-// POST /messages — Nachricht senden
+// POST /messages — Nachricht senden (Patient → Praxis)
 router.post('/messages', requirePatientAuth, async (req: Request, res: Response) => {
   try {
     const data = messageCreateSchema.parse(req.body);
@@ -753,17 +739,14 @@ router.post('/messages', requirePatientAuth, async (req: Request, res: Response)
     const accountId = getAccountId(req);
     const patientId = (req as any).user?.patientId || '';
 
-    const message = await prisma.patientMessage.create({
-      data: {
-        accountId,
-        patientId,
-        direction: 'PATIENT_TO_PROVIDER',
-        subject: data.subject ?? null,
-        body: data.body,
-        senderName: null,
-        senderRole: 'patient',
-        isRead: false,
-      },
+    const message = await sendMessage(prisma, {
+      accountId,
+      patientId,
+      direction: 'PATIENT_TO_PROVIDER',
+      subject: data.subject,
+      body: data.body,
+      senderRole: 'patient',
+      parentId: data.parentId,
     });
 
     res.status(201).json(message);
@@ -779,21 +762,40 @@ router.put('/messages/:id/read', requirePatientAuth, async (req: Request, res: R
   try {
     const prisma = getPrisma(req);
     const accountId = getAccountId(req);
-
-    const existing = await prisma.patientMessage.findFirst({
-      where: { id: req.params.id, accountId },
-    });
-    if (!existing) return res.status(404).json({ error: t(parseLang(req.headers['accept-language']), 'errors.not_found') });
-
-    const message = await prisma.patientMessage.update({
-      where: { id: req.params.id },
-      data: { isRead: true, readAt: new Date() },
-    });
-
+    const message = await markAsRead(prisma, req.params.id as string, accountId);
+    if (!message) return res.status(404).json({ error: t(parseLang(req.headers['accept-language']), 'errors.not_found') });
     res.json(message);
   } catch (err: any) {
     console.error('[pwa] message read error:', err);
     res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.pwa.message_update_failed') });
+  }
+});
+
+// PUT /messages/:id/archive — Nachricht archivieren
+router.put('/messages/:id/archive', requirePatientAuth, async (req: Request, res: Response) => {
+  try {
+    const prisma = getPrisma(req);
+    const accountId = getAccountId(req);
+    const message = await archiveMessage(prisma, req.params.id as string, accountId);
+    if (!message) return res.status(404).json({ error: t(parseLang(req.headers['accept-language']), 'errors.not_found') });
+    res.json(message);
+  } catch (err: any) {
+    console.error('[pwa] message archive error:', err);
+    res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.generic') });
+  }
+});
+
+// DELETE /messages/:id — Nachricht löschen
+router.delete('/messages/:id', requirePatientAuth, async (req: Request, res: Response) => {
+  try {
+    const prisma = getPrisma(req);
+    const accountId = getAccountId(req);
+    const deleted = await deleteMessage(prisma, req.params.id as string, accountId);
+    if (!deleted) return res.status(404).json({ error: t(parseLang(req.headers['accept-language']), 'errors.not_found') });
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error('[pwa] message delete error:', err);
+    res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.generic') });
   }
 });
 
@@ -1125,6 +1127,355 @@ router.get('/profile', requirePatientAuth, async (req: Request, res: Response) =
   } catch (err: any) {
     console.error('[pwa] profile error:', err);
     res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.pwa.profile_load_failed') });
+  }
+});
+
+
+// ═══════════════════════════════════════════════════════════════
+// 12. WEBAUTHN / FIDO2 PASSKEYS
+// ═══════════════════════════════════════════════════════════════
+
+import {
+  generateRegistration,
+  verifyRegistration,
+  generateAuthentication,
+  verifyAuthentication,
+  listCredentials,
+  removeCredential,
+} from '../services/pwa/webauthn.service';
+import { signToken } from '../services/pwa/auth.service';
+
+const webauthnResponseSchema = z.object({
+  response: z.any(),
+  deviceName: z.string().optional(),
+});
+
+const webauthnAuthSchema = z.object({
+  challengeKey: z.string(),
+  response: z.any(),
+});
+
+// POST /webauthn/register/options — Generate registration options (requires auth)
+router.post('/webauthn/register/options', requirePatientAuth, async (req: Request, res: Response) => {
+  try {
+    const prisma = getPrisma(req);
+    const accountId = getAccountId(req);
+    const patientId = (req as any).user?.patientId || '';
+
+    const options = await generateRegistration(prisma, accountId, patientId);
+    res.json(options);
+  } catch (err: any) {
+    console.error('[pwa] webauthn register options error:', err);
+    res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.generic') });
+  }
+});
+
+// POST /webauthn/register/verify — Verify registration response
+router.post('/webauthn/register/verify', requirePatientAuth, async (req: Request, res: Response) => {
+  try {
+    const prisma = getPrisma(req);
+    const accountId = getAccountId(req);
+    const data = webauthnResponseSchema.parse(req.body);
+
+    const result = await verifyRegistration(prisma, accountId, data.response, data.deviceName);
+    res.status(201).json(result);
+  } catch (err: any) {
+    console.error('[pwa] webauthn register verify error:', err);
+    res.status(400).json({ error: err.message || t(parseLang(req.headers['accept-language']), 'errors.generic') });
+  }
+});
+
+// POST /webauthn/authenticate/options — Generate authentication options (no auth required)
+router.post('/webauthn/authenticate/options', async (req: Request, res: Response) => {
+  try {
+    const prisma = getPrisma(req);
+    const accountId = req.body.accountId as string | undefined;
+
+    const result = await generateAuthentication(prisma, accountId);
+    res.json(result);
+  } catch (err: any) {
+    console.error('[pwa] webauthn auth options error:', err);
+    res.status(400).json({ error: err.message || t(parseLang(req.headers['accept-language']), 'errors.generic') });
+  }
+});
+
+// POST /webauthn/authenticate/verify — Verify authentication and return JWT
+router.post('/webauthn/authenticate/verify', async (req: Request, res: Response) => {
+  try {
+    const prisma = getPrisma(req);
+    const data = webauthnAuthSchema.parse(req.body);
+
+    const { accountId, patientId } = await verifyAuthentication(
+      prisma,
+      data.challengeKey,
+      data.response
+    );
+
+    // Issue JWT
+    const { token, expiresAt } = signToken(accountId, patientId);
+
+    res.json({ token, expiresAt, accountId, patientId });
+  } catch (err: any) {
+    console.error('[pwa] webauthn auth verify error:', err);
+    res.status(401).json({ error: err.message || t(parseLang(req.headers['accept-language']), 'errors.auth.invalid_token') });
+  }
+});
+
+// GET /webauthn/credentials — List registered passkeys (requires auth)
+router.get('/webauthn/credentials', requirePatientAuth, async (req: Request, res: Response) => {
+  try {
+    const prisma = getPrisma(req);
+    const accountId = getAccountId(req);
+    const credentials = await listCredentials(prisma, accountId);
+    res.json({ credentials });
+  } catch (err: any) {
+    console.error('[pwa] webauthn list error:', err);
+    res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.generic') });
+  }
+});
+
+// DELETE /webauthn/credentials/:id — Remove a passkey (requires auth)
+router.delete('/webauthn/credentials/:id', requirePatientAuth, async (req: Request, res: Response) => {
+  try {
+    const prisma = getPrisma(req);
+    const accountId = getAccountId(req);
+    const deleted = await removeCredential(prisma, req.params.id as string, accountId);
+    if (!deleted) return res.status(404).json({ error: t(parseLang(req.headers['accept-language']), 'errors.not_found') });
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error('[pwa] webauthn delete error:', err);
+    res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.generic') });
+  }
+});
+
+
+// ═══════════════════════════════════════════════════════════════
+// 13. PUSH NOTIFICATIONS
+// ═══════════════════════════════════════════════════════════════
+
+// GET /push/vapid-key — VAPID public key for client subscription (no auth needed)
+router.get('/push/vapid-key', (_req: Request, res: Response) => {
+  try {
+    const key = getVapidPublicKey();
+    res.json({ publicKey: key });
+  } catch (err: any) {
+    res.status(503).json({ error: 'Push notifications not configured' });
+  }
+});
+
+// POST /push/subscribe — Register push subscription
+router.post('/push/subscribe', requirePatientAuth, async (req: Request, res: Response) => {
+  try {
+    const { endpoint, keys, deviceLabel } = req.body;
+    if (!endpoint || !keys?.p256dh || !keys?.auth) {
+      return res.status(400).json({ error: 'endpoint, keys.p256dh, and keys.auth are required' });
+    }
+    const accountId = getAccountId(req);
+    const device = await subscribeDevice(accountId, {
+      endpoint,
+      p256dh: keys.p256dh,
+      auth: keys.auth,
+      deviceLabel,
+      userAgent: req.headers['user-agent'] ?? undefined,
+    });
+    res.status(201).json(device);
+  } catch (err: any) {
+    console.error('[pwa] push subscribe error:', err);
+    res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.generic') });
+  }
+});
+
+// DELETE /push/unsubscribe — Unregister push subscription
+router.delete('/push/unsubscribe', requirePatientAuth, async (req: Request, res: Response) => {
+  try {
+    const { endpoint } = req.body;
+    if (!endpoint) return res.status(400).json({ error: 'endpoint is required' });
+    await unsubscribeDevice(endpoint);
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error('[pwa] push unsubscribe error:', err);
+    res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.generic') });
+  }
+});
+
+// POST /push/test — Send test notification to own devices (debug)
+router.post('/push/test', requirePatientAuth, async (req: Request, res: Response) => {
+  try {
+    const accountId = getAccountId(req);
+    const result = await sendNotification(accountId, {
+      type: 'test',
+      title: 'Testbenachrichtigung',
+      body: 'Push-Benachrichtigungen funktionieren korrekt.',
+      tag: 'test-notification',
+    });
+    res.json(result);
+  } catch (err: any) {
+    console.error('[pwa] push test error:', err);
+    res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.generic') });
+  }
+});
+
+
+// ═══════════════════════════════════════════════════════════════
+// 14. PASSWORD RESET
+// ═══════════════════════════════════════════════════════════════
+
+// POST /forgot-password — Request password reset email (no auth)
+router.post('/forgot-password', async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'email is required' });
+    await forgotPasswordExtended(email);
+    // Always return 200 to prevent email enumeration
+    res.json({ message: 'Wenn ein Konto mit dieser E-Mail existiert, wurde ein Link versendet.' });
+  } catch (err: any) {
+    console.error('[pwa] forgot-password error:', err);
+    // Still return 200 to prevent enumeration
+    res.json({ message: 'Wenn ein Konto mit dieser E-Mail existiert, wurde ein Link versendet.' });
+  }
+});
+
+// POST /reset-password — Reset password with token (no auth)
+router.post('/reset-password', async (req: Request, res: Response) => {
+  try {
+    const { token, newPassword } = req.body;
+    if (!token || !newPassword) return res.status(400).json({ error: 'token and newPassword are required' });
+    if (newPassword.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    await resetPasswordWithToken(token, newPassword);
+    res.json({ success: true, message: 'Passwort erfolgreich zurückgesetzt.' });
+  } catch (err: any) {
+    console.error('[pwa] reset-password error:', err);
+    res.status(400).json({ error: err.message || 'Token ungültig oder abgelaufen.' });
+  }
+});
+
+// POST /verify-email — Verify email with token (no auth)
+router.post('/verify-email', async (req: Request, res: Response) => {
+  try {
+    const { token } = req.body;
+    if (!token) return res.status(400).json({ error: 'token is required' });
+    const valid = await verifyEmailToken(token);
+    if (!valid) return res.status(400).json({ error: 'Token ungültig oder abgelaufen.' });
+    res.json({ success: true, message: 'E-Mail erfolgreich verifiziert.' });
+  } catch (err: any) {
+    console.error('[pwa] verify-email error:', err);
+    res.status(400).json({ error: err.message || 'Verifizierung fehlgeschlagen.' });
+  }
+});
+
+
+// ═══════════════════════════════════════════════════════════════
+// 15. MEDICATION REMINDERS
+// ═══════════════════════════════════════════════════════════════
+
+const reminderCreateSchema = z.object({
+  medicationId: z.string().uuid(),
+  scheduleCron: z.string().min(5),
+  scheduleLabel: z.string().optional(),
+  pushTitle: z.string().optional(),
+  pushBody: z.string().optional(),
+  isActive: z.boolean().optional(),
+});
+
+const reminderUpdateSchema = z.object({
+  scheduleCron: z.string().min(5).optional(),
+  scheduleLabel: z.string().optional(),
+  pushTitle: z.string().optional(),
+  pushBody: z.string().optional(),
+  isActive: z.boolean().optional(),
+});
+
+// GET /reminders — List all medication reminders
+router.get('/reminders', requirePatientAuth, async (req: Request, res: Response) => {
+  try {
+    const accountId = getAccountId(req);
+    const reminders = await getReminders(accountId);
+    res.json(reminders);
+  } catch (err: any) {
+    console.error('[pwa] reminders list error:', err);
+    res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.generic') });
+  }
+});
+
+// POST /reminders — Create a medication reminder
+router.post('/reminders', requirePatientAuth, async (req: Request, res: Response) => {
+  try {
+    const data = reminderCreateSchema.parse(req.body);
+    const accountId = getAccountId(req);
+    const reminder = await createReminder(accountId, data);
+    res.status(201).json(reminder);
+  } catch (err: any) {
+    if (err instanceof z.ZodError) return res.status(400).json({ error: t(parseLang(req.headers['accept-language']), 'errors.validation'), details: err.issues });
+    console.error('[pwa] reminder create error:', err);
+    res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.generic') });
+  }
+});
+
+// PUT /reminders/:id — Update a medication reminder
+router.put('/reminders/:id', requirePatientAuth, async (req: Request, res: Response) => {
+  try {
+    const data = reminderUpdateSchema.parse(req.body);
+    const accountId = getAccountId(req);
+    const reminder = await updateReminder(req.params.id as string, accountId, data);
+    res.json(reminder);
+  } catch (err: any) {
+    if (err instanceof z.ZodError) return res.status(400).json({ error: t(parseLang(req.headers['accept-language']), 'errors.validation'), details: err.issues });
+    console.error('[pwa] reminder update error:', err);
+    res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.generic') });
+  }
+});
+
+// DELETE /reminders/:id — Delete a medication reminder
+router.delete('/reminders/:id', requirePatientAuth, async (req: Request, res: Response) => {
+  try {
+    const accountId = getAccountId(req);
+    await deleteReminder(req.params.id as string, accountId);
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error('[pwa] reminder delete error:', err);
+    res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.generic') });
+  }
+});
+
+// GET /reminders/adherence — Medication adherence statistics
+router.get('/reminders/adherence', requirePatientAuth, async (req: Request, res: Response) => {
+  try {
+    const accountId = getAccountId(req);
+    const stats = await getAdherenceStats(accountId);
+    res.json(stats);
+  } catch (err: any) {
+    console.error('[pwa] adherence stats error:', err);
+    res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.generic') });
+  }
+});
+
+
+// ═══════════════════════════════════════════════════════════════
+// 16. DIARY TRENDS
+// ═══════════════════════════════════════════════════════════════
+
+const validMetrics: MetricType[] = ['bloodPressure', 'heartRate', 'weight', 'temperature', 'bloodSugar', 'mood', 'pain', 'sleep'];
+const validPeriods: PeriodType[] = ['7d', '30d', '90d', '365d'];
+
+// GET /diary/trends — Vital sign trend analysis
+router.get('/diary/trends', requirePatientAuth, async (req: Request, res: Response) => {
+  try {
+    const metric = req.query.metric as string;
+    const period = (req.query.period as string) || '30d';
+
+    if (!metric || !validMetrics.includes(metric as MetricType)) {
+      return res.status(400).json({ error: `metric must be one of: ${validMetrics.join(', ')}` });
+    }
+    if (!validPeriods.includes(period as PeriodType)) {
+      return res.status(400).json({ error: `period must be one of: ${validPeriods.join(', ')}` });
+    }
+
+    const accountId = getAccountId(req);
+    const trends = await getTrends(accountId, metric as MetricType, period as PeriodType);
+    res.json(trends);
+  } catch (err: any) {
+    console.error('[pwa] diary trends error:', err);
+    res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.generic') });
   }
 });
 

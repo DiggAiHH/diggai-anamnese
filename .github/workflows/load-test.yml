@@ -1,0 +1,196 @@
+name: Load Tests
+
+on:
+  schedule:
+    # Run every Sunday at 2 AM
+    - cron: '0 2 * * 0'
+  workflow_dispatch:
+    inputs:
+      scenario:
+        description: 'Test scenario to run'
+        required: true
+        type: choice
+        options:
+          - normal
+          - peak
+          - stress
+          - spike
+          - endurance
+        default: 'normal'
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+        default: 'staging'
+      base_url:
+        description: 'Base URL (overrides environment)'
+        required: false
+        type: string
+
+jobs:
+  load-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: cd anamnese-app && npm ci
+
+      - name: Setup K6
+        uses: grafana/setup-k6-action@v1
+
+      - name: Start services (local test)
+        if: github.event.inputs.environment == 'local' || github.event.inputs.environment == ''
+        run: |
+          cd anamnese-app
+          docker-compose -f docker-compose.local.yml up -d
+          sleep 30  # Wait for services to start
+
+      - name: Wait for services
+        if: github.event.inputs.environment == 'local' || github.event.inputs.environment == ''
+        run: |
+          timeout=60
+          while [ $timeout -gt 0 ]; do
+            if curl -s http://localhost:3001/api/health > /dev/null; then
+              echo "Services are ready!"
+              break
+            fi
+            echo "Waiting for services... ($timeout seconds left)"
+            sleep 1
+            timeout=$((timeout - 1))
+          done
+          
+          if [ $timeout -eq 0 ]; then
+            echo "Services failed to start"
+            exit 1
+          fi
+
+      - name: Determine base URL
+        id: base-url
+        run: |
+          if [ -n "${{ github.event.inputs.base_url }}" ]; then
+            echo "url=${{ github.event.inputs.base_url }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event.inputs.environment }}" == "production" ]; then
+            echo "url=https://diggai-drklaproth.netlify.app/api" >> $GITHUB_OUTPUT
+          else
+            echo "url=http://localhost:3001/api" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run API Load Test
+        run: |
+          cd anamnese-app
+          k6 run \
+            --env BASE_URL=${{ steps.base-url.outputs.url }} \
+            --env SCENARIO=${{ github.event.inputs.scenario || 'normal' }} \
+            --env ENV=${{ github.event.inputs.environment || 'staging' }} \
+            --out json=tests/load/results/api-load-test.json \
+            --summary-export=tests/load/results/api-summary.json \
+            tests/load/api-load-test.js
+
+      - name: Run Dashboard Load Test
+        run: |
+          cd anamnese-app
+          k6 run \
+            --env BASE_URL=${{ steps.base-url.outputs.url }} \
+            --env SCENARIO=${{ github.event.inputs.scenario || 'normal' }} \
+            --env ENV=${{ github.event.inputs.environment || 'staging' }} \
+            --out json=tests/load/results/dashboard-load-test.json \
+            --summary-export=tests/load/results/dashboard-summary.json \
+            tests/load/dashboard-load-test.js
+
+      - name: Generate Report
+        if: always()
+        run: |
+          cd anamnese-app
+          node scripts/generate-load-report.js \
+            --api-summary tests/load/results/api-summary.json \
+            --dashboard-summary tests/load/results/dashboard-summary.json \
+            --output tests/load/results/REPORT.md
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: load-test-results-${{ github.event.inputs.scenario || 'normal' }}-${{ github.run_id }}
+          path: |
+            anamnese-app/tests/load/results/
+          retention-days: 30
+
+      - name: Comment PR
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('anamnese-app/tests/load/results/REPORT.md', 'utf8');
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## Load Test Results\n\n${report}`
+            });
+
+      - name: Check Performance Budget
+        run: |
+          cd anamnese-app
+          node scripts/check-performance-budget.js \
+            tests/load/results/api-summary.json \
+            tests/load/benchmarks.yml
+
+      - name: Stop services (local test)
+        if: always() && (github.event.inputs.environment == 'local' || github.event.inputs.environment == '')
+        run: |
+          cd anamnese-app
+          docker-compose -f docker-compose.local.yml down
+
+  lighthouse:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          cd anamnese-app
+          npm ci
+
+      - name: Build application
+        run: |
+          cd anamnese-app
+          npm run build
+
+      - name: Run Lighthouse CI
+        run: |
+          npm install -g @lhci/cli@0.14.x
+          cd anamnese-app
+          lhci autorun --config=lighthouserc.js
+        env:
+          LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
+
+      - name: Upload Lighthouse results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-results
+          path: |
+            anamnese-app/.lighthouseci/
+          retention-days: 30

@@ -29,21 +29,21 @@ export function StripeProvider({ children, options }: StripeProviderProps) {
     appearance: {
       theme: 'stripe',
       variables: {
-        colorPrimary: '#3b82f6',
-        colorBackground: '#ffffff',
-        colorText: '#1f2937',
-        colorDanger: '#ef4444',
+        colorPrimary: '#4A90E2',
+        colorBackground: '#FFFFFF',
+        colorText: '#2C5F8A',
+        colorDanger: '#E07A5F',
         fontFamily: 'system-ui, -apple-system, sans-serif',
         spacingUnit: '4px',
         borderRadius: '8px',
       },
       rules: {
         '.Input': {
-          border: '1px solid #e5e7eb',
+          border: '1px solid #D9D9D9',
           padding: '12px',
         },
         '.Input:focus': {
-          border: '2px solid #3b82f6',
+          border: '2px solid #4A90E2',
           outline: 'none',
         },
       },
@@ -74,10 +74,10 @@ export function StripeSetupIntentProvider({
     appearance: {
       theme: 'stripe',
       variables: {
-        colorPrimary: '#3b82f6',
-        colorBackground: '#ffffff',
-        colorText: '#1f2937',
-        colorDanger: '#ef4444',
+        colorPrimary: '#4A90E2',
+        colorBackground: '#FFFFFF',
+        colorText: '#2C5F8A',
+        colorDanger: '#E07A5F',
         fontFamily: 'system-ui, -apple-system, sans-serif',
         spacingUnit: '4px',
         borderRadius: '8px',

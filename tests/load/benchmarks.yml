@@ -1,0 +1,136 @@
+# DiggAI Anamnese - Performance Benchmarks
+# Define SLOs (Service Level Objectives) and SLIs (Service Level Indicators)
+
+benchmarks:
+  # API Response Time Targets
+  api_response_time:
+    p50: 100ms        # 50th percentile - median
+    p95: 200ms        # 95th percentile - target for GO LIVE
+    p99: 500ms        # 99th percentile - acceptable maximum
+    
+  # Throughput Targets
+  throughput:
+    target_rps: 1000        # requests per second target
+    sustained_rps: 500      # sustained load minimum
+    burst_rps: 2000         # burst capacity
+    
+  # Error Rate Targets
+  error_rate:
+    max: 0.1%           # maximum acceptable error rate (0.001)
+    target: 0.01%       # target error rate (0.0001)
+    critical_max: 1%    # critical threshold requiring immediate action
+    
+  # Concurrent User Targets
+  concurrent_users:
+    normal: 100         # normal operating load
+    peak: 500          # peak load (busy hours)
+    stress: 1000       # stress test limit (GO LIVE requirement)
+    max_capacity: 1500  # absolute maximum before degradation
+    
+  # Database Performance
+  database:
+    connection_pool_min: 5
+    connection_pool_max: 20
+    connection_pool_target: 15
+    query_time_p50: 20ms
+    query_time_p95: 50ms
+    query_time_p99: 100ms
+    max_connections: 100
+    
+  # WebSocket/Realtime Performance
+  websocket:
+    max_connections: 2000
+    message_latency_p95: 100ms
+    reconnect_time_max: 5000ms
+    heartbeat_interval: 30000ms
+    
+  # Frontend Performance (Lighthouse)
+  frontend:
+    performance_score_min: 90
+    accessibility_score_min: 100
+    best_practices_score_min: 90
+    seo_score_min: 90
+    first_contentful_paint_max: 1500ms
+    largest_contentful_paint_max: 2500ms
+    time_to_interactive_max: 3000ms
+    total_blocking_time_max: 200ms
+    cumulative_layout_shift_max: 0.1
+    
+  # Infrastructure
+  infrastructure:
+    cpu_threshold: 70%      # Alert if sustained > 70%
+    memory_threshold: 80%   # Alert if sustained > 80%
+    disk_threshold: 85%     # Alert if > 85%
+    target_availability: 99.9%  # Three nines
+
+# Load Test Scenarios Configuration
+scenarios:
+  normal:
+    description: "Baseline performance under normal load"
+    users: 100
+    duration: "20m"
+    ramp_up: "5m"
+    ramp_down: "5m"
+    
+  peak:
+    description: "Peak load during busy hours"
+    users: 500
+    duration: "9m"
+    ramp_up: "2m"
+    ramp_down: "2m"
+    
+  stress:
+    description: "Stress test to find breaking point"
+    users: 1000
+    duration: "22m"
+    ramp_up: "5m"
+    sustain: "10m"
+    overload: "5m"
+    ramp_down: "2m"
+    
+  spike:
+    description: "Sudden traffic spike simulation"
+    baseline_users: 100
+    spike_users: 1000
+    spike_duration: "2m"
+    recovery_check: "2m"
+    
+  endurance:
+    description: "Long-term stability test"
+    users: 200
+    duration: "1h20m"
+    ramp_up: "10m"
+    sustain: "1h"
+    ramp_down: "10m"
+    
+  soak:
+    description: "Memory leak detection"
+    users: 100
+    duration: "4h"
+
+# Success Criteria for GO LIVE
+go_live_criteria:
+  - name: "API Response Time p95"
+    metric: "http_req_duration"
+    threshold: "p(95)<200"
+    required: true
+    
+  - name: "Error Rate"
+    metric: "http_req_failed"
+    threshold: "rate<0.001"
+    required: true
+    
+  - name: "Concurrent Users"
+    metric: "vus_max"
+    threshold: ">=1000"
+    required: true
+    
+  - name: "Database Query Time"
+    metric: "db_query_latency"
+    threshold: "p(95)<50"
+    required: true
+    
+  - name: "Frontend Performance"
+    metric: "lighthouse_performance"
+    threshold: ">=90"
+    required: true

@@ -19,7 +19,36 @@ import {
 
 const router = Router();
 
-// All system routes require ADMIN authentication
+// ─── Public System Routes ──────────────────────────────────
+
+// POST /api/system/error-report — Frontend error fallback reporting
+router.post('/error-report', async (req: Request, res: Response) => {
+  try {
+    const { errorId, routeType, message, stack, componentStack, url, timestamp } = req.body;
+    
+    // Log to console/audit log even if it's public (rate limited by global middleware)
+    console.error(`[FrontendError:${routeType}] ID: ${errorId} | ${message}`);
+    
+    // Optional: save to database if we want to track them
+    const db = (globalThis as any).__prisma;
+    if (db) {
+      await db.auditLog.create({
+        data: {
+          action: `FRONTEND_ERROR_${routeType.toUpperCase()}`,
+          resource: url || 'unknown',
+          metadata: JSON.stringify({ errorId, message, stack, componentStack, timestamp }),
+          userId: 'client-report',
+        }
+      }).catch(() => {});
+    }
+
+    res.status(202).json({ success: true, id: errorId });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// All following system routes require ADMIN authentication
 router.use(requireAuth, requireRole('ADMIN'));
 
 // ─── Deployment Info ────────────────────────────────────────
@@ -143,6 +172,18 @@ router.get('/backups/schedule', async (_req: Request, res: Response) => {
   }
 });
 
+// GET /api/system/backup-status — Backup health check
+import { handleBackupHealthCheck } from '../jobs/backupMonitor';
+
+router.get('/backup-status', async (_req: Request, res: Response) => {
+  try {
+    const status = await handleBackupHealthCheck();
+    res.json(status);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ─── Network Status ─────────────────────────────────────────
 
 // GET /api/system/network — Full network health check
@@ -233,6 +274,75 @@ router.get('/info', async (_req: Request, res: Response) => {
       processMemory: process.memoryUsage(),
       loadAverage: os.loadavg(),
     });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ─── Web Vitals & Performance Metrics ─────────────────────────
+
+import { getRedisClient } from '../redis';
+
+// POST /api/system/metrics/web-vitals - Frontend Web Vitals
+router.post('/metrics/web-vitals', async (req: Request, res: Response) => {
+  const { name, value, rating } = req.body;
+  
+  // Store in Redis for aggregation
+  const redis = getRedisClient();
+  if (redis) {
+    const key = `metrics:webvitals:${name}`;
+    await redis.lpush(key, JSON.stringify({ value, rating, ts: Date.now() }));
+    await redis.ltrim(key, 0, 999); // Keep last 1000
+    await redis.expire(key, 86400); // 24h TTL
+  }
+  
+  res.status(204).send();
+});
+
+// POST /api/system/metrics/api-timing - API Performance
+router.post('/metrics/api-timing', async (req: Request, res: Response) => {
+  const { endpoint, duration } = req.body;
+  
+  const redis = getRedisClient();
+  if (redis) {
+    const key = `metrics:api:${endpoint}`;
+    await redis.lpush(key, JSON.stringify({ duration, ts: Date.now() }));
+    await redis.ltrim(key, 0, 999);
+    await redis.expire(key, 3600); // 1h TTL
+  }
+  
+  res.status(204).send();
+});
+
+// GET /api/system/metrics/web-vitals - Get aggregated Web Vitals (admin only)
+router.get('/metrics/web-vitals', async (_req: Request, res: Response) => {
+  try {
+    const redis = getRedisClient();
+    if (!redis) {
+      res.json({ message: 'Redis not available' });
+      return;
+    }
+    
+    const metrics = ['LCP', 'FID', 'CLS', 'FCP', 'TTFB'];
+    const result: Record<string, any> = {};
+    
+    for (const metric of metrics) {
+      const key = `metrics:webvitals:${metric}`;
+      const data = await redis.lrange(key, 0, 99);
+      const parsed = data.map(d => JSON.parse(d));
+      
+      if (parsed.length > 0) {
+        const values = parsed.map(p => p.value);
+        const avg = values.reduce((a, b) => a + b, 0) / values.length;
+        result[metric] = {
+          count: parsed.length,
+          avg: Math.round(avg * 1000) / 1000,
+          recent: parsed.slice(0, 10),
+        };
+      }
+    }
+    
+    res.json(result);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

@@ -50,6 +50,7 @@ export const LanguageSelector: React.FC = () => {
                 aria-expanded={isOpen ? 'true' : 'false'}
                 aria-haspopup="listbox"
                 aria-label={t('languageSelect', 'Sprache wählen')}
+                data-testid="language-selector"
                 className="flex items-center gap-2 px-4 py-2 bg-[var(--bg-card)] hover:bg-[var(--bg-card-hover)] border border-[var(--border-primary)] rounded-xl transition-all text-[var(--text-primary)] text-sm font-medium backdrop-blur-md"
             >
                 <Globe className="w-4 h-4 text-blue-400" />

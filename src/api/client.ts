@@ -1,6 +1,7 @@
 ﻿import axios, { type AxiosRequestConfig, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios';
 import { questions } from '../data/questions';
 import { isDemoMode } from '../store/modeStore';
+import type { StaffUser } from '../lib/staffSession';
 
 // =============================================================================
 // REQUEST DEDUPLICATION
@@ -129,7 +130,7 @@ function getCsrfTokenFromCookie(): string | null {
     return match ? decodeURIComponent(match[1]) : null;
 }
 
-// Request Interceptor – JWT automatisch anfuegen + CSRF Token
+// Request Interceptor – JWT automatisch anfuegen + CSRF Token + Performance Tracking
 apiClient.interceptors.request.use(
     (config) => {
         const token = getAuthToken();
@@ -145,6 +146,9 @@ apiClient.interceptors.request.use(
                 config.headers['x-xsrf-token'] = csrfToken;
             }
         }
+
+        // PERFORMANCE: Track request start time
+        (config as unknown as Record<string, unknown>).metadata = { startTime: Date.now() };
 
         return config;
     },
@@ -183,7 +187,22 @@ function isAbortError(error: unknown): boolean {
 }
 
 apiClient.interceptors.response.use(
-    (response) => response,
+    (response) => {
+        // PERFORMANCE: Track API response times
+        const config = response.config as unknown as { metadata?: { startTime: number } };
+        if (config.metadata?.startTime) {
+            const duration = Date.now() - config.metadata.startTime;
+            
+            // Log slow API calls in development
+            if (import.meta.env.DEV && duration > 500) {
+                console.warn(`[Slow API] ${response.config.url}: ${duration}ms`);
+            }
+            
+            // Add timing header for debugging
+            response.headers['x-api-duration'] = String(duration);
+        }
+        return response;
+    },
     async (error) => {
         
         // AbortError soll nicht als Fehler angezeigt werden - Silent reject
@@ -770,11 +789,31 @@ export const api = {
                 demoError('Ungültige Anmeldedaten');
             }
             return {
-                token: demoId('arzt_token'),
-                user: { id: 'arzt_demo', role: 'arzt', displayName: 'Demo Arzt' },
+                user: { id: 'arzt_demo', username: username || 'demo.arzt', role: 'arzt', displayName: 'Demo Arzt' },
             };
         }
         const response = await apiClient.post('/arzt/login', { username, password });
+        return response.data;
+    },
+
+    arztMe: async (): Promise<StaffUser> => {
+        if (isDemoMode()) {
+            return {
+                id: 'arzt_demo',
+                username: 'demo.arzt',
+                displayName: 'Demo Arzt',
+                role: 'arzt',
+            };
+        }
+        const response = await apiClient.get('/arzt/me');
+        return response.data.user;
+    },
+
+    arztLogout: async () => {
+        if (isDemoMode()) {
+            return { success: true };
+        }
+        const response = await apiClient.post('/arzt/logout');
         return response.data;
     },
 

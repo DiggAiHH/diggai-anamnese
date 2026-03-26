@@ -218,7 +218,7 @@ export function CertificationModal({
                     className="h-full rounded-full transition-all"
                     style={{
                       width: `${patternScore}%`,
-                      background: patternScore > 70 ? '#22c55e' : patternScore > 40 ? '#eab308' : '#ef4444',
+                      background: patternScore > 70 ? '#81B29A' : patternScore > 40 ? '#F4A261' : '#E07A5F',
                     }}
                   />
                 </div>

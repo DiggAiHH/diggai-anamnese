@@ -172,7 +172,7 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onScan, onClose })
 
                         {/* Scanning Bar Animation */}
                         {status === 'scanning' && (
-                            <div className="absolute left-0 right-0 h-1 bg-blue-500 shadow-[0_0_10px_#3b82f6] animate-[scan_2s_ease-in-out_infinite]" />
+                            <div className="absolute left-0 right-0 h-1 bg-[#4A90E2] shadow-[0_0_10px_#4A90E2] animate-[scan_2s_ease-in-out_infinite]" />
                         )}
                     </div>
                 </div>

@@ -1,0 +1,1330 @@
+openapi: 3.0.0
+info:
+  title: DiggAI Anamnese Platform API
+  description: |
+    # DiggAI Anamnese Platform v3.0.0
+    
+    DSGVO-compliant digital patient intake API for German medical practices.
+    
+    ## Authentication
+    - **HttpOnly Cookie**: `token=<jwt>` (recommended for browsers)
+    - **Bearer Token**: `Authorization: Bearer <jwt>` (for API clients)
+    
+    ## Rate Limits
+    - Authentication: 5 requests / 15 minutes
+    - Answer Submission: 30 requests / 1 minute
+    - General API: 100 requests / 1 minute
+    - Export: 10 requests / 5 minutes
+    
+    ## Support
+    - Email: support@diggai.de
+    - Status: https://status.diggai.de
+  version: 3.0.0
+  contact:
+    name: DiggAI Support
+    email: support@diggai.de
+  license:
+    name: Proprietary
+    
+servers:
+  - url: https://api.diggai.de/api
+    description: Production
+  - url: https://api-staging.diggai.de/api
+    description: Staging
+
+security:
+  - cookieAuth: []
+  - bearerAuth: []
+
+paths:
+  # Sessions
+  /sessions:
+    post:
+      tags: [Sessions]
+      summary: Create new patient session
+      description: Creates a new patient session. Can be anonymous initially.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSessionRequest'
+      responses:
+        '201':
+          description: Session created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateSessionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /sessions/qr-token:
+    post:
+      tags: [Sessions]
+      summary: Generate QR token
+      description: Generate a token for QR code patient self-start
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                service:
+                  type: string
+                  example: "Termin / Anamnese"
+      responses:
+        '200':
+          description: Token generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+
+  /sessions/{id}/state:
+    get:
+      tags: [Sessions]
+      summary: Get session state
+      description: Get full session state including answers and triage events
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Session state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionState'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /sessions/{id}/submit:
+    post:
+      tags: [Sessions]
+      summary: Submit session
+      description: Mark session as completed and submitted
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Session submitted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  sessionId:
+                    type: string
+                  completedAt:
+                    type: string
+                    format: date-time
+
+  /sessions/refresh-token:
+    post:
+      tags: [Sessions]
+      summary: Refresh JWT token
+      description: Refresh an expiring JWT token
+      responses:
+        '200':
+          description: Token refreshed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+
+  # Answers
+  /sessions/{id}/answers:
+    post:
+      tags: [Answers]
+      summary: Submit answer
+      description: Submit an answer and trigger triage evaluation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitAnswerRequest'
+      responses:
+        '200':
+          description: Answer submitted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmitAnswerResponse'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  # Auth
+  /arzt/login:
+    post:
+      tags: [Authentication]
+      summary: Staff login
+      description: Authenticate medical staff (ARZT/MFA/ADMIN)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          headers:
+            Set-Cookie:
+              description: HttpOnly JWT cookie
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /arzt/logout:
+    post:
+      tags: [Authentication]
+      summary: Logout
+      description: Invalidate current token
+      responses:
+        '200':
+          description: Logout successful
+
+  /arzt/sessions:
+    get:
+      tags: [Arzt]
+      summary: List sessions
+      description: Get all patient sessions for doctor dashboard
+      responses:
+        '200':
+          description: Sessions list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sessions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SessionSummary'
+
+  /arzt/sessions/{id}:
+    get:
+      tags: [Arzt]
+      summary: Get session details
+      description: Get detailed session with decrypted PII
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Session details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  session:
+                    $ref: '#/components/schemas/SessionDetail'
+
+  /arzt/triage/{id}/ack:
+    put:
+      tags: [Triage]
+      summary: Acknowledge triage
+      description: Acknowledge a triage event
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Triage acknowledged
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  event:
+                    $ref: '#/components/schemas/TriageEvent'
+
+  # Admin
+  /admin/stats:
+    get:
+      tags: [Admin]
+      summary: Dashboard stats
+      description: Get system statistics for admin dashboard
+      responses:
+        '200':
+          description: Statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardStats'
+
+  /admin/sessions/timeline:
+    get:
+      tags: [Admin]
+      summary: Session timeline
+      description: Get session timeline data for charts
+      parameters:
+        - name: days
+          in: query
+          schema:
+            type: integer
+            default: 30
+      responses:
+        '200':
+          description: Timeline data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TimelineEntry'
+
+  /admin/analytics/services:
+    get:
+      tags: [Admin]
+      summary: Service analytics
+      description: Get service distribution
+      responses:
+        '200':
+          description: Service counts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ServiceCount'
+
+  /admin/analytics/triage:
+    get:
+      tags: [Admin]
+      summary: Triage analytics
+      description: Get triage event statistics
+      parameters:
+        - name: days
+          in: query
+          schema:
+            type: integer
+            default: 30
+      responses:
+        '200':
+          description: Triage analytics
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TriageAnalyticsEntry'
+
+  /admin/audit-log:
+    get:
+      tags: [Admin]
+      summary: Audit log
+      description: Get paginated audit log entries
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+        - name: action
+          in: query
+          schema:
+            type: string
+        - name: userId
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Audit log entries
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditLogResponse'
+
+  /admin/users:
+    get:
+      tags: [Admin]
+      summary: List users
+      description: Get all system users
+      responses:
+        '200':
+          description: Users list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+    post:
+      tags: [Admin]
+      summary: Create user
+      description: Create new user account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+  /admin/users/{id}:
+    put:
+      tags: [Admin]
+      summary: Update user
+      description: Update user account
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRequest'
+      responses:
+        '200':
+          description: User updated
+    delete:
+      tags: [Admin]
+      summary: Delete user
+      description: Soft-delete (deactivate) user
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: User deactivated
+
+  # MFA
+  /mfa/sessions:
+    get:
+      tags: [MFA]
+      summary: MFA sessions list
+      description: Get all sessions for MFA overview
+      responses:
+        '200':
+          description: Sessions list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sessions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MfaSessionSummary'
+
+  /mfa/doctors:
+    get:
+      tags: [MFA]
+      summary: List doctors
+      description: Get available doctors for assignment
+      responses:
+        '200':
+          description: Doctors list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  doctors:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DoctorSummary'
+
+  /mfa/sessions/{id}/assign:
+    post:
+      tags: [MFA]
+      summary: Assign doctor
+      description: Assign a doctor to a session
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                arztId:
+                  type: string
+      responses:
+        '200':
+          description: Assignment successful
+
+  # System
+  /system/health:
+    get:
+      tags: [System]
+      summary: Health check
+      description: System health status
+      security: []
+      responses:
+        '200':
+          description: Health status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+
+  /system/info:
+    get:
+      tags: [System]
+      summary: System info
+      description: System information and metrics
+      responses:
+        '200':
+          description: System info
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemInfo'
+
+  /system/backups:
+    get:
+      tags: [System]
+      summary: List backups
+      description: Get all backups
+      responses:
+        '200':
+          description: Backups list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Backup'
+    post:
+      tags: [System]
+      summary: Create backup
+      description: Create new backup
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                type:
+                  type: string
+                  enum: [full, partial]
+                tables:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '201':
+          description: Backup created
+
+  # Export
+  /export/sessions/{id}/export/csv:
+    get:
+      tags: [Export]
+      summary: Export CSV
+      description: Export session as CSV
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: CSV file
+          content:
+            text/csv:
+              schema:
+                type: string
+
+  /export/sessions/{id}/export/pdf:
+    get:
+      tags: [Export]
+      summary: Export PDF
+      description: Export session as HTML/PDF
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: HTML document
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /export/sessions/{id}/export/json:
+    get:
+      tags: [Export]
+      summary: Export JSON
+      description: Export session as JSON
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: JSON export
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonExport'
+
+  # Chat
+  /chats/{sessionId}:
+    get:
+      tags: [Chat]
+      summary: Get chat history
+      description: Get messages for a session
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Chat messages
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messages:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ChatMessage'
+
+  # Atoms
+  /atoms:
+    get:
+      tags: [Atoms]
+      summary: Get atoms
+      description: Get question atoms
+      parameters:
+        - name: ids
+          in: query
+          schema:
+            type: string
+          description: Comma-separated atom IDs
+        - name: module
+          in: query
+          schema:
+            type: string
+        - name: section
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Atoms list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  atoms:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Atom'
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: token
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    CreateSessionRequest:
+      type: object
+      required:
+        - selectedService
+      properties:
+        selectedService:
+          type: string
+          example: "Termin / Anamnese"
+        email:
+          type: string
+          format: email
+        isNewPatient:
+          type: boolean
+          default: true
+        gender:
+          type: string
+          enum: [M, W, D]
+        birthDate:
+          type: string
+          format: date
+        insuranceType:
+          type: string
+
+    CreateSessionResponse:
+      type: object
+      properties:
+        sessionId:
+          type: string
+        nextAtomIds:
+          type: array
+          items:
+            type: string
+
+    SessionState:
+      type: object
+      properties:
+        session:
+          $ref: '#/components/schemas/Session'
+        answers:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/AnswerData'
+        triageEvents:
+          type: array
+          items:
+            $ref: '#/components/schemas/TriageEvent'
+        totalAnswers:
+          type: integer
+
+    Session:
+      type: object
+      properties:
+        id:
+          type: string
+        isNewPatient:
+          type: boolean
+        gender:
+          type: string
+        birthDate:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [ACTIVE, COMPLETED, SUBMITTED, EXPIRED]
+        selectedService:
+          type: string
+        insuranceType:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+
+    AnswerData:
+      type: object
+      properties:
+        value:
+          type: object
+        answeredAt:
+          type: string
+          format: date-time
+        timeSpentMs:
+          type: integer
+
+    SubmitAnswerRequest:
+      type: object
+      required:
+        - atomId
+        - value
+      properties:
+        atomId:
+          type: string
+        value:
+          type: object
+        timeSpentMs:
+          type: integer
+          default: 0
+
+    SubmitAnswerResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        answerId:
+          type: string
+        redFlags:
+          type: array
+          items:
+            $ref: '#/components/schemas/RedFlag'
+        progress:
+          type: integer
+
+    RedFlag:
+      type: object
+      properties:
+        level:
+          type: string
+          enum: [CRITICAL, WARNING]
+        ruleId:
+          type: string
+        message:
+          type: string
+
+    TriageEvent:
+      type: object
+      properties:
+        id:
+          type: string
+        sessionId:
+          type: string
+        level:
+          type: string
+          enum: [CRITICAL, WARNING]
+        ruleId:
+          type: string
+        message:
+          type: string
+        triggerValues:
+          type: object
+        createdAt:
+          type: string
+          format: date-time
+        acknowledgedBy:
+          type: string
+        acknowledgedAt:
+          type: string
+          format: date-time
+
+    LoginRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          example: "dr.klaproth"
+        password:
+          type: string
+          format: password
+
+    LoginResponse:
+      type: object
+      properties:
+        user:
+          type: object
+          properties:
+            id:
+              type: string
+            username:
+              type: string
+            displayName:
+              type: string
+
+    SessionSummary:
+      type: object
+      properties:
+        id:
+          type: string
+        patientName:
+          type: string
+        isNewPatient:
+          type: boolean
+        gender:
+          type: string
+        selectedService:
+          type: string
+        status:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+        totalAnswers:
+          type: integer
+        totalTriageEvents:
+          type: integer
+        unresolvedCritical:
+          type: integer
+
+    SessionDetail:
+      type: object
+      properties:
+        id:
+          type: string
+        patientName:
+          type: string
+        answers:
+          type: array
+          items:
+            $ref: '#/components/schemas/AnswerDetail'
+        triageEvents:
+          type: array
+          items:
+            $ref: '#/components/schemas/TriageEvent'
+
+    AnswerDetail:
+      type: object
+      properties:
+        id:
+          type: string
+        atomId:
+          type: string
+        value:
+          type: object
+        questionText:
+          type: string
+        section:
+          type: string
+        answerType:
+          type: string
+        answeredAt:
+          type: string
+          format: date-time
+
+    DashboardStats:
+      type: object
+      properties:
+        totalPatients:
+          type: integer
+        totalSessions:
+          type: integer
+        activeSessions:
+          type: integer
+        completedSessions:
+          type: integer
+        sessionsToday:
+          type: integer
+        completionRate:
+          type: integer
+        avgCompletionMinutes:
+          type: integer
+        unresolvedTriageEvents:
+          type: integer
+        totalUsers:
+          type: integer
+
+    TimelineEntry:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        total:
+          type: integer
+        completed:
+          type: integer
+        active:
+          type: integer
+
+    ServiceCount:
+      type: object
+      properties:
+        service:
+          type: string
+        count:
+          type: integer
+
+    TriageAnalyticsEntry:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        critical:
+          type: integer
+        warning:
+          type: integer
+        acknowledged:
+          type: integer
+
+    AuditLogEntry:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        action:
+          type: string
+        resource:
+          type: string
+        ipHash:
+          type: string
+        userAgent:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+
+    AuditLogResponse:
+      type: object
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditLogEntry'
+        pagination:
+          type: object
+          properties:
+            page:
+              type: integer
+            limit:
+              type: integer
+            total:
+              type: integer
+            totalPages:
+              type: integer
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        displayName:
+          type: string
+        role:
+          type: string
+          enum: [ARZT, MFA, ADMIN]
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateUserRequest:
+      type: object
+      required:
+        - username
+        - password
+        - displayName
+        - role
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 50
+        password:
+          type: string
+          minLength: 8
+          maxLength: 100
+        displayName:
+          type: string
+          minLength: 2
+          maxLength: 100
+        role:
+          type: string
+          enum: [ARZT, MFA, ADMIN]
+
+    UpdateUserRequest:
+      type: object
+      properties:
+        displayName:
+          type: string
+        role:
+          type: string
+          enum: [ARZT, MFA, ADMIN]
+        isActive:
+          type: boolean
+        password:
+          type: string
+          minLength: 8
+        pin:
+          type: string
+          pattern: '^\d{4}$'
+
+    MfaSessionSummary:
+      type: object
+      properties:
+        id:
+          type: string
+        selectedService:
+          type: string
+        status:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        totalAnswers:
+          type: integer
+        unresolvedCritical:
+          type: integer
+        assignedArzt:
+          type: object
+          properties:
+            id:
+              type: string
+            displayName:
+              type: string
+
+    DoctorSummary:
+      type: object
+      properties:
+        id:
+          type: string
+        displayName:
+          type: string
+        username:
+          type: string
+
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded, error]
+        version:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        environment:
+          type: string
+        db:
+          type: string
+          enum: [connected, disconnected, error]
+        redis:
+          type: string
+          enum: [connected, disconnected]
+        uptime:
+          type: integer
+
+    SystemInfo:
+      type: object
+      properties:
+        uptime:
+          type: integer
+        nodeVersion:
+          type: string
+        platform:
+          type: string
+        arch:
+          type: string
+        hostname:
+          type: string
+        totalMemory:
+          type: integer
+        freeMemory:
+          type: integer
+        cpuCount:
+          type: integer
+        processMemory:
+          type: object
+        loadAverage:
+          type: array
+          items:
+            type: number
+
+    Backup:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        status:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        size:
+          type: integer
+
+    JsonExport:
+      type: object
+      properties:
+        patient:
+          type: object
+          properties:
+            name:
+              type: string
+            gender:
+              type: string
+            birthDate:
+              type: string
+              format: date
+            insuranceType:
+              type: string
+        service:
+          type: string
+        status:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+        answers:
+          type: array
+        triageEvents:
+          type: array
+        exportedAt:
+          type: string
+          format: date-time
+
+    ChatMessage:
+      type: object
+      properties:
+        id:
+          type: string
+        sessionId:
+          type: string
+        senderType:
+          type: string
+          enum: [PATIENT, ARZT, SYSTEM]
+        senderId:
+          type: string
+        text:
+          type: string
+        fromName:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+
+    Atom:
+      type: object
+      properties:
+        id:
+          type: string
+        questionText:
+          type: string
+        answerType:
+          type: string
+        options:
+          type: array
+          items:
+            type: object
+            properties:
+              value:
+                type: string
+              label:
+                type: string
+        section:
+          type: string
+        orderIndex:
+          type: integer
+        isRequired:
+          type: boolean
+        isRedFlag:
+          type: boolean
+        isPII:
+          type: boolean
+        isActive:
+          type: boolean
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+        details:
+          type: object
+
+  responses:
+    BadRequest:
+      description: Bad Request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Not Found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    RateLimited:
+      description: Too Many Requests
+      headers:
+        X-RateLimit-Limit:
+          schema:
+            type: integer
+        X-RateLimit-Remaining:
+          schema:
+            type: integer
+        X-RateLimit-Reset:
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    InternalError:
+      description: Internal Server Error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'

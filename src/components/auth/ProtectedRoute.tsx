@@ -1,26 +1,8 @@
 import { type ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { getAuthToken } from '../../api/client';
+import { useStaffSession } from '../../hooks/useStaffSession';
 
 export type UserRole = 'patient' | 'arzt' | 'mfa' | 'admin';
-
-function parseJwt(token: string): { role?: UserRole; exp?: number } | null {
-  try {
-    const payload = token.split('.')[1];
-    return JSON.parse(atob(payload));
-  } catch {
-    return null;
-  }
-}
-
-function getCurrentRole(): UserRole | null {
-  const token = getAuthToken();
-  if (!token) return null;
-  const payload = parseJwt(token);
-  if (!payload || !payload.exp) return null;
-  if (payload.exp * 1000 < Date.now()) return null;
-  return payload.role ?? null;
-}
 
 interface Props {
   children: ReactNode;
@@ -34,7 +16,13 @@ interface Props {
  */
 export function ProtectedRoute({ children, allowedRoles, redirectTo }: Props) {
   const location = useLocation();
-  const role = getCurrentRole();
+  const { data: user, isLoading } = useStaffSession();
+
+  if (isLoading) {
+    return null;
+  }
+
+  const role = user?.role ?? null;
 
   if (!role) {
     return <Navigate to={redirectTo ?? '/'} state={{ from: location }} replace />;

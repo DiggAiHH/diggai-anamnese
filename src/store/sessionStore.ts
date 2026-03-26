@@ -76,6 +76,9 @@ export interface SessionState {
     // Wartezeit-Management (Modul 1)
     infoBreakHistory: string[];       // IDs der bereits gesehenen InfoBreak-Contents
     entertainmentMode: 'AUTO' | 'GAMES' | 'READING' | 'QUIET';
+
+    // Phase 3: Layout & Whitespace - Progressive Disclosure
+    simpleMode: boolean;              // true = 1 question/screen, false = 3-4 questions/screen
 }
 
 export interface SessionActions {
@@ -108,6 +111,10 @@ export interface SessionActions {
     // Wartezeit-Management (Modul 1)
     addInfoBreakSeen: (contentId: string) => void;
     setEntertainmentMode: (mode: 'AUTO' | 'GAMES' | 'READING' | 'QUIET') => void;
+
+    // Phase 3: Layout & Whitespace
+    setSimpleMode: (enabled: boolean) => void;
+    toggleSimpleMode: () => void;
 }
 
 const initialState: SessionState = {
@@ -131,6 +138,7 @@ const initialState: SessionState = {
     isHydrated: false,
     infoBreakHistory: [],
     entertainmentMode: 'AUTO',
+    simpleMode: false,  // Default to normal mode
 };
 
 // ─── Store ──────────────────────────────────────────────────
@@ -227,6 +235,10 @@ export const useSessionStore = create<SessionState & SessionActions>()(
                 infoBreakHistory: [...state.infoBreakHistory, contentId],
             })),
             setEntertainmentMode: (mode) => set({ entertainmentMode: mode }),
+
+            // Phase 3: Layout & Whitespace
+            setSimpleMode: (enabled) => set({ simpleMode: enabled }),
+            toggleSimpleMode: () => set((state) => ({ simpleMode: !state.simpleMode })),
         }),
         {
             name: 'anamnese-session',
@@ -243,6 +255,7 @@ export const useSessionStore = create<SessionState & SessionActions>()(
                 selectedService: state.selectedService,
                 progress: state.progress,
                 answers: state.answers,
+                simpleMode: state.simpleMode,  // Persist user preference
             }),
             onRehydrateStorage: () => (rehydratedState) => {
                 if (rehydratedState) {

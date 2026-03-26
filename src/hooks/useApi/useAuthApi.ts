@@ -7,7 +7,8 @@
  */
 
 import { useMutation } from '@tanstack/react-query';
-import { api, setAuthToken } from '../../api/client';
+import { api } from '../../api/client';
+import { setStoredStaffUser, setStoredStaffToken } from '../../lib/staffSession';
 
 /**
  * Hook zum Generieren eines QR-Tokens
@@ -40,7 +41,10 @@ export function useArztLogin() {
         mutationFn: ({ username, password }: { username: string; password: string }) =>
             api.arztLogin(username, password),
         onSuccess: (response) => {
-            setAuthToken(response.token);
+            setStoredStaffUser(response.user ?? null);
+            if (response.token) {
+                setStoredStaffToken(response.token);
+            }
         },
     });
 }

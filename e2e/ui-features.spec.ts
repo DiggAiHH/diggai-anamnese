@@ -18,9 +18,9 @@ async function startQuestionnaireSession(page: Page) {
     await page.getByText('Widerrufsrecht & Datenlöschung').click();
     await page.locator('button').filter({ hasText: /Einwilligen.*Fortfahren/ }).click();
 
-    // Wait for first question
+    // Wait for first question — use h2.question-title to avoid matching hidden service-card previews
     await expect(
-        page.getByText('Sind Sie bereits als Patient in unserer Praxis bekannt?').first()
+        page.locator('h2.question-title').filter({ hasText: 'Sind Sie bereits als Patient' }).first()
     ).toBeVisible({ timeout: 15000 });
 }
 
@@ -92,9 +92,9 @@ test.describe('DSGVO Consent Gate', () => {
         await page.getByText('Widerrufsrecht & Datenlöschung').click();
         await page.locator('button').filter({ hasText: /Einwilligen.*Fortfahren/ }).click();
 
-        // Wait for questionnaire to load
+        // Wait for questionnaire to load — use h2.question-title to avoid hidden service-card previews
         await expect(
-            page.getByText('Sind Sie bereits als Patient in unserer Praxis bekannt?').first()
+            page.locator('h2.question-title').filter({ hasText: 'Sind Sie bereits als Patient' }).first()
         ).toBeVisible({ timeout: 15000 });
 
         // Reload and try again — should NOT show DSGVO again
@@ -118,11 +118,11 @@ test.describe('i18n Language Switching', () => {
     test('Language selector shows dropdown with 5 languages', async ({ page }) => {
         await page.goto('/');
 
-        // Find and click the language selector (Globe icon button)
-        const langSelector = page.locator('button').filter({ hasText: /DE|EN|AR|TR|UK/i }).first();
+        // Find the language selector by data-testid (reliable, avoids matching German words with /DE/i)
+        const langSelector = page.locator('[data-testid="language-selector"]').first();
         await langSelector.click();
 
-        // Dropdown should show all 5 options
+        // Dropdown should show languages including at least these 5
         await expect(page.getByText('Deutsch')).toBeVisible();
         await expect(page.getByText('English')).toBeVisible();
         await expect(page.getByText('العربية')).toBeVisible();
@@ -136,8 +136,8 @@ test.describe('i18n Language Switching', () => {
         // German text should be visible
         await expect(page.getByText('Anliegen wählen')).toBeVisible();
 
-        // Switch to English
-        const langSelector = page.locator('button').filter({ hasText: /DE|EN|AR|TR|UK/i }).first();
+        // Switch to English using data-testid
+        const langSelector = page.locator('[data-testid="language-selector"]').first();
         await langSelector.click();
         await page.getByText('English').click();
 
@@ -151,7 +151,7 @@ test.describe('i18n Language Switching', () => {
     test('Arabic sets RTL direction on html element', async ({ page }) => {
         await page.goto('/');
 
-        const langSelector = page.locator('button').filter({ hasText: /DE|EN|AR|TR|UK/i }).first();
+        const langSelector = page.locator('[data-testid="language-selector"]').first();
         await langSelector.click();
         await page.getByText('العربية').click();
         await page.waitForTimeout(500);
@@ -164,14 +164,14 @@ test.describe('i18n Language Switching', () => {
         await page.goto('/');
 
         // First switch to Arabic
-        const langSelector = page.locator('button').filter({ hasText: /DE|EN|AR|TR|UK/i }).first();
+        const langSelector = page.locator('[data-testid="language-selector"]').first();
         await langSelector.click();
         await page.getByText('العربية').click();
         await page.waitForTimeout(300);
         expect(await page.locator('html').getAttribute('dir')).toBe('rtl');
 
         // Switch back to German
-        const langSelector2 = page.locator('button').filter({ hasText: /DE|EN|AR|TR|UK/i }).first();
+        const langSelector2 = page.locator('[data-testid="language-selector"]').first();
         await langSelector2.click();
         await page.getByText('Deutsch').click();
         await page.waitForTimeout(300);
@@ -190,13 +190,8 @@ test.describe('Theme Toggle', () => {
         const htmlEl = page.locator('html');
         const initialTheme = await htmlEl.getAttribute('data-theme');
 
-        // Find theme toggle button (Sun or Moon icon)
-        const themeBtn = page.locator('button').filter({ has: page.locator('svg') }).filter({
-            hasText: ''
-        });
-
-        // Find the button with aria-label containing "Modus" or "mode"
-        const themeToggle = page.locator('button[aria-label*="Modus"], button[aria-label*="mode"], button[title*="Modus"], button[title*="mode"]').first();
+        // Use data-testid to uniquely target ThemeToggle (ModeToggle also had title*="Modus")
+        const themeToggle = page.locator('[data-testid="theme-toggle"]').first();
 
         if (await themeToggle.isVisible()) {
             await themeToggle.click();
@@ -216,7 +211,7 @@ test.describe('Theme Toggle', () => {
     test('Theme persists after page reload', async ({ page }) => {
         await page.goto('/');
 
-        const themeToggle = page.locator('button[aria-label*="Modus"], button[aria-label*="mode"], button[title*="Modus"], button[title*="mode"]').first();
+        const themeToggle = page.locator('[data-testid="theme-toggle"]').first();
 
         if (await themeToggle.isVisible()) {
             // Get initial theme
@@ -280,7 +275,7 @@ test.describe('Form Validation', () => {
                 await weiterBtn.click();
                 // Should still be on the same question (validation prevents advance)
                 await expect(
-                    page.getByText('Sind Sie bereits als Patient in unserer Praxis bekannt?').first()
+                    page.locator('h2.question-title').filter({ hasText: 'Sind Sie bereits als Patient' }).first()
                 ).toBeVisible();
             } else {
                 expect(isDisabled).toBe(true);

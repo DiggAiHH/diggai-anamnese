@@ -3,6 +3,13 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma as _prisma } from '../db';
 import { requireAuth, requireRole } from '../middleware/auth';
+import { 
+  getCache, 
+  setCache, 
+  invalidateCachePattern, 
+  getAtomsCacheKey,
+  LONG_TTL 
+} from '../services/cache.service';
 
 const prisma: any = _prisma;
 
@@ -20,7 +27,7 @@ function formatAtom(a: any) {
 
 /**
  * GET /api/atoms
- * Batch-Loader für Fragen
+ * Batch-Loader für Fragen with Redis caching
  * Query: ?ids=0000,0001,RES-100&module=...&section=...
  */
 router.get('/', requireAuth, async (req: Request, res: Response) => {
@@ -29,26 +36,44 @@ router.get('/', requireAuth, async (req: Request, res: Response) => {
         const moduleParam = req.query.module as string;
         const sectionParam = req.query.section as string;
 
-        if (!idsParam) {
-            const where: any = {};
-            if (moduleParam) where.module = moduleParam;
-            if (sectionParam) where.section = sectionParam;
+        // Generate cache key based on query params
+        const ids = idsParam ? idsParam.split(',').map(id => id.trim()) : undefined;
+        const cacheKey = getAtomsCacheKey(ids, moduleParam, sectionParam);
 
-            const atoms = await prisma.medicalAtom.findMany({
-                where,
-                orderBy: { orderIndex: 'asc' },
-            });
-            res.json({ atoms: atoms.map(formatAtom) });
+        // Try cache first
+        const cached = await getCache<{ atoms: any[] }>(cacheKey);
+        if (cached) {
+            res.setHeader('X-Cache', 'HIT');
+            res.json(cached);
             return;
         }
 
-        const ids = idsParam.split(',').map(id => id.trim());
-        const atoms = await prisma.medicalAtom.findMany({
-            where: { id: { in: ids } },
-            orderBy: { orderIndex: 'asc' },
-        });
+        // Cache miss - fetch from database
+        let atoms: any[];
+        
+        if (!idsParam) {
+            const where: any = {};
+            if (moduleParam) where.module = parseInt(moduleParam, 10);
+            if (sectionParam) where.section = sectionParam;
 
-        res.json({ atoms: atoms.map(formatAtom) });
+            atoms = await prisma.medicalAtom.findMany({
+                where,
+                orderBy: { orderIndex: 'asc' },
+            });
+        } else {
+            atoms = await prisma.medicalAtom.findMany({
+                where: { id: { in: ids } },
+                orderBy: { orderIndex: 'asc' },
+            });
+        }
+
+        const result = { atoms: atoms.map(formatAtom) };
+        
+        // Store in cache (atoms change rarely, so long TTL)
+        await setCache(cacheKey, result, LONG_TTL);
+        
+        res.setHeader('X-Cache', 'MISS');
+        res.json(result);
     } catch (err: unknown) {
         const error = err instanceof Error ? err : new Error(String(err));
         console.error('[Atoms] Fehler:', error);
@@ -56,13 +81,31 @@ router.get('/', requireAuth, async (req: Request, res: Response) => {
     }
 });
 
-// ─── GET /api/atoms/:id — Single atom ───────────────────────
+// ─── GET /api/atoms/:id — Single atom with caching ───────────
 
 router.get('/:id', requireAuth, async (req: Request, res: Response) => {
     try {
+        const cacheKey = `atoms:single:${req.params.id}`;
+        
+        // Try cache first
+        const cached = await getCache(cacheKey);
+        if (cached) {
+            res.setHeader('X-Cache', 'HIT');
+            res.json(cached);
+            return;
+        }
+
         const atom = await prisma.medicalAtom.findUnique({ where: { id: req.params.id } });
-        if (!atom) { res.status(404).json({ error: 'Atom nicht gefunden' }); return; }
-        res.json(formatAtom(atom));
+        if (!atom) { 
+            res.status(404).json({ error: 'Atom nicht gefunden' }); 
+            return; 
+        }
+        
+        const formatted = formatAtom(atom);
+        await setCache(cacheKey, formatted, LONG_TTL);
+        
+        res.setHeader('X-Cache', 'MISS');
+        res.json(formatted);
     } catch (err) {
         console.error('[Atoms] Get single error:', err);
         res.status(500).json({ error: 'Interner Serverfehler' });
@@ -89,6 +132,9 @@ router.put('/reorder', requireAuth, requireRole('admin'), async (req: Request, r
             }))
         );
 
+        // Invalidate all atom caches after reordering
+        await invalidateCachePattern('atoms:*');
+
         res.json({ success: true, updated: orders.length });
     } catch (err) {
         console.error('[Atoms] Reorder error:', err);
@@ -109,6 +155,11 @@ router.put('/:id/toggle', requireAuth, requireRole('admin'), async (req: Request
             where: { id: req.params.id },
             data: { isActive },
         });
+
+        // Invalidate caches for this atom and list caches
+        await invalidateCachePattern(`atoms:single:${req.params.id}`);
+        await invalidateCachePattern('atoms:filter:*');
+
         res.json(formatAtom(atom));
     } catch (err: any) {
         if (err.code === 'P2025') { res.status(404).json({ error: 'Atom nicht gefunden' }); return; }
@@ -207,7 +258,7 @@ router.put('/draft/:id/publish', requireAuth, requireRole('admin'), async (req: 
                 isPII: draftData.isPII ?? false,
                 isActive: draftData.isActive ?? true,
                 orderIndex: draftData.orderIndex ?? 9999,
-                module: draftData.module ?? 'CUSTOM',
+                module: draftData.module ?? 0,
                 section: draftData.section ?? 'custom',
             },
         });
@@ -217,6 +268,9 @@ router.put('/draft/:id/publish', requireAuth, requireRole('admin'), async (req: 
             where: { id: req.params.id },
             data: { status: 'PUBLISHED', publishedAt: new Date() },
         });
+
+        // Invalidate all atom caches after publishing
+        await invalidateCachePattern('atoms:*');
 
         res.json({ atom: formatAtom(atom), draft: { ...updatedDraft, draftData: JSON.parse(updatedDraft.draftData) } });
     } catch (err) {

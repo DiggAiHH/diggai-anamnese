@@ -8,7 +8,11 @@ import { createServer } from 'http';
 import { config } from './config';
 import { setupSocketIO } from './socket';
 import { auditLogger } from './middleware/audit';
+import { etagMiddleware } from './middleware/etag';
+import { setupQueryPerformanceMonitoring } from './middleware/query-performance';
 import { initRedis, getRedisClient, isRedisReady, closeRedis } from './redis';
+import { initSentry, sentryMiddleware, setupSentryErrorHandler } from './lib/sentry';
+import { metricsMiddleware, metricsHandler } from './middleware/metrics';
 
 // Routes
 import stripeWebhookRoutes from './routes/stripe-webhooks';
@@ -47,6 +51,9 @@ import agentRoutes from './routes/agents';
 import subscriptionRoutes from './routes/subscriptions';
 import billingRoutes from './routes/billing';
 import themeRoutes from './routes/theme.routes';
+import wearablesRoutes from './routes/wearables';
+import usageRoutes from './routes/usage';
+import aiRoutes from './routes/ai';
 import { messageBroker } from './services/messagebroker.service';
 
 // Swagger API Docs (dev only — NOT mounted in production)
@@ -58,6 +65,7 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 const app = express();
+initSentry();
 const httpServer = createServer(app);
 
 // Request timeout — prevents slow-client (Slowloris) attacks
@@ -107,9 +115,45 @@ app.use((_req, res, next) => {
     next();
 });
 
-// CORS – Restricted to actual frontend domain (not '*')
+// Additional OWASP Security Headers (explicitly set for compliance)
+app.use((_req, res, next) => {
+    // X-Content-Type-Options: Prevent MIME type sniffing
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    
+    // X-Frame-Options: Explicit DENY (in addition to CSP frame-ancestors)
+    res.setHeader('X-Frame-Options', 'DENY');
+    
+    // X-XSS-Protection: Legacy browser protection (modern browsers use CSP)
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    
+    // Strict-Transport-Security: Enforce HTTPS (complement to Helmet HSTS)
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+    
+    // Referrer-Policy: Control referrer information
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    
+    // Cache-Control for sensitive paths (API responses)
+    if (_req.path.startsWith('/api')) {
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+    }
+    
+    // Remove X-Powered-By header (express default)
+    res.removeHeader('X-Powered-By');
+    
+    next();
+});
+
+// CORS – Restricted to actual frontend domain (plus localhost in dev)
+const allowedOrigins = [config.frontendUrl];
+if (config.nodeEnv === 'development') {
+    allowedOrigins.push('http://localhost:5173');
+    allowedOrigins.push('http://127.0.0.1:5173');
+}
+
 app.use(cors({
-    origin: config.frontendUrl,
+    origin: allowedOrigins,
     credentials: true,
     exposedHeaders: ['X-CSRF-Token'],
 }));
@@ -123,6 +167,12 @@ const globalLimiter = rateLimit({
     message: { error: 'Zu viele Anfragen. Bitte warten Sie einen Moment.' },
 });
 app.use(globalLimiter);
+
+// Sentry Request Handler (after rate limiting)
+app.use(sentryMiddleware);
+
+// Prometheus Metrics Middleware
+app.use(metricsMiddleware);
 
 // Per-endpoint rate limits (stricter for auth endpoints)
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, message: { error: 'Zu viele Login-Versuche.' } });
@@ -146,10 +196,22 @@ app.use(sanitizeBody);
 // HIPAA Audit Logging
 app.use(auditLogger);
 
+// ETag support for HTTP conditional requests (caching)
+app.use(etagMiddleware);
+
+// Query performance monitoring
+setupQueryPerformanceMonitoring();
+
 // SECURITY: CSRF Protection — Double-Submit Cookie Pattern (HIGH-001 Fix)
 import { setCsrfCookie, validateCsrf } from './middleware/csrf';
 app.use(setCsrfCookie);  // Set CSRF token cookie on every request
 app.use(validateCsrf);   // Validate CSRF token on state-changing requests
+
+// SECURITY: Additional Security Headers (OWASP hardening)
+import { additionalSecurityHeaders, userAgentFilter, apiSecurityHeaders } from './middleware/security-headers';
+app.use(userAgentFilter);           // Block known malicious user agents
+app.use(additionalSecurityHeaders); // Enhanced security headers
+app.use('/api', apiSecurityHeaders); // API-specific headers
 
 // Multi-Tenancy: Resolve tenant from subdomain/custom domain
 import { resolveTenant } from './middleware/tenant';
@@ -191,50 +253,132 @@ app.use('/api/signatures', authLimiter, signatureRoutes);
 app.use('/api/agents', agentRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/billing', billingRoutes);
+app.use('/api/wearables', authLimiter, wearablesRoutes);
+app.use('/api/usage', authLimiter, usageRoutes);
+app.use('/api/ai', aiRoutes);
 app.use('/api', themeRoutes);
 
-// Health Check — includes DB + Redis connectivity
+// Health Check — includes DB + Redis connectivity with detailed checks
 app.get('/api/health', async (_req, res) => {
+    const startTime = Date.now();
     const redis = getRedisClient();
-    let dbStatus = 'unknown';
-    let redisStatus = 'disconnected';
+    
+    type HealthStatus = 'ok' | 'error' | 'degraded' | 'disabled' | 'unknown';
+    const checks: {
+        database: { status: HealthStatus; responseTime: number };
+        redis: { status: HealthStatus; responseTime: number };
+        disk: { status: HealthStatus; freePercent: number };
+        memory: { status: HealthStatus; usedPercent: number };
+    } = {
+        database: { status: 'unknown', responseTime: 0 },
+        redis: { status: 'unknown', responseTime: 0 },
+        disk: { status: 'unknown', freePercent: 0 },
+        memory: { status: 'unknown', usedPercent: 0 },
+    };
 
     // Check DB connectivity
     try {
+        const dbStart = Date.now();
         const { PrismaClient } = await import('@prisma/client');
         const prisma = new PrismaClient();
         await prisma.$queryRaw`SELECT 1`;
         await prisma.$disconnect();
-        dbStatus = 'connected';
+        checks.database = { 
+            status: 'ok', 
+            responseTime: Date.now() - dbStart 
+        };
     } catch {
-        dbStatus = 'error';
+        checks.database.status = 'error';
     }
 
     // Check Redis connectivity
     if (redis && isRedisReady()) {
         try {
+            const redisStart = Date.now();
             await redis.ping();
-            redisStatus = 'connected';
+            checks.redis = { 
+                status: 'ok', 
+                responseTime: Date.now() - redisStart 
+            };
         } catch {
-            redisStatus = 'error';
+            checks.redis.status = 'error';
         }
+    } else {
+        checks.redis.status = 'disabled';
+    }
+
+    // Check Disk Space (if available)
+    try {
+        const os = await import('os');
+        const fs = await import('fs');
+        const tmpDir = os.tmpdir();
+        const stats = fs.statfsSync(tmpDir);
+        const freePercent = (stats.bavail / stats.blocks) * 100;
+        checks.disk = {
+            status: freePercent > 10 ? 'ok' : freePercent > 5 ? 'degraded' : 'error',
+            freePercent: Math.round(freePercent * 100) / 100
+        };
+    } catch {
+        checks.disk.status = 'unknown';
+    }
+
+    // Check Memory
+    try {
+        const totalMem = process.memoryUsage().heapTotal;
+        const usedMem = process.memoryUsage().heapUsed;
+        const usedPercent = (usedMem / totalMem) * 100;
+        checks.memory = {
+            status: usedPercent < 85 ? 'ok' : usedPercent < 95 ? 'degraded' : 'error',
+            usedPercent: Math.round(usedPercent * 100) / 100
+        };
+    } catch {
+        checks.memory.status = 'unknown';
     }
 
     const { agentService } = await import('./services/agent/agent.service');
     const agentList = agentService.listAgents().map(a => ({ name: a.name, online: a.online, busy: a.busy }));
 
-    res.json({
-        status: dbStatus === 'connected' ? 'ok' : 'degraded',
-        version: '3.0.0',
+    const responseTime = Date.now() - startTime;
+    const isHealthy = checks.database.status === 'ok';
+    const isDegraded = checks.database.status === 'ok' && 
+        (checks.redis.status === 'error' || checks.disk.status === 'degraded' || checks.memory.status === 'degraded');
+    
+    res.status(isHealthy ? 200 : isDegraded ? 200 : 503).json({
+        status: isHealthy ? 'ok' : isDegraded ? 'degraded' : 'error',
+        version: process.env.npm_package_version || '3.0.0',
         timestamp: new Date().toISOString(),
         environment: config.nodeEnv,
-        db: dbStatus,
-        redis: redisStatus,
+        db: checks.database.status === 'ok' ? 'connected' : 'error',
+        redis: checks.redis.status === 'ok' ? 'connected' : checks.redis.status === 'disabled' ? 'disabled' : 'error',
         uptime: Math.floor(process.uptime()),
         agents: agentList,
         reminderWorker: 'running',
+        responseTime,
+        checks
     });
 });
+
+// Kubernetes/Docker Health Probes
+// GET /api/system/ready - Readiness probe
+app.get('/api/system/ready', async (_req, res) => {
+    try {
+        const { PrismaClient } = await import('@prisma/client');
+        const prisma = new PrismaClient();
+        await prisma.$queryRaw`SELECT 1`;
+        await prisma.$disconnect();
+        res.status(200).json({ status: 'ready' });
+    } catch {
+        res.status(503).json({ status: 'not ready' });
+    }
+});
+
+// GET /api/system/live - Liveness probe
+app.get('/api/system/live', (_req, res) => {
+    res.status(200).json({ status: 'alive', timestamp: new Date().toISOString() });
+});
+
+// GET /api/system/metrics - Prometheus metrics endpoint
+app.get('/api/system/metrics', metricsHandler);
 
 // ─── Swagger API Docs (dev only) ────────────────────────────
 
@@ -257,6 +401,9 @@ setupSocketIO(httpServer);
 // ─── Error Handler ──────────────────────────────────────────
 
 import { ZodError } from 'zod';
+
+// Sentry Error Handler (before our custom error handler)
+setupSentryErrorHandler(app);
 
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     if (err instanceof ZodError) {
@@ -281,6 +428,7 @@ import { startReminderWorker, stopReminderWorker } from './jobs/reminderWorker';
 import { startHardDeleteWorker } from './jobs/hardDeleteWorker';
 import { startAgentOrchestrator } from './agents/orchestrator.agent';
 import { startBackupScheduler, stopBackupScheduler } from './jobs/backupScheduler';
+import { startBackupMonitor, stopBackupMonitor } from './jobs/backupMonitor';
 import { startEscalationWorker, stopEscalationWorker } from './jobs/escalationWorker';
 import { startComplianceReporter, stopComplianceReporter } from './jobs/complianceReporter';
 import { startQueueAutoDispatch, stopQueueAutoDispatch } from './jobs/queueAutoDispatch';
@@ -291,6 +439,7 @@ try { startReminderWorker(); } catch (err) { console.error('[Server] Failed to s
 try { startHardDeleteWorker(); } catch (err) { console.error('[Server] Failed to start hard-delete worker:', err); }
 try { startAgentOrchestrator(); } catch (err) { console.error('[Server] Failed to start agent orchestrator:', err); }
 try { startBackupScheduler(); } catch (err) { console.error('[Server] Failed to start backup scheduler:', err); }
+try { startBackupMonitor(); } catch (err) { console.error('[Server] Failed to start backup monitor:', err); }
 try { startEscalationWorker(); } catch (err) { console.error('[Server] Failed to start escalation worker:', err); }
 try { startComplianceReporter(); } catch (err) { console.error('[Server] Failed to start compliance reporter:', err); }
 try { startQueueAutoDispatch(); } catch (err) { console.error('[Server] Failed to start queue auto-dispatch:', err); }
@@ -310,6 +459,7 @@ process.on('SIGTERM', async () => {
     try { stopReminderWorker(); } catch (err) { console.error('[Server] Error stopping reminder worker:', err); }
     try { stopROISnapshotJob(); } catch (err) { console.error('[Server] Error stopping ROI snapshot job:', err); }
     try { stopBackupScheduler(); } catch (err) { console.error('[Server] Error stopping backup scheduler:', err); }
+try { stopBackupMonitor(); } catch (err) { console.error('[Server] Error stopping backup monitor:', err); }
     try { stopEscalationWorker(); } catch (err) { console.error('[Server] Error stopping escalation worker:', err); }
     try { stopComplianceReporter(); } catch (err) { console.error('[Server] Error stopping compliance reporter:', err); }
     try { stopQueueAutoDispatch(); } catch (err) { console.error('[Server] Error stopping queue auto-dispatch:', err); }

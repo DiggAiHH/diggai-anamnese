@@ -72,6 +72,76 @@ export const SUPPORTED_PVS_SYSTEMS: PVSConfig[] = [
       terminSync: true,
       bidirectional: false
     }
+  },
+  {
+    id: 'turbomed',
+    name: 'CGM TurboMed',
+    type: 'cgm',
+    baseUrl: '', // File-based GDT
+    authType: 'basic',
+    version: '3.0',
+    features: {
+      patientExport: true,
+      anamneseImport: true,
+      terminSync: false,
+      bidirectional: false
+    }
+  },
+  {
+    id: 'tomedo',
+    name: 'tomedo (Zollsoft)',
+    type: 'other',
+    baseUrl: 'https://api.tomedo.de/fhir/R4',
+    authType: 'oauth2',
+    version: 'R4',
+    features: {
+      patientExport: true,
+      anamneseImport: true,
+      terminSync: true,
+      bidirectional: true
+    }
+  },
+  {
+    id: 'medistar',
+    name: 'CGM MEDISTAR',
+    type: 'cgm',
+    baseUrl: '', // File-based GDT
+    authType: 'basic',
+    version: '3.0',
+    features: {
+      patientExport: true,
+      anamneseImport: true,
+      terminSync: false,
+      bidirectional: false
+    }
+  },
+  {
+    id: 't2med',
+    name: 'T2Med',
+    type: 'other',
+    baseUrl: 'https://api.t2med.de/fhir/R4',
+    authType: 'apikey',
+    version: 'R4',
+    features: {
+      patientExport: true,
+      anamneseImport: true,
+      terminSync: true,
+      bidirectional: true
+    }
+  },
+  {
+    id: 'xisynet',
+    name: 'medatixx x.isynet',
+    type: 'medatixx',
+    baseUrl: '', // File-based GDT
+    authType: 'basic',
+    version: '3.0',
+    features: {
+      patientExport: true,
+      anamneseImport: true,
+      terminSync: false,
+      bidirectional: false
+    }
   }
 ];
 

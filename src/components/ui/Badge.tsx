@@ -1,32 +1,61 @@
 import type { ReactNode } from 'react';
-import type { BadgeVariant } from '../../design/tokens';
+
+type BadgeVariant = 'success' | 'warning' | 'danger' | 'info' | 'neutral';
+
+// Psychology-based colors - anxiety optimized (NO bright reds)
+const STYLES: Record<BadgeVariant, { bg: string; text: string; border: string; icon: string }> = {
+  success: { 
+    bg: 'rgba(129, 178, 154, 0.15)', 
+    text: '#5A8F76', 
+    border: 'rgba(129, 178, 154, 0.3)',
+    icon: '#81B29A'
+  },
+  warning: { 
+    bg: 'rgba(244, 162, 97, 0.15)', 
+    text: '#D9894A', 
+    border: 'rgba(244, 162, 97, 0.3)',
+    icon: '#F4A261'
+  },
+  danger: { 
+    bg: 'rgba(224, 122, 95, 0.15)', 
+    text: '#C75A3E', 
+    border: 'rgba(224, 122, 95, 0.3)',
+    icon: '#E07A5F'
+  },
+  info: { 
+    bg: 'rgba(94, 139, 158, 0.15)', 
+    text: '#4A7A8A', 
+    border: 'rgba(94, 139, 158, 0.3)',
+    icon: '#5E8B9E'
+  },
+  neutral: { 
+    bg: 'rgba(107, 139, 164, 0.15)', 
+    text: '#6B8BA4', 
+    border: 'rgba(107, 139, 164, 0.3)',
+    icon: '#8BA4B4'
+  },
+};
 
 interface BadgeProps {
   variant?: BadgeVariant;
   children: ReactNode;
   className?: string;
+  icon?: ReactNode;
 }
 
-const variantStyles: Record<BadgeVariant, { bg: string; text: string; border: string }> = {
-  success: { bg: 'rgba(34, 197, 94, 0.15)', text: '#22c55e', border: 'rgba(34, 197, 94, 0.3)' },
-  warning: { bg: 'rgba(234, 179, 8, 0.15)', text: '#eab308', border: 'rgba(234, 179, 8, 0.3)' },
-  danger: { bg: 'rgba(239, 68, 68, 0.15)', text: '#ef4444', border: 'rgba(239, 68, 68, 0.3)' },
-  info: { bg: 'rgba(59, 130, 246, 0.15)', text: '#3b82f6', border: 'rgba(59, 130, 246, 0.3)' },
-  neutral: { bg: 'rgba(148, 163, 184, 0.15)', text: '#94a3b8', border: 'rgba(148, 163, 184, 0.3)' },
-};
-
-export function Badge({ variant = 'neutral', children, className = '' }: BadgeProps) {
-  const styles = variantStyles[variant];
-
+export function Badge({ variant = 'neutral', children, className = '', icon }: BadgeProps) {
+  const styles = STYLES[variant];
+  
   return (
-    <span
-      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${className}`}
-      style={{
-        background: styles.bg,
-        color: styles.text,
-        border: `1px solid ${styles.border}`,
+    <span 
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors duration-200 ${className}`}
+      style={{ 
+        backgroundColor: styles.bg, 
+        color: styles.text, 
+        borderColor: styles.border 
       }}
     >
+      {icon && <span style={{ color: styles.icon }}>{icon}</span>}
       {children}
     </span>
   );

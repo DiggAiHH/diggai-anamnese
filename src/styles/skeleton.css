@@ -1,0 +1,128 @@
+/**
+ * Skeleton Loading Animations
+ * 
+ * Enhanced shimmer and pulse animations for skeleton loading states.
+ * Uses CSS custom properties for theme-aware colors.
+ */
+
+/* ─── Base Skeleton Styles ───────────────────────────────────── */
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--border-primary) 25%,
+    var(--bg-card-hover) 50%,
+    var(--border-primary) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+  border-radius: 0.5rem;
+}
+
+.skeleton-pulse {
+  background-color: var(--border-primary);
+  animation: skeleton-pulse 2s ease-in-out infinite;
+  border-radius: 0.5rem;
+}
+
+/* ─── Animations ──────────────────────────────────────────────── */
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes skeleton-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes skeleton-wave {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* ─── Skeleton Variants ───────────────────────────────────────── */
+
+/* Circle skeleton (for avatars, icons) */
+.skeleton-circle {
+  border-radius: 50%;
+}
+
+/* Text line skeleton */
+.skeleton-text {
+  height: 1em;
+  margin-bottom: 0.5em;
+}
+
+.skeleton-text-sm {
+  height: 0.875rem;
+}
+
+.skeleton-text-lg {
+  height: 1.25rem;
+}
+
+/* Button skeleton */
+.skeleton-button {
+  height: 2.5rem;
+  border-radius: 0.75rem;
+}
+
+/* Card skeleton */
+.skeleton-card {
+  border-radius: 1rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border-primary);
+  overflow: hidden;
+}
+
+/* ─── Delayed Appearance ──────────────────────────────────────── */
+
+/* Prevents flash for fast loads */
+.skeleton-delayed {
+  animation: skeleton-fade-in 0.3s ease-out forwards;
+  animation-delay: 200ms;
+  opacity: 0;
+}
+
+@keyframes skeleton-fade-in {
+  to {
+    opacity: 1;
+  }
+}
+
+/* ─── Reduced Motion ──────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton,
+  .skeleton-pulse {
+    animation: none;
+    background: var(--border-primary);
+    opacity: 0.7;
+  }
+}
+
+/* ─── Dark Mode Adjustments ───────────────────────────────────── */
+
+[data-theme="dark"] .skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.05) 25%,
+    rgba(255, 255, 255, 0.1) 50%,
+    rgba(255, 255, 255, 0.05) 75%
+  );
+  background-size: 200% 100%;
+}

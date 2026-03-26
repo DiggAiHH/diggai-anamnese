@@ -1,0 +1,738 @@
+{
+  "info": {
+    "name": "DiggAI API v3.0.0",
+    "description": "DiggAI Anamnese Platform API Collection\n\nBase URLs:\n- Production: https://api.diggai.de/api\n- Staging: https://api-staging.diggai.de/api\n\nAuthentication:\n- HttpOnly Cookie: token=<jwt>\n- Bearer Token: Authorization: Bearer <jwt>\n\nDocumentation: https://docs.diggai.de",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "3.0.0"
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Login (Arzt/MFA/Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"dr.klaproth\",\n  \"password\": \"your-secure-password\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/arzt/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["arzt", "login"]
+            },
+            "description": "Authenticate as medical staff. Sets HttpOnly cookie automatically."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"username\": \"dr.klaproth\",\n  \"password\": \"secure-password\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/arzt/login"
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"user\": {\n    \"id\": \"cluabcdefghijklmnop\",\n    \"username\": \"dr.klaproth\",\n    \"displayName\": \"Dr. Klapproth\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/arzt/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["arzt", "logout"]
+            },
+            "description": "Logout and invalidate current token"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Sessions",
+      "item": [
+        {
+          "name": "Create Session",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"selectedService\": \"Termin / Anamnese\",\n  \"isNewPatient\": true,\n  \"gender\": \"W\",\n  \"birthDate\": \"1985-06-15\",\n  \"insuranceType\": \"Gesetzlich\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/sessions",
+              "host": ["{{baseUrl}}"],
+              "path": ["sessions"]
+            },
+            "description": "Create a new patient session. Returns sessionId and JWT cookie."
+          }
+        },
+        {
+          "name": "Generate QR Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"service\": \"Termin / Anamnese\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/sessions/qr-token",
+              "host": ["{{baseUrl}}"],
+              "path": ["sessions", "qr-token"]
+            },
+            "description": "Generate QR code token for patient self-start. Auth required."
+          }
+        },
+        {
+          "name": "Get Session State",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/sessions/{{sessionId}}/state",
+              "host": ["{{baseUrl}}"],
+              "path": ["sessions", "{{sessionId}}", "state"]
+            },
+            "description": "Get full session state with answers and triage events"
+          }
+        },
+        {
+          "name": "Submit Session",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/sessions/{{sessionId}}/submit",
+              "host": ["{{baseUrl}}"],
+              "path": ["sessions", "{{sessionId}}", "submit"]
+            },
+            "description": "Mark session as completed and submitted"
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/sessions/refresh-token",
+              "host": ["{{baseUrl}}"],
+              "path": ["sessions", "refresh-token"]
+            },
+            "description": "Refresh expiring JWT token"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Answers",
+      "item": [
+        {
+          "name": "Submit Answer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"atomId\": \"0001\",\n  \"value\": \"Musterfrau\",\n  \"timeSpentMs\": 3500\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/sessions/{{sessionId}}/answers",
+              "host": ["{{baseUrl}}"],
+              "path": ["sessions", "{{sessionId}}", "answers"]
+            },
+            "description": "Submit an answer for a question. Triggers triage evaluation. Rate limited: 30/min."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Arzt (Doctor)",
+      "item": [
+        {
+          "name": "List Sessions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/arzt/sessions",
+              "host": ["{{baseUrl}}"],
+              "path": ["arzt", "sessions"]
+            },
+            "description": "Get all patient sessions for doctor dashboard"
+          }
+        },
+        {
+          "name": "Get Session Details",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/arzt/sessions/{{sessionId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["arzt", "sessions", "{{sessionId}}"]
+            },
+            "description": "Get detailed session with decrypted PII"
+          }
+        },
+        {
+          "name": "Acknowledge Triage",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/arzt/triage/{{triageId}}/ack",
+              "host": ["{{baseUrl}}"],
+              "path": ["arzt", "triage", "{{triageId}}", "ack"]
+            },
+            "description": "Acknowledge a triage alert"
+          }
+        },
+        {
+          "name": "Update Session Status",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"COMPLETED\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/arzt/sessions/{{sessionId}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["arzt", "sessions", "{{sessionId}}", "status"]
+            },
+            "description": "Change session status (ACTIVE, COMPLETED, SUBMITTED, EXPIRED)"
+          }
+        },
+        {
+          "name": "Get AI Summary",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/arzt/sessions/{{sessionId}}/summary",
+              "host": ["{{baseUrl}}"],
+              "path": ["arzt", "sessions", "{{sessionId}}", "summary"]
+            },
+            "description": "Get AI-generated session summary"
+          }
+        }
+      ]
+    },
+    {
+      "name": "MFA (Medical Assistant)",
+      "item": [
+        {
+          "name": "List Sessions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/mfa/sessions",
+              "host": ["{{baseUrl}}"],
+              "path": ["mfa", "sessions"]
+            },
+            "description": "Get all sessions for MFA overview"
+          }
+        },
+        {
+          "name": "List Doctors",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/mfa/doctors",
+              "host": ["{{baseUrl}}"],
+              "path": ["mfa", "doctors"]
+            },
+            "description": "Get available doctors for assignment"
+          }
+        },
+        {
+          "name": "Assign Doctor",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"arztId\": \"{{arztId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/mfa/sessions/{{sessionId}}/assign",
+              "host": ["{{baseUrl}}"],
+              "path": ["mfa", "sessions", "{{sessionId}}", "assign"]
+            },
+            "description": "Assign a doctor to a session"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "Dashboard Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "stats"]
+            },
+            "description": "Get dashboard statistics"
+          }
+        },
+        {
+          "name": "Session Timeline",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/sessions/timeline?days=30",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "sessions", "timeline"],
+              "query": [
+                {
+                  "key": "days",
+                  "value": "30"
+                }
+              ]
+            },
+            "description": "Get session timeline for charts"
+          }
+        },
+        {
+          "name": "Service Analytics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/analytics/services",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "analytics", "services"]
+            },
+            "description": "Get service distribution analytics"
+          }
+        },
+        {
+          "name": "Triage Analytics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/analytics/triage?days=30",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "analytics", "triage"],
+              "query": [
+                {
+                  "key": "days",
+                  "value": "30"
+                }
+              ]
+            },
+            "description": "Get triage event statistics"
+          }
+        },
+        {
+          "name": "Audit Log",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/audit-log?page=1&limit=25",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "audit-log"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "25"
+                }
+              ]
+            },
+            "description": "Get paginated audit log entries"
+          }
+        },
+        {
+          "name": "List Users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "users"]
+            },
+            "description": "Get all system users"
+          }
+        },
+        {
+          "name": "Create User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"new.mfa\",\n  \"password\": \"SecurePassword123!\",\n  \"displayName\": \"MFA Mustermann\",\n  \"role\": \"MFA\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "users"]
+            },
+            "description": "Create new user account"
+          }
+        },
+        {
+          "name": "Update User",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"displayName\": \"Updated Name\",\n  \"isActive\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/users/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "users", "{{userId}}"]
+            },
+            "description": "Update user account"
+          }
+        },
+        {
+          "name": "Delete User",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/users/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "users", "{{userId}}"]
+            },
+            "description": "Soft-delete (deactivate) user"
+          }
+        }
+      ]
+    },
+    {
+      "name": "System",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/system/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["system", "health"]
+            },
+            "description": "System health status (no auth required)"
+          }
+        },
+        {
+          "name": "System Info",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/system/info",
+              "host": ["{{baseUrl}}"],
+              "path": ["system", "info"]
+            },
+            "description": "System information and metrics"
+          }
+        },
+        {
+          "name": "List Backups",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/system/backups",
+              "host": ["{{baseUrl}}"],
+              "path": ["system", "backups"]
+            },
+            "description": "Get all backups"
+          }
+        },
+        {
+          "name": "Create Backup",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"full\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/system/backups",
+              "host": ["{{baseUrl}}"],
+              "path": ["system", "backups"]
+            },
+            "description": "Create new backup"
+          }
+        },
+        {
+          "name": "Feature Flags",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/system/features",
+              "host": ["{{baseUrl}}"],
+              "path": ["system", "features"]
+            },
+            "description": "Get feature flags"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Export",
+      "item": [
+        {
+          "name": "Export CSV",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/export/sessions/{{sessionId}}/export/csv",
+              "host": ["{{baseUrl}}"],
+              "path": ["export", "sessions", "{{sessionId}}", "export", "csv"]
+            },
+            "description": "Export session as CSV file"
+          }
+        },
+        {
+          "name": "Export PDF",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/export/sessions/{{sessionId}}/export/pdf",
+              "host": ["{{baseUrl}}"],
+              "path": ["export", "sessions", "{{sessionId}}", "export", "pdf"]
+            },
+            "description": "Export session as HTML/PDF"
+          }
+        },
+        {
+          "name": "Export JSON",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/export/sessions/{{sessionId}}/export/json",
+              "host": ["{{baseUrl}}"],
+              "path": ["export", "sessions", "{{sessionId}}", "export", "json"]
+            },
+            "description": "Export session as JSON"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Chat",
+      "item": [
+        {
+          "name": "Get Chat History",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/chats/{{sessionId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["chats", "{{sessionId}}"]
+            },
+            "description": "Get chat messages for a session"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Atoms (Questions)",
+      "item": [
+        {
+          "name": "List Atoms",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/atoms?module=basis",
+              "host": ["{{baseUrl}}"],
+              "path": ["atoms"],
+              "query": [
+                {
+                  "key": "module",
+                  "value": "basis"
+                }
+              ]
+            },
+            "description": "Get question atoms, optionally filtered"
+          }
+        },
+        {
+          "name": "Get Single Atom",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/atoms/0000",
+              "host": ["{{baseUrl}}"],
+              "path": ["atoms", "0000"]
+            },
+            "description": "Get single atom by ID"
+          }
+        },
+        {
+          "name": "Reorder Atoms",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orders\": [\n    { \"id\": \"0000\", \"orderIndex\": 0 },\n    { \"id\": \"0001\", \"orderIndex\": 1 }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/atoms/reorder",
+              "host": ["{{baseUrl}}"],
+              "path": ["atoms", "reorder"]
+            },
+            "description": "Reorder atoms (drag & drop)"
+          }
+        },
+        {
+          "name": "Toggle Atom",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isActive\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/atoms/0000/toggle",
+              "host": ["{{baseUrl}}"],
+              "path": ["atoms", "0000", "toggle"]
+            },
+            "description": "Activate/deactivate atom"
+          }
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Pre-request script for authentication handling"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://api.diggai.de/api",
+      "type": "string"
+    },
+    {
+      "key": "sessionId",
+      "value": "clu1234567890abcdef",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "user123",
+      "type": "string"
+    },
+    {
+      "key": "arztId",
+      "value": "arzt123",
+      "type": "string"
+    },
+    {
+      "key": "triageId",
+      "value": "triage123",
+      "type": "string"
+    }
+  ]
+}

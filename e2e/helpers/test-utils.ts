@@ -1,7 +1,14 @@
 /**
  * Shared E2E test utilities for DiggAI Anamnese
  */
-import { Page, expect } from '@playwright/test';
+import { Page, expect, APIRequestContext } from '@playwright/test';
+
+// ─── Test Credentials ───────────────────────────────────────
+
+export const TEST_CREDENTIALS = {
+    arzt: { username: 'admin', password: 'praxis2026' },
+    mfa: { username: 'mfa', password: 'praxis2026' }
+} as const;
 
 // ─── Navigation Helpers ─────────────────────────────────────
 
@@ -119,7 +126,7 @@ export async function selectService(page: Page, service: string) {
 // ─── Login Helpers ──────────────────────────────────────────
 
 /** Login to MFA dashboard */
-export async function loginMFA(page: Page, username = 'mfa', password = 'praxis2026') {
+export async function loginMFA(page: Page, username = TEST_CREDENTIALS.mfa.username, password = TEST_CREDENTIALS.mfa.password) {
     await page.goto('/mfa');
     await page.fill('input[type="text"]', username);
     await page.fill('input[type="password"]', password);
@@ -128,12 +135,236 @@ export async function loginMFA(page: Page, username = 'mfa', password = 'praxis2
 }
 
 /** Login to Arzt dashboard */
-export async function loginArzt(page: Page, username = 'admin', password = 'praxis2026') {
+export async function loginArzt(page: Page, username = TEST_CREDENTIALS.arzt.username, password = TEST_CREDENTIALS.arzt.password) {
     await page.goto('/arzt');
     await page.fill('input[type="text"]', username);
     await page.fill('input[type="password"]', password);
     await page.click('button[type="submit"]');
     await page.waitForSelector('text=Arzt-Portal', { timeout: 10000 }).catch(() => {});
+}
+
+/** Login with "remember me" option */
+export async function loginWithRememberMe(page: Page, username: string, password: string) {
+    await page.goto('/arzt');
+    await page.fill('input[type="text"]', username);
+    await page.fill('input[type="password"]', password);
+    
+    // Check "remember me" checkbox if present
+    const rememberMeCheckbox = page.locator('input[type="checkbox"]').filter({ hasText: /angemeldet|remember|merken/i });
+    if (await rememberMeCheckbox.isVisible().catch(() => false)) {
+        await rememberMeCheckbox.check();
+    }
+    
+    await page.click('button[type="submit"]');
+    await page.waitForSelector('text=Arzt-Portal', { timeout: 10000 }).catch(() => {});
+}
+
+/** Logout from dashboard */
+export async function logout(page: Page) {
+    const logoutBtn = page.locator('button').filter({ hasText: /logout|abmelden/i });
+    if (await logoutBtn.first().isVisible().catch(() => false)) {
+        await logoutBtn.first().click();
+        await waitForIdle(page);
+    }
+}
+
+// ─── API Helpers ────────────────────────────────────────────
+
+/** Create API request context with auth */
+export async function createAuthenticatedContext(request: APIRequestContext, username: string, password: string): Promise<string> {
+    const response = await request.post('/api/arzt/login', {
+        data: { username, password }
+    });
+    
+    if (!response.ok()) {
+        throw new Error(`Login failed: ${response.status()}`);
+    }
+    
+    // Extract token from cookies or response
+    const cookies = await response.headers()['set-cookie'];
+    return cookies || '';
+}
+
+/** Create a test session via API */
+export async function createTestSession(request: APIRequestContext, authCookie: string, patientData?: {
+    firstName?: string;
+    lastName?: string;
+    birthDate?: string;
+    gender?: string;
+}): Promise<string> {
+    const defaultData = {
+        firstName: 'Test',
+        lastName: 'Patient',
+        birthDate: '1990-01-15',
+        gender: 'maennlich',
+        ...patientData
+    };
+    
+    const response = await request.post('/api/sessions', {
+        data: defaultData,
+        headers: {
+            'Cookie': authCookie
+        }
+    });
+    
+    if (!response.ok()) {
+        throw new Error(`Failed to create session: ${response.status()}`);
+    }
+    
+    const data = await response.json();
+    return data.id || data.sessionId;
+}
+
+/** Submit a test answer via API */
+export async function submitTestAnswer(
+    request: APIRequestContext, 
+    authCookie: string, 
+    sessionId: string, 
+    atomId: string, 
+    value: unknown
+): Promise<void> {
+    const response = await request.post('/api/answers', {
+        data: {
+            sessionId,
+            atomId,
+            value
+        },
+        headers: {
+            'Cookie': authCookie
+        }
+    });
+    
+    if (!response.ok()) {
+        throw new Error(`Failed to submit answer: ${response.status()}`);
+    }
+}
+
+/** Create a triage alert via API (for testing triage acknowledgment) */
+export async function createTriageAlert(
+    request: APIRequestContext,
+    authCookie: string,
+    sessionId: string,
+    level: 'CRITICAL' | 'WARNING' | 'INFO',
+    ruleId: string = 'TEST_RULE'
+): Promise<void> {
+    const response = await request.post('/api/triage/test-alert', {
+        data: {
+            sessionId,
+            level,
+            ruleId,
+            details: `Test ${level} alert`
+        },
+        headers: {
+            'Cookie': authCookie
+        }
+    }).catch(() => null);
+    
+    // If the test endpoint doesn't exist, we'll create via answers
+    if (!response || !response.ok()) {
+        // Submit answers that trigger specific triage rules
+        const triageTriggerAnswers: Record<string, { atomId: string; value: unknown }[]> = {
+            'CRITICAL': [
+                { atomId: '0060', value: true }, // chest pain
+                { atomId: '0061', value: 'severe' }, // severe chest pain
+            ],
+            'WARNING': [
+                { atomId: '0100', value: true }, // fever
+                { atomId: '0101', value: 39.5 }, // high fever
+            ]
+        };
+        
+        const answers = triageTriggerAnswers[level] || [];
+        for (const answer of answers) {
+            await submitTestAnswer(request, authCookie, sessionId, answer.atomId, answer.value);
+        }
+    }
+}
+
+/** Get sessions list via API */
+export async function getSessions(request: APIRequestContext, authCookie: string, filters?: {
+    status?: string;
+    patient?: string;
+}): Promise<unknown[]> {
+    const params = new URLSearchParams();
+    if (filters?.status) params.append('status', filters.status);
+    if (filters?.patient) params.append('patient', filters.patient);
+    
+    const response = await request.get(`/api/sessions?${params.toString()}`, {
+        headers: {
+            'Cookie': authCookie
+        }
+    });
+    
+    if (!response.ok()) {
+        throw new Error(`Failed to get sessions: ${response.status()}`);
+    }
+    
+    return response.json();
+}
+
+/** Assign session to doctor via API */
+export async function assignSession(
+    request: APIRequestContext,
+    authCookie: string,
+    sessionId: string,
+    doctorId: string
+): Promise<void> {
+    const response = await request.post(`/api/sessions/${sessionId}/assign`, {
+        data: { doctorId },
+        headers: {
+            'Cookie': authCookie
+        }
+    });
+    
+    if (!response.ok()) {
+        throw new Error(`Failed to assign session: ${response.status()}`);
+    }
+}
+
+/** Complete session via API */
+export async function completeSession(
+    request: APIRequestContext,
+    authCookie: string,
+    sessionId: string
+): Promise<void> {
+    const response = await request.post(`/api/sessions/${sessionId}/complete`, {
+        headers: {
+            'Cookie': authCookie
+        }
+    });
+    
+    if (!response.ok()) {
+        throw new Error(`Failed to complete session: ${response.status()}`);
+    }
+}
+
+// ─── UI Helpers ─────────────────────────────────────────────
+
+/** Wait for toast/notification */
+export async function waitForToast(page: Page, text: string, timeout = 5000) {
+    const toast = page.locator('[role="alert"], .toast, .notification').filter({ hasText: text });
+    await expect(toast.first()).toBeVisible({ timeout });
+}
+
+/** Dismiss all visible modals */
+export async function dismissModals(page: Page) {
+    const closeButtons = page.locator('button[aria-label="Close"], button:has-text("Schließen"), button:has-text("Abbrechen")');
+    const count = await closeButtons.count();
+    for (let i = 0; i < count; i++) {
+        const btn = closeButtons.nth(i);
+        if (await btn.isVisible().catch(() => false)) {
+            await btn.click();
+            await page.waitForTimeout(200);
+        }
+    }
+}
+
+/** Scroll element into view */
+export async function scrollIntoView(page: Page, selector: string) {
+    await page.evaluate((sel) => {
+        const element = document.querySelector(sel);
+        if (element) element.scrollIntoView({ behavior: 'instant', block: 'center' });
+    }, selector);
 }
 
 // ─── Assertion Helpers ──────────────────────────────────────
@@ -162,6 +393,13 @@ export async function collectConsoleErrors(page: Page): Promise<string[]> {
     return errors;
 }
 
+/** Expect element to have specific CSS class */
+export async function expectHasClass(page: Page, selector: string, className: string) {
+    const element = page.locator(selector).first();
+    const classAttr = await element.getAttribute('class');
+    expect(classAttr).toContain(className);
+}
+
 // ─── State Helpers ──────────────────────────────────────────
 
 /** Clear session storage and local storage */
@@ -178,4 +416,16 @@ export async function isDemoMode(page: Page): Promise<boolean> {
         return !window.location.hostname.includes('localhost') ||
                !(window as unknown as Record<string, unknown>).__DEMO_MODE__ === false;
     });
+}
+
+/** Simulate session timeout by clearing cookies */
+export async function simulateSessionTimeout(page: Page) {
+    await page.context().clearCookies();
+    await page.reload();
+}
+
+/** Wait for network idle and animations */
+export async function waitForStableState(page: Page, timeout = 5000) {
+    await page.waitForLoadState('networkidle', { timeout });
+    await page.waitForTimeout(500);
 }

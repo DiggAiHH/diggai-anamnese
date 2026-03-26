@@ -1,6 +1,13 @@
-// ============================================
-// FHIR R4 HTTP Client
-// ============================================
+/**
+ * @module fhir-client
+ * @description FHIR R4 HTTP Client mit Rate-Limiting und Audit-Logging
+ *
+ * @security Features:
+ *   - Rate-Limiting pro Endpoint (Token-Bucket)
+ *   - Timeout und Retry-Logik
+ *   - Audit-Logging aller FHIR-Operationen
+ *   - Secure Header-Handling
+ */
 
 import type {
   FhirClientConfig,
@@ -8,23 +15,54 @@ import type {
   FhirBundle,
   FhirPatient,
 } from '../types.js';
+import { FhirRateLimiter, createPvsRateLimiter } from './fhir-rate-limiter.js';
+import { getAuditLogger } from '../security/audit-logger.js';
 
 /**
  * Lightweight FHIR R4 HTTP client.
  * Supports basic, oauth2, and apikey auth.
  * No heavy FHIR library dependency — uses native fetch.
+ * Includes rate limiting and audit logging.
  */
 export class FhirClient {
   private config: FhirClientConfig;
   private accessToken: string | null = null;
   private tokenExpiresAt: number = 0;
+  private rateLimiter: FhirRateLimiter;
+  private auditLogger = getAuditLogger();
 
-  constructor(config: FhirClientConfig) {
+  constructor(config: FhirClientConfig, pvsType?: string) {
     this.config = {
       timeout: 10000,
       retryCount: 3,
       ...config,
     };
+
+    // Initialize rate limiter based on PVS type or default
+    this.rateLimiter = pvsType 
+      ? createPvsRateLimiter(pvsType)
+      : new FhirRateLimiter({ requestsPerMinute: 60 });
+  }
+
+  /**
+   * Manuelle Konfiguration des Rate Limiters
+   */
+  setRateLimiter(limiter: FhirRateLimiter): void {
+    this.rateLimiter = limiter;
+  }
+
+  /**
+   * Gibt aktuellen Rate-Limit-Status zurück
+   */
+  getRateLimitStatus() {
+    return this.rateLimiter.getStatus();
+  }
+
+  /**
+   * Gibt Rate-Limit-Headers für HTTP-Responses zurück
+   */
+  getRateLimitHeaders(): Record<string, string> {
+    return this.rateLimiter.getRateLimitHeaders();
   }
 
   // ─── Auth Headers ─────────────────────────────────────────
@@ -99,9 +137,17 @@ export class FhirClient {
     const url = `${this.config.baseUrl}${path}`;
     const headers = await this.getAuthHeaders();
 
+    // Rate limiting - wait for token
+    await this.rateLimiter.execute(async () => {
+      // Token consumed, proceed with request
+      return Promise.resolve();
+    }, path.split('/')[1] || 'default');
+
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.config.timeout!);
 
+    const startTime = Date.now();
+    
     try {
       const res = await fetch(url, {
         method,
@@ -110,8 +156,21 @@ export class FhirClient {
         signal: controller.signal,
       });
 
+      const durationMs = Date.now() - startTime;
+
       if (!res.ok) {
         const text = await res.text().catch(() => '');
+        
+        // Log error
+        this.auditLogger.log({
+          operation: 'CONNECTION_TEST',
+          tenantId: 'unknown', // Should be passed from caller
+          success: false,
+          level: 'ERROR',
+          durationMs,
+          errorMessage: `FHIR ${method} ${path} → ${res.status}: ${text.slice(0, 200)}`,
+        });
+
         const err = new Error(`FHIR ${method} ${path} → ${res.status}: ${text}`);
         if (attempt < this.config.retryCount! && res.status >= 500) {
           await new Promise(r => setTimeout(r, 1000 * attempt));
@@ -119,6 +178,15 @@ export class FhirClient {
         }
         throw err;
       }
+
+      // Log success
+      this.auditLogger.log({
+        operation: 'CONNECTION_TEST',
+        tenantId: 'unknown', // Should be passed from caller
+        success: true,
+        level: 'DEBUG',
+        durationMs,
+      });
 
       return await res.json() as T;
     } finally {

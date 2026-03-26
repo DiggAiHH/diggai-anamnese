@@ -57,8 +57,9 @@ function extractTenantIdentifier(req: Request): string | null {
     
     // 2. Extract from subdomain (praxis-name.diggai.de)
     const host = req.headers.host || '';
-    const subdomain = host.split('.')[0];
-    if (subdomain && subdomain !== 'www' && subdomain !== 'app' && subdomain !== 'api') {
+    const cleanHost = host.split(':')[0].toLowerCase();
+    const subdomain = cleanHost.split('.')[0];
+    if (subdomain && !['localhost', '127', 'www', 'app', 'api', 'dev', 'test'].includes(subdomain)) {
         return subdomain.toLowerCase();
     }
     
@@ -75,7 +76,7 @@ function extractTenantIdentifier(req: Request): string | null {
 function extractConcreteHostSubdomain(host: string): string | null {
     const cleanHost = host.split(':')[0].toLowerCase();
     const subdomain = cleanHost.split('.')[0];
-    if (!subdomain || subdomain === 'www' || subdomain === 'app' || subdomain === 'api') {
+    if (!subdomain || ['localhost', '127', 'www', 'app', 'api', 'dev', 'test'].includes(subdomain)) {
         return null;
     }
     return subdomain;

@@ -630,7 +630,7 @@ export const DatenschutzGame: React.FC<DatenschutzGameProps> = ({
                     style={{
                       left: `${Math.random() * 100}%`,
                       top: `${Math.random() * 100}%`,
-                      backgroundColor: ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'][i % 6],
+                      backgroundColor: ['#4A90E2', '#81B29A', '#F4A261', '#E07A5F', '#C7C3E6', '#5E8B9E'][i % 6],
                       animationDelay: `${Math.random() * 2}s`,
                       animationDuration: `${1 + Math.random() * 2}s`,
                     }}

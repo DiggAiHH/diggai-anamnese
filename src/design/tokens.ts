@@ -20,7 +20,8 @@ export const radii = {
   sm: '0.5rem',    // 8px
   md: '0.75rem',   // 12px
   lg: '1rem',      // 16px
-  xl: '1.5rem',    // 24px
+  xl: '1.25rem',   // 20px
+  '2xl': '1.5rem', // 24px
   full: '9999px',
 } as const;
 
@@ -32,6 +33,10 @@ export const shadows = {
   xl: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
   glow: '0 0 20px rgba(59, 130, 246, 0.3)',
   'glow-lg': '0 0 40px rgba(59, 130, 246, 0.4)',
+  // Phase 6: Soft, diffused shadows for trust-building
+  soft: '0 8px 32px rgba(44, 95, 138, 0.08)',
+  'soft-lg': '0 12px 48px rgba(44, 95, 138, 0.12)',
+  'glass': '0 8px 32px rgba(44, 95, 138, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
 } as const;
 
 // ─── Transitions ────────────────────────────────────────────
@@ -88,7 +93,17 @@ export const typography = {
 } as const;
 
 // ─── Component Variants ─────────────────────────────────────
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
+// Phase 6: Extended with calming variants
+export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'calm' | 'success' | 'warning';
 export type ButtonSize = 'sm' | 'md' | 'lg';
-export type CardVariant = 'default' | 'glass' | 'interactive';
+export type CardVariant = 'default' | 'glass' | 'interactive' | 'calm';
 export type BadgeVariant = 'success' | 'warning' | 'danger' | 'info' | 'neutral';
+
+// Phase 6: Calming Color Palette for Healthcare
+export const calmingColors = {
+  calm: '#4A90E2',      // Serene blue - trust, calmness
+  success: '#81B29A',   // Sage green - healing, confirmation
+  warning: '#F4A261',   // Warm amber - caution without fear
+  danger: '#E07A5F',    // Soft coral - attention without panic
+  info: '#5E8B9E',      // Dusty blue - trustworthy information
+} as const;

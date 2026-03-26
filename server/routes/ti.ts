@@ -166,6 +166,36 @@ router.get('/epa/documents', async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/ti/epa/documents — Add document to ePA
+router.post('/epa/documents', async (req: Request, res: Response) => {
+  try {
+    const { kvnr, documentData, title } = req.body;
+    if (!kvnr) return res.status(400).json({ error: 'kvnr required' });
+    
+    // Stub implementation for ePA ingestion
+    console.log(`[ePA] Pushing document "${title}" to ePA for KVNR ${kvnr}`);
+    
+    res.json({ success: true, message: 'Document queued for ePA export' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/ti/erezept/issue — Issue eRezept via FHIR
+router.post('/erezept/issue', async (req: Request, res: Response) => {
+  try {
+    const { kvnr, pzn, dosage } = req.body;
+    if (!kvnr || !pzn) return res.status(400).json({ error: 'kvnr and pzn required' });
+    
+    // Stub implementation for eRezept FHIR profile Generation
+    console.log(`[eRezept] Generating FHIR Prescription for ${pzn} dosage: ${dosage}`);
+    
+    res.json({ success: true, prescriptionId: 'ERXP-SIM-12345' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── KIM Stubs ──────────────────────────────────────────────
 
 // GET /api/ti/kim/status — KIM availability

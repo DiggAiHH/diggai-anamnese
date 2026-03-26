@@ -51,7 +51,7 @@ function toAccountData(record: any): PatientAccountData {
   };
 }
 
-function signToken(accountId: string, patientId: string): { token: string; expiresAt: string } {
+export function signToken(accountId: string, patientId: string): { token: string; expiresAt: string } {
   const payload: PwaJwtPayload = {
     accountId,
     patientId,

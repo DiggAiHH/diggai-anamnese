@@ -15,9 +15,10 @@
   <meta property="og:url" content="https://diggai-drklaproth.netlify.app" />
   <meta property="og:locale" content="de_DE" />
   <meta property="og:site_name" content="DiggAI" />
-  <!-- Security — K-07 FIX: unsafe-inline entfernt -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://*.netlify.app wss://*.netlify.app; frame-ancestors 'none';" />
-  <meta http-equiv="Permissions-Policy" content="camera=(self), microphone=(), geolocation=()" />
+  <!-- Security — CSP is handled via Netlify HTTP headers (netlify.toml) to avoid dual-policy conflicts.
+       Meta CSP removed: having both meta + header applies BOTH — meta blocked eval() (lottie-web)
+       and blocked connect-src to api-takios.diggai.de. Netlify header alone is sufficient. -->
+  <meta http-equiv="Permissions-Policy" content="camera=(self), microphone=(self), geolocation=()" />
   <!-- PWA -->
   <link rel="manifest" href="/manifest.json" />
   <meta name="theme-color" content="#3b82f6" />
@@ -25,11 +26,13 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="DiggAI" />
   <link rel="apple-touch-icon" href="/icons/icon-192.svg" />
+  <!-- Typography: Phase 2 Optimization for Elderly/Anxious Users -->
+  <!-- Primary Font: Inter with RTL support via Noto Sans Arabic -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" />
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@400;500;600;700&display=swap" />
   <link
-    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@400;500;600;700&display=swap"
     rel="stylesheet" />
   <title>Anamnese-Fragebogen</title>
 </head>

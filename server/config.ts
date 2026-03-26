@@ -90,4 +90,8 @@ export const config = {
     tiEnabled: process.env.TI_ENABLED === 'true',
     epaEnabled: process.env.EPA_ENABLED === 'true',
     kimEnabled: process.env.KIM_ENABLED === 'true',
+
+    // Monitoring
+    sentryDsn: process.env.SENTRY_DSN,
+    appVersion: process.env.APP_VERSION || '3.0.0',
 };

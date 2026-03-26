@@ -1,149 +1,243 @@
-import { useEffect, useRef, useState } from 'react';
-import SignaturePadLib from 'signature_pad';
-import { useTranslation } from 'react-i18next';
+import { useRef, useState, useCallback } from 'react';
+import { motion } from 'framer-motion';
+import { Pen, RotateCcw, Check, Trash2 } from 'lucide-react';
 
 interface SignaturePadProps {
-    onComplete: (signatureData: string, documentHash: string) => void;
-    onClear?: () => void;
-    documentText?: string;
-    className?: string;
-    disabled?: boolean;
+  onConfirm?: (signatureData: string) => void;
+  onCancel?: () => void;
+  width?: number;
+  height?: number;
+  label?: string;
+  documentText?: string;
+  onComplete?: (signatureData: string, documentHash: string) => void;
 }
 
-/**
- * DSGVO-konforme digitale Unterschrift (Phase 12).
- * FES nach eIDAS Art. 26 — Canvas-basiert, touch+mouse+stylus.
- * Konsistent mit PatternLock.tsx (devicePixelRatio-Skalierung).
- */
-export function SignaturePad({ onComplete, onClear, documentText = '', className = '', disabled = false }: SignaturePadProps) {
-    const { t } = useTranslation();
-    const canvasRef = useRef<HTMLCanvasElement>(null);
-    const padRef = useRef<SignaturePadLib | null>(null);
-    const [isEmpty, setIsEmpty] = useState(true);
-    const [isConfirmed, setIsConfirmed] = useState(false);
+// Psychology-based colors
+const COLORS = {
+  pen: '#2C5F8A',        // Deep Trust Blue
+  confirmed: '#81B29A',  // Sage Green
+  empty: 'rgba(107, 139, 164, 0.3)'
+};
 
-    useEffect(() => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
+export function SignaturePad({
+  onConfirm,
+  onCancel,
+  width = 400,
+  height = 200,
+  label = 'Unterschrift',
+  documentText: _documentText,
+  onComplete,
+}: SignaturePadProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [isEmpty, setIsEmpty] = useState(true);
+  const [isConfirmed, setIsConfirmed] = useState(false);
+  const lastPos = useRef<{ x: number; y: number } | null>(null);
 
-        // DPI-aware sizing — same pattern as PatternLock.tsx
-        const ratio = window.devicePixelRatio || 1;
-        const rect = canvas.parentElement?.getBoundingClientRect();
-        const w = rect?.width || 600;
-        canvas.width = w * ratio;
-        canvas.height = 160 * ratio;
-        canvas.style.width = `${w}px`;
-        canvas.style.height = '160px';
-        const ctx = canvas.getContext('2d');
-        if (ctx) ctx.scale(ratio, ratio);
+  const getCanvasCoordinates = (e: React.MouseEvent | React.TouchEvent) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
 
-        padRef.current = new SignaturePadLib(canvas, {
-            backgroundColor: 'rgba(0, 0, 0, 0)',
-            penColor: '#1e40af',
-            minWidth: 1.5,
-            maxWidth: 3,
-        });
+    const rect = canvas.getBoundingClientRect();
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
 
-        padRef.current.addEventListener('beginStroke', () => setIsEmpty(false));
-
-        return () => {
-            padRef.current?.off();
-        };
-    }, []);
-
-    const handleClear = () => {
-        padRef.current?.clear();
-        setIsEmpty(true);
-        setIsConfirmed(false);
-        onClear?.();
+    return {
+      x: clientX - rect.left,
+      y: clientY - rect.top
     };
+  };
 
-    const handleConfirm = async () => {
-        if (!padRef.current || padRef.current.isEmpty()) return;
+  const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
+    if (isConfirmed) return;
+    
+    const { x, y } = getCanvasCoordinates(e);
+    setIsDrawing(true);
+    lastPos.current = { x, y };
+    
+    // Draw initial dot
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (ctx) {
+      ctx.beginPath();
+      ctx.arc(x, y, 1, 0, Math.PI * 2);
+      ctx.fillStyle = COLORS.pen;
+      ctx.fill();
+    }
+  };
 
-        const signatureData = padRef.current.toDataURL('image/png');
+  const draw = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!isDrawing || !lastPos.current) return;
 
-        // Compute SHA-256 hash of the document text in browser (SubtleCrypto)
-        let documentHash = 'no-document';
-        if (documentText) {
-            try {
-                const encoded = new TextEncoder().encode(documentText);
-                const hashBuffer = await crypto.subtle.digest('SHA-256', encoded);
-                const hashArray = Array.from(new Uint8Array(hashBuffer));
-                documentHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-            } catch {
-                // Fallback: simple hash not available
-                documentHash = 'hash-unavailable';
-            }
-        }
+    const { x, y } = getCanvasCoordinates(e);
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
 
-        setIsConfirmed(true);
-        padRef.current.off(); // Lock the pad after confirming
-        onComplete(signatureData, documentHash);
-    };
+    if (ctx) {
+      ctx.beginPath();
+      ctx.moveTo(lastPos.current.x, lastPos.current.y);
+      ctx.lineTo(x, y);
+      ctx.strokeStyle = COLORS.pen;
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+    }
 
-    return (
-        <div className={`flex flex-col gap-3 ${className}`}>
-            <p className="text-sm text-[var(--text-secondary)]">
-                {t('signature.hint', 'Bitte unterschreiben Sie mit Ihrem Finger oder der Maus im Feld unten.')}
-            </p>
+    lastPos.current = { x, y };
+    setIsEmpty(false);
+  };
 
-            <div
-                className="relative rounded-xl border-2 border-dashed bg-white/5 overflow-hidden"
-                style={{ borderColor: isConfirmed ? '#16a34a' : isEmpty ? 'rgba(255,255,255,0.2)' : '#3b82f6' }}
-            >
-                <canvas
-                    ref={canvasRef}
-                    className="block w-full cursor-crosshair touch-none"
-                    aria-label={t('signature.canvas_label', 'Unterschriften-Feld')}
-                    style={{ pointerEvents: disabled || isConfirmed ? 'none' : 'auto' }}
-                />
-                {isEmpty && !isConfirmed && (
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <span className="text-[var(--text-secondary)] text-sm opacity-50 select-none">
-                            {t('signature.placeholder', 'Hier unterschreiben…')}
-                        </span>
-                    </div>
-                )}
-                {isConfirmed && (
-                    <div className="absolute top-2 right-2 flex items-center gap-1 bg-green-600/90 text-white text-xs px-2 py-1 rounded-full">
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        {t('signature.confirmed', 'Bestätigt')}
-                    </div>
-                )}
-            </div>
+  const stopDrawing = () => {
+    setIsDrawing(false);
+    lastPos.current = null;
+  };
 
-            {!isConfirmed && (
-                <div className="flex gap-3">
-                    <button
-                        type="button"
-                        onClick={handleClear}
-                        className="flex-1 py-2 px-4 rounded-lg border border-[var(--border-primary)] text-[var(--text-secondary)] text-sm hover:bg-white/5 transition-colors"
-                    >
-                        {t('signature.clear', 'Löschen')}
-                    </button>
-                    <button
-                        type="button"
-                        onClick={handleConfirm}
-                        disabled={isEmpty}
-                        className="flex-1 py-2 px-4 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                        {t('signature.confirm', 'Unterschrift bestätigen')}
-                    </button>
-                </div>
-            )}
+  const clear = () => {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (ctx && canvas) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+    setIsEmpty(true);
+    setIsConfirmed(false);
+  };
 
-            {isConfirmed && (
-                <button
-                    type="button"
-                    onClick={handleClear}
-                    className="text-xs text-[var(--text-secondary)] underline underline-offset-2 text-center hover:text-[var(--text-primary)] transition-colors"
-                >
-                    {t('signature.redo', 'Unterschrift neu zeichnen')}
-                </button>
-            )}
+  const confirm = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || isEmpty) return;
+
+    const signatureData = canvas.toDataURL('image/png');
+    setIsConfirmed(true);
+    onConfirm?.(signatureData);
+    onComplete?.(signatureData, signatureData);
+  }, [isEmpty, onConfirm, onComplete]);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <label className="text-sm font-medium flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+          <Pen className="w-4 h-4" style={{ color: 'var(--text-secondary)' }} />
+          {label}
+        </label>
+        <div className="flex gap-2">
+          <motion.button
+            type="button"
+            onClick={clear}
+            className="p-2 rounded-lg border transition-all duration-200 flex items-center gap-1.5 text-sm"
+            style={{ 
+              borderColor: 'var(--border-primary)',
+              color: 'var(--text-secondary)',
+              backgroundColor: 'var(--bg-card)'
+            }}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            disabled={isEmpty}
+          >
+            <RotateCcw className="w-4 h-4" />
+            <span className="hidden sm:inline">Zurücksetzen</span>
+          </motion.button>
         </div>
-    );
+      </div>
+
+      <motion.div
+        className="relative rounded-xl overflow-hidden border-2 transition-colors duration-300"
+        style={{
+          borderColor: isConfirmed ? COLORS.confirmed : isEmpty ? COLORS.empty : COLORS.pen,
+          backgroundColor: 'var(--bg-secondary)'
+        }}
+        animate={{
+          boxShadow: isConfirmed 
+            ? `0 0 0 3px ${COLORS.confirmed}20`
+            : '0 0 0 0 transparent'
+        }}
+      >
+        <canvas
+          ref={canvasRef}
+          width={width}
+          height={height}
+          className="touch-none cursor-crosshair block"
+          style={{ 
+            width: '100%', 
+            height: 'auto',
+            opacity: isConfirmed ? 0.7 : 1
+          }}
+          onMouseDown={startDrawing}
+          onMouseMove={draw}
+          onMouseUp={stopDrawing}
+          onMouseLeave={stopDrawing}
+          onTouchStart={startDrawing}
+          onTouchMove={draw}
+          onTouchEnd={stopDrawing}
+        />
+
+        {isEmpty && !isConfirmed && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <span className="text-sm" style={{ color: 'var(--text-muted)' }}>
+              Hier unterschreiben...
+            </span>
+          </div>
+        )}
+
+        {isConfirmed && (
+          <motion.div 
+            className="absolute inset-0 flex items-center justify-center pointer-events-none"
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+          >
+            <div 
+              className="px-4 py-2 rounded-full flex items-center gap-2"
+              style={{ 
+                backgroundColor: `${COLORS.confirmed}20`,
+                border: `1px solid ${COLORS.confirmed}40`
+              }}
+            >
+              <Check className="w-5 h-5" style={{ color: COLORS.confirmed }} />
+              <span className="text-sm font-medium" style={{ color: COLORS.confirmed }}>
+                Unterschrift gespeichert
+              </span>
+            </div>
+          </motion.div>
+        )}
+      </motion.div>
+
+      <div className="flex gap-3">
+        <motion.button
+          type="button"
+          onClick={confirm}
+          disabled={isEmpty || isConfirmed}
+          className="flex-1 py-2.5 px-4 rounded-lg font-medium text-white transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          style={{
+            background: isConfirmed 
+              ? COLORS.confirmed 
+              : 'linear-gradient(135deg, #4A90E2, #2C5F8A)'
+          }}
+          whileHover={!isEmpty && !isConfirmed ? { scale: 1.01 } : {}}
+          whileTap={!isEmpty && !isConfirmed ? { scale: 0.99 } : {}}
+        >
+          <Check className="w-4 h-4" />
+          {isConfirmed ? 'Gespeichert' : 'Bestätigen'}
+        </motion.button>
+        
+        {onCancel && (
+          <motion.button
+            type="button"
+            onClick={onCancel}
+            className="py-2.5 px-4 rounded-lg font-medium transition-all duration-200 border"
+            style={{
+              borderColor: 'var(--border-primary)',
+              color: 'var(--text-secondary)',
+              backgroundColor: 'var(--bg-card)'
+            }}
+            whileHover={{ scale: 1.01 }}
+            whileTap={{ scale: 0.99 }}
+          >
+            Abbrechen
+          </motion.button>
+        )}
+      </div>
+    </div>
+  );
 }
+
+export default SignaturePad;

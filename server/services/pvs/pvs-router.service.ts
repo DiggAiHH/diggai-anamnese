@@ -5,6 +5,12 @@
 import type { PvsAdapter, PvsType, PvsConnectionData, TransferResult, PatientSessionFull } from './types.js';
 import { CgmM1Adapter } from './adapters/cgm-m1.adapter.js';
 import { FhirGenericAdapter } from './adapters/fhir-generic.adapter.js';
+import { TurbomedAdapter } from './adapters/turbomed.adapter.js';
+import { TomedoAdapter } from './adapters/tomedo.adapter.js';
+import { MedistarAdapter } from './adapters/medistar.adapter.js';
+import { T2MedAdapter } from './adapters/t2med.adapter.js';
+import { xIsynetAdapter } from './adapters/xisynet.adapter.js';
+import { AlbisAdapter } from './adapters/albis.adapter.js';
 
 /**
  * Adapter registry: Maps PVS type to adapter constructor.
@@ -17,12 +23,14 @@ type AdapterConstructor = new () => PvsAdapter;
 const ADAPTER_REGISTRY: Record<PvsType, AdapterConstructor> = {
   CGM_M1: CgmM1Adapter,
   MEDATIXX: CgmM1Adapter,       // GDT-based, same interface
-  MEDISTAR: CgmM1Adapter,       // CGM family
-  T2MED: FhirGenericAdapter,    // Supports FHIR natively
-  X_ISYNET: CgmM1Adapter,      // medatixx family, GDT
+  MEDISTAR: MedistarAdapter,    // CGM family (dedicated adapter)
+  T2MED: T2MedAdapter,          // T2Med - dedicated FHIR adapter
+  X_ISYNET: xIsynetAdapter,     // medatixx family (dedicated adapter)
   DOCTOLIB: FhirGenericAdapter, // REST/FHIR
-  TURBOMED: CgmM1Adapter,      // CGM family
+  TURBOMED: TurbomedAdapter,   // CGM family (dedicated adapter)
   FHIR_GENERIC: FhirGenericAdapter,
+  ALBIS: AlbisAdapter,         // CGM family (dedicated adapter)
+  TOMEDO: TomedoAdapter,       // Zollsoft - dedicated FHIR adapter
 };
 
 /**

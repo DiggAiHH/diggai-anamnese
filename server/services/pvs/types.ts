@@ -4,7 +4,7 @@
 
 // ─── Enums (mirror Prisma but usable w/o generated client) ──
 
-export type PvsType = 'CGM_M1' | 'MEDATIXX' | 'MEDISTAR' | 'T2MED' | 'X_ISYNET' | 'DOCTOLIB' | 'TURBOMED' | 'FHIR_GENERIC';
+export type PvsType = 'CGM_M1' | 'MEDATIXX' | 'MEDISTAR' | 'T2MED' | 'X_ISYNET' | 'DOCTOLIB' | 'TURBOMED' | 'FHIR_GENERIC' | 'ALBIS' | 'TOMEDO';
 export type PvsProtocol = 'GDT' | 'BDT' | 'FHIR' | 'REST' | 'KIM';
 export type TransferDirection = 'IMPORT' | 'EXPORT' | 'BIDIRECTIONAL';
 export type TransferStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED' | 'RETRYING' | 'CANCELLED';
@@ -60,7 +60,7 @@ export interface FhirResource {
 export interface FhirPatient extends FhirResource {
   resourceType: 'Patient';
   identifier?: Array<{
-    type?: { coding?: Array<{ system?: string; code?: string }> };
+    type?: { coding?: Array<{ system?: string; code?: string; display?: string }> };
     system?: string;
     value?: string;
   }>;
@@ -71,12 +71,13 @@ export interface FhirPatient extends FhirResource {
   }>;
   birthDate?: string;
   gender?: 'male' | 'female' | 'other' | 'unknown';
+  text?: { status: string; div: string };
 }
 
 export interface FhirEncounter extends FhirResource {
   resourceType: 'Encounter';
   status: string;
-  class?: { system?: string; code?: string };
+  class?: { system?: string; code?: string; display?: string };
   subject?: { reference?: string };
   period?: { start?: string; end?: string };
   reasonCode?: Array<{ text?: string }>;
@@ -128,7 +129,10 @@ export interface FhirRiskAssessment extends FhirResource {
 export interface FhirMedicationStatement extends FhirResource {
   resourceType: 'MedicationStatement';
   status: string;
-  medicationCodeableConcept?: { text?: string };
+  medicationCodeableConcept?: {
+    text?: string;
+    coding?: Array<{ system?: string; code?: string; display?: string }>;
+  };
   subject?: { reference?: string };
   dosage?: Array<{ text?: string }>;
 }
@@ -136,15 +140,69 @@ export interface FhirMedicationStatement extends FhirResource {
 export interface FhirProcedure extends FhirResource {
   resourceType: 'Procedure';
   status: string;
-  code?: { text?: string };
+  code?: {
+    text?: string;
+    coding?: Array<{ system?: string; code?: string; display?: string }>;
+  };
   subject?: { reference?: string };
   performedString?: string;
+  performedDateTime?: string;
+  performedPeriod?: { start?: string; end?: string };
   note?: Array<{ text?: string }>;
+}
+
+export interface FhirObservation extends FhirResource {
+  resourceType: 'Observation';
+  status: string;
+  category?: Array<{ coding?: Array<{ system?: string; code?: string; display?: string }> }>;
+  code: {
+    coding?: Array<{ system?: string; code?: string; display?: string }>;
+    text?: string;
+  };
+  subject?: { reference?: string };
+  encounter?: { reference?: string };
+  effectiveDateTime?: string;
+  valueQuantity?: { value?: number; unit?: string; system?: string; code?: string };
+}
+
+export interface FhirComposition extends FhirResource {
+  resourceType: 'Composition';
+  status: string;
+  type: {
+    coding?: Array<{ system?: string; code?: string; display?: string }>;
+    text?: string;
+  };
+  subject?: { reference?: string };
+  encounter?: { reference?: string };
+  date?: string;
+  title?: string;
+  section?: Array<{
+    title?: string;
+    code?: { coding?: Array<{ system?: string; code?: string; display?: string }> };
+    entry?: Array<{ reference?: string }>;
+  }>;
+}
+
+export interface FhirCondition extends FhirResource {
+  resourceType: 'Condition';
+  clinicalStatus?: { coding?: Array<{ system?: string; code?: string }> };
+  code?: { coding?: Array<{ system?: string; code?: string; display?: string }>; text?: string };
+  subject?: { reference?: string };
+}
+
+export interface FhirCoverage extends FhirResource {
+  resourceType: 'Coverage';
+  status: string;
+  type?: { coding?: Array<{ system?: string; code?: string; display?: string }> };
+  beneficiary?: { reference?: string };
+  subscriberId?: string;
+  payor?: Array<{ reference?: string; display?: string }>;
 }
 
 export interface FhirBundle extends FhirResource {
   resourceType: 'Bundle';
-  type: 'transaction' | 'batch' | 'searchset' | 'collection';
+  type: 'transaction' | 'batch' | 'searchset' | 'collection' | 'document';
+  timestamp?: string;
   entry?: Array<{
     fullUrl?: string;
     resource?: FhirResource;

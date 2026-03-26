@@ -1,11 +1,10 @@
-# CLAUDE.md — Developer Instructions for DiggAI Anamnese Platform
+# CLAUDE.md
 
-> This file is the authoritative developer reference for AI agents and human developers.
-> It supersedes all previous planning notes. Last updated: 2026-03-07.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ---
 
-## 2a. PROJECT IDENTITY
+## Project Identity
 
 | Field | Value |
 |---|---|
@@ -15,219 +14,188 @@
 | **Purpose** | DSGVO-compliant digital patient intake for German medical practices (Arztpraxis) |
 | **Stack** | React 19 + TypeScript 5.9 + Vite 8 + Express 5 + Prisma 6 + PostgreSQL 16 |
 | **Compliance** | DSGVO, HIPAA audit logging, BSI TR-03161, gematik TI/ePA, eIDAS |
-| **Architecture** | Part of DiggAI Service 4 (4-service distributed system) |
-| **Contacts** | Dr. Klapproth / Dr. Al-Shdaifat (clinical review), DiggAI GmbH (technical) |
-
-**DiggAI 4-Service Architecture:**
-- Service 1: Python Agent Core (`diggai-agent-core/`) — in progress
-- Service 2: Tauri Desktop App (`diggai-desktop/`) — pending
-- Service 3: Monorepo (`diggai-monorepo/`) — pending
-- Service 4: **This project** (`Anamnese-kimi/anamnese-app/`) — production
+| **Architecture** | DiggAI Service 4 of 4 (Python Agent Core / Tauri Desktop / Monorepo / **this**) |
 
 **SCOPE: Work EXCLUSIVELY in `anamnese-app/`. Do NOT touch sibling folders.**
 
 ---
 
-## 2b. DEV COMMANDS
+## Build & Dev Commands
 
-All commands must be run from `anamnese-app/`:
+All commands run from `anamnese-app/`:
 
 ```bash
 # Development
-npm run dev                                        # Vite dev server :5173 + proxy to :3001
-npm run build                                      # tsc -b && vite build (frontend + server types)
-npm run lint                                       # ESLint check
+npm run dev              # Vite dev server :5173 + proxy to :3001
+npm run dev:server       # Express backend only (tsx watch)
+npm run dev:all          # Both frontend + backend concurrently
 
-# Database
-npx prisma studio                                  # Visual DB browser GUI
-npx prisma migrate dev --name <descriptive-name>   # Run AFTER schema changes (always)
-npx prisma generate                                # Regenerate Prisma client after schema changes
-npx prisma db seed                                 # Seed 270+ questions + admin user
+# Build & Type Check
+npm run build            # tsc -b (app + node configs) && vite build
+npm run type-check       # tsc --noEmit for app, node, and server configs
+npm run check-all        # type-check + lint + i18n check + prisma migrate status
+npm run lint             # ESLint (frontend src/ only — server/ is excluded)
 
-# Local infrastructure
-docker-compose -f docker-compose.local.yml up -d   # Start PostgreSQL 16 + Redis 7 locally
-docker-compose -f docker-compose.local.yml down    # Stop local infra
+# Unit / Integration Tests (Vitest)
+npm test                 # vitest (watch mode)
+npm run test:run         # vitest run (single pass)
+npm run test:server      # server tests only (node env, vitest.server.config.ts)
+npm run test:coverage    # vitest with v8 coverage report
 
-# Testing
-npx playwright test                                # Full E2E suite (22 specs)
-npx playwright test e2e/anamnese.spec.ts           # Single spec
-npx playwright test --ui                           # Interactive test runner
+# E2E Tests (Playwright — Chromium + Mobile Chrome)
+npx playwright test                          # Full suite (34 specs)
+npx playwright test e2e/anamnese.spec.ts     # Single spec
+npx playwright test --ui                     # Interactive runner
+
+# Database (Prisma)
+npx prisma migrate dev --name <name>   # Create + apply migration
+npx prisma generate                    # Regenerate client after schema change
+npx prisma db seed                     # Seed 270+ questions + admin user
+npx prisma studio                      # Visual DB browser GUI
+
+# Local Infrastructure
+docker-compose -f docker-compose.local.yml up -d    # PostgreSQL 16 + Redis 7
+docker-compose -f docker-compose.local.yml down
 
 # i18n
-node scripts/generate-i18n.ts                      # Detect missing translation keys
-node compare-translations.cjs                      # Compare all 10 language files
+node scripts/generate-i18n.ts          # Detect missing translation keys
+node compare-translations.cjs          # Compare all 10 language files
 
-# Preview
-npm run preview                                    # Preview production build locally
+# Deployment
+npm run preflight        # Pre-deploy checks
+npm run deploy           # Guided deployment script
+npm run preview          # Preview production build locally
 ```
 
 ---
 
-## 2c. ARCHITECTURE OVERVIEW
+## Architecture Overview
 
 ### Frontend (`src/`)
 
-| Layer | Technology | Location |
-|---|---|---|
-| Framework | React 19.2 + TypeScript 5.9 strict | `src/` |
-| Routing | React Router v7 (lazy-loaded pages) | `src/App.tsx` |
-| Global State | Zustand 5 (persisted stores) | `src/store/` |
-| Server State | TanStack React Query 5 | `src/hooks/useApi.ts` |
-| HTTP Client | Axios 1.13 + JWT interceptor | `src/api/client.ts` |
-| Realtime | Socket.IO 4 client | `src/lib/socketClient.ts` |
-| Offline DB | Dexie 4 (IndexedDB) | `src/lib/offlineDb.ts` |
-| i18n | i18next 25 + react-i18next | `src/i18n.ts` |
-| Build | Vite 8-beta + Tailwind CSS 4 | `vite.config.ts` |
+React 19 SPA with lazy-loaded pages via React Router v7. State split between Zustand (client state in `src/store/`) and TanStack React Query (server state in `src/hooks/useApi.ts`). Axios HTTP client with JWT interceptor at `src/api/client.ts`. Offline support via Dexie/IndexedDB at `src/lib/offlineDb.ts`. Realtime updates via Socket.IO client at `src/lib/socketClient.ts`. i18next for 10 languages configured in `src/i18n.ts`. Manual service worker (not VitePWA plugin — see comment in `vite.config.ts`).
+
+Key pages: `Questionnaire.tsx` (patient intake), `ArztDashboard.tsx` (doctor), `MFADashboard.tsx` (medical assistant), `AdminDashboard.tsx`, plus sub-directories for `pwa/`, `telemedizin/`, `kiosk/`, `epa/`, `flows/`, `forms/`, `nfc/`.
 
 ### Backend (`server/`)
 
-| Layer | Technology | Location |
-|---|---|---|
-| Framework | Express 5.2 | `server/index.ts` |
-| ORM | Prisma 6.19 | `prisma/schema.prisma` |
-| Auth | JWT HS256 + HttpOnly cookies + RBAC | `server/middleware/auth.ts` |
-| Realtime | Socket.IO 4 server | `server/socket.ts` |
-| Cache | Redis via ioredis (optional) | `server/redis.ts` |
-| Encryption | AES-256-GCM (all PII fields) | `server/services/encryption.ts` |
-| Security | Helmet 8 + rate limiting + CORS | `server/index.ts` |
-| Audit | HIPAA-compliant middleware | `server/middleware/audit.ts` |
-| Config | Centralized env loader | `server/config.ts` |
+Express 5 with extensive security middleware stack (Helmet, CORS, rate limiting, CSRF double-submit cookie, input sanitization, HIPAA audit logging). Multi-tenant via subdomain resolution (`server/middleware/tenant.ts`).
+
+**35+ route modules** mounted at `/api/*` in `server/index.ts`. Each route file follows the pattern: Zod validation + auth middleware + business logic + audit logging.
+
+**Engines** (`server/engine/`): `TriageEngine.ts` (10 medical safety rules) and `QuestionFlowEngine.ts` (three-tier routing: followUpQuestions -> conditional -> static next).
+
+**Background jobs** started on boot (all in `server/jobs/`): cleanup, ROI snapshots, medication reminders, hard-delete worker, agent orchestrator, backup scheduler/monitor, escalation worker, compliance reporter, queue auto-dispatch, billing reconciler. Each has graceful shutdown on SIGTERM.
 
 ### AI / LLM System
 
-The LLM provider is **runtime-configurable** via the `SystemSetting` database table.
-No code changes needed to switch providers.
+Runtime-configurable via `SystemSetting` DB table (key `llm_provider`): `ollama` (default, local), `openai` (API key required), or `none` (rule-based fallback). Abstraction at `server/services/ai/llm-client.ts`. Prompt templates at `server/services/ai/prompt-templates.ts`.
 
-| Provider | Config Key | Notes |
-|---|---|---|
-| Ollama (local) | `ollama` | Default. Self-hosted. Docker profile `llm`. |
-| OpenAI-compatible | `openai` | Requires `OPENAI_API_KEY` env var. |
-| None (rule-based) | `none` | Fallback — no LLM required. |
+### Agent System
 
-To switch: `UPDATE "SystemSetting" SET value='openai' WHERE key='llm_provider';`
+5 agents (orchestrator, empfang, triage, dokumentation, abrechnung) dispatched via `server/services/agent/agent.service.ts`. Task queue at `server/services/agent/task.queue.ts` is **in-memory only** — tasks are lost on restart. RabbitMQ is optional (graceful degradation to HTTP-only). Agent Core (Service 1) URL via `AGENT_CORE_URL` env var.
 
-LLM client abstraction: `server/services/ai/llm-client.ts`
-Prompt templates: `server/services/ai/prompt-templates.ts` (4 templates: SYSTEM_MEDICAL, THERAPY_SUGGEST, SESSION_SUMMARY, ICD_SUGGEST)
+### TypeScript Config
 
-### DiggAI Agent System
+Three project references in `tsconfig.json`: `tsconfig.app.json` (frontend, `src/`), `tsconfig.node.json` (Vite/build tooling), `tsconfig.server.json` (backend, `server/` + `prisma/`). All strict mode. ESLint config excludes `server/` — server TypeScript is checked via `tsc -p tsconfig.server.json` only.
 
-- Entry route: `server/routes/agents.ts`
-- Dispatch: `server/services/agent/agent.service.ts`
-- Task queue: `server/services/agent/task.queue.ts` (**currently in-memory — tasks lost on restart**)
-- 5 agents: orchestrator, empfang, triage, dokumentation, abrechnung
-- Agent Core (Service 1) communication: `server/services/agentcore.client.ts`
-- RabbitMQ: optional — app degrades gracefully without it
+### Test Config
+
+- `vitest.config.ts` — jsdom env, includes both `src/**/*.test.*` and `server/**/*.test.ts`
+- `vitest.server.config.ts` — node env, server tests only, 80% coverage thresholds (statements/functions/lines), 70% branches
+- `playwright.config.ts` — Chromium + Mobile Chrome, locale `de-DE`, auto-starts `npm run dev`
 
 ---
 
-## 2d. CRITICAL FILES
+## Critical Files
 
 | Purpose | File |
 |---|---|
-| Frontend entry | `src/main.tsx` |
-| Router + all providers | `src/App.tsx` |
 | All API hooks (1500+ lines) | `src/hooks/useApi.ts` |
 | All medical questions (1246 lines) | `src/data/questions.ts` |
 | Question type definitions | `src/types/question.ts` |
-| PII encryption service | `server/services/encryption.ts` |
+| PII encryption (AES-256-GCM) | `server/services/encryption.ts` |
 | JWT auth + RBAC middleware | `server/middleware/auth.ts` |
 | Triage engine (10 rules) | `server/engine/TriageEngine.ts` |
 | Question flow routing | `server/engine/QuestionFlowEngine.ts` |
 | Database schema | `prisma/schema.prisma` |
-| Express entry point | `server/index.ts` |
-| Socket.IO server | `server/socket.ts` |
-| LLM provider abstraction | `server/services/ai/llm-client.ts` |
-| Agent task queue | `server/services/agent/task.queue.ts` |
+| Express entry + all route mounts | `server/index.ts` |
+| Input sanitization | `server/services/sanitize.ts` |
+| CSRF middleware | `server/middleware/csrf.ts` |
 
 ---
 
-## 2e. SECURITY RULES (NON-NEGOTIABLE)
+## Security Rules (Non-Negotiable)
 
-These rules are MEDICAL APPLICATION requirements. Violations may cause DSGVO fines or patient harm.
+Medical application — violations cause DSGVO fines or patient harm.
 
-1. **NEVER log** patient names, emails, birthdates, diagnoses, or any health data — use patient IDs or session IDs only in logs.
-2. **ALWAYS use** `server/services/encryption.ts` (AES-256-GCM) for any PII field stored in the database.
-3. **ALWAYS use** HttpOnly cookies for JWT auth tokens — **never** store tokens in localStorage or sessionStorage.
-4. **ALWAYS sanitize** user inputs through `server/services/sanitize.ts` before any database write.
-5. **NEVER bypass** `server/middleware/auth.ts` for any route that accesses patient data.
-6. **Hash patient email** with SHA-256 (via encryption.ts) before storing — never store plaintext email in any table.
-
----
-
-## 2f. DATABASE RULES
-
-1. **Always run** `npx prisma migrate dev --name <descriptive-name>` after any schema change.
-2. **Never use raw SQL** — Prisma ORM only. No `$queryRaw` except in health checks.
-3. **Never modify** existing migration files — create new migrations only.
-4. **Run** `npx prisma generate` after any change to `prisma/schema.prisma`.
+1. **NEVER log** patient names, emails, birthdates, diagnoses, or health data — use patient/session IDs only.
+2. **ALWAYS use** `server/services/encryption.ts` (AES-256-GCM) for any PII field in the database.
+3. **ALWAYS use** HttpOnly cookies for JWT — never localStorage/sessionStorage.
+4. **ALWAYS sanitize** inputs through `server/services/sanitize.ts` before any DB write.
+5. **NEVER bypass** `server/middleware/auth.ts` for routes accessing patient data.
+6. **Hash patient email** with SHA-256 (via encryption.ts) before storing — no plaintext email.
 
 ---
 
-## 2g. i18n RULES
+## Database Rules
 
-- **ALL** user-facing strings must use i18next: `t('key')` — never hardcoded strings in JSX.
-- **German (`de`) is the source of truth** for all translation keys.
-- When adding a new key: add it to **ALL 10 language files**:
-  `public/locales/{de,en,tr,ar,uk,es,fa,it,fr,pl}/translation.json`
-- Use `node scripts/generate-i18n.ts` to detect missing keys before committing.
-- **RTL languages**: `ar` (Arabic) and `fa` (Farsi) — test layout after any UI change. Apply `dir="rtl"` to the HTML root when these are active.
-- 10 languages: DE, EN, TR, AR, UK, ES, FA, IT, FR, PL
+1. Always run `npx prisma migrate dev --name <name>` after any schema change — migrations are irreversible in production.
+2. Never use raw SQL — Prisma ORM only. No `$queryRaw` except in health checks.
+3. Never modify existing migration files — create new migrations only.
+4. Run `npx prisma generate` after any `schema.prisma` change.
 
 ---
 
-## 2h. MEDICAL DATA RULES
+## i18n Rules
 
-- **All triage logic** MUST go through `server/engine/TriageEngine.ts` — never add inline triage checks in route files.
-- **All question routing** MUST use `server/engine/QuestionFlowEngine.ts`.
-- **Question IDs are canonical** — they are routing keys throughout the system. Never renumber or delete existing question IDs.
-- **TriageEngine changes require clinical review** — any modification must be approved by Dr. Klapproth or Dr. Al-Shdaifat before deployment.
-- **10 triage rules** — 4 CRITICAL (ACS, Suizidalität, SAH, Syncope) + 6 WARNING. See `docs/TRIAGE_RULES.md`.
-- **270+ medical questions** across 13 specialty modules. See `docs/QUESTION_CATALOG.md` before modifying `src/data/questions.ts`.
-
----
-
-## 2i. AGENT SYSTEM RULES
-
-- Entry point: `POST /api/agents/task` → `server/routes/agents.ts`
-- Task dispatch: `server/services/agent/agent.service.ts`
-- Task queue: `server/services/agent/task.queue.ts`
-  - **WARNING**: Currently in-memory. Tasks are LOST on server restart.
-  - Future: migrate to Redis-backed queue.
-- LLM provider: controlled via `SystemSetting` DB table, key `llm_provider`.
-- RabbitMQ is OPTIONAL — the app works without it (HTTP-only agent mode).
-- Agent Core (Service 1) URL: configured via `AGENT_CORE_URL` env var.
+- ALL user-facing strings: `t('key')` via i18next — no hardcoded strings in JSX.
+- German (`de`) is source of truth.
+- New keys must be added to ALL 10 files: `public/locales/{de,en,tr,ar,uk,es,fa,it,fr,pl}/translation.json`
+- RTL languages: `ar` (Arabic) and `fa` (Farsi) — test layout after UI changes.
+- Run `node scripts/generate-i18n.ts` before committing to verify zero missing keys.
 
 ---
 
-## 2j. FRAGILE AREAS — READ BEFORE MODIFYING
+## Medical Data Rules
+
+- All triage logic MUST go through `server/engine/TriageEngine.ts` — no inline triage checks in routes.
+- All question routing MUST use `server/engine/QuestionFlowEngine.ts`.
+- Question IDs are canonical routing keys — never renumber or delete existing IDs.
+- TriageEngine changes require clinical sign-off (Dr. Klapproth / Dr. Al-Shdaifat) before deployment.
+- 10 triage rules: 4 CRITICAL (ACS, Suizidalitaet, SAH, Syncope) + 6 WARNING. See `docs/TRIAGE_RULES.md`.
+
+---
+
+## Fragile Areas
 
 | File | Risk |
 |---|---|
-| `src/hooks/useApi.ts` | 1500+ lines. All API hooks are here. Modifying one hook can break unrelated features. Read the full file before editing. |
-| `src/data/questions.ts` | 1246 lines. Question IDs are canonical routing keys. Adding is safe; renumbering or deleting BREAKS the question flow engine. |
-| `server/engine/QuestionFlowEngine.ts` | Complex three-tier routing logic (followUpQuestions → conditional → static next). Logic is implicit — read carefully, document changes. |
-| `server/engine/TriageEngine.ts` | Medical safety rules. Changes can cause missed CRITICAL alerts. Requires clinical sign-off before deployment. |
-| `prisma/schema.prisma` | Any change requires `npx prisma migrate dev` + app restart. Migrations are irreversible in production. |
+| `src/hooks/useApi.ts` | 1500+ lines, all API hooks. Read fully before editing — changing one hook can break unrelated features. |
+| `src/data/questions.ts` | 1246 lines. Adding questions is safe; renumbering/deleting BREAKS the flow engine. |
+| `server/engine/QuestionFlowEngine.ts` | Three-tier implicit routing logic. Read carefully, document changes. |
+| `server/engine/TriageEngine.ts` | Medical safety rules. Changes can cause missed CRITICAL alerts. Requires clinical sign-off. |
+| `prisma/schema.prisma` | Any change requires migrate + restart. Irreversible in production. |
+| `server/index.ts` | 470 lines, all middleware ordering + route mounts + job startup. Middleware order is security-critical. |
 
 ---
 
-## 2k. FORBIDDEN ACTIONS
+## Forbidden Actions
 
-- **DO NOT** log patient health data, names, or emails anywhere.
-- **DO NOT** hardcode credentials, API keys, or secrets — always use `.env`.
-- **DO NOT** `git push --force` to the `main` branch.
-- **DO NOT** skip Prisma migrations after schema changes.
-- **DO NOT** add new i18n strings without updating all 10 language files.
-- **DO NOT** modify `TriageEngine.ts` without clinical review and sign-off.
-- **DO NOT** add triage logic outside `TriageEngine.ts`.
-- **DO NOT** access any sibling project (`dr-aroob-ki`, `diggai-monorepo`, `diggai-desktop`) from this codebase.
-- **DO NOT** commit `dist/`, `.env`, `anamnese.db`, `*.log`, or `build_*.txt`.
+- DO NOT log patient health data, names, or emails.
+- DO NOT hardcode secrets — use `.env`.
+- DO NOT `git push --force` to `main`.
+- DO NOT skip Prisma migrations after schema changes.
+- DO NOT add i18n strings without updating all 10 language files.
+- DO NOT modify TriageEngine without clinical review.
+- DO NOT add triage logic outside TriageEngine.
+- DO NOT commit `dist/`, `.env`, `anamnese.db`, `*.log`, or `build_*.txt`.
 
 ---
 
-## 2l. ENVIRONMENT VARIABLES REFERENCE
+## Environment Variables
 
-### Required (app will not start without these)
+### Required
 
 ```bash
 DATABASE_URL="postgresql://user:pass@host:5432/dbname"
@@ -235,142 +203,52 @@ JWT_SECRET="minimum-32-character-random-string"
 ENCRYPTION_KEY="exactly-32-characters-for-aes256!!"
 ```
 
-### Frontend (Vite)
+### Frontend
 
 ```bash
 VITE_API_URL="https://your-backend.example.com/api"
 FRONTEND_URL="https://your-frontend.example.com"
 ```
 
-### Auth
-
-```bash
-ARZT_PASSWORD="initial-doctor-account-password"
-```
-
-### Optional — Redis
+### Optional
 
 ```bash
 REDIS_URL="redis://localhost:6379"
-```
-
-### Optional — LLM
-
-```bash
-LLM_ENDPOINT="http://localhost:11434"   # Ollama local instance
-OPENAI_API_KEY="sk-..."                 # OpenAI-compatible endpoint
-```
-
-### Optional — Email (nodemailer)
-
-```bash
-SMTP_HOST="smtp.example.com"
-SMTP_PORT="587"
-SMTP_USER="noreply@example.com"
-SMTP_PASS="smtp-password"
-```
-
-### Optional — Push Notifications (web-push / VAPID)
-
-```bash
-VAPID_PUBLIC_KEY="..."
-VAPID_PRIVATE_KEY="..."
+LLM_ENDPOINT="http://localhost:11434"          # Ollama
+OPENAI_API_KEY="sk-..."                        # OpenAI-compatible
+SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASS  # Email
+VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY            # Web Push
+AGENT_CORE_URL="http://localhost:8000"          # Python Agent Core
 ```
 
 ### Feature Flags
 
 ```bash
-NFC_ENABLED="true"         # NFC reader check-in
-PAYMENT_ENABLED="true"     # Payment processing
-TELEMED_ENABLED="true"     # Video consultation
-TI_ENABLED="false"         # Gematik TI (requires dedicated Docker profile)
-```
-
-### Deployment
-
-```bash
-NETLIFY_SITE_ID="..."
-NETLIFY_AUTH_TOKEN="..."
-NODE_ENV="production"
-PORT="3001"
+NFC_ENABLED="true"       # NFC reader check-in
+PAYMENT_ENABLED="true"   # Payment processing
+TELEMED_ENABLED="true"   # Video consultation
+TI_ENABLED="false"       # Gematik TI (requires dedicated Docker profile)
 ```
 
 ---
 
-## Quick Reference: Adding a New Feature
+## Quick Reference: Adding Features
 
-### New API endpoint
+**New API endpoint:** Create `server/routes/<domain>.ts` -> add auth + audit + Zod validation -> register in `server/index.ts` -> add React Query hook in `src/hooks/useApi.ts` -> `npm run build` + `npx playwright test`.
 
-1. Create `server/routes/<domain>.ts` with route handlers
-2. Add JWT auth middleware for all non-public routes
-3. Add HIPAA audit log for any patient data access
-4. Add Zod validation + input sanitization
-5. Register in `server/index.ts` with `app.use('/api/<domain>', ...)`
-6. Add React Query hook in `src/hooks/useApi.ts`
-7. Run `npm run build` — must pass
-8. Run `npx playwright test` — must pass
+**New medical question:** Check `docs/QUESTION_CATALOG.md` for next ID -> add `QuestionAtom` to `src/data/questions.ts` -> add conditional routing -> add to all 10 locale files -> `node scripts/generate-i18n.ts` -> build + test.
 
-### New medical question
-
-1. Check `docs/QUESTION_CATALOG.md` for next available question ID
-2. Add `QuestionAtom` to `src/data/questions.ts`
-3. Add conditional routing in `logic.conditional`
-4. Add German text to `public/locales/de/translation.json`
-5. Add to ALL 9 other language files
-6. Run `node scripts/generate-i18n.ts` — zero missing keys
-7. Run `npm run build` + `npx playwright test e2e/questionnaire-flow.spec.ts`
-
-### Schema change
-
-1. Edit `prisma/schema.prisma`
-2. Run `npx prisma migrate dev --name <name>`
-3. Run `npx prisma generate`
-4. Update any affected TypeScript types in `server/types/`
-5. Run `npm run build`
+**Schema change:** Edit `prisma/schema.prisma` -> `npx prisma migrate dev --name <name>` -> `npx prisma generate` -> update `server/types/` -> `npm run build`.
 
 ---
 
-## NO-REDUNDANCY PROTOCOL (MANDATORY FOR ALL AGENTS)
+## No-Redundancy Protocol
 
-This workspace uses a shared Once-Guard system. **Every agent, every session, every model MUST follow this protocol.**
-
-### Goldene Regel: Alles darf nur einmal gemacht werden.
-
-### Pre-Check BEFORE creating any file, feature, or service:
+This workspace uses a multi-agent Once-Guard system. See root `../CLAUDE.md` for the full protocol. Before creating any file, feature, or service:
 
 ```powershell
-# 1. Check if already done
 powershell -ExecutionPolicy Bypass -File ../scripts/once-guard.ps1 precheck -Task "<task-key>"
-# Exit 0 = free to proceed | Exit 2 = IN PROGRESS by another agent | Exit 3 = ALREADY DONE
-
-# 2. Claim it (reserve before starting)
-powershell -ExecutionPolicy Bypass -File ../scripts/once-guard.ps1 claim -Task "<task-key>" -Agent "claude" -SessionId "<date-topic>"
-
-# 3. Read shared knowledge BEFORE working
-# ../shared/knowledge/knowledge-share.md  (lessons learned, decisions, artifacts)
-# ../shared/knowledge/task-registry.json  (all tasks: in_progress / completed)
-
-# 4. Do the work.
-
-# 5. Mark complete
-powershell -ExecutionPolicy Bypass -File ../scripts/once-guard.ps1 complete -Task "<task-key>" -Agent "claude" -Artifacts @("path/to/artifact1","path/to/artifact2")
+# Exit 0 = free | Exit 2 = in_progress (STOP) | Exit 3 = completed (read artifacts) | Exit 4 = file exists (read first)
 ```
 
-### Rules:
-- Exit code 2 (IN_PROGRESS): Stop. Contact the claiming agent. Do NOT duplicate.
-- Exit code 3 (COMPLETED): Stop. Read the artifacts. Extend if needed — never rebuild.
-- Exit code 4 (ARTIFACT_EXISTS): File already exists. Extend, do not overwrite.
-- If an artifact already exists on disk: treat it as DONE — read it first.
-
-### Registry & Knowledge files:
-- `../shared/knowledge/task-registry.json` — machine-readable registry
-- `../shared/knowledge/knowledge-share.md` — human-readable lessons + decisions
-- `../SESSIONS_ONCE_POLICY.md` — full policy document
-
-### Brainstorm Flow (for new feature ideas):
-- See `../AGENT_BRAINSTORM_FLOW.md` and `../scripts/agent-brainstorm.ps1`
-- All 4 agents (claude, codex, copilot, cursor) contribute before implementation starts.
-
----
-
-*This file is auto-updated by Claude Code agents. Do not mix planning content with developer instructions.*
+Registry: `../shared/knowledge/task-registry.json` | Knowledge: `../shared/knowledge/knowledge-share.md`

@@ -43,6 +43,7 @@ interface AtomLogic {
     next?: string[];
     conditional?: ConditionalRoute[];
     showIf?: ShowIfCondition[];
+    aiDynamicPivot?: boolean;
     triage?: {
         when: string | string[];
         level: 'WARNING' | 'CRITICAL';
@@ -138,7 +139,16 @@ export class QuestionFlowEngine {
             }
         }
 
-        // PRIORITÄT 3: Statisches next
+        // PRIORITÄT 3: AI Dynamic Triage / Pivot
+        if (atom.branchingLogic?.aiDynamicPivot) {
+            // Hier würde die Engine einen real-time Call ans LLM absetzen, um den 
+            // nächsten sinnvollen medizinischen Schritt zu bestimmen.
+            // Für den synchronen Pfad geben wir einen Platzhalter zurück.
+            console.log(`[QuestionFlowEngine] AI Dynamic Pivot ausgelöst für Frage ${currentAtomId}`);
+            return ['AI_DYNAMIC_FOLLOWUP'];
+        }
+
+        // PRIORITÄT 4: Statisches next
         if (atom.branchingLogic?.next) {
             return atom.branchingLogic.next;
         }
@@ -281,6 +291,10 @@ export class QuestionFlowEngine {
             'Telefonanfrage': 'TEL-100',
             'Dokumente anfordern': 'BEF-100',
             'Nachricht schreiben': 'MS-100',
+            'BG Unfall': 'BG-100',
+            'Handbuch': 'HB-100',
+            'DSGVO Spiel': 'GAME-100',
+            'Anmeldung': 'ANM-100',
         };
         return serviceMap[service] || '1000';
     }

@@ -1,146 +1,217 @@
 /**
  * Design Tokens - CSS Variables
- * Auto-generated from tokens.json - DO NOT EDIT DIRECTLY
- * Run: npx ts-node scripts/generate-tokens.ts
+ * Psychology-Based Color System for DiggAI Anamnese Platform
+ * 
+ * This file uses calming, anxiety-reducing colors optimized for healthcare:
+ * - NO bright reds (anxiety-inducing)
+ * - Soft, trustworthy blues
+ * - Natural, healing greens
+ * - Warm, comforting neutrals
+ * 
+ * Generated: 2026-03-24
  */
 
 :root {
-  --token-color-primary-50: #e6f0ff;
-  --token-color-primary-100: #cce0ff;
-  --token-color-primary-200: #99c2ff;
-  --token-color-primary-300: #66a3ff;
-  --token-color-primary-400: #3385ff;
-  --token-color-primary-500: #0066cc;
-  --token-color-primary-600: #0052a3;
-  --token-color-primary-700: #003d7a;
-  --token-color-primary-800: #002952;
-  --token-color-primary-900: #001429;
-  --token-color-secondary-50: #fdf4ff;
-  --token-color-secondary-100: #fae8ff;
-  --token-color-secondary-200: #f5d0fe;
-  --token-color-secondary-300: #f0abfc;
-  --token-color-secondary-400: #e879f9;
-  --token-color-secondary-500: #d946ef;
-  --token-color-secondary-600: #c026d3;
-  --token-color-secondary-700: #a21caf;
-  --token-color-secondary-800: #86198f;
-  --token-color-secondary-900: #701a75;
+  /* ─── Primary Colors - Trust & Calmness ─────────────────── */
+  --token-color-serene-blue: #4A90E2;
+  --token-color-serene-blue-50: #EDF4FC;
+  --token-color-serene-blue-100: #DBE9F9;
+  --token-color-serene-blue-200: #B7D3F3;
+  --token-color-serene-blue-300: #93BDED;
+  --token-color-serene-blue-400: #6FA7E7;
+  --token-color-serene-blue-500: #4A90E2;
+  --token-color-serene-blue-600: #3A7AC7;
+  --token-color-serene-blue-700: #2A64AC;
+  --token-color-serene-blue-800: #1A4E91;
+  --token-color-serene-blue-900: #0A3876;
+  
+  --token-color-deep-trust: #2C5F8A;
+  --token-color-deep-trust-50: #EAF1F6;
+  --token-color-deep-trust-100: #D5E3ED;
+  --token-color-deep-trust-200: #ABC7DB;
+  --token-color-deep-trust-300: #81ABC9;
+  --token-color-deep-trust-400: #578FB7;
+  --token-color-deep-trust-500: #2C5F8A;
+  --token-color-deep-trust-600: #25527A;
+  --token-color-deep-trust-700: #1E456A;
+  --token-color-deep-trust-800: #17385A;
+  --token-color-deep-trust-900: #102B4A;
+  
+  /* ─── Secondary Colors - Healing & Balance ──────────────── */
+  --token-color-soft-mint: #A8D5BA;
+  --token-color-soft-mint-50: #F3FAF6;
+  --token-color-soft-mint-100: #E7F5ED;
+  --token-color-soft-mint-200: #D0EBDB;
+  --token-color-soft-mint-300: #B9E1C9;
+  --token-color-soft-mint-400: #A2D7B7;
+  --token-color-soft-mint-500: #A8D5BA;
+  --token-color-soft-mint-600: #8FC4A3;
+  --token-color-soft-mint-700: #76B38C;
+  --token-color-soft-mint-800: #5DA275;
+  --token-color-soft-mint-900: #44915E;
+  
+  --token-color-sage-green: #81B29A;
+  --token-color-sage-green-50: #F1F7F4;
+  --token-color-sage-green-100: #E3EFE9;
+  --token-color-sage-green-200: #C7DFD3;
+  --token-color-sage-green-300: #ABCFBD;
+  --token-color-sage-green-400: #8FBFA7;
+  --token-color-sage-green-500: #81B29A;
+  --token-color-sage-green-600: #6A9A83;
+  --token-color-sage-green-700: #53826C;
+  --token-color-sage-green-800: #3C6A55;
+  --token-color-sage-green-900: #25523E;
+  
+  --token-color-light-lavender: #C7C3E6;
+  --token-color-light-lavender-50: #F9F9FD;
+  --token-color-light-lavender-100: #F3F2FA;
+  --token-color-light-lavender-200: #E7E5F5;
+  --token-color-light-lavender-300: #DBD8F0;
+  --token-color-light-lavender-400: #CFCBE8;
+  --token-color-light-lavender-500: #C7C3E6;
+  --token-color-light-lavender-600: #A9A3D6;
+  --token-color-light-lavender-700: #8B83C6;
+  --token-color-light-lavender-800: #6D63B6;
+  --token-color-light-lavender-900: #4F43A6;
+  
+  --token-color-dusty-blue: #5E8B9E;
+  --token-color-dusty-blue-50: #EFF4F6;
+  --token-color-dusty-blue-100: #DFE9ED;
+  --token-color-dusty-blue-200: #BFD3DB;
+  --token-color-dusty-blue-300: #9FBDC9;
+  --token-color-dusty-blue-400: #7FA7B7;
+  --token-color-dusty-blue-500: #5E8B9E;
+  --token-color-dusty-blue-600: #4F7A8C;
+  --token-color-dusty-blue-700: #40697A;
+  --token-color-dusty-blue-800: #315868;
+  --token-color-dusty-blue-900: #224756;
+  
+  /* ─── Neutral Colors - Warm & Comforting ────────────────── */
+  --token-color-warm-beige: #F5F1E7;
+  --token-color-warm-beige-50: #FDFCFA;
+  --token-color-warm-beige-100: #FBFAF7;
+  --token-color-warm-beige-200: #F8F6F1;
+  --token-color-warm-beige-300: #F5F1E7;
+  --token-color-warm-beige-400: #E8E2D4;
+  --token-color-warm-beige-500: #DBD3C1;
+  --token-color-warm-beige-600: #CEC4AE;
+  --token-color-warm-beige-700: #C1B59B;
+  --token-color-warm-beige-800: #B4A688;
+  --token-color-warm-beige-900: #A79775;
+  
+  --token-color-misty-gray: #D9D9D9;
+  --token-color-misty-gray-50: #F7F7F7;
+  --token-color-misty-gray-100: #F0F0F0;
+  --token-color-misty-gray-200: #E3E3E3;
+  --token-color-misty-gray-300: #D9D9D9;
+  --token-color-misty-gray-400: #C2C2C2;
+  --token-color-misty-gray-500: #ABABAB;
+  --token-color-misty-gray-600: #949494;
+  --token-color-misty-gray-700: #7D7D7D;
+  --token-color-misty-gray-800: #666666;
+  --token-color-misty-gray-900: #4F4F4F;
+  
+  /* ─── Legacy Neutral Scale (Maintained for compatibility) ─ */
   --token-color-neutral-0: #ffffff;
-  --token-color-neutral-50: #f8fafc;
-  --token-color-neutral-100: #f1f5f9;
-  --token-color-neutral-200: #e2e8f0;
-  --token-color-neutral-300: #cbd5e1;
-  --token-color-neutral-400: #94a3b8;
-  --token-color-neutral-500: #64748b;
-  --token-color-neutral-600: #475569;
-  --token-color-neutral-700: #334155;
-  --token-color-neutral-800: #1e293b;
-  --token-color-neutral-900: #0f172a;
-  --token-color-neutral-950: #020617;
-  --token-color-blue-50: #eff6ff;
-  --token-color-blue-100: #dbeafe;
-  --token-color-blue-200: #bfdbfe;
-  --token-color-blue-300: #93c5fd;
-  --token-color-blue-400: #60a5fa;
-  --token-color-blue-500: #3b82f6;
-  --token-color-blue-600: #2563eb;
-  --token-color-blue-700: #1d4ed8;
-  --token-color-blue-800: #1e40af;
-  --token-color-blue-900: #1e3a8a;
-  --token-color-green-50: #f0fdf4;
-  --token-color-green-100: #dcfce7;
-  --token-color-green-200: #bbf7d0;
-  --token-color-green-300: #86efac;
-  --token-color-green-400: #4ade80;
-  --token-color-green-500: #22c55e;
-  --token-color-green-600: #16a34a;
-  --token-color-green-700: #15803d;
-  --token-color-green-800: #166534;
-  --token-color-green-900: #14532d;
-  --token-color-red-50: #fef2f2;
-  --token-color-red-100: #fee2e2;
-  --token-color-red-200: #fecaca;
-  --token-color-red-300: #fca5a5;
-  --token-color-red-400: #f87171;
-  --token-color-red-500: #ef4444;
-  --token-color-red-600: #dc2626;
-  --token-color-red-700: #b91c1c;
-  --token-color-red-800: #991b1b;
-  --token-color-red-900: #7f1d1d;
-  --token-color-yellow-50: #fefce8;
-  --token-color-yellow-100: #fef9c3;
-  --token-color-yellow-200: #fef08a;
-  --token-color-yellow-300: #fde047;
-  --token-color-yellow-400: #facc15;
-  --token-color-yellow-500: #eab308;
-  --token-color-yellow-600: #ca8a04;
-  --token-color-yellow-700: #a16207;
-  --token-color-yellow-800: #854d0e;
-  --token-color-yellow-900: #713f12;
-  --token-color-orange-50: #fff7ed;
-  --token-color-orange-100: #ffedd5;
-  --token-color-orange-200: #fed7aa;
-  --token-color-orange-300: #fdba74;
-  --token-color-orange-400: #fb923c;
-  --token-color-orange-500: #f97316;
-  --token-color-orange-600: #ea580c;
-  --token-color-orange-700: #c2410c;
-  --token-color-orange-800: #9a3412;
-  --token-color-orange-900: #7c2d12;
-  --token-color-purple-50: #faf5ff;
-  --token-color-purple-100: #f3e8ff;
-  --token-color-purple-200: #e9d5ff;
-  --token-color-purple-300: #d8b4fe;
-  --token-color-purple-400: #c084fc;
-  --token-color-purple-500: #a855f7;
-  --token-color-purple-600: #9333ea;
-  --token-color-purple-700: #7e22ce;
-  --token-color-purple-800: #6b21a8;
-  --token-color-purple-900: #581c87;
-  --token-color-pink-50: #fdf2f8;
-  --token-color-pink-100: #fce7f3;
-  --token-color-pink-200: #fbcfe8;
-  --token-color-pink-300: #f9a8d4;
-  --token-color-pink-400: #f472b6;
-  --token-color-pink-500: #ec4899;
-  --token-color-pink-600: #db2777;
-  --token-color-pink-700: #be185d;
-  --token-color-pink-800: #9d174d;
-  --token-color-pink-900: #831843;
-  --token-color-teal-50: #f0fdfa;
-  --token-color-teal-100: #ccfbf1;
-  --token-color-teal-200: #99f6e4;
-  --token-color-teal-300: #5eead4;
-  --token-color-teal-400: #2dd4bf;
-  --token-color-teal-500: #14b8a6;
-  --token-color-teal-600: #0d9488;
-  --token-color-teal-700: #0f766e;
-  --token-color-teal-800: #115e59;
-  --token-color-teal-900: #134e4a;
-  --token-color-semantic-success: #22c55e;
-  --token-color-semantic-success-light: #dcfce7;
-  --token-color-semantic-success-dark: #15803d;
-  --token-color-semantic-error: #ef4444;
-  --token-color-semantic-error-light: #fee2e2;
-  --token-color-semantic-error-dark: #b91c1c;
-  --token-color-semantic-warning: #eab308;
-  --token-color-semantic-warning-light: #fef9c3;
-  --token-color-semantic-warning-dark: #a16207;
-  --token-color-semantic-info: #3b82f6;
-  --token-color-semantic-info-light: #dbeafe;
-  --token-color-semantic-info-dark: #1d4ed8;
-  --token-color-background-primary: #ffffff;
-  --token-color-background-secondary: #f8fafc;
-  --token-color-background-tertiary: #f1f5f9;
-  --token-color-background-inverse: #0f172a;
-  --token-color-text-primary: #0f172a;
-  --token-color-text-secondary: #475569;
-  --token-color-text-tertiary: #94a3b8;
-  --token-color-text-inverse: #ffffff;
-  --token-color-text-disabled: #94a3b8;
-  --token-color-border-light: #e2e8f0;
-  --token-color-border-default: #cbd5e1;
-  --token-color-border-dark: #94a3b8;
+  --token-color-neutral-50: #F9F9F7;
+  --token-color-neutral-100: #F5F1E7;
+  --token-color-neutral-200: #E8E2D4;
+  --token-color-neutral-300: #D9D9D9;
+  --token-color-neutral-400: #B8C4CC;
+  --token-color-neutral-500: #8BA4B4;
+  --token-color-neutral-600: #6B8BA4;
+  --token-color-neutral-700: #4A6572;
+  --token-color-neutral-800: #2C5F8A;
+  --token-color-neutral-900: #1A3A5C;
+  --token-color-neutral-950: #0D1F33;
+  
+  /* ─── Semantic Colors - Anxiety-Optimized ───────────────── */
+  /* NO bright reds - using soft coral instead */
+  --token-color-critical: #E07A5F;
+  --token-color-critical-50: #FDF3F0;
+  --token-color-critical-100: #FAE7E1;
+  --token-color-critical-200: #F5CFC3;
+  --token-color-critical-300: #F0B7A5;
+  --token-color-critical-400: #EB9F87;
+  --token-color-critical-500: #E07A5F;
+  --token-color-critical-600: #C9684F;
+  --token-color-critical-700: #B2563F;
+  --token-color-critical-800: #9C442F;
+  --token-color-critical-900: #86321F;
+  
+  --token-color-warning: #F4A261;
+  --token-color-warning-50: #FDF6EE;
+  --token-color-warning-100: #FAEDDD;
+  --token-color-warning-200: #F5DBBB;
+  --token-color-warning-300: #F0C999;
+  --token-color-warning-400: #EBB777;
+  --token-color-warning-500: #F4A261;
+  --token-color-warning-600: #D98E52;
+  --token-color-warning-700: #BE7A43;
+  --token-color-warning-800: #A36634;
+  --token-color-warning-900: #885225;
+  
+  --token-color-success: #81B29A;
+  --token-color-success-50: #F1F7F4;
+  --token-color-success-100: #E3EFE9;
+  --token-color-success-200: #C7DFD3;
+  --token-color-success-300: #ABCFBD;
+  --token-color-success-400: #8FBFA7;
+  --token-color-success-500: #81B29A;
+  --token-color-success-600: #6A9A83;
+  --token-color-success-700: #53826C;
+  --token-color-success-800: #3C6A55;
+  --token-color-success-900: #25523E;
+  
+  --token-color-info: #5E8B9E;
+  --token-color-info-50: #EFF4F6;
+  --token-color-info-100: #DFE9ED;
+  --token-color-info-200: #BFD3DB;
+  --token-color-info-300: #9FBDC9;
+  --token-color-info-400: #7FA7B7;
+  --token-color-info-500: #5E8B9E;
+  --token-color-info-600: #4F7A8C;
+  --token-color-info-700: #40697A;
+  --token-color-info-800: #315868;
+  --token-color-info-900: #224756;
+  
+  /* ─── Legacy Semantic Aliases (for backwards compatibility) ─ */
+  --token-color-semantic-error: #E07A5F;
+  --token-color-semantic-error-light: #FAE7E1;
+  --token-color-semantic-error-dark: #B2563F;
+  --token-color-semantic-warning: #F4A261;
+  --token-color-semantic-warning-light: #FAEDDD;
+  --token-color-semantic-warning-dark: #BE7A43;
+  --token-color-semantic-success: #81B29A;
+  --token-color-semantic-success-light: #E3EFE9;
+  --token-color-semantic-success-dark: #53826C;
+  --token-color-semantic-info: #5E8B9E;
+  --token-color-semantic-info-light: #DFE9ED;
+  --token-color-semantic-info-dark: #40697A;
+  
+  /* ─── Background Colors ─────────────────────────────────── */
+  --token-color-background-primary: #FFFFFF;
+  --token-color-background-secondary: #F5F1E7;
+  --token-color-background-tertiary: #E8E2D4;
+  --token-color-background-inverse: #1A1F2E;
+  --token-color-background-warm: #FFFBF5;
+  --token-color-background-card: rgba(255, 255, 255, 0.85);
+  
+  /* ─── Text Colors ───────────────────────────────────────── */
+  --token-color-text-primary: #2C5F8A;
+  --token-color-text-secondary: #6B8BA4;
+  --token-color-text-tertiary: #9BB0C0;
+  --token-color-text-muted: #B8C4CC;
+  --token-color-text-inverse: #FFFFFF;
+  --token-color-text-disabled: #9BB0C0;
+  
+  /* ─── Border Colors ─────────────────────────────────────── */
+  --token-color-border-light: #E8E2D4;
+  --token-color-border-default: #D9D9D9;
+  --token-color-border-dark: #B8C4CC;
+  --token-color-border-subtle: rgba(44, 95, 138, 0.12);
+  
+  /* ─── Spacing Scale ─────────────────────────────────────── */
   --token-spacing-0: 0;
   --token-spacing-1: 4px;
   --token-spacing-2: 8px;
@@ -176,37 +247,65 @@
   --token-spacing-1-5: 6px;
   --token-spacing-2-5: 10px;
   --token-spacing-3-5: 14px;
-  --token-font-family-sans: 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  
+  /* ─── Typography ────────────────────────────────────────── */
+  /* PHASE 2: Typography Optimization for Elderly/Anxious Users */
+  /* Primary: Inter - optimized for screen readability */
+  --token-font-family-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  /* RTL: Noto Sans Arabic - superior Arabic/Persian script support */
+  --token-font-family-rtl: 'Noto Sans Arabic', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  /* Monospace: JetBrains Mono - excellent for medical codes/data */
   --token-font-family-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  /* Deprecated: Outfit removed (too stylized for medical UX) */
   --token-font-family-serif: 'Merriweather', Georgia, Cambria, 'Times New Roman', Times, serif;
-  --token-font-size-xs: 12px;
-  --token-font-size-sm: 14px;
-  --token-font-size-base: 16px;
-  --token-font-size-lg: 18px;
-  --token-font-size-xl: 20px;
-  --token-font-size-2xl: 24px;
-  --token-font-size-3xl: 30px;
-  --token-font-size-4xl: 36px;
-  --token-font-size-5xl: 48px;
-  --token-font-size-6xl: 60px;
+  
+  /* PHASE 2: Type Scale - Psychology-Based for Elderly Users */
+  /* Research: 18px base size reduces senior operation time significantly */
+  /* Scale uses Major Second ratio (1.125) with accessibility adjustments */
+  --token-font-size-xs: 12px;        /* Legal text only - avoid if possible */
+  --token-font-size-sm: 14px;        /* Captions, metadata - minimum accessible */
+  --token-font-size-base: 16px;      /* Small text, labels */
+  --token-font-size-body: 18px;      /* NEW: Primary body text (was 16px) */
+  --token-font-size-lg: 20px;        /* H3, large body */
+  --token-font-size-xl: 24px;        /* H2, section headings */
+  --token-font-size-2xl: 32px;       /* H1, page titles (was 24px) */
+  --token-font-size-3xl: 40px;       /* Hero text */
+  --token-font-size-4xl: 48px;       /* Display */
+  --token-font-size-5xl: 60px;       /* Marketing headlines */
+  --token-font-size-6xl: 72px;       /* Maximum impact */
+  /* Legacy mapping for backward compatibility */
+  --token-font-size-base-legacy: var(--token-font-size-base);
+  
   --token-font-weight-light: 300;
   --token-font-weight-normal: 400;
   --token-font-weight-medium: 500;
   --token-font-weight-semibold: 600;
   --token-font-weight-bold: 700;
   --token-font-weight-extrabold: 800;
+  
+  /* PHASE 2: Line Heights - Optimized for Readability */
+  /* Increased line heights aid dyslexic users and reduce eye strain */
   --token-font-line-height-none: 1;
-  --token-font-line-height-tight: 1.25;
-  --token-font-line-height-snug: 1.375;
-  --token-font-line-height-normal: 1.5;
-  --token-font-line-height-relaxed: 1.625;
-  --token-font-line-height-loose: 2;
+  --token-font-line-height-tight: 1.3;     /* H1 - tight but readable */
+  --token-font-line-height-snug: 1.4;      /* H2-H3 - headings */
+  --token-font-line-height-normal: 1.5;    /* Small text, captions */
+  --token-font-line-height-relaxed: 1.625; /* Body text - INCREASED (was 1.5) */
+  --token-font-line-height-loose: 2;       /* Maximum readability for dense content */
+  --token-font-line-height-rtl: 1.7;       /* NEW: Arabic/Persian scripts */
+  
+  /* PHASE 2: Letter Spacing - Psychology-Based */
+  /* Slight expansion aids readability; tight tracking for elegance */
   --token-font-letter-spacing-tighter: -0.05em;
   --token-font-letter-spacing-tight: -0.025em;
+  --token-font-letter-spacing-headings: -0.02em;  /* H1 - tight tracking */
+  --token-font-letter-spacing-subhead: -0.01em;   /* H2 - slight tightening */
   --token-font-letter-spacing-normal: 0;
-  --token-font-letter-spacing-wide: 0.025em;
+  --token-font-letter-spacing-body: 0.01em;       /* Body - slight expansion */
+  --token-font-letter-spacing-wide: 0.02em;       /* Captions - more expansion */
   --token-font-letter-spacing-wider: 0.05em;
   --token-font-letter-spacing-widest: 0.1em;
+  
+  /* ─── Border Radius ─────────────────────────────────────── */
   --token-radius-none: 0;
   --token-radius-sm: 4px;
   --token-radius-default: 6px;
@@ -216,23 +315,30 @@
   --token-radius-2xl: 20px;
   --token-radius-3xl: 24px;
   --token-radius-full: 9999px;
-  --token-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --token-shadow-default: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
-  --token-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
-  --token-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
-  --token-shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
-  --token-shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-  --token-shadow-inner: inset 0 2px 4px 0 rgba(0, 0, 0, 0.05);
+  
+  /* ─── Shadows ───────────────────────────────────────────── */
+  --token-shadow-sm: 0 1px 2px 0 rgba(44, 95, 138, 0.05);
+  --token-shadow-default: 0 1px 3px 0 rgba(44, 95, 138, 0.08), 0 1px 2px -1px rgba(44, 95, 138, 0.06);
+  --token-shadow-md: 0 4px 6px -1px rgba(44, 95, 138, 0.1), 0 2px 4px -2px rgba(44, 95, 138, 0.08);
+  --token-shadow-lg: 0 10px 15px -3px rgba(44, 95, 138, 0.12), 0 4px 6px -4px rgba(44, 95, 138, 0.1);
+  --token-shadow-xl: 0 20px 25px -5px rgba(44, 95, 138, 0.14), 0 8px 10px -6px rgba(44, 95, 138, 0.12);
+  --token-shadow-2xl: 0 25px 50px -12px rgba(44, 95, 138, 0.2);
+  --token-shadow-inner: inset 0 2px 4px 0 rgba(44, 95, 138, 0.06);
   --token-shadow-none: none;
+  
+  /* ─── Transitions ───────────────────────────────────────── */
   --token-transition-duration-fast: 150ms;
   --token-transition-duration-normal: 200ms;
   --token-transition-duration-slow: 300ms;
   --token-transition-duration-slower: 500ms;
+  
   --token-transition-easing-linear: linear;
   --token-transition-easing-in: cubic-bezier(0.4, 0, 1, 1);
   --token-transition-easing-out: cubic-bezier(0, 0, 0.2, 1);
   --token-transition-easing-in-out: cubic-bezier(0.4, 0, 0.2, 1);
   --token-transition-easing-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  
+  /* ─── Z-Index Scale ─────────────────────────────────────── */
   --token-z-index-hide: -1;
   --token-z-index-auto: auto;
   --token-z-index-base: 0;
@@ -246,6 +352,8 @@
   --token-z-index-skip-link: 1600;
   --token-z-index-toast: 1700;
   --token-z-index-tooltip: 1800;
+  
+  /* ─── Opacity Scale ─────────────────────────────────────── */
   --token-opacity-0: 0;
   --token-opacity-5: 0.05;
   --token-opacity-10: 0.1;
@@ -261,6 +369,8 @@
   --token-opacity-90: 0.9;
   --token-opacity-95: 0.95;
   --token-opacity-100: 1;
+  
+  /* ─── Size Scale ────────────────────────────────────────── */
   --token-size-0: 0;
   --token-size-1: 4px;
   --token-size-2: 8px;
@@ -297,6 +407,8 @@
   --token-size-min: min-content;
   --token-size-max: max-content;
   --token-size-fit: fit-content;
+  
+  /* ─── Breakpoints ───────────────────────────────────────── */
   --token-breakpoint-sm: 640px;
   --token-breakpoint-md: 768px;
   --token-breakpoint-lg: 1024px;
@@ -304,14 +416,22 @@
   --token-breakpoint-2xl: 1536px;
 }
 
-/* Token Categories */
-/* color: primary, secondary, neutral, blue, green, red, yellow, orange, purple, pink, teal, semantic, background, text, border */
-/* spacing: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64, 72, 80, 96, px, 0.5, 1.5, 2.5, 3.5 */
-/* font: family, size, weight, lineHeight, letterSpacing */
-/* radius: none, sm, DEFAULT, md, lg, xl, 2xl, 3xl, full */
-/* shadow: sm, DEFAULT, md, lg, xl, 2xl, inner, none */
-/* transition: duration, easing */
-/* zIndex: hide, auto, base, docked, dropdown, sticky, banner, overlay, modal, popover, skipLink, toast, tooltip */
-/* opacity: 0, 5, 10, 20, 25, 30, 40, 50, 60, 70, 75, 80, 90, 95, 100 */
-/* size: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64, 72, 80, 96, auto, full, screen, min, max, fit */
-/* breakpoint: sm, md, lg, xl, 2xl */
+/* ─── Token Categories Reference ──────────────────────────── */
+/* 
+ * Primary Colors: serene-blue, deep-trust
+ * Secondary Colors: soft-mint, sage-green, light-lavender, dusty-blue
+ * Neutral Colors: warm-beige, misty-gray, neutral-scale
+ * Semantic Colors: critical, warning, success, info (anxiety-optimized)
+ * Background: primary, secondary, tertiary, inverse, warm, card
+ * Text: primary, secondary, tertiary, muted, inverse, disabled
+ * Border: light, default, dark, subtle
+ * Spacing: 0-96, px, 0.5-3.5
+ * Font: family, size, weight, lineHeight, letterSpacing
+ * Radius: none, sm, DEFAULT, md, lg, xl, 2xl, 3xl, full
+ * Shadow: sm, DEFAULT, md, lg, xl, 2xl, inner, none
+ * Transition: duration, easing
+ * Z-Index: hide, auto, base, docked, dropdown, sticky, banner, overlay, modal, popover, skipLink, toast, tooltip
+ * Opacity: 0, 5, 10, 20, 25, 30, 40, 50, 60, 70, 75, 80, 90, 95, 100
+ * Size: 0-96, auto, full, screen, min, max, fit
+ * Breakpoint: sm, md, lg, xl, 2xl
+ */

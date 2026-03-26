@@ -51,7 +51,7 @@ export function ROIDashboard() {
                             <XAxis dataKey="date" fontSize={12} />
                             <YAxis fontSize={12} />
                             <Tooltip />
-                            <Bar dataKey="saving" fill="#10b981" radius={[4, 4, 0, 0]} />
+                            <Bar dataKey="saving" fill="#81B29A" radius={[4, 4, 0, 0]} />
                         </BarChart>
                     </ResponsiveContainer>
                     {history.summary && (
@@ -75,8 +75,8 @@ export function ROIDashboard() {
                             <YAxis fontSize={12} />
                             <Tooltip />
                             <Legend />
-                            <Line type="monotone" dataKey="projectedNetROI" name="Monatl. Netto-ROI" stroke="#8b5cf6" strokeWidth={2} />
-                            <Line type="monotone" dataKey="cumulativeROI" name="Kumulativ" stroke="#10b981" strokeWidth={2} />
+                            <Line type="monotone" dataKey="projectedNetROI" name="Monatl. Netto-ROI" stroke="#C7C3E6" strokeWidth={2} />
+                            <Line type="monotone" dataKey="cumulativeROI" name="Kumulativ" stroke="#81B29A" strokeWidth={2} />
                         </LineChart>
                     </ResponsiveContainer>
                 </div>

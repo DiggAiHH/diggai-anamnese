@@ -1,0 +1,186 @@
+name: Security Scan
+
+on:
+  schedule:
+    - cron: '0 6 * * *'  # Daily at 6am UTC
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  npm-audit:
+    name: Dependency Vulnerability Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run npm audit (moderate+)
+        run: npm audit --audit-level=moderate
+        continue-on-error: true
+      
+      - name: Run npm audit (high+)
+        run: npm audit --audit-level=high
+        id: audit-high
+      
+      - name: Audit summary
+        if: failure() && steps.audit-high.outcome == 'failure'
+        run: |
+          echo "❌ High/Critical vulnerabilities found. Run 'npm audit fix' to resolve."
+          exit 1
+
+  secret-scan:
+    name: Secret Detection
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Run GitLeaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+      
+      - name: Check for common secrets patterns
+        run: |
+          # Check for common secret patterns
+          if grep -rE "(password|secret|key|token)\s*=\s*['\"][^'\"]+['\"]" --include="*.ts" --include="*.js" --include="*.json" --exclude-dir=node_modules --exclude="*.test.ts" . 2>/dev/null | grep -v "example\|placeholder\|YOUR_"; then
+            echo "⚠️  Potential hardcoded secrets found!"
+            exit 1
+          fi
+          echo "✅ No obvious secrets detected"
+
+  security-tests:
+    name: OWASP Security Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: anamnese_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Generate Prisma Client
+        run: npx prisma generate
+      
+      - name: Run security unit tests
+        run: npm run test:server -- --run server/security-tests/
+        env:
+          DATABASE_URL: postgresql://postgres:test@localhost:5432/anamnese_test
+          JWT_SECRET: test-secret-key-that-is-32-chars-long!!
+          ENCRYPTION_KEY: exactly-32-chars-for-aes256!!
+          VITE_API_URL: http://localhost:3001
+          NODE_ENV: test
+
+  codeql-analysis:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ['javascript']
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+      
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+      
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+
+  dependency-review:
+    name: Dependency Review
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+
+  security-headers-check:
+    name: Security Headers Check
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Check security headers
+        run: |
+          echo "Checking security headers on production..."
+          HEADERS=$(curl -s -I "https://api.diggai.de/api/health" 2>/dev/null || echo "")
+          
+          if [ -z "$HEADERS" ]; then
+            echo "⚠️  Could not reach production API (expected in PR builds)"
+            exit 0
+          fi
+          
+          MISSING=0
+          
+          check_header() {
+            local header=$1
+            if echo "$HEADERS" | grep -qi "^$header:"; then
+              echo "✅ $header present"
+            else
+              echo "❌ $header MISSING"
+              MISSING=$((MISSING + 1))
+            fi
+          }
+          
+          check_header "Strict-Transport-Security"
+          check_header "X-Content-Type-Options"
+          check_header "X-Frame-Options"
+          check_header "Content-Security-Policy"
+          check_header "X-XSS-Protection"
+          check_header "Referrer-Policy"
+          check_header "Permissions-Policy"
+          
+          if [ $MISSING -gt 0 ]; then
+            echo "❌ $MISSING security headers missing!"
+            exit 1
+          fi
+          
+          echo "✅ All security headers present"

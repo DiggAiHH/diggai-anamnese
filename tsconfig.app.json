@@ -9,9 +9,8 @@
       "DOM.Iterable"
     ],
     "module": "ESNext",
-    "types": [],
-    "typeRoots": [
-      "./node_modules/@types"
+    "types": [
+      "vitest/globals"
     ],
     "skipLibCheck": true,
     /* Bundler mode */

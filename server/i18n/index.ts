@@ -16,6 +16,10 @@ export class LocalizedError extends Error {
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 type TranslationMap = Record<string, string>;
 const cache: Record<string, TranslationMap> = {};

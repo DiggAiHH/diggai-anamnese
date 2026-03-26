@@ -1,141 +1,191 @@
-/**
- * Color Picker Component
- * 
- * Accessible color input with preview and validation
- */
-
-import React, { useState, useCallback } from 'react';
-import { isValidColor } from '../../../theme/applyTheme';
+import { useState } from 'react';
+import { Check } from 'lucide-react';
 
 interface ColorPickerProps {
-  label: string;
   value: string;
-  onChange: (value: string) => void;
+  onChange: (color: string) => void;
+  label?: string;
+  presets?: string[];
   error?: string;
   disabled?: boolean;
 }
 
-const PRESET_COLORS = [
-  '#ef4444', '#f97316', '#f59e0b', '#84cc16', '#22c55e',
-  '#10b981', '#14b8a6', '#06b6d4', '#0ea5e9', '#3b82f6',
-  '#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899',
-  '#f43f5e', '#0f172a', '#374151', '#6b7280', '#9ca3af',
+// Psychology-based color presets for healthcare
+const DEFAULT_PRESETS = [
+  // Primary - Trust & Calmness
+  '#4A90E2', // Serene Blue
+  '#2C5F8A', // Deep Trust Blue
+  '#5E8B9E', // Dusty Blue
+  
+  // Secondary - Healing & Balance
+  '#81B29A', // Sage Green
+  '#A8D5BA', // Soft Mint
+  '#C7C3E6', // Light Lavender
+  
+  // Neutrals - Comfort
+  '#F5F1E7', // Warm Beige
+  '#D9D9D9', // Misty Gray
+  '#6B8BA4', // Muted Blue-Gray
+  
+  // Alerts - Anxiety Optimized (NO bright reds)
+  '#E07A5F', // Soft Coral (critical)
+  '#F4A261', // Warm Amber (warning)
+  
+  // Additional calming options
+  '#7BA3B3', // Dusty Teal
+  '#9BB0C0', // Soft Gray-Blue
+  '#E8E2D4', // Warm Sand
+  '#B8C4CC', // Cool Gray
 ];
 
-export function ColorPicker({
+export function ColorPicker({ 
+  value, 
+  onChange, 
   label,
-  value,
-  onChange,
+  presets = DEFAULT_PRESETS,
   error,
   disabled = false,
 }: ColorPickerProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [inputValue, setInputValue] = useState(value);
+  const [customColor, setCustomColor] = useState(value);
+  const [showCustom, setShowCustom] = useState(false);
 
-  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = e.target.value;
-    setInputValue(newValue);
-    if (isValidColor(newValue)) {
+  const isValidHex = (hex: string): boolean => {
+    return /^#[0-9A-Fa-f]{6}$/.test(hex);
+  };
+
+  const handleCustomChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let newValue = e.target.value;
+    
+    // Auto-add # if missing
+    if (newValue && !newValue.startsWith('#')) {
+      newValue = '#' + newValue;
+    }
+    
+    setCustomColor(newValue);
+    
+    if (isValidHex(newValue)) {
       onChange(newValue);
     }
-  }, [onChange]);
-
-  const handlePresetClick = useCallback((color: string) => {
-    setInputValue(color);
-    onChange(color);
-    setIsOpen(false);
-  }, [onChange]);
-
-  const isValid = isValidColor(inputValue);
+  };
 
   return (
-    <div className="color-picker">
-      <label className="block text-xs font-medium text-[var(--color-text-muted)] uppercase mb-2">
-        {label}
-      </label>
+    <div className="space-y-3">
+      {label && (
+        <label className="block text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+          {label}
+        </label>
+      )}
       
-      <div className="relative">
-        <div className="flex items-center gap-2">
-          {/* Color Preview Button */}
+      {/* Color Presets Grid */}
+      <div className="grid grid-cols-7 gap-2">
+        {presets.map((color) => (
           <button
+            key={color}
             type="button"
-            onClick={() => !disabled && setIsOpen(!isOpen)}
-            disabled={disabled}
-            className={`
-              w-10 h-10 rounded-lg border-2 shadow-sm flex-shrink-0
-              ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:scale-105'}
-              ${error ? 'border-red-500' : 'border-[var(--color-border)]'}
-              transition-transform
-            `}
-            style={{ backgroundColor: isValid ? value : 'transparent' }}
-            aria-label={`${label} auswählen`}
-          >
-            {!isValid && (
-              <span className="text-red-500 text-lg">!</span>
-            )}
-          </button>
-
-          {/* Text Input */}
-          <input
-            type="text"
-            value={inputValue}
-            onChange={handleInputChange}
-            disabled={disabled}
-            className={`
-              flex-1 px-3 py-2 bg-[var(--color-background)] border rounded text-sm font-mono uppercase
-              ${error || !isValid ? 'border-red-500' : 'border-[var(--color-border)]'}
-              ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
-            `}
-            placeholder="#3b82f6"
-          />
-
-          {/* Native Color Picker */}
-          <input
-            type="color"
-            value={isValid ? value : '#000000'}
-            onChange={(e) => {
-              setInputValue(e.target.value);
-              onChange(e.target.value);
+            onClick={() => {
+              if (disabled) return;
+              onChange(color);
+              setCustomColor(color);
             }}
             disabled={disabled}
-            className="w-10 h-10 p-0 border-0 rounded cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-          />
-        </div>
-
-        {/* Preset Colors Popup */}
-        {isOpen && !disabled && (
-          <>
-            <div 
-              className="fixed inset-0 z-40"
-              onClick={() => setIsOpen(false)}
-            />
-            <div className="absolute top-full left-0 mt-2 p-3 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg shadow-lg z-50 w-64">
-              <div className="grid grid-cols-5 gap-2">
-                {PRESET_COLORS.map((color) => (
-                  <button
-                    key={color}
-                    type="button"
-                    onClick={() => handlePresetClick(color)}
-                    className={`
-                      w-8 h-8 rounded border-2 transition-transform hover:scale-110
-                      ${value === color ? 'border-[var(--color-primary)] scale-110' : 'border-transparent'}
-                    `}
-                    style={{ backgroundColor: color }}
-                    aria-label={`Farbe ${color}`}
-                  />
-                ))}
-              </div>
-            </div>
-          </>
-        )}
+            className="relative w-8 h-8 rounded-lg border-2 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--accent)]"
+            style={{ 
+              backgroundColor: color,
+              borderColor: value === color ? 'var(--text-primary)' : 'transparent',
+              transform: value === color ? 'scale(1.1)' : 'scale(1)',
+              opacity: disabled ? 0.5 : 1,
+            }}
+            title={color}
+          >
+            {value === color && (
+              <Check 
+                className="absolute inset-0 m-auto w-4 h-4"
+                style={{ 
+                  color: isLightColor(color) ? '#2C5F8A' : '#ffffff',
+                  strokeWidth: 3
+                }}
+              />
+            )}
+          </button>
+        ))}
       </div>
 
-      {/* Error Message */}
+      {/* Custom Color Input */}
+      <div className="flex items-center gap-3 pt-2 border-t border-[var(--border-primary)]">
+        <button
+          type="button"
+          onClick={() => setShowCustom(!showCustom)}
+          disabled={disabled}
+          className="text-sm transition-colors duration-200"
+          style={{ color: 'var(--text-secondary)' }}
+          onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-primary)'}
+          onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
+        >
+          {showCustom ? 'Benutzerdefiniert ausblenden' : 'Eigene Farbe eingeben'}
+        </button>
+      </div>
+
+      {showCustom && (
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <input
+              type="color"
+              value={isValidHex(customColor) ? customColor : '#4A90E2'}
+              onChange={(e) => {
+                setCustomColor(e.target.value);
+                onChange(e.target.value);
+              }}
+              disabled={disabled}
+              className="w-10 h-10 rounded-lg border-2 border-[var(--border-primary)] cursor-pointer"
+            />
+          </div>
+          <div className="flex-1">
+            <input
+              type="text"
+              value={customColor}
+              onChange={handleCustomChange}
+              disabled={disabled}
+              placeholder="#4A90E2"
+              className="w-full px-3 py-2 text-sm rounded-lg border border-[var(--border-primary)] bg-[var(--bg-input)] transition-colors duration-200 focus:outline-none focus:border-[var(--accent)]"
+              style={{ color: 'var(--text-primary)' }}
+            />
+            {!isValidHex(customColor) && customColor.length > 1 && (
+              <span className="text-xs mt-1 block" style={{ color: '#E07A5F' }}>
+                Ungültiger Hex-Code
+              </span>
+            )}
+          </div>
+          <div 
+            className="w-8 h-8 rounded-lg border-2 border-[var(--border-primary)]"
+            style={{ 
+              backgroundColor: isValidHex(customColor) ? customColor : '#4A90E2'
+            }}
+          />
+        </div>
+      )}
+
+      {/* Color Psychology Info */}
+      <div className="pt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+        <p>Psychologie-basierte Farben für beruhigende Wirkung im medizinischen Kontext.</p>
+      </div>
+
       {error && (
-        <p className="mt-1 text-xs text-red-500">{error}</p>
+        <span className="text-xs block" style={{ color: '#E07A5F' }}>
+          {error}
+        </span>
       )}
     </div>
   );
+}
+
+// Helper to determine if a color is light (for contrast)
+function isLightColor(hex: string): boolean {
+  const cleanHex = hex.replace('#', '');
+  const r = parseInt(cleanHex.substring(0, 2), 16);
+  const g = parseInt(cleanHex.substring(2, 4), 16);
+  const b = parseInt(cleanHex.substring(4, 6), 16);
+  const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+  return brightness > 128;
 }
 
 export default ColorPicker;

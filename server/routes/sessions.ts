@@ -140,12 +140,26 @@ router.post('/', async (req: Request, res: Response) => {
 
 /**
  * GET /api/sessions/:id/state
+ * 
+ * OPTIMIZED: Combined query with include to prevent N+1 queries
+ * Previously: 3 separate queries (session, answers, triageEvents)
+ * Now: 1 query with included relations
  */
 router.get('/:id/state', requireAuth, requireSessionOwner, async (req: Request, res: Response) => {
     try {
         const sessionId = req.params.id as string;
+        
+        // Single optimized query with includes instead of 3 separate queries
         const session = await prisma.patientSession.findUnique({
             where: { id: sessionId },
+            include: {
+                answers: {
+                    orderBy: { answeredAt: 'asc' },
+                },
+                triageEvents: {
+                    orderBy: { createdAt: 'desc' },
+                },
+            },
         });
 
         if (!session) {
@@ -153,18 +167,9 @@ router.get('/:id/state', requireAuth, requireSessionOwner, async (req: Request, 
             return;
         }
 
-        const answers = await prisma.answer.findMany({
-            where: { sessionId },
-            orderBy: { answeredAt: 'asc' },
-        });
-
-        const triageEvents = await prisma.triageEvent.findMany({
-            where: { sessionId },
-            orderBy: { createdAt: 'desc' },
-        });
-
+        // Build answers map from included data
         const answersMap: Record<string, { value: unknown; answeredAt: Date; timeSpentMs: number }> = {};
-        for (const answer of answers) {
+        for (const answer of session.answers) {
             answersMap[answer.atomId] = {
                 value: JSON.parse(answer.value),
                 answeredAt: answer.answeredAt,
@@ -185,11 +190,11 @@ router.get('/:id/state', requireAuth, requireSessionOwner, async (req: Request, 
                 completedAt: session.completedAt,
             },
             answers: answersMap,
-            triageEvents: triageEvents.map((te) => ({
+            triageEvents: session.triageEvents.map((te) => ({
                 ...te,
                 triggerValues: JSON.parse(te.triggerValues),
             })),
-            totalAnswers: answers.length,
+            totalAnswers: session.answers.length,
         });
     } catch (err: unknown) {
         console.error('[Sessions] Fehler beim Abrufen:', err);
@@ -213,6 +218,26 @@ router.post('/:id/submit', requireAuth, requireSessionOwner, async (req: Request
 
         const { emitSessionComplete } = await import('../socket');
         emitSessionComplete(session.id, session.selectedService);
+
+        // Log service usage (non-blocking)
+        setImmediate(async () => {
+            try {
+                const { logServiceUsage } = await import('../services/serviceUsageService');
+                const durationMs = session.completedAt && session.createdAt
+                    ? new Date(session.completedAt).getTime() - new Date(session.createdAt).getTime()
+                    : undefined;
+                await logServiceUsage({
+                    tenantId: session.tenantId,
+                    sessionId: session.id,
+                    patientId: session.patientId || undefined,
+                    serviceType: 'ANAMNESE',
+                    actionName: `Fragebogen abgeschlossen (${session.selectedService})`,
+                    durationMs,
+                });
+            } catch (usageErr) {
+                console.warn('[Sessions] Usage logging failed (non-critical):', usageErr);
+            }
+        });
 
         // Auto-trigger agent pipeline (non-blocking — never delay the response)
         setImmediate(async () => {
@@ -326,6 +351,7 @@ router.post('/:id/medications', requireAuth, requireSessionOwner, async (req: Re
         const sessionId = req.params.id as string;
         const { medications } = medicationsBodySchema.parse(req.body);
 
+        // Optimized: Use select to only fetch needed field
         const session = await prisma.patientSession.findUnique({
             where: { id: sessionId },
             select: { patientId: true }
@@ -336,22 +362,23 @@ router.post('/:id/medications', requireAuth, requireSessionOwner, async (req: Re
             return;
         }
 
-        // Bulk-Replace
-        await prisma.patientMedication.deleteMany({
-            where: { patientId: session.patientId }
-        });
-
-        if (medications.length > 0) {
-            await prisma.patientMedication.createMany({
-                data: medications.map((m) => ({
-                    patientId: session.patientId!,
-                    name: m.name,
-                    dosage: m.dosage || '',
-                    frequency: m.frequency || '',
-                    notes: m.notes || null
-                }))
-            });
-        }
+        // Bulk-Replace using transaction for atomicity
+        await prisma.$transaction([
+            prisma.patientMedication.deleteMany({
+                where: { patientId: session.patientId }
+            }),
+            ...(medications.length > 0 ? [
+                prisma.patientMedication.createMany({
+                    data: medications.map((m) => ({
+                        patientId: session.patientId!,
+                        name: m.name,
+                        dosage: m.dosage || '',
+                        frequency: m.frequency || '',
+                        notes: m.notes || null
+                    }))
+                })
+            ] : [])
+        ]);
 
         res.status(201).json({ success: true, count: medications.length });
     } catch (err: unknown) {
@@ -421,22 +448,23 @@ router.post('/:id/surgeries', requireAuth, requireSessionOwner, async (req: Requ
             return;
         }
 
-        // Bulk-Replace
-        await prisma.patientSurgery.deleteMany({
-            where: { patientId: session.patientId }
-        });
-
-        if (surgeries.length > 0) {
-            await prisma.patientSurgery.createMany({
-                data: surgeries.map((s) => ({
-                    patientId: session.patientId!,
-                    surgeryName: s.surgeryName,
-                    date: s.date || null,
-                    complications: s.complications || null,
-                    notes: s.notes || null
-                }))
-            });
-        }
+        // Bulk-Replace using transaction
+        await prisma.$transaction([
+            prisma.patientSurgery.deleteMany({
+                where: { patientId: session.patientId }
+            }),
+            ...(surgeries.length > 0 ? [
+                prisma.patientSurgery.createMany({
+                    data: surgeries.map((s) => ({
+                        patientId: session.patientId!,
+                        surgeryName: s.surgeryName,
+                        date: s.date || null,
+                        complications: s.complications || null,
+                        notes: s.notes || null
+                    }))
+                })
+            ] : [])
+        ]);
 
         res.status(201).json({ success: true, count: surgeries.length });
     } catch (err: unknown) {

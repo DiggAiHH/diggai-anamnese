@@ -12,6 +12,10 @@ import {
   WifiOff,
   Loader2,
   ChevronRight,
+  Play,
+  Users,
+  ShieldAlert,
+  CalendarCheck,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { usePwaDashboard, usePwaUnreadCount, usePwaMeasureComplete } from '../../hooks/usePatientApi';
@@ -21,6 +25,8 @@ const QUICK_ACTIONS = [
   { key: 'pwa.nav.diary', icon: BookOpen, to: '/pwa/diary', color: 'bg-emerald-100 text-emerald-600' },
   { key: 'pwa.nav.measures', icon: Pill, to: '/pwa/measures', color: 'bg-violet-100 text-violet-600' },
   { key: 'pwa.nav.messages', icon: MessageSquare, to: '/pwa/messages', color: 'bg-amber-100 text-amber-600' },
+  { key: 'Reels', icon: Play, to: '/pwa/reels', color: 'bg-pink-100 text-pink-600' },
+  { key: 'Community', icon: Users, to: '/pwa/community', color: 'bg-blue-100 text-blue-600' },
   { key: 'pwa.nav.settings', icon: Settings, to: '/pwa/settings', color: 'bg-gray-100 text-gray-600' },
 ] as const;
 
@@ -129,6 +135,36 @@ export default function PwaDashboard() {
               );
             })}
           </div>
+        </section>
+
+        {/* ── Persönlicher Bereich (Personal Area) ── */}
+        <section className="space-y-3 mt-6 mb-6">
+            <h2 className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
+                <ShieldAlert className="w-4 h-4 text-rose-500" /> {t('Persönlicher Bereich')}
+            </h2>
+            <div className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm flex flex-col gap-3">
+                <button className="flex items-center justify-between text-left hover:bg-gray-50 p-2 -mx-2 rounded-lg transition-colors">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-rose-50 rounded-lg text-rose-600"><Activity className="w-4 h-4" /></div>
+                        <div>
+                            <p className="text-sm font-bold text-gray-800">ePA & Gesundheitsakte</p>
+                            <p className="text-xs text-gray-500">Gematik gesichert</p>
+                        </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-gray-300" />
+                </button>
+                <div className="h-px bg-gray-100 w-full" />
+                <button className="flex items-center justify-between text-left hover:bg-gray-50 p-2 -mx-2 rounded-lg transition-colors">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-emerald-50 rounded-lg text-emerald-600"><CalendarCheck className="w-4 h-4" /></div>
+                        <div>
+                            <p className="text-sm font-bold text-gray-800">Voruntersuchungen</p>
+                            <p className="text-xs text-gray-500">Nächster Checkup empfohlen</p>
+                        </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-gray-300" />
+                </button>
+            </div>
         </section>
 
         {/* ── Active Measures ── */}
