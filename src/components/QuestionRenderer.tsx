@@ -38,6 +38,7 @@ const formatValue = (value: unknown): string => {
 
 import { AlertCircle, Lock, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { useState, useCallback } from 'react';
 
 export function QuestionRenderer({ question, value, onAnswer, error, simpleMode = false }: QuestionRendererProps) {
@@ -266,7 +267,7 @@ interface TrustSignalsProps {
     showWhy: boolean;
     toggleHelp: () => void;
     toggleWhy: () => void;
-    t: (key: string, defaultValue?: string, options?: Record<string, unknown>) => string;
+    t: TFunction;
 }
 
 function TrustSignals({ question, showHelp, showWhy, toggleHelp, toggleWhy, t }: TrustSignalsProps) {
