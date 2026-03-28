@@ -2386,22 +2386,18 @@
   "consent.cta_waiting": "Bitte beide Pflichtfelder bestätigen",
   "consent.privacy_link_prefix": "Mehr Infos in unserer",
   "consent.privacy_link": "Datenschutzerklärung",
-
   "trust.encrypted": "Ihre Antwort wird verschlüsselt gespeichert",
   "trust.helpButton": "Was bedeutet das?",
   "trust.whyButton": "Warum fragen wir das?",
-
   "helpText.diabetesKomplikationen": "Retinopathie = Augenerkrankung durch Diabetes. Neuropathie = Nervenschädigung (z.B. Kribbeln in den Füßen). Nephropathie = Nierenschädigung. Diabetisches Fußsyndrom = schlecht heilende Wunden an den Füßen.",
   "helpText.gerinnungsstoerung": "Gerinnungsstörungen betreffen die Blutgerinnung. Von-Willebrand-Syndrom und Hämophilie verursachen verstärkte Blutungen. Faktor-V-Leiden und Antiphospholipid-Syndrom erhöhen das Thromboserisiko.",
   "helpText.lungenerkrankung": "COPD = chronische Lungenerkrankung mit Atemnot. Bronchiektasen = erweiterte Atemwege. Sarkoidose = Entzündung in verschiedenen Organen. IPF = Vernarbung der Lunge.",
   "helpText.vorerkrankungen": "Thrombose = Blutgerinnsel in einer Vene. Lungenembolie = Blutgerinnsel in der Lunge. Aneurysma = Erweiterung eines Blutgefäßes.",
   "helpText.gesundheitsstoerungen": "Herzinsuffizienz = das Herz pumpt nicht stark genug. Arrhythmie = unregelmäßiger Herzschlag. Dialyse = maschinelle Blutwäsche bei eingeschränkter Nierenfunktion.",
-
   "whyWeAsk.diabetesKomplikationen": "Diabetes-Komplikationen beeinflussen die Wahl der Medikamente und die Behandlungsplanung. Ihr Arzt muss diese kennen, um Nebenwirkungen zu vermeiden.",
   "whyWeAsk.gerinnungsstoerung": "Gerinnungsstörungen sind wichtig für die sichere Verschreibung von Medikamenten und für chirurgische Eingriffe.",
   "whyWeAsk.lungenerkrankung": "Ihre Atemwegsgesundheit beeinflusst die Wahl der Narkose und bestimmter Medikamente.",
   "whyWeAsk.vorerkrankungen": "Frühere Erkrankungen helfen Ihrem Arzt, Risiken besser einzuschätzen und die beste Behandlung zu wählen.",
   "whyWeAsk.gesundheitsstoerungen": "Bestehende Gesundheitsstörungen beeinflussen Diagnose und Therapie. Diese Angaben helfen Ihrem Arzt, Wechselwirkungen zu vermeiden.",
-
   "progress.chapters": "Kapitel"
 }

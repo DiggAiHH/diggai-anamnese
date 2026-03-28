@@ -266,7 +266,7 @@ interface TrustSignalsProps {
     showWhy: boolean;
     toggleHelp: () => void;
     toggleWhy: () => void;
-    t: (key: string, defaultValue?: string) => string;
+    t: (key: string, defaultValue?: string, options?: Record<string, unknown>) => string;
 }
 
 function TrustSignals({ question, showHelp, showWhy, toggleHelp, toggleWhy, t }: TrustSignalsProps) {
