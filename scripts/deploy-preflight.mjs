@@ -16,7 +16,7 @@
  */
 
 import { existsSync, readFileSync } from 'fs';
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import { config } from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -101,10 +101,11 @@ section('2. Build Check');
 
 try {
   info('Running TypeScript build...');
-  execSync('npm run build', { 
+  execFileSync('npm', ['run', 'build'], { 
     cwd: ROOT_DIR,
     encoding: 'utf8',
-    stdio: 'pipe'
+    stdio: 'pipe',
+    shell: false,
   });
   ok('TypeScript build completed successfully');
 } catch (error) {
@@ -129,10 +130,11 @@ for (const artifact of buildArtifacts) {
 section('3. Migration Check (Prisma)');
 
 try {
-  const result = execSync('npx prisma migrate status', { 
+  const result = execFileSync('npx', ['prisma', 'migrate', 'status'], { 
     cwd: ROOT_DIR,
     encoding: 'utf8',
-    stdio: 'pipe'
+    stdio: 'pipe',
+    shell: false,
   });
   
   if (result.includes('have not yet been applied')) {
@@ -159,10 +161,11 @@ try {
 section('4. TypeCheck');
 
 try {
-  execSync('npm run type-check', { 
+  execFileSync('npm', ['run', 'type-check'], { 
     cwd: ROOT_DIR,
     encoding: 'utf8',
-    stdio: 'pipe'
+    stdio: 'pipe',
+    shell: false,
   });
   ok('TypeScript type check passed — no type errors');
 } catch (error) {
@@ -173,10 +176,11 @@ try {
 section('5. Security Audit');
 
 try {
-  const auditResult = execSync('npm audit --audit-level=high --json', { 
+  const auditResult = execFileSync('npm', ['audit', '--audit-level=high', '--json'], { 
     cwd: ROOT_DIR,
     encoding: 'utf8',
-    stdio: 'pipe'
+    stdio: 'pipe',
+    shell: false,
   });
   
   // Parse audit result

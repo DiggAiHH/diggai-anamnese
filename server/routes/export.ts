@@ -515,4 +515,145 @@ router.get('/sessions/:id/export/json', rejectTokenQueryParameter, requireAuth, 
     }
 });
 
+// ─── FHIR R4 Export (M42 / Presight / Jordan Digital Health Center) ──────────
+//
+// GET /api/export/sessions/:id/export/fhir
+//   ?profile=nephrology  — include nephrology-specific resources (Dr. Sarah Al-oudat)
+//
+// Returns FHIR R4 Bundle (type: document) with:
+//   Patient, Encounter, QuestionnaireResponse, Flag (triage) [+ Nephrology profile]
+
+router.get('/sessions/:id/export/fhir', rejectTokenQueryParameter, requireAuth, requireRole('arzt', 'admin', 'mfa'), async (req: Request, res: Response) => {
+    try {
+        const tenantId = getEffectiveTenantId(req, res);
+        if (!tenantId) return;
+
+        const role = req.auth?.role;
+        const userId = req.auth?.userId;
+        const { session, decryptedAnswers, triageEvents } = await getDecryptedSessionData(req.params.id as string, {
+            role,
+            userId,
+            tenantId,
+        });
+
+        // Load raw answers for nephrology extraction (before PII decryption)
+        const rawSession = await prisma.patientSession.findUnique({
+            where: { id: req.params.id as string },
+            include: { answers: true, patient: true },
+        });
+
+        const patient = rawSession?.patient ?? null;
+        const sessionTs = new Date(session.createdAt).toISOString();
+        const patientRef = patient ? `Patient/${patient.id}` : `Patient/anonymous-${session.id.slice(0, 8)}`;
+
+        // ── Patient resource ──────────────────────────────────
+        const fhirPatient = {
+            resourceType: 'Patient',
+            id: patient?.id ?? `anon-${session.id.slice(0, 8)}`,
+            meta: { profile: ['https://fhir.kbv.de/StructureDefinition/KBV_PR_Base_Patient|1.5.0'] },
+            identifier: [
+                { system: 'https://diggai.de/sid/patient-id', value: patient?.id ?? session.id },
+                patient?.patientNumber
+                    ? { system: 'https://diggai.de/sid/patient-number', value: patient.patientNumber }
+                    : null,
+            ].filter(Boolean),
+            birthDate: session.birthDate ? new Date(session.birthDate).toISOString().split('T')[0] : undefined,
+            gender: session.gender === 'M' ? 'male' : session.gender === 'W' ? 'female' : 'unknown',
+        };
+
+        // ── Encounter resource ────────────────────────────────
+        const fhirEncounter = {
+            resourceType: 'Encounter',
+            id: session.id,
+            status: session.status === 'COMPLETED' ? 'finished' : 'in-progress',
+            class: { system: 'http://terminology.hl7.org/CodeSystem/v3-ActCode', code: 'AMB', display: 'ambulatory' },
+            subject: { reference: patientRef },
+            reasonCode: [{ text: session.selectedService }],
+            period: {
+                start: sessionTs,
+                end: session.completedAt ? new Date(session.completedAt).toISOString() : undefined,
+            },
+        };
+
+        // ── QuestionnaireResponse ─────────────────────────────
+        const fhirQR = {
+            resourceType: 'QuestionnaireResponse',
+            id: `qr-${session.id}`,
+            status: 'completed',
+            subject: { reference: patientRef },
+            encounter: { reference: `Encounter/${session.id}` },
+            authored: sessionTs,
+            item: decryptedAnswers.map(a => ({
+                linkId: a.atomId,
+                text: a.questionText,
+                answer: [{ valueString: a.value }],
+            })),
+        };
+
+        // ── Triage Flags ──────────────────────────────────────
+        const fhirFlags = triageEvents.map((t, i) => ({
+            resourceType: 'Flag',
+            id: `flag-${i}-${session.id}`,
+            status: 'active',
+            category: [{ coding: [{ system: 'http://terminology.hl7.org/CodeSystem/flag-category', code: 'clinical' }] }],
+            code: { text: `[${t.level}] ${t.message}` },
+            subject: { reference: patientRef },
+            period: { start: new Date(t.createdAt).toISOString() },
+        }));
+
+        // ── Nephrology resources (opt-in) ─────────────────────
+        const nephrologyResources: object[] = [];
+        if (req.query.profile === 'nephrology') {
+            const { buildNephrologyResources, extractNephrologyData } = await import('../services/fhir/NephrologyProfile');
+            const rawAnswers = rawSession?.answers?.map(a => ({ atomId: a.atomId, value: a.value })) ?? [];
+            const nephrData = extractNephrologyData(patientRef, rawAnswers);
+            nephrologyResources.push(...buildNephrologyResources(nephrData));
+        }
+
+        // ── Assemble FHIR R4 Document Bundle ──────────────────
+        const bundle = {
+            resourceType: 'Bundle',
+            id: `export-${session.id}`,
+            type: 'document',
+            timestamp: new Date().toISOString(),
+            meta: {
+                source: 'https://diggai.de/anamnese',
+                tag: [{ system: 'https://diggai.de/tag', code: 'anamnese-export' }],
+            },
+            entry: [fhirPatient, fhirEncounter, fhirQR, ...fhirFlags, ...nephrologyResources]
+                .map(resource => ({ resource })),
+        };
+
+        // Audit-Log
+        await prisma.auditLog.create({
+            data: {
+                tenantId: req.tenantId || req.auth?.tenantId || 'system',
+                userId: req.auth?.userId || null,
+                action: 'EXPORT_FHIR',
+                resource: `sessions/${session.id}`,
+                metadata: JSON.stringify({ format: 'fhir-r4', profile: req.query.profile ?? 'standard' }),
+            },
+        });
+
+        import('../services/serviceUsageService').then(({ logServiceUsage }) => {
+            logServiceUsage({
+                tenantId: req.tenantId || req.auth?.tenantId || 'default',
+                sessionId: session.id,
+                serviceType: 'JSON_EXPORT',
+                actionName: `FHIR R4 Bundle exportiert (profile: ${req.query.profile ?? 'standard'})`,
+            }).catch(() => {});
+        }).catch(() => {});
+
+        res.setHeader('Content-Type', 'application/fhir+json');
+        res.json(bundle);
+    } catch (err: unknown) {
+        if (err instanceof ExportRouteError) {
+            res.status(err.status).json({ error: err.message, code: err.code });
+            return;
+        }
+        console.error('[Export] FHIR-Fehler:', err);
+        res.status(500).json({ error: 'FHIR-Export fehlgeschlagen' });
+    }
+});
+
 export default router;

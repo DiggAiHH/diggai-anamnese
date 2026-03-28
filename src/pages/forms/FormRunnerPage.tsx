@@ -1,5 +1,8 @@
 import { useState, useMemo, useCallback } from 'react';
 import { ChevronRight, Check, AlertCircle } from 'lucide-react';
+import { useParams } from 'react-router-dom';
+import { useFormGet, useFormSubmit } from '../../hooks/useApi';
+import { useSessionStore } from '../../store/sessionStore';
 
 /* ── Types ── */
 
@@ -33,6 +36,28 @@ interface FormQuestion {
 interface FormRunnerPageProps {
   /** Optional external questions array. Falls back to built-in sample. */
   questions?: FormQuestion[];
+}
+
+interface PersistedFormQuestion {
+  id: string;
+  label: string;
+  type: QuestionType;
+  required: boolean;
+  options?: string[];
+  placeholder?: string;
+  conditionalOn?: ConditionalOn | null;
+}
+
+function normalizeQuestions(questions: PersistedFormQuestion[]): FormQuestion[] {
+  return questions.map((question) => ({
+    id: question.id,
+    label: question.label,
+    type: question.type,
+    required: question.required,
+    options: question.options ?? [],
+    placeholder: question.placeholder ?? '',
+    conditionalOn: question.conditionalOn ?? null,
+  }));
 }
 
 /* ── Sample form ── */
@@ -272,11 +297,31 @@ function QuestionField({
 /* ── Main component ── */
 
 export function FormRunnerPage({ questions: externalQuestions }: FormRunnerPageProps) {
-  const questions = externalQuestions ?? SAMPLE_QUESTIONS;
+  const { formId } = useParams<{ formId: string }>();
+  const sessionId = useSessionStore((state) => state.sessionId);
+  const formQuery = useFormGet(formId ?? '');
+  const submitMutation = useFormSubmit();
+
+  const questions = useMemo(() => {
+    if (externalQuestions) {
+      return externalQuestions;
+    }
+
+    const loadedQuestions = Array.isArray((formQuery.data as { questions?: PersistedFormQuestion[] } | null)?.questions)
+      ? normalizeQuestions(((formQuery.data as { questions?: PersistedFormQuestion[] }).questions ?? []))
+      : null;
+
+    if (loadedQuestions) {
+      return loadedQuestions;
+    }
+
+    return formId ? [] : SAMPLE_QUESTIONS;
+  }, [externalQuestions, formId, formQuery.data]);
 
   const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
   const [fieldErrors, setFieldErrors] = useState<Set<string>>(new Set());
   const [submitted, setSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   /* Visibility: evaluate conditional logic */
   const visibleQuestions = useMemo(
@@ -312,7 +357,7 @@ export function FormRunnerPage({ questions: externalQuestions }: FormRunnerPageP
     });
   }, []);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const errs = new Set<string>();
 
     visibleQuestions.forEach((q) => {
@@ -331,8 +376,29 @@ export function FormRunnerPage({ questions: externalQuestions }: FormRunnerPageP
       if (answers[q.id] !== undefined) result[q.id] = answers[q.id];
     });
 
-    console.log('[FormRunner] Submitted answers:', JSON.stringify(result, null, 2));
-    setSubmitted(true);
+    if (!formId) {
+      setSubmitError(null);
+      setSubmitted(true);
+      return;
+    }
+
+    if (!sessionId) {
+      setSubmitError('Sitzung nicht verfügbar.');
+      return;
+    }
+
+    try {
+      setSubmitError(null);
+      await submitMutation.mutateAsync({
+        formId,
+        sessionId,
+        answers: result,
+        submittedAt: new Date().toISOString(),
+      });
+      setSubmitted(true);
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : 'Formular konnte nicht übermittelt werden.');
+    }
   };
 
   /* ── Success screen ── */
@@ -366,6 +432,14 @@ export function FormRunnerPage({ questions: externalQuestions }: FormRunnerPageP
   }
 
   /* ── Form view ── */
+  if (formId && formQuery.isLoading) {
+    return <div className="mx-auto max-w-2xl p-6 text-sm text-gray-500 dark:text-gray-400">Formular wird geladen…</div>;
+  }
+
+  if (formId && formQuery.error) {
+    return <div className="mx-auto max-w-2xl p-6 text-sm text-red-600 dark:text-red-400">Formular konnte nicht geladen werden.</div>;
+  }
+
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-6">
       {/* Progress bar */}
@@ -428,12 +502,19 @@ export function FormRunnerPage({ questions: externalQuestions }: FormRunnerPageP
         <p className="py-12 text-center text-sm text-gray-400">Keine Fragen vorhanden.</p>
       )}
 
+      {submitError && (
+        <div className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-700 dark:bg-red-900/30 dark:text-red-400">
+          {submitError}
+        </div>
+      )}
+
       {/* Submit */}
       {visibleQuestions.length > 0 && (
         <div className="flex justify-end pt-2">
           <button
             type="button"
             onClick={handleSubmit}
+            disabled={submitMutation.isPending}
             className="flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
           >
             Absenden <ChevronRight className="h-4 w-4" />

@@ -66,21 +66,67 @@ const UpdateFormSchema = z.object({
 });
 
 const AiGenerateSchema = z.object({
-  praxisId: z.string().min(1),
-  createdBy: z.string().min(1),
   prompt: z.string().min(1),
   language: z.string().optional(),
 });
+
+const CreateFormBodySchema = CreateFormSchema.omit({ praxisId: true, createdBy: true });
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
 function wrap(fn: (req: Request, res: Response) => Promise<void>) {
   return (req: Request, res: Response) => {
     fn(req, res).catch((err: any) => {
-      const status = err.message?.startsWith('Form not found') ? 404 : 500;
-      res.status(status).json({ error: err.message ?? 'Internal server error' });
+      if (err instanceof z.ZodError) {
+        res.status(400).json({ error: 'Ungültige Eingabedaten', details: err.flatten() });
+        return;
+      }
+
+      const status = err.message?.startsWith('Form not found') || err.message?.startsWith('Session not found')
+        ? 404
+        : err.message === 'Missing tenant context' || err.message === 'Missing authenticated user'
+          ? 401
+          : err.message === 'Session mismatch' || err.message === 'Missing patient session context'
+            ? 403
+            : err.message === 'No valid answers provided'
+              ? 400
+            : 500;
+
+      const error = err.message?.startsWith('Form not found')
+        ? 'Form not found'
+        : err.message?.startsWith('Session not found')
+          ? 'Session not found'
+          : err.message === 'Missing tenant context'
+            ? 'Missing tenant context'
+            : err.message === 'Missing authenticated user'
+              ? 'Missing authenticated user'
+              : err.message === 'Session mismatch'
+                ? 'Session mismatch'
+                : err.message === 'Missing patient session context'
+                  ? 'Missing patient session context'
+                    : err.message === 'No valid answers provided'
+                      ? 'No valid answers provided'
+                  : 'Internal server error';
+
+      res.status(status).json({ error });
     });
   };
+}
+
+function requireTenantId(req: Request): string {
+  if (!req.tenantId) {
+    throw new Error('Missing tenant context');
+  }
+
+  return req.tenantId;
+}
+
+function requireAuthUserId(req: Request): string {
+  if (!req.auth?.userId) {
+    throw new Error('Missing authenticated user');
+  }
+
+  return req.auth.userId;
 }
 
 // ── Routes ──────────────────────────────────────────────────────────
@@ -88,8 +134,10 @@ function wrap(fn: (req: Request, res: Response) => Promise<void>) {
 // GET /stats must be registered BEFORE /:id to avoid conflicts
 router.get(
   '/stats',
+  requireAuth,
+  requireRole('arzt', 'mfa', 'admin'),
   wrap(async (req, res) => {
-    const praxisId = z.string().min(1).parse(req.query.praxisId);
+    const praxisId = requireTenantId(req);
     const stats = await getFormStats(praxisId);
     res.json(stats);
   }),
@@ -98,9 +146,15 @@ router.get(
 // POST / — create form
 router.post(
   '/',
+  requireAuth,
+  requireRole('arzt', 'mfa', 'admin'),
   wrap(async (req, res) => {
-    const data = CreateFormSchema.parse(req.body);
-    const form = await createForm(data);
+    const data = CreateFormBodySchema.parse(req.body);
+    const form = await createForm({
+      ...data,
+      praxisId: requireTenantId(req),
+      createdBy: requireAuthUserId(req),
+    });
     res.status(201).json(form);
   }),
 );
@@ -109,10 +163,14 @@ router.post(
 router.post(
   '/ai-generate',
   requireAuth,
-  requireRole('ARZT', 'MFA', 'ADMIN'),
+  requireRole('arzt', 'mfa', 'admin'),
   wrap(async (req, res) => {
     const data = AiGenerateSchema.parse(req.body);
-    const form = await aiGenerate(data);
+    const form = await aiGenerate({
+      ...data,
+      praxisId: requireTenantId(req),
+      createdBy: requireAuthUserId(req),
+    });
     res.status(201).json(form);
   }),
 );
@@ -120,8 +178,12 @@ router.post(
 // GET /:id — get form
 router.get(
   '/:id',
+  requireAuth,
   wrap(async (req, res) => {
-    const form = await getForm(req.params.id as string);
+    const form = await getForm(req.params.id as string, {
+      praxisId: requireTenantId(req),
+      requireActive: req.auth?.role === 'patient',
+    });
     res.json(form);
   }),
 );
@@ -129,8 +191,10 @@ router.get(
 // GET / — list forms
 router.get(
   '/',
+  requireAuth,
+  requireRole('arzt', 'mfa', 'admin'),
   wrap(async (req, res) => {
-    const praxisId = z.string().min(1).parse(req.query.praxisId);
+    const praxisId = requireTenantId(req);
     const isActive =
       req.query.isActive !== undefined
         ? req.query.isActive === 'true'
@@ -144,9 +208,11 @@ router.get(
 // PATCH /:id — update form
 router.patch(
   '/:id',
+  requireAuth,
+  requireRole('arzt', 'mfa', 'admin'),
   wrap(async (req, res) => {
     const data = UpdateFormSchema.parse(req.body);
-    const form = await updateForm(req.params.id as string, data);
+    const form = await updateForm(req.params.id as string, data, { praxisId: requireTenantId(req) });
     res.json(form);
   }),
 );
@@ -154,8 +220,10 @@ router.patch(
 // DELETE /:id — soft delete
 router.delete(
   '/:id',
+  requireAuth,
+  requireRole('arzt', 'mfa', 'admin'),
   wrap(async (req, res) => {
-    const form = await deleteForm(req.params.id as string);
+    const form = await deleteForm(req.params.id as string, { praxisId: requireTenantId(req) });
     res.json(form);
   }),
 );
@@ -163,8 +231,10 @@ router.delete(
 // POST /:id/publish — publish form
 router.post(
   '/:id/publish',
+  requireAuth,
+  requireRole('arzt', 'mfa', 'admin'),
   wrap(async (req, res) => {
-    const form = await publishForm(req.params.id as string);
+    const form = await publishForm(req.params.id as string, { praxisId: requireTenantId(req) });
     res.json(form);
   }),
 );
@@ -172,8 +242,10 @@ router.post(
 // POST /:id/usage — increment usage
 router.post(
   '/:id/usage',
+  requireAuth,
+  requireRole('arzt', 'mfa', 'admin'),
   wrap(async (req, res) => {
-    const form = await incrementUsage(req.params.id as string);
+    const form = await incrementUsage(req.params.id as string, { praxisId: requireTenantId(req) });
     res.json(form);
   }),
 );
@@ -189,7 +261,22 @@ router.post(
       submittedAt: z.string().datetime().optional(),
     });
     const data = SubmitSchema.parse(req.body);
-    const form = await submitForm(req.params.id as string, data);
+    if (req.auth?.role === 'patient') {
+      if (!req.auth.sessionId) {
+        throw new Error('Missing patient session context');
+      }
+
+      if (req.auth.sessionId !== data.sessionId) {
+        throw new Error('Session mismatch');
+      }
+    }
+
+    const form = await submitForm(req.params.id as string, data, {
+      praxisId: requireTenantId(req),
+      requireActive: true,
+      requesterRole: req.auth?.role,
+      requesterSessionId: req.auth?.sessionId,
+    });
     res.status(201).json(form);
   }),
 );

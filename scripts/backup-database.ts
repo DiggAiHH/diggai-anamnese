@@ -17,8 +17,9 @@
  *   - AWS_SECRET_ACCESS_KEY: AWS Credentials
  */
 
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import { createReadStream, createWriteStream, unlinkSync, existsSync, mkdirSync } from 'fs';
+import { createGzip } from 'zlib';
 import { pipeline } from 'stream/promises';
 import * as path from 'path';
 import * as crypto from 'crypto';
@@ -93,10 +94,12 @@ function encryptFile(inputPath: string, outputPath: string): { iv: string; tag: 
     });
 }
 
-// Alternative: OpenSSL Verschlüsselung (falls native Probleme)
+// Alternative: OpenSSL Verschlüsselung (falls native Probleme) — BSI-konform: Args-Array
 function encryptWithOpenSSL(inputPath: string, outputPath: string): void {
-    const cmd = `openssl enc -aes-256-cbc -salt -pbkdf2 -iter 100000 -in "${inputPath}" -out "${outputPath}" -k "${ENCRYPTION_KEY}"`;
-    execSync(cmd, { stdio: 'pipe' });
+    execFileSync('openssl', [
+        'enc', '-aes-256-cbc', '-salt', '-pbkdf2', '-iter', '100000',
+        '-in', inputPath, '-out', outputPath, '-k', ENCRYPTION_KEY,
+    ], { stdio: 'pipe', shell: false });
 }
 
 // S3 Upload
@@ -148,25 +151,32 @@ async function createBackup(): Promise<void> {
     log('info', `Typ: ${BACKUP_TYPE}`);
 
     try {
-        // 1. pg_dump ausführen
+        // 1. pg_dump ausführen — BSI-konform: execFileSync mit Args-Array
         log('info', 'Erstelle Datenbank-Dump...');
         const dbUrl = config.databaseUrl;
-        const schemaFlag = BACKUP_TYPE === 'schema_only' ? '--schema-only' : '';
         
-        const dumpCmd = `pg_dump "${dbUrl}" ${schemaFlag} --verbose --no-owner --no-privileges`;
-        execSync(dumpCmd, { 
-            encoding: 'utf-8',
-            maxBuffer: 1024 * 1024 * 100, // 100MB buffer
-            timeout: 300000, // 5 minutes
+        const pgDumpArgs = [
+            '--dbname', dbUrl,
+            '--file', tempPath,
+            '--verbose', '--no-owner', '--no-privileges',
+        ];
+        if (BACKUP_TYPE === 'schema_only') pgDumpArgs.push('--schema-only');
+        
+        execFileSync('pg_dump', pgDumpArgs, {
+            timeout: 300000,
+            shell: false,
+            stdio: 'pipe',
         });
-        
-        // Write to temp file first
-        execSync(`${dumpCmd} > "${tempPath}"`, { timeout: 300000 });
         log('info', `Dump erstellt: ${tempPath}`);
 
-        // 2. Komprimieren mit gzip
+        // 2. Komprimieren mit Node.js stream statt Shell-Redirect
         log('info', 'Komprimiere Backup...');
-        execSync(`gzip -f "${tempPath}"`, { timeout: 120000 });
+        await pipeline(
+            createReadStream(tempPath),
+            createGzip(),
+            createWriteStream(compressedPath)
+        );
+        unlinkSync(tempPath); // Temp-Datei nach Komprimierung entfernen
         log('info', `Komprimiert: ${compressedPath}`);
 
         // 3. Verschlüsseln

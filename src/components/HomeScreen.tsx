@@ -27,11 +27,14 @@ import {
   Rocket,
   Activity,
   ArrowRight,
+  ChevronDown,
+  ChevronUp,
+  Timer,
 } from 'lucide-react';
 import { LanguageSelector } from './LanguageSelector';
 import { ThemeToggle } from './ThemeToggle';
 import { preloadPatientFlow, preloadPwaPortal, preloadTelemedizin } from '../lib/routePreloaders';
-import { PracticeGrowthSection } from './PracticeGrowthSection';
+import { TrustBadgeBar } from './ui/TrustBadgeBar';
 
 interface HomeTile {
   id: string;
@@ -57,6 +60,7 @@ export function HomeScreen() {
   const navigate = useNavigate();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [lastInteraction, setLastInteraction] = useState(Date.now());
+  const [showMore, setShowMore] = useState(false);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -72,9 +76,16 @@ export function HomeScreen() {
     return () => clearInterval(timer);
   }, []);
 
-  // ─── Auto-Reset nach 60s ─────────────────────────────
+  // ─── Progressive Auto-Reset (statt harter 60s) ─────
+  // Studie: Nielsen Heuristik #1 — User Control & Freedom
+  // Ältere (60+) brauchen 2-3x länger; Migranten wechseln Sprache = Zeitverzug
+  const [resetWarning, setResetWarning] = useState(false);
+  const [resetCountdown, setResetCountdown] = useState(0);
+
   const resetTimer = useCallback(() => {
     setLastInteraction(Date.now());
+    setResetWarning(false);
+    setResetCountdown(0);
   }, []);
 
   useEffect(() => {
@@ -85,12 +96,22 @@ export function HomeScreen() {
 
   useEffect(() => {
     const check = setInterval(() => {
-      if (Date.now() - lastInteraction > 60_000) {
-        // Navigate back to home if idle
+      const idle = Date.now() - lastInteraction;
+      if (idle > 120_000) {
+        // Reset after 120s total inactivity
         navigate('/', { replace: true });
         setLastInteraction(Date.now());
+        setResetWarning(false);
+        setResetCountdown(0);
+      } else if (idle > 90_000) {
+        // Show countdown warning at 90s
+        setResetWarning(true);
+        setResetCountdown(Math.ceil((120_000 - idle) / 1000));
+      } else {
+        setResetWarning(false);
+        setResetCountdown(0);
       }
-    }, 5000);
+    }, 1000);
     return () => clearInterval(check);
   }, [lastInteraction, navigate]);
 
@@ -260,34 +281,25 @@ export function HomeScreen() {
         </div>
       </header>
 
-      {/* Feature Hub */}
+      {/* Trust Strip — above-the-fold signals for patients (Adjekum et al. 2018) */}
+      <div className="border-b border-(--border-primary) bg-(--bg-card) py-2 px-6">
+        <TrustBadgeBar compact className="justify-center" />
+      </div>
+
+      {/* Patient-Focused Main — Hick's Law: 3 core options (Schwartz 2004) */}
       <main className="flex-1 p-6 md:p-10">
-        <div className="max-w-7xl mx-auto space-y-6">
-          <section className="rounded-3xl border border-[var(--border-primary)] bg-[var(--bg-card)] p-5 md:p-7 shadow-sm">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-              <div>
-                <h2 className="text-2xl md:text-3xl font-extrabold text-[var(--text-primary)] flex items-center gap-2">
-                  <Rocket className="w-7 h-7 text-blue-500" />
-                  {t('Praxis OS Launch Hub', 'Praxis OS Launch Hub')}
-                </h2>
-                <p className="text-sm text-[var(--text-secondary)] mt-1">
-                  {t(
-                    'Alle vorbereiteten Module an einem Ort: Patient, Agenten, Management und Operations.',
-                    'Alle vorbereiteten Module an einem Ort: Patient, Agenten, Management und Operations.',
-                  )}
-                </p>
-              </div>
+        <div className="max-w-5xl mx-auto space-y-6">
+          {/* Patient Welcome */}
+          <div className="text-center space-y-2">
+            <h2 className="text-2xl md:text-3xl font-extrabold text-[var(--text-primary)]">
+              {t('home.patient_welcome', 'Wie können wir Ihnen helfen?')}
+            </h2>
+            <p className="text-sm text-[var(--text-secondary)]">
+              {t('home.patient_welcome_sub', 'Wählen Sie Ihr Anliegen — dauert nur wenige Minuten.')}
+            </p>
+          </div>
 
-              <button
-                onClick={() => navigate('/verwaltung/login')}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 text-sm font-semibold transition-colors"
-              >
-                <ArrowRight className="w-4 h-4" />
-                {t('Zur Verwaltungsansicht', 'Zur Verwaltungsansicht')}
-              </button>
-            </div>
-          </section>
-
+          {/* 3 Core Tiles — Hick's Law optimized */}
           <section className="grid grid-cols-1 md:grid-cols-3 gap-5">
             {tiles.map((tile) => (
               <button
@@ -322,81 +334,132 @@ export function HomeScreen() {
             ))}
           </section>
 
-          <section className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-            <div className="lg:col-span-2 rounded-3xl border border-[var(--border-primary)] bg-[var(--bg-card)] p-5 md:p-6 shadow-sm">
-              <div className="flex items-center gap-2 mb-4">
-                <Bot className="w-5 h-5 text-indigo-500" />
-                <h3 className="text-lg font-bold text-[var(--text-primary)]">
-                  {t('Agenten & Praxis-Funktionen', 'Agenten & Praxis-Funktionen')}
-                </h3>
+          {/* Expandable "Mehr" — Progressive Disclosure (Nielsen 2006) */}
+          <div className="text-center">
+            <button
+              onClick={() => setShowMore((v) => !v)}
+              className="inline-flex items-center gap-2 text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors px-4 py-2 rounded-xl hover:bg-[var(--bg-card)]"
+              aria-expanded={showMore}
+            >
+              {showMore ? (
+                <>
+                  <ChevronUp className="w-4 h-4" />
+                  {t('home.show_less', 'Weniger anzeigen')}
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="w-4 h-4" />
+                  {t('home.show_more', 'Praxis-Verwaltung & mehr')}
+                </>
+              )}
+            </button>
+          </div>
+
+          {showMore && (
+            <section className="grid grid-cols-1 lg:grid-cols-3 gap-5 animate-[gentleFadeIn_300ms_ease-out]">
+              <div className="lg:col-span-2 rounded-3xl border border-[var(--border-primary)] bg-[var(--bg-card)] p-5 md:p-6 shadow-sm">
+                <div className="flex items-center gap-2 mb-4">
+                  <Bot className="w-5 h-5 text-indigo-500" />
+                  <h3 className="text-lg font-bold text-[var(--text-primary)]">
+                    {t('Agenten & Praxis-Funktionen', 'Agenten & Praxis-Funktionen')}
+                  </h3>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {practiceOpsLinks.map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => navigate(item.route)}
+                      className="group rounded-2xl border border-[var(--border-primary)] bg-[var(--bg-primary)] p-4 text-left hover:border-blue-400/60 hover:shadow-md transition-all"
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="inline-flex items-center gap-2 text-[var(--text-primary)] font-semibold text-sm">
+                          {item.icon}
+                          {item.title}
+                        </span>
+                        {item.badge ? (
+                          <span className="text-[10px] uppercase tracking-wide bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full font-bold">
+                            {item.badge}
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="text-xs text-[var(--text-secondary)]">{item.subtitle}</p>
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {practiceOpsLinks.map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => navigate(item.route)}
-                    className="group rounded-2xl border border-[var(--border-primary)] bg-[var(--bg-primary)] p-4 text-left hover:border-blue-400/60 hover:shadow-md transition-all"
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="inline-flex items-center gap-2 text-[var(--text-primary)] font-semibold text-sm">
+              <div className="rounded-3xl border border-[var(--border-primary)] bg-[var(--bg-card)] p-5 md:p-6 shadow-sm">
+                <div className="flex items-center gap-2 mb-4">
+                  <Activity className="w-5 h-5 text-emerald-500" />
+                  <h3 className="text-lg font-bold text-[var(--text-primary)]">
+                    {t('Schnellstart', 'Schnellstart')}
+                  </h3>
+                </div>
+                <div className="space-y-3">
+                  {quickLaunch.map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => navigate(item.route)}
+                      className="w-full rounded-xl border border-[var(--border-primary)] bg-[var(--bg-primary)] p-3.5 text-left hover:border-blue-400/60 transition-colors"
+                    >
+                      <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
                         {item.icon}
                         {item.title}
-                      </span>
-                      {item.badge ? (
-                        <span className="text-[10px] uppercase tracking-wide bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full font-bold">
-                          {item.badge}
-                        </span>
-                      ) : null}
-                    </div>
-                    <p className="text-xs text-[var(--text-secondary)]">{item.subtitle}</p>
-                  </button>
-                ))}
+                      </div>
+                      <p className="text-xs text-[var(--text-secondary)] mt-1">{item.subtitle}</p>
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-
-            <div className="rounded-3xl border border-[var(--border-primary)] bg-[var(--bg-card)] p-5 md:p-6 shadow-sm">
-              <div className="flex items-center gap-2 mb-4">
-                <Activity className="w-5 h-5 text-emerald-500" />
-                <h3 className="text-lg font-bold text-[var(--text-primary)]">
-                  {t('Schnellstart', 'Schnellstart')}
-                </h3>
-              </div>
-              <div className="space-y-3">
-                {quickLaunch.map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => navigate(item.route)}
-                    className="w-full rounded-xl border border-[var(--border-primary)] bg-[var(--bg-primary)] p-3.5 text-left hover:border-blue-400/60 transition-colors"
-                  >
-                    <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
-                      {item.icon}
-                      {item.title}
-                    </div>
-                    <p className="text-xs text-[var(--text-secondary)] mt-1">{item.subtitle}</p>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          <PracticeGrowthSection
-            onOpenAdmin={() => navigate('/verwaltung/login')}
-            onOpenAgents={() => navigate('/verwaltung/agents')}
-            onOpenBuilder={() => navigate('/flows/builder')}
-          />
+            </section>
+          )}
         </div>
       </main>
 
-      {/* Footer */}
+      {/* Progressive Reset Warning Overlay */}
+      {resetWarning && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-[var(--bg-card)] rounded-3xl p-8 max-w-sm mx-4 text-center shadow-2xl space-y-4 border border-[var(--border-primary)]">
+            <Timer className="w-12 h-12 text-amber-500 mx-auto" />
+            <h3 className="text-lg font-bold text-[var(--text-primary)]">
+              {t('home.reset_warning_title', 'Sind Sie noch da?')}
+            </h3>
+            <p className="text-sm text-[var(--text-secondary)]">
+              {t('home.reset_warning_desc', 'Dieses Gerät wird in {{seconds}} Sekunden zurückgesetzt.', { seconds: resetCountdown })}
+            </p>
+            <button
+              onClick={resetTimer}
+              className="w-full py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold transition-colors"
+            >
+              {t('home.reset_continue', 'Ja, ich bin noch da')}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Footer — with Impressum + Datenschutz links (DSGVO transparency) */}
       <footer className="text-center py-3 text-xs text-[var(--text-muted)] border-t border-[var(--border-primary)]">
-        <div>{t('home.footer_patient', 'Bitte wählen Sie Ihren Bereich. Dieses Gerät setzt sich nach 60 Sekunden automatisch zurück.')}</div>
-        <div className="mt-1">
+        <div className="flex items-center justify-center gap-3">
+          <button
+            onClick={() => navigate('/datenschutz')}
+            className="underline hover:text-[var(--text-secondary)] transition-colors"
+          >
+            {t('Datenschutz', 'Datenschutz')}
+          </button>
+          <span aria-hidden="true">·</span>
+          <button
+            onClick={() => navigate('/impressum')}
+            className="underline hover:text-[var(--text-secondary)] transition-colors"
+          >
+            {t('Impressum', 'Impressum')}
+          </button>
+          <span aria-hidden="true">·</span>
           <button
             onClick={() => navigate('/verwaltung/login')}
             className="underline hover:text-[var(--text-secondary)] transition-colors"
           >
-            {t('home.verwaltung_link', 'Zur Verwaltungsansicht')}
+            {t('home.verwaltung_link', 'Verwaltung')}
           </button>
         </div>
       </footer>

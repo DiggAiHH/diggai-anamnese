@@ -733,4 +733,133 @@ router.post('/content/seed', requireRole('admin'), requirePermission('admin_cont
     }
 });
 
+// ─── Regional Tenant Onboarding (Phase 4 – DE/UAE/Jordan bridge) ────────────
+
+const onboardTenantSchema = z.object({
+    subdomain: z.string().min(3).max(64).regex(/^[a-z0-9-]+$/, 'Only lowercase letters, digits and hyphens'),
+    name: z.string().min(2).max(128),
+    dataRegion: z.enum(['de', 'uae', 'jordan']).default('de'),
+    adminUsername: z.string().min(3).max(64),
+    adminPassword: z.string().min(12),
+    adminDisplayName: z.string().min(2).max(128),
+    fhirBaseUrl: z.string().url().optional(),
+    fhirAuthType: z.enum(['none', 'basic', 'oauth2', 'apikey']).optional(),
+});
+
+/**
+ * POST /api/admin/tenants/onboard
+ * Super-admin endpoint: create a new tenant with its first admin user in one step.
+ * Only callable by users with role 'admin' and no tenantId scoping (platform-level admins).
+ */
+router.post('/tenants/onboard', requireRole('admin'), async (req, res) => {
+    // Restrict to platform-level admins (no tenant scope in token)
+    if (req.auth?.tenantId) {
+        res.status(403).json({ error: 'Platform-level admin access required for onboarding' });
+        return;
+    }
+
+    const parsed = onboardTenantSchema.safeParse(req.body);
+    if (!parsed.success) {
+        res.status(400).json({ error: 'Validation failed', details: parsed.error.flatten() });
+        return;
+    }
+
+    const { subdomain, name, dataRegion, adminUsername, adminPassword, adminDisplayName, fhirBaseUrl, fhirAuthType } = parsed.data;
+
+    try {
+        // Check subdomain uniqueness
+        const existing = await prisma.tenant.findUnique({ where: { subdomain } });
+        if (existing) {
+            res.status(409).json({ error: 'Tenant subdomain already exists' });
+            return;
+        }
+
+        const passwordHash = await bcrypt.hash(adminPassword, 12);
+
+        const tenant = await prisma.$transaction(async (tx) => {
+            const newTenant = await tx.tenant.create({
+                data: {
+                    subdomain,
+                    name,
+                    dataRegion,
+                },
+            });
+
+            await tx.arztUser.create({
+                data: {
+                    tenantId: newTenant.id,
+                    username: adminUsername,
+                    passwordHash,
+                    displayName: adminDisplayName,
+                    role: 'admin',
+                    isActive: true,
+                },
+            });
+
+            if (fhirBaseUrl) {
+                await tx.pvsConnection.create({
+                    data: {
+                        praxisId: newTenant.id,
+                        pvsType: 'FHIR_GENERIC',
+                        fhirBaseUrl,
+                        fhirAuthType: fhirAuthType ?? 'none',
+                        isActive: true,
+                    },
+                });
+            }
+
+            return newTenant;
+        });
+
+        console.log(`[Admin] Tenant onboarded: ${tenant.subdomain} (${dataRegion}) id=${tenant.id}`);
+        res.status(201).json({
+            success: true,
+            tenantId: tenant.id,
+            subdomain: tenant.subdomain,
+            dataRegion: tenant.dataRegion,
+        });
+    } catch (err) {
+        console.error('[Admin] Tenant onboard error:', err);
+        res.status(500).json({ error: 'Onboarding failed' });
+    }
+});
+
+const regionSchema = z.object({
+    dataRegion: z.enum(['de', 'uae', 'jordan']),
+});
+
+/**
+ * PATCH /api/admin/tenants/:tenantId/configure-region
+ * Update the data residency region for an existing tenant.
+ */
+router.patch('/tenants/:tenantId/configure-region', requireRole('admin'), async (req, res) => {
+    if (req.auth?.tenantId) {
+        res.status(403).json({ error: 'Platform-level admin access required' });
+        return;
+    }
+
+    const tenantId = param(req, 'tenantId');
+    const parsed = regionSchema.safeParse(req.body);
+    if (!parsed.success) {
+        res.status(400).json({ error: 'Validation failed', details: parsed.error.flatten() });
+        return;
+    }
+
+    try {
+        const updated = await prisma.tenant.update({
+            where: { id: tenantId },
+            data: { dataRegion: parsed.data.dataRegion },
+            select: { id: true, subdomain: true, dataRegion: true },
+        });
+        res.json({ success: true, tenant: updated });
+    } catch (err: any) {
+        if (err?.code === 'P2025') {
+            res.status(404).json({ error: 'Tenant not found' });
+            return;
+        }
+        console.error('[Admin] Configure-region error:', err);
+        res.status(500).json({ error: 'Region update failed' });
+    }
+});
+
 export default router;

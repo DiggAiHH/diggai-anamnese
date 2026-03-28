@@ -575,6 +575,9 @@ export const questions: Question[] = [
             { value: 'neuropathie', label: 'Neuropathie' },
             { value: 'nephropathie', label: 'Nephropathie' }
         ],
+        helpText: 'helpText.diabetesKomplikationen',
+        whyWeAsk: 'whyWeAsk.diabetesKomplikationen',
+        sensitive: true,
         logic: { next: ['6000'] }
     },
     {
@@ -737,6 +740,9 @@ export const questions: Question[] = [
         question: 'Haben Sie eine der folgenden Gesundheitsstörungen?',
         section: 'gesundheitsstoerungen',
         order: 52,
+        helpText: 'helpText.gesundheitsstoerungen',
+        whyWeAsk: 'whyWeAsk.gesundheitsstoerungen',
+        sensitive: true,
         options: [
             { value: 'bluthochdruck', label: 'Bluthochdruck' },
             { value: 'gerinnung', label: 'Blutung/Gerinnungsstörung', followUpQuestions: ['7001'] },
@@ -757,6 +763,9 @@ export const questions: Question[] = [
         question: 'Welche Gerinnungsstörung haben Sie?',
         section: 'gesundheitsstoerungen',
         order: 53,
+        helpText: 'helpText.gerinnungsstoerung',
+        whyWeAsk: 'whyWeAsk.gerinnungsstoerung',
+        sensitive: true,
         options: [
             { value: 'vws', label: 'Von-Willebrand-Syndrom' },
             { value: 'faktor_v', label: 'Faktor-V-Leiden' },
@@ -784,6 +793,9 @@ export const questions: Question[] = [
         question: 'Welche Lungenerkrankung haben Sie?',
         section: 'gesundheitsstoerungen',
         order: 54,
+        helpText: 'helpText.lungenerkrankung',
+        whyWeAsk: 'whyWeAsk.lungenerkrankung',
+        sensitive: true,
         options: [
             { value: 'asthma', label: 'Asthma bronchiale' },
             { value: 'copd', label: 'COPD' },
@@ -811,6 +823,9 @@ export const questions: Question[] = [
         question: 'Hatten Sie jemals eine der folgenden Ereignisse?',
         section: 'vorerkrankungen',
         order: 55,
+        helpText: 'helpText.vorerkrankungen',
+        whyWeAsk: 'whyWeAsk.vorerkrankungen',
+        sensitive: true,
         options: [
             { value: 'aneurysma', label: 'Aneurysma', followUpQuestions: ['8001'] },
             { value: 'durchblutung', label: 'Arterielle Durchblutungsstörung', followUpQuestions: ['8003'] },

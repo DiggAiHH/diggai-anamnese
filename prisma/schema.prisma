@@ -68,6 +68,9 @@ model Tenant {
   dsgvoAgreementSigned   Boolean   @default(false)
   dsgvoAgreementSignedAt DateTime?
 
+  // Regional data residency (DE = DSGVO EU, UAE = Abu Dhabi ADHICS, jordan = Jordan MoH)
+  dataRegion    String   @default("de")
+
   settings  Json?    @default("{}")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -675,6 +678,7 @@ model RolePermission {
 
 model WunschboxEntry {
   id              String    @id @default(uuid())
+  tenantId        String
   submittedBy     String // userId
   originalText    String // Freitext des Users
   aiParsedChanges String? // JSON: [{ area, description, priority, estimatedEffort }]
@@ -686,8 +690,8 @@ model WunschboxEntry {
   reviewedAt      DateTime?
   reviewedBy      String?
 
-  @@index([status, createdAt])
-  @@index([submittedBy])
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, submittedBy])
 }
 
 // ─── ROI Snapshot (Tagesbasierte Wirtschaftlichkeit) ────────

@@ -79,6 +79,9 @@ export interface SessionState {
 
     // Phase 3: Layout & Whitespace - Progressive Disclosure
     simpleMode: boolean;              // true = 1 question/screen, false = 3-4 questions/screen
+
+    // Phase Trust: Auto-save indicator
+    lastSavedAt: number | null;       // Unix timestamp of last persist
 }
 
 export interface SessionActions {
@@ -115,6 +118,9 @@ export interface SessionActions {
     // Phase 3: Layout & Whitespace
     setSimpleMode: (enabled: boolean) => void;
     toggleSimpleMode: () => void;
+
+    // Phase Trust: Save indicator
+    markSaved: () => void;
 }
 
 const initialState: SessionState = {
@@ -138,7 +144,8 @@ const initialState: SessionState = {
     isHydrated: false,
     infoBreakHistory: [],
     entertainmentMode: 'AUTO',
-    simpleMode: false,  // Default to normal mode
+    simpleMode: true,   // Default to simple mode for new/stressed patients (Hick's Law)
+    lastSavedAt: null,
 };
 
 // ─── Store ──────────────────────────────────────────────────
@@ -207,6 +214,7 @@ export const useSessionStore = create<SessionState & SessionActions>()(
                         answeredAt: new Date(),
                     },
                 },
+                lastSavedAt: Date.now(),
             })),
 
             loadAtoms: (atoms) => set((state) => {
@@ -239,6 +247,9 @@ export const useSessionStore = create<SessionState & SessionActions>()(
             // Phase 3: Layout & Whitespace
             setSimpleMode: (enabled) => set({ simpleMode: enabled }),
             toggleSimpleMode: () => set((state) => ({ simpleMode: !state.simpleMode })),
+
+            // Phase Trust: Save indicator
+            markSaved: () => set({ lastSavedAt: Date.now() }),
         }),
         {
             name: 'anamnese-session',
@@ -256,6 +267,7 @@ export const useSessionStore = create<SessionState & SessionActions>()(
                 progress: state.progress,
                 answers: state.answers,
                 simpleMode: state.simpleMode,  // Persist user preference
+                lastSavedAt: state.lastSavedAt,
             }),
             onRehydrateStorage: () => (rehydratedState) => {
                 if (rehydratedState) {

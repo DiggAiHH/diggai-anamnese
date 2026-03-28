@@ -2,6 +2,7 @@
 // Generates end-of-day summary from ServiceUsageLog entries
 // and produces invoice data for the Praxis.
 
+import { Prisma } from '@prisma/client';
 import { prisma } from '../db';
 
 // ─── Types ──────────────────────────────────────────────────
@@ -134,6 +135,7 @@ export async function generateDailySummary(tenantId: string, date: Date): Promis
         totalSessions,
         generatedAt: new Date().toISOString(),
     };
+    const invoiceDataJson = JSON.parse(JSON.stringify(invoiceData)) as Prisma.InputJsonValue;
 
     // Upsert daily summary
     const summary = await prisma.dailySummary.upsert({
@@ -147,7 +149,7 @@ export async function generateDailySummary(tenantId: string, date: Date): Promis
             totalCostSaving: Math.round(totalCostSaving * 100) / 100,
             estimatedManualCost: Math.round(estimatedManualCost * 100) / 100,
             invoiceGenerated: true,
-            invoiceData: invoiceData as unknown as Record<string, unknown>,
+            invoiceData: invoiceDataJson,
         },
         create: {
             tenantId,
@@ -160,7 +162,7 @@ export async function generateDailySummary(tenantId: string, date: Date): Promis
             totalCostSaving: Math.round(totalCostSaving * 100) / 100,
             estimatedManualCost: Math.round(estimatedManualCost * 100) / 100,
             invoiceGenerated: true,
-            invoiceData: invoiceData as unknown as Record<string, unknown>,
+            invoiceData: invoiceDataJson,
         },
     });
 

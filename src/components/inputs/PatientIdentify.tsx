@@ -155,7 +155,7 @@ export function PatientIdentify({ onIdentified, onFallback, onError }: PatientId
           mode="verify"
           onComplete={handlePatternComplete}
           onError={(msg) => {
-            setError(msg);
+            setError(msg ?? t('identify.error_server', 'Serverfehler. Bitte an der Anmeldung wenden.'));
             onFallback();
           }}
           disabled={loading}

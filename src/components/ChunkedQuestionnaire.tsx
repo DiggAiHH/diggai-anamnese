@@ -9,6 +9,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronRight, ChevronLeft, Save, Loader2 } from 'lucide-react';
+import { ProgressTrust } from './ui/ProgressTrust';
 
 interface Question {
   id: string;
@@ -158,10 +159,9 @@ export function ChunkedQuestionnaire({
     }
   }, [currentChunk]);
 
-  // Fortschritt berechnen
-  const progress = ((currentChunk + 1) / totalChunks) * 100;
+  // Fortschritt berechnen (für zukünftige Nutzung / externe Callbacks)
   const answeredQuestions = Object.keys(answers).length;
-  const totalAnsweredPercent = (answeredQuestions / questions.length) * 100;
+  void answeredQuestions; // suppress unused warning while keeping for future use
 
   if (isLoading) {
     return (
@@ -176,34 +176,15 @@ export function ChunkedQuestionnaire({
 
   return (
     <div className="max-w-3xl mx-auto">
-      {/* Progress Header */}
+      {/* Progress Header — ProgressTrust (Katz 2015, Tullis & Albert 2008) */}
       <div className="mb-8">
-        <div className="flex justify-between items-center mb-2">
-          <span className="text-sm text-[var(--text-secondary)]">
-            {t('questionnaire.step', 'Schritt {{current}} von {{total}}', {
-              current: currentChunk + 1,
-              total: totalChunks
-            })}
-          </span>
-          <span className="text-sm text-[var(--text-secondary)]">
-            {Math.round(totalAnsweredPercent)}% {t('questionnaire.completed', 'abgeschlossen')}
-          </span>
-        </div>
-
-        {/* Progress Bar */}
-        <div className="h-2 bg-[var(--bg-secondary)] rounded-full overflow-hidden">
-          <div
-            className="h-full bg-[var(--accent-primary)] transition-all duration-500 ease-out"
-            style={{ width: `${progress}%` }}
-          />
-        </div>
-
-        {/* Category Indicator */}
-        {currentQuestions[0]?.category && (
-          <div className="mt-3 text-sm font-medium text-[var(--accent-primary)]">
-            {currentQuestions[0].category}
-          </div>
-        )}
+        <ProgressTrust
+          currentStep={currentChunk + 1}
+          totalSteps={totalChunks}
+          isSaving={isSaving}
+          lastSaved={lastSaved}
+          minutesRemaining={Math.ceil((totalChunks - currentChunk - 1) * 2)}
+        />
       </div>
 
       {/* Fragen */}

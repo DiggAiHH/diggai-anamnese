@@ -252,6 +252,60 @@ router.post('/:id/submit', requireAuth, requireSessionOwner, async (req: Request
             }
         });
 
+        // FHIR push to external command centers (M42 / Presight / JDHC) — non-blocking
+        setImmediate(async () => {
+            try {
+                const { buildNephrologyResources, extractNephrologyData, NEPHROLOGY_ATOM_IDS } = await import('../services/fhir/NephrologyProfile');
+                const { triggerFhirPushAsync } = await import('../services/fhir/ExternalFhirPush');
+
+                // Reload session with answers for FHIR bundle construction
+                const { prisma: p } = await import('../db');
+                const fullSession = await p.patientSession.findUnique({
+                    where: { id: session.id },
+                    include: { answers: true, patient: true },
+                });
+
+                if (!fullSession) return;
+
+                const patientRef = fullSession.patient
+                    ? `Patient/${fullSession.patient.id}`
+                    : `Patient/anonymous-${session.id.slice(0, 8)}`;
+
+                const isNephrology = fullSession.selectedService?.toLowerCase().includes('nephro') ||
+                    fullSession.selectedService?.toLowerCase().includes('niere') ||
+                    fullSession.selectedService?.toLowerCase().includes('dialysis') ||
+                    fullSession.answers.some(a => NEPHROLOGY_ATOM_IDS.has(a.atomId));
+
+                const nephrologyResources = isNephrology
+                    ? buildNephrologyResources(extractNephrologyData(patientRef, fullSession.answers))
+                    : [];
+
+                const fhirBundle = {
+                    resourceType: 'Bundle' as const,
+                    type: 'transaction',
+                    timestamp: new Date().toISOString(),
+                    entry: [
+                        {
+                            resource: {
+                                resourceType: 'Encounter',
+                                id: session.id,
+                                status: 'finished',
+                                class: { system: 'http://terminology.hl7.org/CodeSystem/v3-ActCode', code: 'AMB' },
+                                subject: { reference: patientRef },
+                                reasonCode: [{ text: fullSession.selectedService }],
+                                period: { start: new Date(fullSession.createdAt).toISOString() },
+                            },
+                        },
+                        ...nephrologyResources.map(r => ({ resource: r as unknown as Record<string, unknown> })),
+                    ],
+                };
+
+                await triggerFhirPushAsync(session.tenantId, session.id, fhirBundle);
+            } catch (fhirErr) {
+                console.warn('[Sessions] FHIR push fehlgeschlagen (non-critical):', fhirErr);
+            }
+        });
+
         res.json({
             success: true,
             sessionId: session.id,
@@ -525,6 +579,95 @@ router.post('/refresh-token', requireAuth, async (req: Request, res: Response) =
     } catch (err: unknown) {
         console.error('[Sessions] Token-Refresh-Fehler:', err);
         res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.session.token_refresh_failed') });
+    }
+});
+
+// ─── Phase 5: Digital Front Door — Mobile/QR Session Bootstrap ──────────────
+
+const ALLOWED_SPECIALTIES = new Set([
+    'nephrology', 'cardiology', 'hematology', 'radiology',
+    'general', 'dermatology', 'neurology', 'orthopedics', 'pediatrics',
+]);
+
+/**
+ * POST /api/sessions/start
+ * Digital Front Door: create an anonymous session pre-configured for a
+ * specific specialty / tenant, returning the session URL and a signed
+ * deep-link that can be embedded in a QR code.
+ *
+ * Query params (all optional):
+ *   lang       – BCP-47 language tag (default: 'de')
+ *   specialty  – medical specialty slug for pre-selecting service (default: 'general')
+ *   tenant     – tenant slug (resolved to tenantId)
+ *
+ * No authentication required — the session starts in anonymous mode and
+ * the patient authenticates later inside the session flow.
+ */
+router.post('/start', async (req: Request, res: Response) => {
+    try {
+        const lang = (typeof req.query.lang === 'string' ? req.query.lang : 'de').slice(0, 8);
+        const specialtyRaw = typeof req.query.specialty === 'string' ? req.query.specialty : 'general';
+        const specialty = ALLOWED_SPECIALTIES.has(specialtyRaw) ? specialtyRaw : 'general';
+        const tenantSubdomain = typeof req.query.tenant === 'string' ? req.query.tenant.replace(/[^a-z0-9-]/g, '') : null;
+
+        // Resolve tenantId from subdomain (or use header / default)
+        let tenantId: string = req.tenantId || 'default';
+        if (tenantSubdomain) {
+            const tenant = await prisma.tenant.findUnique({
+                where: { subdomain: tenantSubdomain },
+                select: { id: true, status: true },
+            });
+            if (!tenant || tenant.status !== 'ACTIVE') {
+                res.status(404).json({ error: 'Tenant not found or inactive' });
+                return;
+            }
+            tenantId = tenant.id;
+        }
+
+        const serviceLabel = specialty.charAt(0).toUpperCase() + specialty.slice(1);
+
+        const patient = await prisma.patient.create({
+            data: {
+                hashedEmail: `dfd-anon-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                tenantId,
+            },
+        });
+
+        const session = await prisma.patientSession.create({
+            data: {
+                tenantId,
+                patientId: patient.id,
+                isNewPatient: true,
+                selectedService: serviceLabel,
+            },
+        });
+
+        const token = createToken({ sessionId: session.id, role: 'patient' });
+        setTokenCookie(res, token);
+
+        // Build the deep-link URL the QR code will encode
+        const baseUrl = appConfig.frontendUrl || `${req.protocol}://${req.get('host')}`;
+        const sessionUrl = `${baseUrl}/session/${session.id}?lang=${encodeURIComponent(lang)}&specialty=${encodeURIComponent(specialty)}`;
+
+        // Signed short-lived link token (15 min) embeddable in QR codes
+        const linkToken = sign(
+            { type: 'dfd-link', sessionId: session.id, tenantId, specialty },
+            process.env.JWT_SECRET!,
+            { expiresIn: '15m' },
+        );
+
+        res.status(201).json({
+            sessionId: session.id,
+            sessionUrl,
+            linkToken,
+            qrData: sessionUrl,
+            lang,
+            specialty,
+            tenantId,
+        });
+    } catch (err) {
+        console.error('[Sessions] Digital Front Door start error:', err);
+        res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.generic') });
     }
 });
 

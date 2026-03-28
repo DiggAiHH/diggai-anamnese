@@ -1,9 +1,15 @@
 # DiggAI Anamnese Platform
 
-DSGVO-konforme, klinische Patientenaufnahme-Plattform fÃ¼r Arztpraxen in Deutschland.
-Digitalisiert den Anamnese-Prozess mit 270+ medizinischen Fragen, Echtzeit-Triage, KI-gestÃ¼tzter Auswertung und vollstÃ¤ndiger Offline-UnterstÃ¼tzung als Progressive Web App.
+DSGVO-konforme, klinische Patientenaufnahme-Plattform für Arztpraxen in Deutschland.
+Digitalisiert den Anamnese-Prozess mit 270+ medizinischen Fragen, Echtzeit-Triage, KI-gestützter Auswertung und vollständiger Offline-Unterstützung als Progressive Web App.
 
 **Live**: [diggai-drklaproth.netlify.app](https://diggai-drklaproth.netlify.app)
+
+---
+
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/DiggAiHH/diggai-anamnese?quickstart=1)
+
+> **Schnellstart in der Cloud:** Klick auf den Badge → Codespace startet → `npm run dev:all` → fertig.
 
 ---
 
@@ -14,7 +20,7 @@ Digitalisiert den Anamnese-Prozess mit 270+ medizinischen Fragen, Echtzeit-Triag
 ![HIPAA](https://img.shields.io/badge/HIPAA-Audit_Logging-green)
 ![eIDAS](https://img.shields.io/badge/eIDAS-Digitale_Signatur-blue)
 ![gematik TI](https://img.shields.io/badge/gematik_TI-ready-orange)
-![License](https://img.shields.io/badge/Lizenz-ProprietÃ¤r-red)
+![License](https://img.shields.io/badge/Lizenz-Proprietär-red)
 
 ---
 

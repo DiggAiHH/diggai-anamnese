@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { io, Socket } from 'socket.io-client';
 import { SOCKET_BASE_URL, getAuthToken } from '../api/client';
+import { useChatMessages, useSendChatMessage } from '../hooks/useApi';
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -119,7 +120,38 @@ export const StaffChat: React.FC<StaffChatProps> = ({ currentUser, patientSessio
   }, [channels, searchQuery]);
 
   const activeChannel = channels.find(ch => ch.id === activeChannelId);
-  const activeMessages = messages[activeChannelId] || [];
+  const activeMessages = useMemo(() => messages[activeChannelId] || [], [messages, activeChannelId]);
+  const activePatientSessionId = activeChannel?.type === 'patient' ? activeChannel.sessionId ?? '' : '';
+  const { data: patientHistory } = useChatMessages(activePatientSessionId);
+  const sendChatMessage = useSendChatMessage();
+
+  const playNotificationSound = useCallback(() => {
+    try {
+      const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbsGczFj+a37nFdzANMIS/0LlkHgMvi7LVqFMFH3+q08RzAw==');
+      audio.volume = 0.3;
+      audio.play().catch(() => { });
+    } catch { /* ignore */ }
+  }, []);
+
+  const normalizePatientMessage = useCallback((msg: Partial<ChatMessage> & {
+    id?: string;
+    text?: string;
+    from?: string;
+    fromName?: string;
+    fromRole?: ChatMessage['fromRole'];
+    senderType?: string;
+    timestamp?: string;
+    createdAt?: string;
+    channel?: string;
+  }, channelId: string): ChatMessage => ({
+    id: msg.id,
+    text: msg.text || '',
+    from: msg.from ?? msg.fromName ?? 'Praxis-Team',
+    fromRole: (msg.fromRole
+      ?? (msg.senderType?.toLowerCase() === 'patient' ? 'patient' : 'arzt')) as ChatMessage['fromRole'],
+    timestamp: msg.timestamp ?? msg.createdAt ?? new Date().toISOString(),
+    channel: msg.channel ?? channelId,
+  }), []);
 
   // ─── Socket.IO Connection ─────────────────────────────
 
@@ -243,37 +275,91 @@ export const StaffChat: React.FC<StaffChatProps> = ({ currentUser, patientSessio
     }
   }, [activeMessages]);
 
+  useEffect(() => {
+    if (!activeChannel || activeChannel.type !== 'patient' || !patientHistory?.messages) {
+      return;
+    }
+
+    const normalizedMessages = patientHistory.messages.map((msg: Partial<ChatMessage>) =>
+      normalizePatientMessage(msg, activeChannel.id),
+    );
+
+    setMessages(prev => {
+      const existing = prev[activeChannel.id] || [];
+      const merged = [...existing];
+
+      for (const nextMessage of normalizedMessages) {
+        const duplicate = merged.some((current) =>
+          (nextMessage.id && current.id === nextMessage.id)
+          || (
+            current.text === nextMessage.text
+            && current.timestamp === nextMessage.timestamp
+            && current.from === nextMessage.from
+          )
+        );
+
+        if (!duplicate) {
+          merged.push(nextMessage);
+        }
+      }
+
+      merged.sort((left, right) => +new Date(left.timestamp) - +new Date(right.timestamp));
+
+      return {
+        ...prev,
+        [activeChannel.id]: merged,
+      };
+    });
+  }, [activeChannel, normalizePatientMessage, patientHistory]);
+
   // ─── Send Message ──────────────────────────────────────
 
-  const handleSend = useCallback(() => {
-    if (!inputText.trim() || !socketRef.current) return;
+  const handleSend = useCallback(async () => {
+    const trimmedMessage = inputText.trim();
+    if (!trimmedMessage) return;
 
     const channel = activeChannel;
     if (!channel) return;
 
     if (channel.type === 'staff') {
+      if (!socketRef.current?.connected) return;
+
       // Staff-to-staff message
       socketRef.current.emit('staff:send_message', {
         channel: channel.id,
-        message: inputText,
+        message: trimmedMessage,
         userName: currentUser.displayName,
         userRole: currentUser.role,
       });
     } else if (channel.type === 'patient' && channel.sessionId) {
-      // Staff-to-patient message
-      socketRef.current.emit('arzt:message', {
-        sessionId: channel.sessionId,
-        message: inputText,
-        userId: currentUser.id,
-      });
-      // Local echo
       const echo: ChatMessage = {
-        text: inputText,
+        text: trimmedMessage,
         from: currentUser.displayName,
         fromRole: currentUser.role,
         timestamp: new Date().toISOString(),
         channel: channel.id,
       };
+
+      if (socketRef.current?.connected) {
+        socketRef.current.emit('arzt:message', {
+          sessionId: channel.sessionId,
+          message: trimmedMessage,
+          userId: currentUser.id,
+        });
+      } else {
+        const response = await sendChatMessage.mutateAsync({
+          sessionId: channel.sessionId,
+          text: trimmedMessage,
+        });
+
+        const persistedMessage = response?.message
+          ? normalizePatientMessage(response.message as Partial<ChatMessage>, channel.id)
+          : echo;
+
+        echo.id = persistedMessage.id;
+        echo.timestamp = persistedMessage.timestamp;
+      }
+
       setMessages(prev => ({
         ...prev,
         [channel.id]: [...(prev[channel.id] || []), echo]
@@ -281,7 +367,7 @@ export const StaffChat: React.FC<StaffChatProps> = ({ currentUser, patientSessio
     }
 
     setInputText('');
-  }, [inputText, activeChannel, currentUser]);
+  }, [activeChannel, currentUser, inputText, normalizePatientMessage, sendChatMessage]);
 
   // ─── Typing ─────────────────────────────────────────────
 
@@ -300,14 +386,6 @@ export const StaffChat: React.FC<StaffChatProps> = ({ currentUser, patientSessio
   }, [activeChannel, currentUser]);
 
   // ─── Helpers ────────────────────────────────────────────
-
-  const playNotificationSound = () => {
-    try {
-      const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbsGczFj+a37nFdzANMIS/0LlkHgMvi7LVqFMFH3+q08RzAw==');
-      audio.volume = 0.3;
-      audio.play().catch(() => { });
-    } catch { /* ignore */ }
-  };
 
   const getRoleColor = (role: string) => {
     switch (role) {
@@ -460,6 +538,7 @@ export const StaffChat: React.FC<StaffChatProps> = ({ currentUser, patientSessio
             <button
               onClick={() => setShowSidebar(!showSidebar)}
               className="p-1 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+              title={showSidebar ? t('staffChat.hideSidebar', 'Seitenleiste ausblenden') : t('staffChat.showSidebar', 'Seitenleiste einblenden')}
             >
               <ChevronDown className={`w-4 h-4 transition-transform ${showSidebar ? 'rotate-90' : '-rotate-90'}`} />
             </button>
@@ -486,6 +565,7 @@ export const StaffChat: React.FC<StaffChatProps> = ({ currentUser, patientSessio
             <button
               onClick={() => setIsOpen(false)}
               className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+              title={t('staffChat.close', 'Chat schließen')}
             >
               <X className="w-4 h-4" />
             </button>

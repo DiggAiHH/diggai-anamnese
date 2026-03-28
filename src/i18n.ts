@@ -39,6 +39,10 @@ i18n
             bindI18nStore: 'added removed',
             nsMode: 'default',
         },
+        // Arabic has 6 plural forms: zero, one, two, few (3–10), many (11–99), other (100+)
+        // i18next uses suffixes: _zero, _one, _two, _few, _many, _other
+        // Persian (fa) uses 2 forms: one, other
+        pluralSeparator: '_',
     });
 
 /**

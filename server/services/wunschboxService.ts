@@ -1,5 +1,9 @@
 const db = (globalThis as any).__prisma as any;
 
+interface WunschboxAccessOptions {
+    tenantId?: string;
+}
+
 /**
  * Wunschbox KI-Service
  * Phase 1 (MVP): Regelbasiertes Parsing mit Keyword-Matching
@@ -127,12 +131,25 @@ export function parseWishRuleBased(text: string): ParsedChange[] {
     }));
 }
 
+async function loadEntry(entryId: string, options?: WunschboxAccessOptions) {
+    const entry = await db.wunschboxEntry.findUnique({ where: { id: entryId } });
+
+    if (!entry) {
+        throw new Error('Wunschbox-Eintrag nicht gefunden');
+    }
+
+    if (options?.tenantId && entry.tenantId !== options.tenantId) {
+        throw new Error('Wunschbox-Eintrag nicht gefunden');
+    }
+
+    return entry;
+}
+
 /**
  * Process a WunschboxEntry: parse and store AI results
  */
-export async function processWunschboxEntry(entryId: string): Promise<ParsedChange[]> {
-    const entry = await db.wunschboxEntry.findUnique({ where: { id: entryId } });
-    if (!entry) throw new Error('Wunschbox-Eintrag nicht gefunden');
+export async function processWunschboxEntry(entryId: string, options?: WunschboxAccessOptions): Promise<ParsedChange[]> {
+    const entry = await loadEntry(entryId, options);
 
     // Phase 1: Rule-based parsing
     const parsed = parseWishRuleBased(entry.originalText);
@@ -151,9 +168,8 @@ export async function processWunschboxEntry(entryId: string): Promise<ParsedChan
 /**
  * Generate export spec from a reviewed Wunschbox entry
  */
-export async function generateExportSpec(entryId: string): Promise<string> {
-    const entry = await db.wunschboxEntry.findUnique({ where: { id: entryId } });
-    if (!entry) throw new Error('Wunschbox-Eintrag nicht gefunden');
+export async function generateExportSpec(entryId: string, options?: WunschboxAccessOptions): Promise<string> {
+    const entry = await loadEntry(entryId, options);
 
     const changes: ParsedChange[] = entry.aiParsedChanges ? JSON.parse(entry.aiParsedChanges) : [];
 

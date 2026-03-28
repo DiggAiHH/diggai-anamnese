@@ -1,5 +1,9 @@
-import { useState, useReducer, useCallback, type ChangeEvent } from 'react';
+import { useState, useReducer, useCallback, useEffect, useRef, type ChangeEvent } from 'react';
 import { Plus, Trash2, GripVertical, Eye, Save, Sparkles } from 'lucide-react';
+import { useParams } from 'react-router-dom';
+import { useFormAiGenerate, useFormCreate, useFormGet, useFormUpdate } from '../../hooks/useApi';
+import { useStaffSession } from '../../hooks/useStaffSession';
+import { resolvePraxisId } from '../../lib/praxisContext';
 
 /* ── Types ── */
 
@@ -47,6 +51,24 @@ interface FormState {
   selectedId: string | null;
 }
 
+interface PersistedFormQuestion {
+  id: string;
+  label: string;
+  type: QuestionType;
+  required: boolean;
+  options?: string[];
+  placeholder?: string;
+  conditionalOn?: ConditionalOn | null;
+}
+
+interface PersistedForm {
+  id: string;
+  name: string;
+  description?: string;
+  tags?: string[];
+  questions?: PersistedFormQuestion[];
+}
+
 /* ── Reducer ── */
 
 type Action =
@@ -55,6 +77,7 @@ type Action =
   | { type: 'REMOVE_QUESTION'; id: string }
   | { type: 'UPDATE_QUESTION'; id: string; patch: Partial<Question> }
   | { type: 'SELECT_QUESTION'; id: string | null }
+  | { type: 'HYDRATE_FORM'; value: FormState }
   | { type: 'MOVE_QUESTION'; fromIdx: number; toIdx: number };
 
 function uid(): string {
@@ -103,6 +126,9 @@ function formReducer(state: FormState, action: Action): FormState {
     case 'SELECT_QUESTION':
       return { ...state, selectedId: action.id };
 
+    case 'HYDRATE_FORM':
+      return action.value;
+
     case 'MOVE_QUESTION': {
       const qs = [...state.questions];
       const [moved] = qs.splice(action.fromIdx, 1);
@@ -120,6 +146,28 @@ const initialState: FormState = {
   questions: [],
   selectedId: null,
 };
+
+function toFormState(form: PersistedForm): FormState {
+  const questions = (form.questions ?? []).map((question) => ({
+    id: question.id,
+    label: question.label,
+    type: question.type,
+    required: question.required,
+    options: (question.options ?? []).join(', '),
+    placeholder: question.placeholder ?? '',
+    conditionalOn: question.conditionalOn ?? null,
+  }));
+
+  return {
+    meta: {
+      name: form.name,
+      description: form.description ?? '',
+      tags: (form.tags ?? []).join(', '),
+    },
+    questions,
+    selectedId: questions[0]?.id ?? null,
+  };
+}
 
 /* ── Sub-components ── */
 
@@ -260,7 +308,7 @@ function QuestionEditor({
               className="peer sr-only"
               title="Pflichtfeld umschalten"
             />
-            <div className="h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all peer-checked:bg-blue-600 peer-checked:after:translate-x-full peer-focus:ring-2 peer-focus:ring-blue-300 dark:bg-gray-700" />
+            <div className="h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all peer-checked:bg-blue-600 peer-checked:after:translate-x-full peer-focus:ring-2 peer-focus:ring-blue-300 dark:bg-gray-700" />
           </label>
           <span className="text-sm text-gray-700 dark:text-gray-300">Pflichtfeld</span>
         </div>
@@ -412,11 +460,30 @@ function PreviewField({ question }: { question: Question }) {
 /* ── Main component ── */
 
 export function FormBuilderPage() {
+  const { formId } = useParams<{ formId: string }>();
+  const praxisId = resolvePraxisId();
+  const hydratedFormIdRef = useRef<string | null>(null);
+  const staffSession = useStaffSession();
+  const formQuery = useFormGet(formId ?? '');
+  const formCreateMutation = useFormCreate();
+  const formUpdateMutation = useFormUpdate();
+  const formAiGenerateMutation = useFormAiGenerate();
   const [state, dispatch] = useReducer(formReducer, initialState);
   const [preview, setPreview] = useState(false);
   const [aiPrompt, setAiPrompt] = useState('');
   const [showAi, setShowAi] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!formId || !formQuery.data || hydratedFormIdRef.current === formId) {
+      return;
+    }
+
+    dispatch({ type: 'HYDRATE_FORM', value: toFormState(formQuery.data as PersistedForm) });
+    hydratedFormIdRef.current = formId;
+    setErrors([]);
+  }, [formId, formQuery.data]);
 
   const selected = state.questions.find((q) => q.id === state.selectedId) ?? null;
 
@@ -434,13 +501,19 @@ export function FormBuilderPage() {
     return errs;
   }, [state]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const errs = validate();
+    const currentUserId = staffSession.data?.id;
+    if (!currentUserId) {
+      errs.push('Angemeldeter Mitarbeiter konnte nicht ermittelt werden.');
+    }
+
     setErrors(errs);
     if (errs.length > 0) return;
 
     const payload = {
-      ...state.meta,
+      name: state.meta.name,
+      description: state.meta.description || undefined,
       tags: state.meta.tags
         .split(',')
         .map((t) => t.trim())
@@ -453,21 +526,55 @@ export function FormBuilderPage() {
         options: TYPES_WITH_OPTIONS.includes(type)
           ? options.split(',').map((o) => o.trim()).filter(Boolean)
           : [],
-        placeholder,
-        conditionalOn,
+        placeholder: placeholder || undefined,
+        ...(conditionalOn ? { conditionalOn } : {}),
       })),
     };
 
-    console.log('[FormBuilder] Saved form JSON:', JSON.stringify(payload, null, 2));
-    alert('Formular gespeichert! (siehe Konsole)');
+    try {
+      setStatusMessage(null);
+      if (formId) {
+        await formUpdateMutation.mutateAsync({ id: formId, ...payload });
+      } else {
+        await formCreateMutation.mutateAsync({
+          praxisId,
+          createdBy: currentUserId!,
+          ...payload,
+        });
+      }
+      setErrors([]);
+      setStatusMessage('Formular gespeichert.');
+    } catch (error) {
+      setStatusMessage(null);
+      setErrors([error instanceof Error ? error.message : 'Formular konnte nicht gespeichert werden.']);
+    }
   };
 
-  const handleAiGenerate = () => {
+  const handleAiGenerate = async () => {
     if (!aiPrompt.trim()) return;
-    console.log('[FormBuilder] KI-Prompt:', aiPrompt);
-    alert(`KI-Generierung angefragt:\n\n${aiPrompt}`);
-    setShowAi(false);
-    setAiPrompt('');
+    if (!staffSession.data?.id) {
+      setErrors(['Angemeldeter Mitarbeiter konnte nicht ermittelt werden.']);
+      return;
+    }
+
+    try {
+      const generatedForm = await formAiGenerateMutation.mutateAsync({
+        praxisId,
+        createdBy: staffSession.data.id,
+        prompt: aiPrompt.trim(),
+        language: 'de',
+      });
+
+      dispatch({ type: 'HYDRATE_FORM', value: toFormState(generatedForm as PersistedForm) });
+      hydratedFormIdRef.current = formId ?? null;
+      setErrors([]);
+      setStatusMessage('KI-Formular übernommen.');
+      setShowAi(false);
+      setAiPrompt('');
+    } catch (error) {
+      setStatusMessage(null);
+      setErrors([error instanceof Error ? error.message : 'KI-Formular konnte nicht generiert werden.']);
+    }
   };
 
   /* ── Preview mode ── */
@@ -551,6 +658,12 @@ export function FormBuilderPage() {
         </div>
       )}
 
+      {statusMessage && (
+        <div className="mx-6 mt-3 rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-700 dark:border-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+          {statusMessage}
+        </div>
+      )}
+
       {/* AI prompt modal */}
       {showAi && (
         <div className="mx-6 mt-3 rounded-lg border border-purple-300 bg-purple-50 p-4 dark:border-purple-700 dark:bg-purple-900/20">
@@ -596,6 +709,7 @@ export function FormBuilderPage() {
                 dispatch({ type: 'SET_META', field: 'name', value: e.target.value })
               }
               placeholder="Formularname *"
+              aria-label="Formularname *"
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
             />
             <textarea
@@ -614,6 +728,7 @@ export function FormBuilderPage() {
                 dispatch({ type: 'SET_META', field: 'tags', value: e.target.value })
               }
               placeholder="Tags (kommagetrennt)"
+              aria-label="Tags (kommagetrennt)"
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
             />
           </div>

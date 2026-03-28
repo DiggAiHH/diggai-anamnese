@@ -155,6 +155,7 @@ describe('answers routes', () => {
     it('should reject answer for completed session', async () => {
       vi.mocked(prisma.patientSession.findUnique).mockResolvedValue({
         id: 'session-1',
+        tenantId: 'tenant-1',
         status: 'COMPLETED',
       } as never);
 
@@ -173,9 +174,35 @@ describe('answers routes', () => {
       expect(res.body).toHaveProperty('error');
     });
 
+    it('should reject invalid birth dates with 400', async () => {
+      vi.mocked(prisma.patientSession.findUnique).mockResolvedValue({
+        id: 'session-1',
+        tenantId: 'tenant-1',
+        status: 'ACTIVE',
+      } as never);
+      vi.mocked(prisma.answer.upsert).mockResolvedValue({ id: 'answer-1' } as never);
+      vi.mocked(prisma.answer.findMany).mockResolvedValue([] as never);
+
+      const handlers = getRouteHandlers('/:id', 'post');
+      const handler = handlers[handlers.length - 1] as (req: unknown, res: unknown) => Promise<void>;
+
+      const req = {
+        params: { id: 'session-1' },
+        body: { atomId: '0003', value: 'definitely-not-a-date' },
+      };
+      const res = createMockResponse();
+
+      await handler(req, res);
+
+      expect(res.statusCode).toBe(400);
+      expect(res.body).toEqual({ error: 'Ungültiges Geburtsdatum' });
+      expect(prisma.patientSession.update).not.toHaveBeenCalled();
+    });
+
     it('should encrypt PII values', async () => {
       vi.mocked(prisma.patientSession.findUnique).mockResolvedValue({
         id: 'session-1',
+        tenantId: 'tenant-1',
         status: 'ACTIVE',
       } as never);
       vi.mocked(prisma.answer.upsert).mockResolvedValue({ id: 'answer-1' } as never);
@@ -195,11 +222,18 @@ describe('answers routes', () => {
       await handler(req, res);
 
       expect(res.statusCode).toBe(200);
+      expect(prisma.answer.upsert).toHaveBeenCalledWith(expect.objectContaining({
+        create: expect.objectContaining({
+          value: JSON.stringify({ type: 'text', data: '[encrypted]', redacted: true }),
+          encryptedValue: 'enc-sensitive data',
+        }),
+      }));
     });
 
     it('should evaluate triage and create events', async () => {
       vi.mocked(prisma.patientSession.findUnique).mockResolvedValue({
         id: 'session-1',
+        tenantId: 'tenant-1',
         status: 'ACTIVE',
         gender: 'M',
         birthDate: new Date('1990-01-01'),
@@ -229,6 +263,7 @@ describe('answers routes', () => {
     it('should emit critical triage alert', async () => {
       vi.mocked(prisma.patientSession.findUnique).mockResolvedValue({
         id: 'session-1',
+        tenantId: 'tenant-1',
         status: 'ACTIVE',
         gender: 'M',
         isNewPatient: true,
@@ -256,6 +291,7 @@ describe('answers routes', () => {
     it('should link patient by email when email atom submitted', async () => {
       vi.mocked(prisma.patientSession.findUnique).mockResolvedValue({
         id: 'session-1',
+        tenantId: 'tenant-1',
         status: 'ACTIVE',
         gender: 'M',
         isNewPatient: true,
@@ -283,7 +319,32 @@ describe('answers routes', () => {
 
       await handler(req, res);
 
-      expect(prisma.patient.findFirst).toHaveBeenCalled();
+      expect(prisma.patient.findFirst).toHaveBeenCalledWith({
+        where: { hashedEmail: 'hash-test@example.com', tenantId: 'tenant-1' },
+      });
+    });
+
+    it('should reject staff requests without matching tenant context', async () => {
+      vi.mocked(prisma.patientSession.findUnique).mockResolvedValue({
+        id: 'session-1',
+        tenantId: 'tenant-a',
+        status: 'ACTIVE',
+      } as never);
+
+      const handlers = getRouteHandlers('/:id', 'post');
+      const handler = handlers[handlers.length - 1] as (req: unknown, res: unknown) => Promise<void>;
+
+      const req = {
+        params: { id: 'session-1' },
+        body: { atomId: 'atom-1', value: 'test' },
+        auth: { role: 'arzt', tenantId: 'tenant-b' },
+      };
+      const res = createMockResponse();
+
+      await handler(req, res);
+
+      expect(res.statusCode).toBe(404);
+      expect(prisma.answer.upsert).not.toHaveBeenCalled();
     });
 
     it('should require auth and session owner', () => {

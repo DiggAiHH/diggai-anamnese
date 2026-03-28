@@ -127,6 +127,42 @@ services:
     networks:
       - diggai-network
 
+  # ─── UAE Regional Deployment (Abu Dhabi / UAE North) ──────────────────────
+  app-uae:
+    build: .
+    container_name: diggai-app-uae
+    profiles: ["uae"]
+    env_file: .env.uae
+    environment:
+      - DATA_RESIDENCY_REGION=uae
+      - CORS_EXTRA_ORIGINS=https://*.doh.gov.ae,https://*.m42.ae
+    ports:
+      - "3002:3001"
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+    networks:
+      - diggai-network
+
+  # ─── Jordan Regional Deployment (Sarah Speciality Hospital, Mafraq) ────────
+  app-jordan:
+    build: .
+    container_name: diggai-app-jordan
+    profiles: ["jordan"]
+    env_file: .env.jordan
+    environment:
+      - DATA_RESIDENCY_REGION=jordan
+      - CORS_EXTRA_ORIGINS=https://*.moh.gov.jo,https://*.jdhc.jo
+    ports:
+      - "3003:3001"
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+    networks:
+      - diggai-network
+
 volumes:
   pgdata:
     driver: local

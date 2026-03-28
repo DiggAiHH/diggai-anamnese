@@ -5,6 +5,14 @@
 **Praxis OS** ist das übergeordnete, privacy-first Praxis-Betriebssystem für deutsche Arztpraxen.
 Die **DiggAI Anamnese App** ist das erste produktive Modul innerhalb dieses Systems.
 
+### Globale Architektur- und Sicherheitsrichtlinie
+
+Verbindliche Single Source of Truth (Root):
+
+- `docs/GLOBAL_AI_ARCHITECTURE_SECURITY_POLICY.md`
+
+Dieses Modul darf keine widersprüchlichen Regeln definieren.
+
 ### 6-Layer Architektur
 
 | Layer | Verantwortung | Beispiele |

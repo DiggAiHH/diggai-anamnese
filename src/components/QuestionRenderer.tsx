@@ -36,11 +36,16 @@ const formatValue = (value: unknown): string => {
     return String(value);
 };
 
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Lock, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useState, useCallback } from 'react';
 
 export function QuestionRenderer({ question, value, onAnswer, error, simpleMode = false }: QuestionRendererProps) {
     const { t } = useTranslation();
+    const [showHelp, setShowHelp] = useState(false);
+    const [showWhy, setShowWhy] = useState(false);
+    const toggleHelp = useCallback(() => setShowHelp(prev => !prev), []);
+    const toggleWhy = useCallback(() => setShowWhy(prev => !prev), []);
 
     const translatedOptions = question.options?.map(opt => ({
         ...opt,
@@ -174,6 +179,16 @@ export function QuestionRenderer({ question, value, onAnswer, error, simpleMode 
                     )}
                 </div>
 
+                {/* Trust Signals: helpText + whyWeAsk + sensitive badge */}
+                <TrustSignals
+                    question={question}
+                    showHelp={showHelp}
+                    showWhy={showWhy}
+                    toggleHelp={toggleHelp}
+                    toggleWhy={toggleWhy}
+                    t={t}
+                />
+
                 {error && (
                     <div className="mt-6 p-4 bg-red-500/10 border border-red-500/20 rounded-[16px] flex items-center gap-3 text-red-400 text-sm animate-fade-in">
                         <AlertCircle className="w-5 h-5 shrink-0" />
@@ -189,6 +204,9 @@ export function QuestionRenderer({ question, value, onAnswer, error, simpleMode 
         <div className={`question-container animate-fade-in ${error ? 'border-red-500/50' : ''}`}>
             <div className="mb-6">
                 <h2 className="question-title">
+                    {question.sensitive && (
+                        <Lock className="w-4 h-4 inline-block mr-1.5 text-[#4A90E2] shrink-0" aria-hidden="true" />
+                    )}
                     {t(question.question)}
                     {question.validation?.required && (
                         <span className="text-red-400 ml-1">*</span>
@@ -214,10 +232,97 @@ export function QuestionRenderer({ question, value, onAnswer, error, simpleMode 
                 )}
             </div>
 
+            {/* Trust Signals */}
+            <TrustSignals
+                question={question}
+                showHelp={showHelp}
+                showWhy={showWhy}
+                toggleHelp={toggleHelp}
+                toggleWhy={toggleWhy}
+                t={t}
+            />
+
             {error && (
                 <div className="mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded-[16px] flex items-center gap-2 text-red-400 text-sm animate-fade-in">
                     <AlertCircle className="w-4 h-4 shrink-0" />
                     <span>{error}</span>
+                </div>
+            )}
+        </div>
+    );
+}
+
+/**
+ * TrustSignals — Inline transparency elements for medical questions
+ *
+ * Forschungsgrundlage:
+ * - Transparency enhances trust (Joinson et al. 2010): Explaining "why we ask" raises form completion 11%
+ * - Health Literacy: 47% of adults have limited health literacy (Berkman et al. 2011)
+ * - Progressive Disclosure: Show medical explanations on demand, not by default
+ */
+interface TrustSignalsProps {
+    question: Question;
+    showHelp: boolean;
+    showWhy: boolean;
+    toggleHelp: () => void;
+    toggleWhy: () => void;
+    t: (key: string, defaultValue?: string) => string;
+}
+
+function TrustSignals({ question, showHelp, showWhy, toggleHelp, toggleWhy, t }: TrustSignalsProps) {
+    const hasSignals = question.helpText || question.whyWeAsk || question.sensitive;
+    if (!hasSignals) return null;
+
+    return (
+        <div className="mt-3 space-y-2">
+            {/* Sensitive field badge */}
+            {question.sensitive && (
+                <div className="flex items-center gap-1.5 text-xs text-[#4A90E2]">
+                    <Lock className="w-3 h-3" aria-hidden="true" />
+                    <span>{t('trust.encrypted', 'Ihre Antwort wird verschlüsselt gespeichert')}</span>
+                </div>
+            )}
+
+            <div className="flex flex-wrap gap-3">
+                {/* Help text toggle */}
+                {question.helpText && (
+                    <button
+                        type="button"
+                        onClick={toggleHelp}
+                        className="flex items-center gap-1 text-xs text-[var(--text-secondary)] hover:text-[#4A90E2] transition-colors"
+                        aria-expanded={showHelp}
+                    >
+                        <HelpCircle className="w-3.5 h-3.5" aria-hidden="true" />
+                        <span>{t('trust.helpButton', 'Was bedeutet das?')}</span>
+                        {showHelp ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                    </button>
+                )}
+
+                {/* Why we ask toggle */}
+                {question.whyWeAsk && (
+                    <button
+                        type="button"
+                        onClick={toggleWhy}
+                        className="flex items-center gap-1 text-xs text-[var(--text-secondary)] hover:text-[#4A90E2] transition-colors"
+                        aria-expanded={showWhy}
+                    >
+                        <span>{t('trust.whyButton', 'Warum fragen wir das?')}</span>
+                        {showWhy ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                    </button>
+                )}
+            </div>
+
+            {/* Expandable help text panel */}
+            {showHelp && question.helpText && (
+                <div className="p-3 bg-[rgba(74,144,226,0.08)] border border-[rgba(74,144,226,0.15)] rounded-xl text-xs text-[var(--text-secondary)] animate-fade-in">
+                    {t(question.helpText)}
+                </div>
+            )}
+
+            {/* Expandable why-we-ask panel */}
+            {showWhy && question.whyWeAsk && (
+                <div className="p-3 bg-[rgba(129,178,154,0.08)] border border-[rgba(129,178,154,0.15)] rounded-xl text-xs text-[var(--text-secondary)] animate-fade-in">
+                    {t(question.whyWeAsk)}
                 </div>
             )}
         </div>

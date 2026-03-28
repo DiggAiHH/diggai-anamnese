@@ -1,13 +1,12 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { z } from 'zod';
 import { requireAuth, requireRole } from '../middleware/auth';
+import { prisma } from '../db';
 
 const router = Router();
-const prisma: any = new PrismaClient();
 
 const createTodoSchema = z.object({
-    text: z.string().min(1).max(500),
+    text: z.string().trim().min(1).max(500),
     priority: z.enum(['low', 'medium', 'high', 'urgent']).default('medium'),
     category: z.enum(['patient', 'admin', 'followup', 'general']).default('general'),
     sessionId: z.string().optional(),
@@ -15,16 +14,38 @@ const createTodoSchema = z.object({
 });
 
 const updateTodoSchema = z.object({
-    text: z.string().min(1).max(500).optional(),
+    text: z.string().trim().min(1).max(500).optional(),
     priority: z.enum(['low', 'medium', 'high', 'urgent']).optional(),
     category: z.enum(['patient', 'admin', 'followup', 'general']).optional(),
     completed: z.boolean().optional(),
 });
 
+function getAuthenticatedUserId(req: { auth?: { userId?: string } }) {
+    return req.auth?.userId;
+}
+
+async function getAuthenticatedDisplayName(userId: string | undefined) {
+    if (!userId) {
+        return '';
+    }
+
+    const user = await prisma.arztUser.findUnique({
+        where: { id: userId },
+        select: { displayName: true },
+    });
+
+    return user?.displayName ?? '';
+}
+
 // GET / — List todos for current user
 router.get('/', requireAuth, requireRole('admin', 'arzt', 'mfa'), async (req, res) => {
     try {
-        const userId = (req as any).user?.userId;
+        const userId = getAuthenticatedUserId(req);
+        if (!userId) {
+            res.status(401).json({ error: 'Ungültiger Authentifizierungskontext' });
+            return;
+        }
+
         const status = req.query.status as string | undefined;
 
         const where: any = { assigneeId: userId };
@@ -46,8 +67,13 @@ router.get('/', requireAuth, requireRole('admin', 'arzt', 'mfa'), async (req, re
 // POST / — Create todo
 router.post('/', requireAuth, requireRole('admin', 'arzt', 'mfa'), async (req, res) => {
     try {
-        const userId = (req as any).user?.userId;
-        const displayName = (req as any).user?.displayName || '';
+        const userId = getAuthenticatedUserId(req);
+        if (!userId) {
+            res.status(401).json({ error: 'Ungültiger Authentifizierungskontext' });
+            return;
+        }
+
+        const displayName = await getAuthenticatedDisplayName(userId);
         const data = createTodoSchema.parse(req.body);
 
         const todo = await prisma.staffTodo.create({
@@ -75,13 +101,22 @@ router.post('/', requireAuth, requireRole('admin', 'arzt', 'mfa'), async (req, r
 // PUT /:id — Update todo
 router.put('/:id', requireAuth, requireRole('admin', 'arzt', 'mfa'), async (req, res) => {
     try {
-        const userId = (req as any).user?.userId;
-        const { id } = req.params;
+        const userId = getAuthenticatedUserId(req);
+        if (!userId) {
+            res.status(401).json({ error: 'Ungültiger Authentifizierungskontext' });
+            return;
+        }
+
+        const id = String(req.params.id);
         const data = updateTodoSchema.parse(req.body);
 
         const existing = await prisma.staffTodo.findUnique({ where: { id } });
-        if (!existing || existing.assigneeId !== userId) {
+        if (!existing) {
             return res.status(404).json({ error: 'Aufgabe nicht gefunden' });
+        }
+
+        if (existing.assigneeId !== userId) {
+            return res.status(403).json({ error: 'Kein Zugriff auf diese Aufgabe' });
         }
 
         const updateData: any = {};
@@ -114,12 +149,21 @@ router.put('/:id', requireAuth, requireRole('admin', 'arzt', 'mfa'), async (req,
 // DELETE /:id — Delete todo
 router.delete('/:id', requireAuth, requireRole('admin', 'arzt', 'mfa'), async (req, res) => {
     try {
-        const userId = (req as any).user?.userId;
-        const { id } = req.params;
+        const userId = getAuthenticatedUserId(req);
+        if (!userId) {
+            res.status(401).json({ error: 'Ungültiger Authentifizierungskontext' });
+            return;
+        }
+
+        const id = String(req.params.id);
 
         const existing = await prisma.staffTodo.findUnique({ where: { id } });
-        if (!existing || existing.assigneeId !== userId) {
+        if (!existing) {
             return res.status(404).json({ error: 'Aufgabe nicht gefunden' });
+        }
+
+        if (existing.assigneeId !== userId) {
+            return res.status(403).json({ error: 'Kein Zugriff auf diese Aufgabe' });
         }
 
         await prisma.staffTodo.delete({ where: { id } });

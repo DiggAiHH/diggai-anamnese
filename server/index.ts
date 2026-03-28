@@ -158,12 +158,35 @@ app.use(cors({
     exposedHeaders: ['X-CSRF-Token'],
 }));
 
-// Global Rate Limiting (fallback)
+// Global Rate Limiting — Redis-backed when available, in-memory fallback
+// Redis store prevents per-server bypass in multi-instance deployments
+const buildRateLimitStore = (() => {
+    // Lazy-import to avoid breaking startup if rate-limit-redis is not installed
+    let store: import('express-rate-limit').Store | undefined;
+    try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { RedisStore } = require('rate-limit-redis');
+        const redisClient = getRedisClient();
+        if (redisClient && isRedisReady()) {
+            store = new RedisStore({
+                sendCommand: (...args: string[]) => (redisClient as unknown as { sendCommand: (...a: string[]) => Promise<unknown> }).sendCommand(...args),
+                prefix: 'rl:',
+            });
+        }
+    } catch {
+        // rate-limit-redis not installed or Redis unavailable — fall through to in-memory
+    }
+    return store;
+});
+
+const rateLimitStore = buildRateLimitStore();
+
 const globalLimiter = rateLimit({
     windowMs: config.rateLimitWindowMs,
     max: config.rateLimitMax,
     standardHeaders: true,
     legacyHeaders: false,
+    store: rateLimitStore, // undefined → in-memory (express-rate-limit default)
     message: { error: 'Zu viele Anfragen. Bitte warten Sie einen Moment.' },
 });
 app.use(globalLimiter);

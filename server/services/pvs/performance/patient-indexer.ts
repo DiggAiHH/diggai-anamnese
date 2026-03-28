@@ -214,6 +214,7 @@ export class PatientIndexer extends EventEmitter {
   private workerPool: WorkerPool;
   private isRunning = false;
   private watcherInitialized = false;
+  private indexedFileKeys = new Map<string, string[]>();
 
   constructor(config: Partial<IndexerConfig> = {}) {
     super();
@@ -340,9 +341,7 @@ export class PatientIndexer extends EventEmitter {
    * Datei aus Index entfernen
    */
   removeFile(filePath: string): boolean {
-    // Aus Cache entfernen
-    const cache = pvsCacheService.getPatientIndex();
-    const removed = cache.removeByFilePath(filePath);
+    const removed = this.removeIndexedFile(filePath);
     
     if (removed) {
       this.emit('file:removed', { filePath });
@@ -466,26 +465,6 @@ export class PatientIndexer extends EventEmitter {
         };
       }
 
-      // Prüfe Cache ob Datei bereits geparst wurde
-      if (pvsCacheService.isFileMetadataValid(task.filePath, stat.mtime.getTime(), stat.size)) {
-        const cached = pvsCacheService.getFileMetadata(task.filePath);
-        if (cached?.patientData) {
-          // Aus Cache wiederherstellen
-          const indexEntry = this.patientDataToIndexEntry(
-            cached.patientData,
-            task.filePath,
-            stat
-          );
-          pvsCacheService.indexPatient(indexEntry);
-          
-          return {
-            filePath: task.filePath,
-            success: true,
-            patientData: indexEntry,
-          };
-        }
-      }
-
       // Datei parsen
       const patientData = await this.parseGdtFileStreaming(task.filePath);
       
@@ -501,18 +480,8 @@ export class PatientIndexer extends EventEmitter {
       // Index-Eintrag erstellen
       const indexEntry = this.patientDataToIndexEntry(patientData, task.filePath, stat);
 
-      // Cache aktualisieren
-      pvsCacheService.setFileMetadata(task.filePath, {
-        filePath: task.filePath,
-        size: stat.size,
-        mtime: stat.mtime.getTime(),
-        checksum: await this.calculateChecksum(task.filePath),
-        parsedAt: Date.now(),
-        patientData,
-      });
-
       // In Index einfügen
-      pvsCacheService.indexPatient(indexEntry);
+      this.storeIndexEntry(indexEntry);
 
       return {
         filePath: task.filePath,
@@ -609,13 +578,14 @@ export class PatientIndexer extends EventEmitter {
     stat: { mtime: Date; size: number }
   ): PatientIndexEntry {
     return {
-      kvnr: data.kvnr || data.patNr,
+      patNr: data.patNr,
       filePath,
       lastName: data.lastName,
       firstName: data.firstName,
-      birthDate: data.birthDate,
-      modifiedAt: stat.mtime.getTime(),
-      fileSize: stat.size,
+      birthDate: data.birthDate ?? undefined,
+      insuranceNr: data.kvnr || data.patNr,
+      fileHash: `${stat.mtime.getTime()}:${stat.size}`,
+      indexedAt: new Date(stat.mtime),
     };
   }
 
@@ -684,6 +654,39 @@ export class PatientIndexer extends EventEmitter {
     this.workerPool.on('error', (result: FileProcessingResult) => {
       this.emit('file:error', result);
     });
+  }
+
+  private storeIndexEntry(entry: PatientIndexEntry): void {
+    this.removeIndexedFile(entry.filePath);
+
+    const keys: string[] = [];
+
+    if (entry.insuranceNr) {
+      pvsCacheService.patientIndex.indexByKvnr(entry.insuranceNr, entry.filePath);
+      keys.push(`kvnr:${entry.insuranceNr}`);
+    }
+
+    const fullName = `${entry.firstName} ${entry.lastName}`.trim();
+    if (fullName) {
+      pvsCacheService.patientIndex.indexByName(fullName, entry.filePath);
+      keys.push(`name:${fullName.toLowerCase().replace(/\s+/g, '')}`);
+    }
+
+    this.indexedFileKeys.set(entry.filePath, keys);
+  }
+
+  private removeIndexedFile(filePath: string): boolean {
+    const keys = this.indexedFileKeys.get(filePath);
+    if (!keys || keys.length === 0) {
+      return false;
+    }
+
+    for (const key of keys) {
+      pvsCacheService.patientIndex.delete(key);
+    }
+
+    this.indexedFileKeys.delete(filePath);
+    return true;
   }
 }
 

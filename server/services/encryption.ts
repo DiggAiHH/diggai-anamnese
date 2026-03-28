@@ -146,3 +146,74 @@ const PII_ATOM_IDS = new Set([
 export function isPIIAtom(atomId: string): boolean {
     return PII_ATOM_IDS.has(atomId);
 }
+
+// ─── Key-Versioned Encryption (for future key rotation) ──────
+//
+// Reads ENCRYPTION_KEY_v1, ENCRYPTION_KEY_v2, ... from environment.
+// Falls back to ENCRYPTION_KEY (= v1) when versioned keys are not set.
+// Only the current version is used for NEW encryptions.
+// All versions remain available for decryption (backwards compatibility).
+//
+// Environment variables:
+//   ENCRYPTION_KEY_CURRENT_VERSION=2    (which version to use for new encrypts, default: 1)
+//   ENCRYPTION_KEY_v1=<32 chars>        (= ENCRYPTION_KEY)
+//   ENCRYPTION_KEY_v2=<32 chars>        (new rotated key)
+//
+// Usage:
+//   const { ciphertext, version } = encryptVersioned(plaintext);
+//   const plain = decryptVersioned(ciphertext, version);
+
+function getVersionedKey(version: number): Buffer {
+    const envKey = process.env[`ENCRYPTION_KEY_v${version}`] || (version === 1 ? config.encryptionKey : null);
+    if (!envKey) {
+        throw new Error(`ENCRYPTION_KEY_v${version} ist nicht gesetzt`);
+    }
+    const key = Buffer.from(envKey, 'utf-8');
+    if (key.length !== 32) {
+        throw new Error(`ENCRYPTION_KEY_v${version} muss exakt 32 Bytes lang sein`);
+    }
+    return key;
+}
+
+export const CURRENT_KEY_VERSION = parseInt(process.env.ENCRYPTION_KEY_CURRENT_VERSION ?? '1', 10);
+
+/**
+ * Verschlüsselt mit der aktuellen Schlüsselversion.
+ * @returns ciphertext (Format: iv:authTag:cipher) und die verwendete version
+ */
+export function encryptVersioned(plaintext: string): { ciphertext: string; version: number } {
+    const key = getVersionedKey(CURRENT_KEY_VERSION);
+    const iv = crypto.randomBytes(IV_LENGTH);
+
+    const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
+    let encrypted = cipher.update(plaintext, 'utf-8', 'hex');
+    encrypted += cipher.final('hex');
+    const authTag = cipher.getAuthTag();
+
+    return {
+        ciphertext: `${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted}`,
+        version: CURRENT_KEY_VERSION,
+    };
+}
+
+/**
+ * Entschlüsselt mit einer expliziten Schlüsselversion (backwards-compatible).
+ * @param ciphertext Format: iv:authTag:cipher
+ * @param version    Schlüsselversion aus DB (Answer.encryptionVersion / Patient.encryptionVersion)
+ */
+export function decryptVersioned(ciphertext: string, version: number): string {
+    const key = getVersionedKey(version);
+    const parts = ciphertext.split(':');
+    if (parts.length !== 3) throw new Error('Ungültiges verschlüsseltes Format');
+
+    const iv = Buffer.from(parts[0], 'hex');
+    const authTag = Buffer.from(parts[1], 'hex');
+    const encrypted = parts[2];
+
+    const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
+    decipher.setAuthTag(authTag);
+    let decrypted = decipher.update(encrypted, 'hex', 'utf-8');
+    decrypted += decipher.final('utf-8');
+    return decrypted;
+}
+

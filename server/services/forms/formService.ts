@@ -8,8 +8,37 @@ import type {
   FormQuestion,
   UpdateFormInput,
 } from './types';
+import { encrypt } from '../encryption';
 
 const prisma = () => (globalThis as any).__prisma;
+
+interface FormAccessOptions {
+  praxisId?: string;
+  requireActive?: boolean;
+  requesterRole?: 'patient' | 'arzt' | 'mfa' | 'admin';
+  requesterSessionId?: string;
+}
+
+function buildEncryptedCustomFormAnswer(formId: string, questionId: string, value: unknown) {
+  const normalizedValue = value === undefined ? null : value;
+
+  return {
+    value: JSON.stringify({
+      type: 'custom-form',
+      formId,
+      questionId,
+      data: '[encrypted]',
+      redacted: true,
+      dataType: Array.isArray(normalizedValue) ? 'array' : typeof normalizedValue,
+    }),
+    encryptedValue: encrypt(JSON.stringify({
+      type: 'custom-form',
+      formId,
+      questionId,
+      data: normalizedValue,
+    })),
+  };
+}
 
 // ── CRUD ────────────────────────────────────────────────────────────
 
@@ -35,9 +64,15 @@ export async function createForm(input: CreateFormInput): Promise<CustomFormReco
   });
 }
 
-export async function getForm(id: string): Promise<CustomFormRecord> {
+export async function getForm(id: string, options?: FormAccessOptions): Promise<CustomFormRecord> {
   const db = prisma();
-  const form = await db.customForm.findUnique({ where: { id } });
+  const form = await db.customForm.findFirst({
+    where: {
+      id,
+      ...(options?.praxisId ? { praxisId: options.praxisId } : {}),
+      ...(options?.requireActive ? { isActive: true } : {}),
+    },
+  });
   if (!form) throw new Error(`Form not found: ${id}`);
   return form;
 }
@@ -56,9 +91,10 @@ export async function listForms(
 export async function updateForm(
   id: string,
   input: UpdateFormInput,
+  options?: FormAccessOptions,
 ): Promise<CustomFormRecord> {
   const db = prisma();
-  const existing = await getForm(id);
+  const existing = await getForm(id, options);
   return db.customForm.update({
     where: { id },
     data: {
@@ -71,8 +107,9 @@ export async function updateForm(
   });
 }
 
-export async function deleteForm(id: string): Promise<CustomFormRecord> {
+export async function deleteForm(id: string, options?: FormAccessOptions): Promise<CustomFormRecord> {
   const db = prisma();
+  await getForm(id, options);
   return db.customForm.update({
     where: { id },
     data: { isActive: false },
@@ -81,16 +118,18 @@ export async function deleteForm(id: string): Promise<CustomFormRecord> {
 
 // ── Publish / Usage ─────────────────────────────────────────────────
 
-export async function publishForm(id: string): Promise<CustomFormRecord> {
+export async function publishForm(id: string, options?: FormAccessOptions): Promise<CustomFormRecord> {
   const db = prisma();
+  await getForm(id, options);
   return db.customForm.update({
     where: { id },
     data: { isActive: true },
   });
 }
 
-export async function incrementUsage(id: string): Promise<CustomFormRecord> {
+export async function incrementUsage(id: string, options?: FormAccessOptions): Promise<CustomFormRecord> {
   const db = prisma();
+  await getForm(id, options);
   return db.customForm.update({
     where: { id },
     data: { usageCount: { increment: 1 } },
@@ -102,15 +141,83 @@ export async function incrementUsage(id: string): Promise<CustomFormRecord> {
 export async function submitForm(
   formId: string,
   data: { sessionId: string; answers: Record<string, unknown>; submittedAt?: string },
+  options?: FormAccessOptions,
 ) {
   const db = prisma();
-  await getForm(formId); // Throws if not found
-  await incrementUsage(formId);
+  const form = await getForm(formId, { ...options, requireActive: true });
+
+  if (options?.requesterRole === 'patient') {
+    if (!options.requesterSessionId) {
+      throw new Error('Missing patient session context');
+    }
+
+    if (options.requesterSessionId !== data.sessionId) {
+      throw new Error('Session mismatch');
+    }
+  }
+
+  const submittedAt = new Date();
+  const session = await db.patientSession.findFirst({
+    where: {
+      id: data.sessionId,
+      ...(options?.praxisId ? { tenantId: options.praxisId } : {}),
+    },
+    select: { id: true },
+  });
+
+  if (!session) {
+    throw new Error(`Session not found: ${data.sessionId}`);
+  }
+
+  const allowedQuestionIds = new Set(
+    Array.isArray(form.questions)
+      ? (form.questions as FormQuestion[]).map((question) => question.id)
+      : [],
+  );
+  const persistedEntries = Object.entries(data.answers).filter(([questionId]) => allowedQuestionIds.has(questionId));
+
+  if (persistedEntries.length === 0) {
+    throw new Error('No valid answers provided');
+  }
+
+  await db.$transaction([
+    ...persistedEntries.map(([questionId, value]) =>
+      (() => {
+        const storage = buildEncryptedCustomFormAnswer(form.id, questionId, value);
+
+        return db.answer.upsert({
+          where: {
+            sessionId_atomId: {
+              sessionId: data.sessionId,
+              atomId: `FORM:${form.id}:${questionId}`,
+            },
+          },
+          create: {
+            sessionId: data.sessionId,
+            atomId: `FORM:${form.id}:${questionId}`,
+            value: storage.value,
+            encryptedValue: storage.encryptedValue,
+            answeredAt: submittedAt,
+          },
+          update: {
+            value: storage.value,
+            encryptedValue: storage.encryptedValue,
+            answeredAt: submittedAt,
+          },
+        });
+      })(),
+    ),
+    db.customForm.update({
+      where: { id: form.id },
+      data: { usageCount: { increment: 1 } },
+    }),
+  ]);
+
   return {
     formId,
     sessionId: data.sessionId,
-    answersCount: Object.keys(data.answers).length,
-    submittedAt: data.submittedAt || new Date().toISOString(),
+    answersCount: persistedEntries.length,
+    submittedAt: submittedAt.toISOString(),
   };
 }
 

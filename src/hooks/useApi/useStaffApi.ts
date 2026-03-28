@@ -193,6 +193,21 @@ export function useChatMessages(sessionId: string) {
     });
 }
 
+/**
+ * Hook zum Senden einer Chat-Nachricht via REST-Fallback
+ */
+export function useSendChatMessage() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ sessionId, text }: { sessionId: string; text: string }) =>
+            api.sendChatMessage(sessionId, text),
+        onSuccess: (_data, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['chat', variables.sessionId] });
+        },
+    });
+}
+
 // ─── Queue / Wartezimmer Hooks ─────────────────────────────
 
 /**

@@ -5,6 +5,8 @@ import { useSubmitAnswer, useSubmitSession, useSubmitAccidentDetails, useSubmitM
 import { questions as allQuestions } from '../data/questions';
 import { QuestionRenderer } from './QuestionRenderer';
 import { ProgressBar } from './ProgressBar';
+import { ChapterProgress, DEFAULT_CHAPTERS } from './ui/ChapterProgress';
+import { AutoSaveIndicator } from './ui/AutoSaveIndicator';
 import {
     validateAnswer,
     shouldShowQuestion,
@@ -89,6 +91,7 @@ const ESTIMATED_TIME_NUMBERS: Record<string, string> = {
 };
 
 import { useTranslation } from 'react-i18next';
+import { ConsentFlow } from './ui/ConsentFlow';
 
 /**
  * Questionnaire Component - Phase 3: Layout & Whitespace
@@ -140,6 +143,7 @@ export function Questionnaire() {
     const [criticalOverlay, setCriticalOverlay] = useState<{ level: 'WARNING' | 'CRITICAL'; atomId: string; message: string; triggerValues: Record<string, unknown> | null } | null>(null);
     const [showPDF, setShowPDF] = useState(false);
     const [isSubmitted, setIsSubmitted] = useState(false);
+    const [clinicalConsentDone, setClinicalConsentDone] = useState(false);
     const [medications, setMedications] = useState<{ id: string; name: string; dosage: string; frequency: string; sinceWhen: string }[]>([]);
     const [surgeries, setSurgeries] = useState<{ id: string; surgeryName: string; date: string; complications: string; notes: string }[]>([]);
     const [showCameraScanner, setShowCameraScanner] = useState(false);
@@ -489,6 +493,21 @@ export function Questionnaire() {
     const estTime = `${estTimeNum} ${t('time.min', 'Min.')}`;
     const isLastQuestion = state.currentQuestionId === '9000';
 
+    // ─── Clinical Consent Gate (trust signals before questionnaire) ─────────
+    if (!clinicalConsentDone) {
+        const estimatedMinutes = Number(
+            (ESTIMATED_TIME_NUMBERS[state.selectedReason ?? ''] ?? '5').split('-')[0]
+        );
+        return (
+            <div className="min-h-screen bg-(--bg-primary) flex items-center justify-center p-4">
+                <ConsentFlow
+                    onContinue={() => setClinicalConsentDone(true)}
+                    estimatedMinutes={estimatedMinutes || 5}
+                />
+            </div>
+        );
+    }
+
     // ─── Submitted ──────────────────────────────────────────
     if (isSubmitted) {
         return (
@@ -623,13 +642,29 @@ export function Questionnaire() {
                         ${store.simpleMode ? 'max-w-2xl' : 'max-w-3xl'}  /* Narrower in simple mode for focus */
                     `}>
                         {/* Progress - Increased spacing for breathing room */}
-                        <div className="mb-10">
+                        <div className="mb-10 space-y-4">
                             <ProgressBar
                                 progress={progress}
                                 colorClass={theme.colorClass}
                                 currentStep={totalAnswered + 1}
                                 totalSteps={activePathIds.length}
                             />
+
+                            {/* Chapter Progress + Auto-Save (Trust & Transparency) */}
+                            <div className="flex items-start justify-between gap-4">
+                                <ChapterProgress
+                                    activeChapterIndex={(() => {
+                                        const currentQ = allQuestions.find(q => q.id === state.currentQuestionId);
+                                        if (!currentQ) return 0;
+                                        const idx = DEFAULT_CHAPTERS.findIndex(ch => ch.sections.includes(currentQ.section));
+                                        return idx >= 0 ? idx : 0;
+                                    })()}
+                                    answeredCount={totalAnswered}
+                                    totalEstimated={activePathIds.length}
+                                    compact={store.simpleMode}
+                                />
+                                <AutoSaveIndicator />
+                            </div>
                         </div>
 
                         {/* Warning Banner (non-critical) */}

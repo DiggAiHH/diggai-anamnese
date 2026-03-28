@@ -950,6 +950,30 @@ export const api = {
         const response = await apiClient.get(`/chats/${sessionId}`);
         return response.data;
     },
+    sendChatMessage: async (sessionId: string, text: string) => {
+        if (isDemoMode()) {
+            const db = readDemoDb();
+            const session = db.sessions[sessionId];
+            if (!session) demoError('Session nicht gefunden');
+
+            const message = {
+                id: demoId('chat'),
+                text,
+                from: 'Praxis-Team',
+                fromRole: 'arzt',
+                timestamp: new Date().toISOString(),
+                channel: `patient-${sessionId}`,
+            };
+
+            session.chatMessages = [...(session.chatMessages || []), message];
+            writeDemoDb(db);
+
+            return { message };
+        }
+
+        const response = await apiClient.post(`/chats/${sessionId}`, { text });
+        return response.data;
+    },
 
     // Export (entschluesselte Daten â€“ nur fuer Arzt/MFA)
     exportSessionPDF: async (sessionId: string) => {
@@ -2442,6 +2466,11 @@ export const api = {
     formUsage: async (id: string) => {
         if (isDemoMode()) return { id, usageCount: 1 };
         const response = await apiClient.post(`/forms/${id}/usage`);
+        return response.data;
+    },
+    formSubmit: async (id: string, data: { sessionId: string; answers: Record<string, unknown>; submittedAt?: string }) => {
+        if (isDemoMode()) return { formId: id, sessionId: data.sessionId, answersCount: Object.keys(data.answers).length, submittedAt: data.submittedAt ?? new Date().toISOString() };
+        const response = await apiClient.post(`/forms/${id}/submit`, data);
         return response.data;
     },
     formStats: async (praxisId: string) => {

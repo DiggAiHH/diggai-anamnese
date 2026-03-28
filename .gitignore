@@ -1,5 +1,11 @@
-# Logs
-logs
+# ── Node / Build ──────────────────────────────────────────────
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# ── Logs ──────────────────────────────────────────────────────
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -7,40 +13,47 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
-
-# Environment variables (SENSITIVE!)
+# ── Environment variables (SENSITIVE – never commit!) ─────────
 .env
 .env.local
 .env.production
 server/.env
 **/.env
+# But keep the example template:
+!.env.example
 
-# Prisma
+# ── Prisma ────────────────────────────────────────────────────
 prisma/*.db
 prisma/migrations/
 
+# ── Databases ─────────────────────────────────────────────────
+anamnese.db
+*.db
+uploads/
 
-# Editor directories and files
+# ── Editor & OS ───────────────────────────────────────────────
 .vscode/*
 !.vscode/extensions.json
-.idea
+!.vscode/settings.json
+.idea/
 .DS_Store
+Thumbs.db
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+*.code-workspace
 
-# Claude Code Desktop — worktrees for parallel sessions
+# ── Claude / AI agent artifacts ───────────────────────────────
 .claude/worktrees/
+.tmp-*
+.playwright-mcp/
 
-# Deploy/build log files
+# ── Deploy & build log files (CI output, not source) ─────────
 *.txt
-!README.md
+!README*.md
+!**/*.md
 deploy_out.json
 deploy_result.json
 netlify-api-deploy.json
@@ -49,30 +62,48 @@ sites.json
 test-results.json
 test-final*.json
 .netlify/
-
-# Build & deploy artifacts (safe to delete)
+surge-output.txt
+vercel-*.txt
+cf-*.txt
 build_*.txt
-build_final.txt
+build_debug.txt
+build_out.txt
 deploy-*.txt
 deploy-*.json
 netlify-deploy.log
-netlify-status.txt
-cf-create.txt
-cf-deploy.txt
+netlify-status*.txt
+eslint-*.txt
+eslint-*.json
+tsc_*.txt
+tsc_*.log
+type_check.log
+pw-*.txt
+pentest_results.txt
+link-output.txt
+login-output*.txt
+git-sync.txt
+prisma_gen_output.txt
+coverage-vitest/
+playwright-report/
+dist-asset-sizes*.txt
+audit-high.json
+compare_translations.py
+translation-comparison.txt
+translation-audit-results.json
+untranslated_report.txt
+vite_build_check.txt
+performance-budget.json
+k6.exe
 
-# Temp files
-*.tmp
-*.zip
-
-# Test artifacts
+# ── Test artifacts ────────────────────────────────────────────
 test-results/
 coverage/
-
-# Playwright MCP logs (external tooling — not in-app config)
-.playwright-mcp/
-
-# SQLite dev database — never commit
-anamnese.db
-
-# VS Code workspace files — per-developer, not shared
-*.code-workspace
+test-output*.txt
+test-result*.txt
+test-result*.json
+test-run*.txt
+test-final*.json
+test-final*.txt
+pw-phase*.txt
+pw-results*.txt
+pw-penetration-test.txt

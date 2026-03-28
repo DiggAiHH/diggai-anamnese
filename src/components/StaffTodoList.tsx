@@ -1,4 +1,5 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
   CheckSquare, Square, Plus, Trash2, AlertTriangle, Clock,
@@ -44,9 +45,10 @@ const CATEGORY_CONFIG = {
 
 // ─── Component ──────────────────────────────────────────────
 
-export const StaffTodoList: React.FC<StaffTodoListProps> = ({ currentUser: _currentUser, className = '' }) => {
+export const StaffTodoList: React.FC<StaffTodoListProps> = ({ currentUser, className = '' }) => {
   const { t, i18n } = useTranslation();
-  const [todos, setTodos] = useState<TodoItem[]>([]);
+  const queryClient = useQueryClient();
+  const todoQueryKey = ['staff-todos', currentUser.id] as const;
   const [showAddForm, setShowAddForm] = useState(false);
   const [newText, setNewText] = useState('');
   const [newPriority, setNewPriority] = useState<TodoItem['priority']>('medium');
@@ -55,67 +57,109 @@ export const StaffTodoList: React.FC<StaffTodoListProps> = ({ currentUser: _curr
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
+  const [operationError, setOperationError] = useState<string | null>(null);
 
-  // ─── Fetch from API ────────────────────────────────
+  const normalizeTodo = useCallback((todo: TodoItem): TodoItem => ({
+    ...todo,
+    assignee: todo.assignee || currentUser.displayName,
+  }), [currentUser.displayName]);
 
-  const fetchTodos = useCallback(async () => {
-    try {
+  const todoQuery = useQuery<TodoItem[]>({
+    queryKey: todoQueryKey,
+    queryFn: async () => {
       const res = await apiClient.get('/todos');
-      setTodos(res.data);
-    } catch (err) {
-      console.error('[StaffTodoList] fetch error:', err);
-    }
-  }, []);
+      return res.data as TodoItem[];
+    },
+  });
 
-  useEffect(() => { fetchTodos(); }, [fetchTodos]);
+  const createTodoMutation = useMutation({
+    mutationFn: async (payload: Pick<TodoItem, 'text' | 'priority' | 'category'>) => {
+      const res = await apiClient.post('/todos', payload);
+      return res.data as TodoItem;
+    },
+    onMutate: () => {
+      setOperationError(null);
+    },
+    onSuccess: (createdTodo) => {
+      queryClient.setQueryData<TodoItem[]>(todoQueryKey, (previousTodos = []) => [
+        normalizeTodo(createdTodo),
+        ...previousTodos,
+      ]);
+      setNewText('');
+      setShowAddForm(false);
+    },
+    onError: (err) => {
+      console.error('[StaffTodoList] create error:', err);
+      setOperationError(t('todo.createError', 'Aufgabe konnte nicht erstellt werden.'));
+    },
+  });
+
+  const updateTodoMutation = useMutation({
+    mutationFn: async ({ id, payload }: { id: string; payload: Partial<Pick<TodoItem, 'text' | 'completed'>> }) => {
+      const res = await apiClient.put(`/todos/${id}`, payload);
+      return res.data as TodoItem;
+    },
+    onMutate: () => {
+      setOperationError(null);
+    },
+    onSuccess: (updatedTodo) => {
+      queryClient.setQueryData<TodoItem[]>(todoQueryKey, (previousTodos = []) =>
+        previousTodos.map(todo => (todo.id === updatedTodo.id ? normalizeTodo(updatedTodo) : todo))
+      );
+      setEditingId(null);
+    },
+    onError: (err) => {
+      console.error('[StaffTodoList] update error:', err);
+      setOperationError(t('todo.updateError', 'Aufgabe konnte nicht aktualisiert werden.'));
+    },
+  });
+
+  const deleteTodoMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiClient.delete(`/todos/${id}`);
+      return id;
+    },
+    onMutate: () => {
+      setOperationError(null);
+    },
+    onSuccess: (deletedId) => {
+      queryClient.setQueryData<TodoItem[]>(todoQueryKey, (previousTodos = []) =>
+        previousTodos.filter(todo => todo.id !== deletedId)
+      );
+    },
+    onError: (err) => {
+      console.error('[StaffTodoList] delete error:', err);
+      setOperationError(t('todo.deleteError', 'Aufgabe konnte nicht gelöscht werden.'));
+    },
+  });
+
+  const todos = todoQuery.data ?? [];
 
   // ─── CRUD Operations ──────────────────────────────────
 
   const addTodo = useCallback(async () => {
     if (!newText.trim()) return;
-    try {
-      const res = await apiClient.post('/todos', {
+    createTodoMutation.mutate({
         text: newText.trim(),
         priority: newPriority,
         category: newCategory,
       });
-      setTodos(prev => [res.data, ...prev]);
-      setNewText('');
-      setShowAddForm(false);
-    } catch (err) {
-      console.error('[StaffTodoList] create error:', err);
-    }
-  }, [newText, newPriority, newCategory]);
+  }, [createTodoMutation, newCategory, newPriority, newText]);
 
   const toggleTodo = useCallback(async (id: string) => {
     const todo = todos.find(t => t.id === id);
     if (!todo) return;
-    try {
-      const res = await apiClient.put(`/todos/${id}`, { completed: !todo.completed });
-      setTodos(prev => prev.map(t => t.id === id ? res.data : t));
-    } catch (err) {
-      console.error('[StaffTodoList] toggle error:', err);
-    }
-  }, [todos]);
+    updateTodoMutation.mutate({ id, payload: { completed: !todo.completed } });
+  }, [todos, updateTodoMutation]);
 
   const deleteTodo = useCallback(async (id: string) => {
-    try {
-      await apiClient.delete(`/todos/${id}`);
-      setTodos(prev => prev.filter(t => t.id !== id));
-    } catch (err) {
-      console.error('[StaffTodoList] delete error:', err);
-    }
-  }, []);
+    deleteTodoMutation.mutate(id);
+  }, [deleteTodoMutation]);
 
   const updateTodoText = useCallback(async (id: string, text: string) => {
-    try {
-      const res = await apiClient.put(`/todos/${id}`, { text });
-      setTodos(prev => prev.map(t => t.id === id ? res.data : t));
-      setEditingId(null);
-    } catch (err) {
-      console.error('[StaffTodoList] update error:', err);
-    }
-  }, []);
+    if (!text.trim()) return;
+    updateTodoMutation.mutate({ id, payload: { text: text.trim() } });
+  }, [updateTodoMutation]);
 
   // ─── Filter & Sort ─────────────────────────────────────
 
@@ -138,14 +182,16 @@ export const StaffTodoList: React.FC<StaffTodoListProps> = ({ currentUser: _curr
     urgent: todos.filter(t => !t.completed && t.priority === 'urgent').length,
   };
 
+  const visibleError = operationError ?? (todoQuery.error ? t('todo.fetchError', 'Aufgaben konnten nicht geladen werden.') : null);
+
   // ─── Render ────────────────────────────────────────────
 
   return (
-    <div className={`rounded-2xl border border-[var(--border-primary)] bg-white/5 backdrop-blur-md ${className}`}>
+    <div className={`rounded-2xl border border-(--border-primary) bg-white/5 backdrop-blur-md ${className}`}>
       {/* Header */}
-      <div className="p-5 border-b border-[var(--border-primary)]">
+      <div className="p-5 border-b border-(--border-primary)">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold flex items-center gap-3 text-[var(--text-primary)]">
+          <h2 className="text-lg font-bold flex items-center gap-3 text-(--text-primary)">
             <div className="w-8 h-8 rounded-lg bg-violet-500/20 flex items-center justify-center border border-violet-500/30">
               <CheckSquare className="w-4 h-4 text-violet-400" />
             </div>
@@ -173,7 +219,7 @@ export const StaffTodoList: React.FC<StaffTodoListProps> = ({ currentUser: _curr
               className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${
                 filter === f.key
                   ? 'bg-violet-500/20 text-violet-400 border border-violet-500/30'
-                  : 'bg-white/5 text-[var(--text-muted)] border border-transparent hover:bg-white/10'
+                  : 'bg-white/5 text-(--text-muted) border border-transparent hover:bg-white/10'
               }`}
             >
               {f.label} ({f.count})
@@ -186,25 +232,33 @@ export const StaffTodoList: React.FC<StaffTodoListProps> = ({ currentUser: _curr
             </div>
           )}
         </div>
+
+        {visibleError && (
+          <div className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+            {visibleError}
+          </div>
+        )}
       </div>
 
       {/* Add Form */}
       {showAddForm && (
-        <div className="p-4 border-b border-[var(--border-primary)] bg-violet-500/5 space-y-3">
+        <div className="p-4 border-b border-(--border-primary) bg-violet-500/5 space-y-3">
           <input
             type="text"
             value={newText}
             onChange={e => setNewText(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && addTodo()}
+            aria-label={t('todo.placeholder', 'Aufgabe beschreiben...')}
             placeholder={t('todo.placeholder', 'Aufgabe beschreiben...')}
-            className="w-full px-3 py-2.5 bg-[var(--bg-input)] border border-[var(--border-primary)] rounded-xl text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-violet-500/50"
+            className="w-full px-3 py-2.5 bg-(--bg-input) border border-(--border-primary) rounded-xl text-sm text-(--text-primary) placeholder-(--text-muted) focus:outline-none focus:border-violet-500/50"
             autoFocus
           />
           <div className="flex items-center gap-2">
             <select
               value={newPriority}
               onChange={e => setNewPriority(e.target.value as TodoItem['priority'])}
-              className="px-2 py-1.5 bg-[var(--bg-input)] border border-[var(--border-primary)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none"
+              aria-label={t('todo.priority', 'Priorität')}
+              className="px-2 py-1.5 bg-(--bg-input) border border-(--border-primary) rounded-lg text-xs text-(--text-primary) focus:outline-none"
             >
               <option value="urgent">{PRIORITY_CONFIG.urgent.label}</option>
               <option value="high">{PRIORITY_CONFIG.high.label}</option>
@@ -214,7 +268,8 @@ export const StaffTodoList: React.FC<StaffTodoListProps> = ({ currentUser: _curr
             <select
               value={newCategory}
               onChange={e => setNewCategory(e.target.value as TodoItem['category'])}
-              className="px-2 py-1.5 bg-[var(--bg-input)] border border-[var(--border-primary)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none"
+              aria-label={t('todo.category', 'Kategorie')}
+              className="px-2 py-1.5 bg-(--bg-input) border border-(--border-primary) rounded-lg text-xs text-(--text-primary) focus:outline-none"
             >
               <option value="patient">{CATEGORY_CONFIG.patient.label}</option>
               <option value="admin">{CATEGORY_CONFIG.admin.label}</option>
@@ -224,13 +279,13 @@ export const StaffTodoList: React.FC<StaffTodoListProps> = ({ currentUser: _curr
             <div className="flex-1" />
             <button
               onClick={() => setShowAddForm(false)}
-              className="px-3 py-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
+              className="px-3 py-1.5 text-xs text-(--text-muted) hover:text-(--text-secondary) transition-colors"
             >
               {t('todo.cancel', 'Abbrechen')}
             </button>
             <button
               onClick={addTodo}
-              disabled={!newText.trim()}
+              disabled={!newText.trim() || createTodoMutation.isPending}
               className="px-4 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold disabled:opacity-50 transition-all"
             >
               {t('todo.save', 'Speichern')}
@@ -240,12 +295,14 @@ export const StaffTodoList: React.FC<StaffTodoListProps> = ({ currentUser: _curr
       )}
 
       {/* Todo List */}
-      <div className="divide-y divide-[var(--border-primary)]">
+      <div className="divide-y divide-(--border-primary)">
         {filteredTodos.length === 0 && (
-          <div className="p-8 text-center text-[var(--text-muted)]">
+          <div className="p-8 text-center text-(--text-muted)">
             <CheckSquare className="w-10 h-10 mx-auto mb-3 opacity-20" />
             <p className="text-xs font-medium">
-              {filter === 'completed'
+              {todoQuery.isLoading
+                ? t('todo.loading', 'Aufgaben werden geladen...')
+                : filter === 'completed'
                 ? t('todo.noCompleted', 'Noch keine erledigten Aufgaben.')
                 : t('todo.noTasks', 'Keine offenen Aufgaben. 🎉')}
             </p>
@@ -261,13 +318,14 @@ export const StaffTodoList: React.FC<StaffTodoListProps> = ({ currentUser: _curr
           return (
             <div
               key={todo.id}
-              className={`p-4 transition-all ${todo.completed ? 'opacity-50' : ''} hover:bg-white/[0.02]`}
+              className={`p-4 transition-all ${todo.completed ? 'opacity-50' : ''} hover:bg-white/2`}
             >
               <div className="flex items-start gap-3">
                 {/* Checkbox */}
                 <button
                   onClick={() => toggleTodo(todo.id)}
-                  className="mt-0.5 shrink-0 text-[var(--text-muted)] hover:text-violet-400 transition-colors"
+                  aria-label={todo.completed ? t('todo.markOpen', 'Als offen markieren') : t('todo.markDone', 'Als erledigt markieren')}
+                  className="mt-0.5 shrink-0 text-(--text-muted) hover:text-violet-400 transition-colors"
                 >
                   {todo.completed
                     ? <CheckSquare className="w-5 h-5 text-emerald-400" />
@@ -286,19 +344,20 @@ export const StaffTodoList: React.FC<StaffTodoListProps> = ({ currentUser: _curr
                           if (e.key === 'Enter') updateTodoText(todo.id, editText);
                           if (e.key === 'Escape') setEditingId(null);
                         }}
-                        className="flex-1 px-2 py-1 bg-[var(--bg-input)] border border-violet-500/50 rounded text-sm text-[var(--text-primary)] focus:outline-none"
+                        aria-label={t('todo.edit', 'Bearbeiten')}
+                        className="flex-1 px-2 py-1 bg-(--bg-input) border border-violet-500/50 rounded text-sm text-(--text-primary) focus:outline-none"
                         autoFocus
                       />
-                      <button onClick={() => updateTodoText(todo.id, editText)} className="text-emerald-400 hover:text-emerald-300">
+                      <button onClick={() => updateTodoText(todo.id, editText)} aria-label={t('todo.save', 'Speichern')} className="text-emerald-400 hover:text-emerald-300">
                         <Check className="w-4 h-4" />
                       </button>
-                      <button onClick={() => setEditingId(null)} className="text-[var(--text-muted)] hover:text-red-400">
+                      <button onClick={() => setEditingId(null)} aria-label={t('todo.cancel', 'Abbrechen')} className="text-(--text-muted) hover:text-red-400">
                         <X className="w-4 h-4" />
                       </button>
                     </div>
                   ) : (
                     <p
-                      className={`text-sm ${todo.completed ? 'line-through text-[var(--text-muted)]' : 'text-[var(--text-primary)]'} cursor-pointer`}
+                      className={`text-sm ${todo.completed ? 'line-through text-(--text-muted)' : 'text-(--text-primary)'} cursor-pointer`}
                       onClick={() => setExpandedId(isExpanded ? null : todo.id)}
                     >
                       {todo.text}
@@ -315,18 +374,18 @@ export const StaffTodoList: React.FC<StaffTodoListProps> = ({ currentUser: _curr
                       {categoryCfg.label}
                     </span>
                     {todo.assignee && (
-                      <span className="text-[9px] text-[var(--text-muted)]">
+                      <span className="text-[9px] text-(--text-muted)">
                         → {todo.assignee}
                       </span>
                     )}
-                    <span className="text-[9px] text-[var(--text-muted)]">
+                    <span className="text-[9px] text-(--text-muted)">
                       {new Date(todo.createdAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
 
                   {/* Expanded details */}
                   {isExpanded && !isEditing && (
-                    <div className="mt-2 text-[10px] text-[var(--text-muted)] space-y-1">
+                    <div className="mt-2 text-[10px] text-(--text-muted) space-y-1">
                       {todo.patientName && <p>Patient: {todo.patientName}</p>}
                       {todo.sessionId && <p>Session: {todo.sessionId.slice(0, 8)}...</p>}
                       {todo.completedAt && <p>{t('todo.completedAt', 'Erledigt am')}: {new Date(todo.completedAt).toLocaleString(i18n.language)}</p>}
@@ -338,14 +397,14 @@ export const StaffTodoList: React.FC<StaffTodoListProps> = ({ currentUser: _curr
                 <div className="flex items-center gap-1 shrink-0">
                   <button
                     onClick={() => { setEditingId(todo.id); setEditText(todo.text); }}
-                    className="p-1.5 text-[var(--text-muted)] hover:text-blue-400 transition-colors"
+                    className="p-1.5 text-(--text-muted) hover:text-blue-400 transition-colors"
                     title={t('todo.edit', 'Bearbeiten')}
                   >
                     <Edit3 className="w-3.5 h-3.5" />
                   </button>
                   <button
                     onClick={() => deleteTodo(todo.id)}
-                    className="p-1.5 text-[var(--text-muted)] hover:text-red-400 transition-colors"
+                    className="p-1.5 text-(--text-muted) hover:text-red-400 transition-colors"
                     title={t('todo.delete', 'Löschen')}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -359,10 +418,10 @@ export const StaffTodoList: React.FC<StaffTodoListProps> = ({ currentUser: _curr
 
       {/* Quick Add (always visible at bottom) */}
       {!showAddForm && (
-        <div className="p-4 border-t border-[var(--border-primary)]">
+        <div className="p-4 border-t border-(--border-primary)">
           <button
             onClick={() => setShowAddForm(true)}
-            className="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl border border-dashed border-[var(--border-primary)] text-xs text-[var(--text-muted)] hover:text-violet-400 hover:border-violet-500/30 transition-all"
+            className="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl border border-dashed border-(--border-primary) text-xs text-(--text-muted) hover:text-violet-400 hover:border-violet-500/30 transition-all"
           >
             <Plus className="w-4 h-4" />
             {t('todo.quickAdd', 'Aufgabe hinzufügen...')}

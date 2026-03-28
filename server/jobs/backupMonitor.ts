@@ -14,7 +14,7 @@
 import * as cron from 'node-cron';
 import { prisma } from '../db';
 import { createLogger } from '../logger';
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 
 const logger = createLogger('BackupMonitor');
 
@@ -165,10 +165,11 @@ export async function checkS3Connectivity(): Promise<BackupHealthStatus> {
     }
 
     try {
-        // AWS CLI check (falls verfügbar)
-        execSync(`aws s3 ls s3://${bucket}/backups/ --max-items 1`, { 
+        // BSI-konform: execFileSync mit Args-Array — bucket-Name wird als separates Argument übergeben
+        execFileSync('aws', ['s3', 'ls', `s3://${bucket}/backups/`, '--max-items', '1'], { 
             timeout: 10000,
-            stdio: 'pipe'
+            stdio: 'pipe',
+            shell: false,
         });
         
         logger.info('S3-Konnektivität: OK');

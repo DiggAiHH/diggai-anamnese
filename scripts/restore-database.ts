@@ -20,9 +20,10 @@
  *   - AWS_*: AWS Credentials für S3 Zugriff
  */
 
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import { createReadStream, createWriteStream, existsSync, mkdirSync, unlinkSync } from 'fs';
 import { pipeline } from 'stream/promises';
+import { createGunzip } from 'zlib';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import { config } from '../server/config';
@@ -120,10 +121,12 @@ function decryptFile(inputPath: string, outputPath: string): void {
         log('warn', 'Native Entschlüsselung fehlgeschlagen, versuche OpenSSL...');
     }
     
-    // Fallback zu OpenSSL (AES-256-CBC)
+    // Fallback zu OpenSSL (AES-256-CBC) — BSI-konform: Args-Array, kein String-Template
     try {
-        const cmd = `openssl enc -d -aes-256-cbc -pbkdf2 -iter 100000 -in "${inputPath}" -out "${outputPath}" -k "${ENCRYPTION_KEY}"`;
-        execSync(cmd, { stdio: 'pipe' });
+        execFileSync('openssl', [
+            'enc', '-d', '-aes-256-cbc', '-pbkdf2', '-iter', '100000',
+            '-in', inputPath, '-out', outputPath, '-k', ENCRYPTION_KEY,
+        ], { stdio: 'pipe', shell: false });
         log('info', 'OpenSSL Entschlüsselung erfolgreich');
     } catch (err: any) {
         throw new Error(`Entschlüsselung fehlgeschlagen: ${err.message}`);
@@ -214,17 +217,25 @@ async function restoreDatabase(): Promise<void> {
         // 2. Entschlüsseln
         decryptFile(encryptedPath, compressedPath);
         
-        // 3. Dekomprimieren
+        // 3. Dekomprimieren — Node-Stream statt Shell-Redirect
         log('info', 'Dekomprimiere Backup...');
-        execSync(`gunzip -c "${compressedPath}" > "${sqlPath}"`, { timeout: 300000 });
+        await pipeline(
+            createReadStream(compressedPath),
+            createGunzip(),
+            createWriteStream(sqlPath)
+        );
         log('info', `SQL-Datei erstellt: ${sqlPath}`);
         
-        // 4. Pre-restore: Aktuellen Zustand speichern (falls --force nicht gesetzt)
+        // 4. Pre-restore: Aktuellen Zustand sichern (falls --force nicht gesetzt)
         if (!FORCE_RESTORE) {
             log('info', 'Erstelle Sicherheits-Backup des aktuellen Zustands...');
             const safetyBackup = path.join(workDir, 'pre-restore-backup.sql');
             try {
-                execSync(`pg_dump "${config.databaseUrl}" > "${safetyBackup}"`, { timeout: 300000 });
+                // BSI-konform: execFileSync mit Args-Array, kein String-Template
+                execFileSync('pg_dump', [
+                    '--dbname', config.databaseUrl,
+                    '--file', safetyBackup,
+                ], { timeout: 300000, shell: false, stdio: 'pipe' });
                 log('info', `Sicherheits-Backup: ${safetyBackup}`);
             } catch (err) {
                 log('warn', 'Konnte kein Sicherheits-Backup erstellen');
@@ -240,17 +251,23 @@ async function restoreDatabase(): Promise<void> {
         
         log('info', `Ziel-Datenbank: ${dbName}`);
         
-        // Datenbank neu erstellen (alle Verbindungen trennen)
+        // Datenbank neu erstellen (alle Verbindungen trennen) — BSI-konform: Args-Array
         try {
-            const maintenanceCmd = `psql "${config.databaseUrl}" -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '${dbName}' AND pid <> pg_backend_pid();"`;
-            execSync(maintenanceCmd, { timeout: 30000 });
+            execFileSync('psql', [
+                '--dbname', config.databaseUrl,
+                '--command',
+                `SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid();`,
+            ], { timeout: 30000, shell: false, stdio: 'pipe' });
         } catch { /* ignore */ }
         
-        // Restore durchführen
-        const restoreCmd = `psql "${config.databaseUrl}" < "${sqlPath}"`;
-        execSync(restoreCmd, { 
+        // Restore durchführen — BSI-konform: Input über --file statt stdin-Redirect
+        execFileSync('psql', [
+            '--dbname', config.databaseUrl,
+            '--file', sqlPath,
+        ], { 
             timeout: 600000, // 10 Minuten
-            stdio: 'inherit'
+            shell: false,
+            stdio: 'inherit',
         });
         
         log('info', 'Wiederherstellung abgeschlossen ✓');
@@ -258,7 +275,12 @@ async function restoreDatabase(): Promise<void> {
         // 6. Post-restore: Verification
         log('info', 'Führe Verifikation durch...');
         try {
-            const result = execSync(`psql "${config.databaseUrl}" -c "SELECT COUNT(*) FROM \\"Patient\\";"`, { encoding: 'utf-8' });
+            // BSI-konform: Args-Array, kein String-Template
+            const result = execFileSync('psql', [
+                '--dbname', config.databaseUrl,
+                '--tuples-only',
+                '--command', 'SELECT COUNT(*) FROM "Patient";',
+            ], { encoding: 'utf-8', shell: false });
             const count = result.match(/\d+/)?.[0] || 'unknown';
             log('info', `Verifikation: ${count} Patienten in Datenbank`);
         } catch (err) {

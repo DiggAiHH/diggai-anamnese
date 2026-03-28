@@ -79,3 +79,35 @@ export function Card({
     </div>
   );
 }
+
+interface CardSectionProps extends HTMLAttributes<HTMLDivElement> {
+  children: ReactNode;
+}
+
+interface CardTitleProps extends HTMLAttributes<HTMLHeadingElement> {
+  children: ReactNode;
+}
+
+export function CardHeader({ children, className = '', ...props }: CardSectionProps) {
+  return (
+    <div className={`flex flex-col gap-2 ${className}`.trim()} {...props}>
+      {children}
+    </div>
+  );
+}
+
+export function CardTitle({ children, className = '', ...props }: CardTitleProps) {
+  return (
+    <h3 className={`text-lg font-semibold text-(--text-primary) ${className}`.trim()} {...props}>
+      {children}
+    </h3>
+  );
+}
+
+export function CardContent({ children, className = '', ...props }: CardSectionProps) {
+  return (
+    <div className={className} {...props}>
+      {children}
+    </div>
+  );
+}

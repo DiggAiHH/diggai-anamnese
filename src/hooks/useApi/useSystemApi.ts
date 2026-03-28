@@ -1456,6 +1456,21 @@ export function useFormUsage() {
     return useMutation({ mutationFn: (id: string) => api.formUsage(id) });
 }
 
+/**
+ * Hook zum Absenden eines Formulars.
+ */
+export function useFormSubmit() {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: ({ formId, ...data }: { formId: string; sessionId: string; answers: Record<string, unknown>; submittedAt?: string }) =>
+            api.formSubmit(formId, data),
+        onSuccess: (_data, variables) => {
+            qc.invalidateQueries({ queryKey: ['forms', variables.formId] });
+            qc.invalidateQueries({ queryKey: ['forms', 'stats'] });
+        },
+    });
+}
+
 // ─── Private ePA Hooks ─────────────────────────────────────
 
 /**

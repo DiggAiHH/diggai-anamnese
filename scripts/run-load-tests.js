@@ -12,7 +12,7 @@
  * Scenarios: normal, peak, stress, spike, endurance, breakpoint
  */
 
-const { execSync } = require('child_process');
+const { execFileSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
@@ -53,7 +53,7 @@ function ensureDirectories() {
 
 function checkK6Installed() {
   try {
-    execSync('k6 version', { stdio: 'pipe' });
+    execFileSync('k6', ['version'], { stdio: 'pipe', shell: false });
     return true;
   } catch (error) {
     return false;
@@ -85,16 +85,18 @@ function runTest(testFile, scenario) {
       SCENARIO: scenario,
     };
 
-    const command = `k6 run \
-      --env BASE_URL=${env.BASE_URL} \
-      --env SCENARIO=${scenario} \
-      --out json=${resultFile} \
-      --summary-export=${summaryFile} \
-      ${testPath}`;
-
-    execSync(command, {
+    // BSI-konform: execFileSync mit Args-Array — kein String-Template als Shell-Befehl
+    execFileSync('k6', [
+      'run',
+      '--env', `BASE_URL=${env.BASE_URL}`,
+      '--env', `SCENARIO=${scenario}`,
+      '--out', `json=${resultFile}`,
+      `--summary-export=${summaryFile}`,
+      testPath,
+    ], {
       stdio: 'inherit',
       env,
+      shell: false,
     });
 
     log(`\n✓ Test completed successfully`, 'green');

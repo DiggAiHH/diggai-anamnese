@@ -2,6 +2,7 @@
 // Erfasst jede benutzte Leistung/Aktion pro Session für
 // Tagesend-Zusammenfassung, Rechnung und ROI-Dashboard.
 
+import { Prisma } from '@prisma/client';
 import { prisma } from '../db';
 
 // ─── Types ──────────────────────────────────────────────────
@@ -64,6 +65,9 @@ export async function logServiceUsage(input: LogUsageInput): Promise<void> {
     const actualDuration = input.durationMs || 0;
     const timeSavedMs = Math.max(0, manualTimeMs - actualDuration);
     const costEstimate = (timeSavedMs / 3600000) * MFA_HOURLY_COST;
+    const metadata = input.metadata
+        ? JSON.parse(JSON.stringify(input.metadata)) as Prisma.InputJsonValue
+        : undefined;
 
     try {
         await prisma.serviceUsageLog.create({
@@ -77,7 +81,7 @@ export async function logServiceUsage(input: LogUsageInput): Promise<void> {
                 manualTimeMs: manualTimeMs,
                 timeSavedMs: timeSavedMs,
                 costEstimate: Math.round(costEstimate * 100) / 100,
-                metadata: input.metadata ? input.metadata : undefined,
+                metadata,
             },
         });
     } catch (err) {

@@ -161,6 +161,89 @@
 }
 
 /* ==========================================================================
+   RTL Logical Property Overrides
+   Fixes Tailwind utility classes (ml-*, mr-*, pl-*, pr-*, text-left, text-right)
+   which do not auto-flip in RTL. Replace with CSS logical properties.
+   ========================================================================== */
+
+/* Margin inline (start/end) — replaces ml-* / mr-* */
+.rtl [class*="ml-1"]  { margin-inline-start: 0.25rem; margin-inline-end: 0; }
+.rtl [class*="ml-2"]  { margin-inline-start: 0.5rem;  margin-inline-end: 0; }
+.rtl [class*="ml-3"]  { margin-inline-start: 0.75rem; margin-inline-end: 0; }
+.rtl [class*="ml-4"]  { margin-inline-start: 1rem;    margin-inline-end: 0; }
+.rtl [class*="ml-6"]  { margin-inline-start: 1.5rem;  margin-inline-end: 0; }
+.rtl [class*="ml-8"]  { margin-inline-start: 2rem;    margin-inline-end: 0; }
+.rtl [class*="ml-auto"] { margin-inline-start: auto;  margin-inline-end: 0; }
+.rtl [class*="mr-1"]  { margin-inline-end: 0.25rem; margin-inline-start: 0; }
+.rtl [class*="mr-2"]  { margin-inline-end: 0.5rem;  margin-inline-start: 0; }
+.rtl [class*="mr-3"]  { margin-inline-end: 0.75rem; margin-inline-start: 0; }
+.rtl [class*="mr-4"]  { margin-inline-end: 1rem;    margin-inline-start: 0; }
+.rtl [class*="mr-6"]  { margin-inline-end: 1.5rem;  margin-inline-start: 0; }
+.rtl [class*="mr-8"]  { margin-inline-end: 2rem;    margin-inline-start: 0; }
+.rtl [class*="mr-auto"] { margin-inline-end: auto;  margin-inline-start: 0; }
+
+/* Padding inline (start/end) — replaces pl-* / pr-* */
+.rtl [class*="pl-1"]  { padding-inline-start: 0.25rem; }
+.rtl [class*="pl-2"]  { padding-inline-start: 0.5rem; }
+.rtl [class*="pl-3"]  { padding-inline-start: 0.75rem; }
+.rtl [class*="pl-4"]  { padding-inline-start: 1rem; }
+.rtl [class*="pl-6"]  { padding-inline-start: 1.5rem; }
+.rtl [class*="pl-8"]  { padding-inline-start: 2rem; }
+.rtl [class*="pr-1"]  { padding-inline-end: 0.25rem; }
+.rtl [class*="pr-2"]  { padding-inline-end: 0.5rem; }
+.rtl [class*="pr-3"]  { padding-inline-end: 0.75rem; }
+.rtl [class*="pr-4"]  { padding-inline-end: 1rem; }
+.rtl [class*="pr-6"]  { padding-inline-end: 1.5rem; }
+.rtl [class*="pr-8"]  { padding-inline-end: 2rem; }
+
+/* Text alignment — replaces text-left / text-right */
+.rtl .text-left  { text-align: start; }
+.rtl .text-right { text-align: end; }
+
+/* Inset (left/right positioning) — replaces left-* / right-* */
+.rtl [class*="left-0"]  { inset-inline-start: 0;        inset-inline-end: auto; }
+.rtl [class*="right-0"] { inset-inline-end: 0;          inset-inline-start: auto; }
+.rtl [class*="left-4"]  { inset-inline-start: 1rem;     inset-inline-end: auto; }
+.rtl [class*="right-4"] { inset-inline-end: 1rem;       inset-inline-start: auto; }
+
+/* Border inline (start/end) — replaces border-l-* / border-r-* */
+.rtl [class*="border-l"] { border-inline-start-width: inherit; border-inline-end-width: 0; }
+.rtl [class*="border-r"] { border-inline-end-width: inherit;   border-inline-start-width: 0; }
+
+/* Rounded corners — replaces rounded-l-* / rounded-r-* */
+.rtl [class*="rounded-l"] {
+  border-start-start-radius: inherit;
+  border-end-start-radius: inherit;
+  border-start-end-radius: 0;
+  border-end-end-radius: 0;
+}
+.rtl [class*="rounded-r"] {
+  border-start-end-radius: inherit;
+  border-end-end-radius: inherit;
+  border-start-start-radius: 0;
+  border-end-start-radius: 0;
+}
+
+/* Form inputs — text direction for Arabic content */
+.rtl input[type="text"],
+.rtl input[type="email"],
+.rtl input[type="tel"],
+.rtl input[type="search"],
+.rtl textarea,
+.rtl select {
+  text-align: start;
+  direction: rtl;
+}
+
+/* Numeric inputs always LTR (dates, numbers, phone) */
+.rtl input[type="number"],
+.rtl input[type="date"],
+.rtl input[type="time"] {
+  direction: ltr;
+  text-align: end;
+}
+
+/* ==========================================================================
    Cognitive Accessibility Mode (Simple Mode)
    ========================================================================== */
 .a11y-cognitive-mode {

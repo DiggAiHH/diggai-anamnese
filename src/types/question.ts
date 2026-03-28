@@ -26,6 +26,12 @@ export interface Question {
   validation?: ValidationRules;
   errorMessage?: string;
   logic?: QuestionLogic;
+  /** i18n key for a plain-language explanation of a medical term */
+  helpText?: string;
+  /** i18n key explaining why we ask this question (trust transparency) */
+  whyWeAsk?: string;
+  /** Whether this field collects sensitive/health data (shows lock icon) */
+  sensitive?: boolean;
 }
 
 export interface Option {

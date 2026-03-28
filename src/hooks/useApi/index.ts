@@ -71,6 +71,7 @@ export {
     useMfaAssignDoctor,
     // Chat
     useChatMessages,
+    useSendChatMessage,
     // Queue
     useQueue,
     useQueuePosition,
@@ -355,6 +356,7 @@ export {
     useFormAiGenerate,
     useFormPublish,
     useFormUsage,
+    useFormSubmit,
     // ePA
     useEpaGet,
     useEpaDocuments,

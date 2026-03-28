@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card'; // Assuming a UI module
 import { Button } from '../ui/Button';
 import { CheckCircle, AlertCircle, TrendingUp } from 'lucide-react';
-import axios from 'axios';
+import apiClient from '../../api/client';
 
 interface BillingSuggestion {
   code: string;
@@ -14,18 +14,21 @@ interface BillingSuggestion {
 export const BillingSuggestions = ({ sessionId, clinicalNotes }: { sessionId: string; clinicalNotes: string }) => {
   const [suggestions, setSuggestions] = useState<BillingSuggestion[]>([]);
   const [loading, setLoading] = useState(false);
+  const canSendToPvs = sessionId.length > 0;
 
   const generateSuggestions = async () => {
     setLoading(true);
     try {
-      const { data } = await axios.post('/api/ai/billing-optimization', { clinicalNotes }, {
-        headers: {
-            Authorization: `Bearer ${localStorage.getItem('anamnese_auth_token') || ''}`,
-        }
+      const { data } = await apiClient.post('/ai/billing-optimization', {
+        sessionId,
+        clinicalNotes,
       });
       setSuggestions(data.suggestions || []);
     } catch (e) {
-      console.error('Failed to parse billing optimization', e);
+      const status = typeof e === 'object' && e !== null && 'response' in e
+        ? (e as { response?: { status?: number } }).response?.status
+        : undefined;
+      console.error('Failed to load billing optimization suggestions', { status });
     } finally {
         setLoading(false);
     }
@@ -63,7 +66,7 @@ export const BillingSuggestions = ({ sessionId, clinicalNotes }: { sessionId: st
                   <span className="text-xs text-green-600 flex items-center gap-1">
                     <CheckCircle className="w-3 h-3" /> {(s.confidence * 100).toFixed(0)}% Match
                   </span>
-                  <Button variant="outline" size="sm">Zum PVS senden</Button>
+                  <Button variant="secondary" size="sm" disabled={!canSendToPvs}>Zum PVS senden</Button>
                 </div>
               </div>
             ))}

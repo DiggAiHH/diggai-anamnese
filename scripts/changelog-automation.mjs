@@ -16,7 +16,7 @@
  *   node scripts/changelog-automation.mjs --output CHANGELOG.md
  */
 
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -81,12 +81,20 @@ const CONFIG = {
   },
 };
 
-// Hilfsfunktionen
+// BSI-konform: execFileSync mit Args-Array.
+// Parst einfache Kommandostrings (kein Shell-Operator-Support).
 function exec(command, options = {}) {
   try {
-    return execSync(command, {
+    // Einfaches Tokenisieren (keine Shell-Expansion, kein Umgebungsvariablen-Expanding)
+    const parts = command
+      .split(/\s+/)
+      .filter(Boolean)
+      .map(p => p.replace(/^["'](.*)["']$/, '$1')); // Anführungszeichen entfernen
+    const [binary, ...args] = parts;
+    return execFileSync(binary, args, {
       encoding: 'utf-8',
       cwd: ROOT_DIR,
+      shell: false,
       ...options,
     }).trim();
   } catch (error) {
@@ -107,7 +115,16 @@ function getPackageVersion() {
 }
 
 function getLatestTag() {
-  return exec('git describe --tags --abbrev=0 2>/dev/null || echo ""', { ignoreError: true });
+  try {
+    return execFileSync('git', ['describe', '--tags', '--abbrev=0'], {
+      encoding: 'utf-8',
+      cwd: ROOT_DIR,
+      shell: false,
+      stdio: 'pipe',
+    }).trim();
+  } catch {
+    return '';
+  }
 }
 
 function getLastChangelogVersion() {

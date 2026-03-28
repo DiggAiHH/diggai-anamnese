@@ -1,6 +1,6 @@
 // Modul 6: Backup & Recovery Service — pg_dump → AES-256-GCM → SHA-256 checksum
 import { createHash, createCipheriv, createDecipheriv, randomBytes } from 'crypto';
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import type { BackupRequest, BackupRecordData, RestoreRequest, BackupSchedule } from './types';
@@ -80,13 +80,23 @@ export async function createBackup(request: BackupRequest = {}): Promise<BackupR
   });
 
   try {
-    // Execute pg_dump
+    // Execute pg_dump — BSI-konform: explizite Args, kein String-Template
     const dbUrl = process.env.DATABASE_URL || '';
-    const tableArgs = request.tables?.map(t => `-t ${t}`).join(' ') || '';
-    const schemaFlag = type === 'schema_only' ? '--schema-only' : '';
-    const cmd = `pg_dump "${dbUrl}" ${schemaFlag} ${tableArgs} -f "${dumpPath}"`;
+    if (!dbUrl) throw new Error('DATABASE_URL ist nicht gesetzt');
 
-    execSync(cmd, { timeout: 300000 }); // 5 min timeout
+    const pgDumpArgs: string[] = ['--dbname', dbUrl, '--file', dumpPath];
+    if (type === 'schema_only') pgDumpArgs.push('--schema-only');
+    if (request.tables && request.tables.length > 0) {
+      for (const table of request.tables) {
+        // Tabellennamen nur alphanumerisch + _ erlaubt — Injection-Schutz
+        if (!/^[A-Za-z0-9_.]+$/.test(table)) {
+          throw new RangeError(`Ungültiger Tabellenname: ${JSON.stringify(table)}`);
+        }
+        pgDumpArgs.push('--table', table);
+      }
+    }
+
+    execFileSync('pg_dump', pgDumpArgs, { timeout: 300000, shell: false });
 
     // Encrypt if key is set
     let finalPath = dumpPath;
@@ -168,10 +178,15 @@ export async function restoreBackup(request: RestoreRequest): Promise<{ success:
       data: { status: 'RESTORING' },
     });
 
-    // Execute pg_restore
+    // Execute pg_restore — BSI-konform: kein Shell-Redirect, Input über --file
     const dbUrl = process.env.DATABASE_URL || '';
-    const tableArgs = request.targetTables?.map(t => `-t ${t}`).join(' ') || '';
-    execSync(`psql "${dbUrl}" ${tableArgs} < "${restorePath}"`, { timeout: 600000 });
+    if (!dbUrl) throw new Error('DATABASE_URL ist nicht gesetzt');
+
+    const psqlArgs: string[] = ['--dbname', dbUrl, '--file', restorePath];
+    // Hinweis: psql hat kein --table; tabellengefilterter Restore erfordert pg_restore
+    // (targetTables-Filtering ist hier bewusst nicht implementiert um Shell-Injection zu verhindern)
+
+    execFileSync('psql', psqlArgs, { timeout: 600000, shell: false });
 
     // Cleanup temp decrypt file
     if (restorePath.endsWith('.restore.sql')) {
