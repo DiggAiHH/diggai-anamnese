@@ -18,6 +18,16 @@ jobs:
         run: |
           npm install prisma@^6.19.2 @prisma/client@^6.19.2 tsx@^4.21.0 dotenv@^17.3.1 bcryptjs@^3.0.3 @types/bcryptjs --no-save --legacy-peer-deps
 
+      - name: Test psql authentication
+        env:
+          SUPABASE_DB_PASS: ${{ secrets.SUPABASE_DB_PASS }}
+        run: |
+          sudo apt-get install -y postgresql-client -q 2>/dev/null || true
+          echo "Testing psql connection..."
+          PGPASSWORD="$SUPABASE_DB_PASS" psql \
+            "host=aws-1-eu-central-1.pooler.supabase.com port=5432 dbname=postgres user=postgres.oanbmfztnzjvkumzpnfb sslmode=require" \
+            -c "SELECT current_user, version();" 2>&1 || echo "psql auth test result above"
+
       - name: Run production migration
         env:
           SUPABASE_DB_PASS: ${{ secrets.SUPABASE_DB_PASS }}
@@ -25,7 +35,6 @@ jobs:
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
         run: |
-          # Build DATABASE_URL with Python-safe URL encoding (avoids %40 double-encode issues)
           ENCODED_PASS=$(python3 -c "import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=''))" "$SUPABASE_DB_PASS")
           export DATABASE_URL="postgresql://postgres.oanbmfztnzjvkumzpnfb:${ENCODED_PASS}@aws-1-eu-central-1.pooler.supabase.com:5432/postgres"
           bash scripts/migrate-production.sh
