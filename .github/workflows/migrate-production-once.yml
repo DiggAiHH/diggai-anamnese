@@ -13,11 +13,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: package-lock.json
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Install migration dependencies only
+        run: |
+          npm install prisma@^6.19.2 @prisma/client@^6.19.2 tsx@^4.21.0 dotenv@^17.3.1 bcryptjs@^3.0.3 @types/bcryptjs --no-save
 
       - name: Run production migration
         env:
