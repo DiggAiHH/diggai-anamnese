@@ -48,14 +48,16 @@ describe('Button', () => {
     render(<Button>Primary</Button>);
     
     const button = screen.getByRole('button');
-    expect(button).toHaveClass('btn-primary');
+    expect(button).toHaveClass('bg-gradient-to-br');
+    expect(button).toHaveClass('text-white');
   });
 
   it('should render with secondary variant', () => {
     render(<Button variant="secondary">Secondary</Button>);
     
     const button = screen.getByRole('button');
-    expect(button).toHaveClass('btn-secondary');
+    expect(button).toHaveClass('border-2');
+    expect(button).not.toHaveClass('text-white');
   });
 
   it('should render with ghost variant', () => {
@@ -69,28 +71,32 @@ describe('Button', () => {
     render(<Button variant="danger">Danger</Button>);
     
     const button = screen.getByRole('button');
-    expect(button).toHaveClass('bg-red-500/20');
+    // Danger uses rgba soft-coral, not bg-red-500/20
+    expect(button.className).toMatch(/rgba\(224/);
   });
 
   it('should render with medium size by default', () => {
     render(<Button>Medium</Button>);
     
     const button = screen.getByRole('button');
-    expect(button).toHaveClass('px-5', 'py-2.5');
+    // md size: px-6 py-3 text-base rounded-xl h-14
+    expect(button).toHaveClass('px-6', 'py-3', 'h-14');
   });
 
   it('should render with small size', () => {
     render(<Button size="sm">Small</Button>);
     
     const button = screen.getByRole('button');
-    expect(button).toHaveClass('px-3', 'py-1.5', 'text-xs');
+    // sm size: px-4 py-2 text-sm rounded-xl h-10
+    expect(button).toHaveClass('px-4', 'py-2', 'text-sm', 'h-10');
   });
 
   it('should render with large size', () => {
     render(<Button size="lg">Large</Button>);
     
     const button = screen.getByRole('button');
-    expect(button).toHaveClass('px-8', 'py-3.5', 'text-base');
+    // lg size: px-8 py-4 text-lg rounded-xl h-16
+    expect(button).toHaveClass('px-8', 'py-4', 'text-lg', 'h-16');
   });
 
   it('should render with icon', () => {
@@ -130,7 +136,8 @@ describe('Button', () => {
     );
     
     const button = screen.getByRole('button');
-    expect(button).toHaveClass('btn-primary', 'extra-class');
+    expect(button).toHaveClass('extra-class');
+    expect(button).toHaveClass('bg-gradient-to-br');
     expect(button).toBeDisabled();
     expect(button.querySelector('.animate-spin')).toBeInTheDocument();
   });

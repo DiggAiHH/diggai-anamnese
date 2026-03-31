@@ -2,9 +2,14 @@ import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
 import HttpBackend from 'i18next-http-backend';
+import {
+    APP_LANGUAGE_CODES,
+    RTL_APP_LANGUAGE_CODES,
+    normalizeAppLanguageCode,
+} from './lib/i18n/languages';
 
 // RTL languages that require layout mirroring
-const RTL_LANGUAGES = ['ar', 'fa'];
+const rtlLanguageSet = new Set<string>(RTL_APP_LANGUAGE_CODES);
 
 /**
  * i18n Configuration for DiggAI Anamnese Platform
@@ -21,7 +26,7 @@ i18n
     .use(initReactI18next)
     .init({
         fallbackLng: 'de',
-        supportedLngs: ['de', 'en', 'ar', 'tr', 'uk', 'es', 'fa', 'it', 'fr', 'pl'],
+        supportedLngs: APP_LANGUAGE_CODES,
         backend: {
             loadPath: '/locales/{{lng}}/{{ns}}.json',
         },
@@ -50,9 +55,10 @@ i18n
  * Critical for RTL languages (Arabic, Persian)
  */
 export function setDocumentDirection(lng: string): void {
-    const isRTL = RTL_LANGUAGES.includes(lng);
+    const normalizedLanguage = normalizeAppLanguageCode(lng);
+    const isRTL = rtlLanguageSet.has(normalizedLanguage);
     document.documentElement.dir = isRTL ? 'rtl' : 'ltr';
-    document.documentElement.lang = lng;
+    document.documentElement.lang = normalizedLanguage;
     
     // Add RTL class for CSS logical properties
     if (isRTL) {
@@ -71,7 +77,7 @@ i18n.on('languageChanged', (lng) => {
 
 // Initialize direction on load
 if (typeof window !== 'undefined') {
-    const currentLang = i18n.language || 'de';
+    const currentLang = i18n.resolvedLanguage || i18n.language || 'de';
     setDocumentDirection(currentLang);
 }
 
@@ -80,8 +86,8 @@ if (typeof window !== 'undefined') {
  * Useful for conditional styling
  */
 export function isRTLLanguage(lng?: string): boolean {
-    const language = lng || i18n.language;
-    return RTL_LANGUAGES.includes(language);
+    const language = normalizeAppLanguageCode(lng || i18n.language);
+    return rtlLanguageSet.has(language);
 }
 
 /**

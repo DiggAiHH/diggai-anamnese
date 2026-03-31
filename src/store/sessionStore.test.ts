@@ -206,6 +206,7 @@ describe('SessionStore', () => {
     });
 
     it('should update existing answer', () => {
+      vi.useFakeTimers();
       const { setAnswer } = useSessionStore.getState();
       
       setAnswer('atom-1', 'yes');
@@ -219,6 +220,7 @@ describe('SessionStore', () => {
       
       expect(secondAnswer.value).toBe('no');
       expect(secondAnswer.atomId).toBe('atom-1');
+      vi.useRealTimers();
     });
 
     it('should handle different answer types', () => {

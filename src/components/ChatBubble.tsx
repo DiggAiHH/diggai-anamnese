@@ -217,7 +217,10 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({ sessionId }) => {
 
     useEffect(() => {
         if (!hasSession) return;
-        const socket = io(SOCKET_BASE_URL || window.location.origin);
+        const socket = io(SOCKET_BASE_URL || window.location.origin, {
+            withCredentials: true,
+            transports: ['websocket', 'polling'],
+        });
         socketRef.current = socket;
         socket.emit('join:session', sessionId);
         

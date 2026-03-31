@@ -1,659 +1,542 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
+import { z } from 'zod';
 import { prisma } from '../db';
+import { config } from '../config';
 import { requireAuth, requireRole } from '../middleware/auth';
-import { decrypt, isPIIAtom } from '../services/encryption';
+import { buildCcdXml } from '../services/export/ccd.service';
+import { sendPackageLinkEmail } from '../services/export/package-mail.service';
+import { PackageError, consumeSecureExportLink, createEncryptedPackage, createSecureExportLink } from '../services/export/package.service';
+import { renderSessionPdf } from '../services/export/pdf.service';
+import {
+  ExportAccessError,
+  buildExportFilename,
+  escapeCsvValue,
+  getNormalizedSessionExport,
+  renderTxtExport,
+} from '../services/export/session-export.service';
 
 const router = Router();
 
 function getEffectiveTenantId(req: Request, res: Response): string | null {
-    const requestTenantId = req.tenantId;
-    const authTenantId = req.auth?.tenantId;
+  const requestTenantId = req.tenantId;
+  const authTenantId = req.auth?.tenantId;
 
-    if (requestTenantId && authTenantId && requestTenantId !== authTenantId) {
-        res.status(403).json({ error: 'Tenant scope violation', code: 'EXPORT_SCOPE_VIOLATION' });
-        return null;
-    }
+  if (requestTenantId && authTenantId && requestTenantId !== authTenantId) {
+    res.status(403).json({ error: 'Tenant scope violation', code: 'EXPORT_SCOPE_VIOLATION' });
+    return null;
+  }
 
-    const tenantId = requestTenantId || authTenantId;
-    if (!tenantId) {
-        res.status(400).json({ error: 'Tenant context required', code: 'TENANT_CONTEXT_REQUIRED' });
-        return null;
-    }
+  const tenantId = requestTenantId || authTenantId;
+  if (!tenantId) {
+    res.status(400).json({ error: 'Tenant context required', code: 'TENANT_CONTEXT_REQUIRED' });
+    return null;
+  }
 
-    return tenantId;
+  return tenantId;
 }
 
 function rejectTokenQueryParameter(req: Request, res: Response, next: () => void) {
-    if (typeof req.query.token !== 'undefined') {
-        return res.status(400).json({ error: 'Token query parameter is not allowed' });
-    }
+  if (typeof req.query.token !== 'undefined') {
+    return res.status(400).json({ error: 'Token query parameter is not allowed' });
+  }
 
-    next();
+  next();
 }
 
-// ─── H-05 FIX: HTML Escaping gegen XSS in PDF-Export ────────
-function escapeHtml(str: string): string {
-    return str
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
+function buildStaffScope(req: Request, res: Response) {
+  const tenantId = getEffectiveTenantId(req, res);
+  if (!tenantId) return null;
+
+  return {
+    role: req.auth?.role,
+    userId: req.auth?.userId,
+    tenantId,
+  };
 }
 
-// ─── H-06 FIX: CSV Injection Prevention ─────────────────────
-function escapeCsvValue(str: string): string {
-    // Remove formula chars that could be interpreted by Excel
-    let safe = str.replace(/;/g, ',').replace(/\n/g, ' ').replace(/\r/g, '');
-    // Prefix formula-start characters with a single quote
-    if (/^\s*[=+\-@\t\r]/.test(safe)) {
-        safe = `'${safe}`;
-    }
-    return safe;
-}
+function buildFlexibleScope(req: Request, res: Response) {
+  if (!req.auth) {
+    res.status(401).json({ error: 'Authentifizierung erforderlich' });
+    return null;
+  }
 
-function sanitizeFilenamePart(str: string): string {
-    const cleaned = str
-        .replace(/[\r\n\t]/g, ' ')
-        .replace(/[^a-zA-Z0-9_-]+/g, '_')
-        .replace(/_+/g, '_')
-        .replace(/^_+|_+$/g, '');
-    return cleaned.slice(0, 64) || 'Patient';
-}
-
-function buildExportFilename(patientName: string, extension: 'csv' | 'html'): string {
-    const date = new Date().toISOString().slice(0, 10);
-    const safeName = sanitizeFilenamePart(patientName);
-    return `Anamnese_${safeName}_${date}.${extension}`;
-}
-
-// ─── Helper: Entschlüsselte Antworten aufbereiten ────────────
-
-interface DecryptedAnswer {
-    atomId: string;
-    questionText: string;
-    section: string;
-    value: string;
-    answeredAt: Date;
-}
-
-interface ExportScopeContext {
-    role?: string;
-    userId?: string;
-    tenantId?: string;
-}
-
-class ExportRouteError extends Error {
-    public readonly status: number;
-    public readonly code: string;
-
-    constructor(status: number, code: string, message: string) {
-        super(message);
-        this.status = status;
-        this.code = code;
-    }
-}
-
-async function getDecryptedSessionData(sessionId: string, scope?: ExportScopeContext) {
-    const session = await prisma.patientSession.findUnique({
-        where: { id: sessionId },
-        include: {
-            answers: { orderBy: { answeredAt: 'asc' } },
-            triageEvents: true,
-        },
-    });
-
-    if (!session) {
-        throw new ExportRouteError(404, 'EXPORT_SESSION_NOT_FOUND', 'Session nicht gefunden');
-    }
-
-    const effectiveTenantId = scope?.tenantId;
-    if (effectiveTenantId && session.tenantId !== effectiveTenantId) {
-        throw new ExportRouteError(403, 'EXPORT_SCOPE_VIOLATION', 'Kein Zugriff auf diese Sitzung');
-    }
-
-    if (scope?.role === 'arzt' && scope.userId && session.assignedArztId && session.assignedArztId !== scope.userId) {
-        throw new ExportRouteError(403, 'EXPORT_SCOPE_VIOLATION', 'Kein Zugriff auf diese Sitzung');
-    }
-
-    // Alle Fragen laden für die Texte
-    const atoms = await prisma.medicalAtom.findMany();
-    const atomMap = new Map(atoms.map(a => [a.id, a]));
-
-    const decryptedAnswers: DecryptedAnswer[] = session.answers.map(a => {
-        const atom = atomMap.get(a.atomId);
-        let displayValue = a.value;
-
-        // PII-Felder entschlüsseln
-        if (isPIIAtom(a.atomId) && a.encryptedValue) {
-            try {
-                displayValue = decrypt(a.encryptedValue);
-            } catch {
-                displayValue = '[Entschlüsselung fehlgeschlagen]';
-            }
-        } else {
-            // JSON-Werte auspacken
-            try {
-                const parsed = JSON.parse(a.value);
-                if (typeof parsed === 'object' && parsed.data !== undefined) {
-                    displayValue = Array.isArray(parsed.data)
-                        ? parsed.data.join(', ')
-                        : String(parsed.data);
-                } else if (typeof parsed === 'string') {
-                    displayValue = parsed;
-                } else {
-                    displayValue = JSON.stringify(parsed);
-                }
-            } catch {
-                // Kein JSON => Rohwert verwenden
-            }
-        }
-
-        return {
-            atomId: a.atomId,
-            questionText: atom?.questionText || `Frage ${a.atomId}`,
-            section: atom?.section || 'sonstige',
-            value: displayValue,
-            answeredAt: a.answeredAt,
-        };
-    });
-
-    // Entschlüsselten Namen zusammenbauen
-    let patientName = 'Unbekannt';
-    if (session.encryptedName) {
-        try {
-            patientName = decrypt(session.encryptedName);
-        } catch {
-            patientName = '[Name verschlüsselt]';
-        }
-    }
-
+  if (req.auth.role === 'patient') {
     return {
-        session,
-        patientName,
-        decryptedAnswers,
-        triageEvents: session.triageEvents,
+      role: req.auth.role,
+      sessionId: req.auth.sessionId,
     };
+  }
+
+  const tenantId = getEffectiveTenantId(req, res);
+  if (!tenantId) return null;
+
+  return {
+    role: req.auth.role,
+    userId: req.auth.userId,
+    tenantId,
+    sessionId: req.auth.sessionId,
+  };
 }
 
-// ─── Sektions-Überschriften auf Deutsch ─────────────────────
+async function writeAuditLog(params: {
+  tenantId: string;
+  userId?: string | null;
+  action: string;
+  resource: string;
+  metadata: Record<string, unknown>;
+}) {
+  await prisma.auditLog.create({
+    data: {
+      tenantId: params.tenantId,
+      userId: params.userId || null,
+      action: params.action,
+      resource: params.resource,
+      metadata: JSON.stringify(params.metadata),
+    },
+  });
+}
 
-const SECTION_LABELS: Record<string, string> = {
-    'basis': 'Personalien',
-    'versicherung': 'Versicherung',
-    'adresse': 'Adresse',
-    'kontakt': 'Kontaktdaten',
-    'beschwerden': 'Aktuelle Beschwerden',
-    'koerpermasse': 'Körpermaße',
-    'rauchen': 'Raucherstatus',
-    'impfungen': 'Impfstatus',
-    'familie': 'Familienanamnese',
-    'beruf': 'Beruf & Lebensstil',
-    'diabetes': 'Diabetes',
-    'beeintraechtigung': 'Beeinträchtigungen',
-    'implantate': 'Implantate',
-    'blutverduenner': 'Blutverdünner',
-    'allergien': 'Allergien',
-    'gesundheitsstoerungen': 'Gesundheitsstörungen',
-    'vorerkrankungen': 'Vorerkrankungen',
-    'medikamente-freitext': 'Medikamente',
-    'schwangerschaft': 'Schwangerschaft',
-    'rezepte': 'Rezeptanfrage',
-    'dateien': 'Dokumenten-Upload',
-    'au-anfrage': 'AU-Anfrage',
-    'ueberweisung': 'Überweisungsanfrage',
-    'absage': 'Terminabsage',
-    'telefon': 'Telefonanfrage',
-    'befund-anforderung': 'Befundanforderung',
-    'nachricht': 'Nachricht',
-    'abschluss': 'Abschluss',
-    'bg-unfall': 'BG-Unfall',
-};
+function handleExportError(res: Response, err: unknown, label: string) {
+  if (err instanceof ExportAccessError || err instanceof PackageError) {
+    res.status(err.status).json({ error: err.message, code: err.code });
+    return;
+  }
 
-// ─── CSV Export ──────────────────────────────────────────────
+  if (err instanceof z.ZodError) {
+    res.status(400).json({ error: 'Ungültige Anfragedaten', code: 'EXPORT_VALIDATION_ERROR' });
+    return;
+  }
+
+  console.error(label, err);
+  res.status(500).json({ error: 'Export fehlgeschlagen' });
+}
+
+function buildApiBaseUrl(req: Request): string {
+  const configured = config.apiPublicUrl.trim();
+  if (configured) {
+    return configured.replace(/\/+$/, '');
+  }
+
+  return `${req.protocol}://${req.get('host')}/api`;
+}
+
+function getRequestIp(req: Request): string | null {
+  const forwardedFor = req.headers['x-forwarded-for'];
+  if (typeof forwardedFor === 'string' && forwardedFor.length > 0) {
+    return forwardedFor.split(',')[0]?.trim() || null;
+  }
+
+  return req.ip || null;
+}
+
+async function getTenantName(tenantId: string): Promise<string> {
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: tenantId },
+    select: { name: true },
+  });
+
+  return tenant?.name || 'Ihre Praxis';
+}
 
 router.get('/sessions/:id/export/csv', rejectTokenQueryParameter, requireAuth, requireRole('arzt', 'admin', 'mfa'), async (req: Request, res: Response) => {
-    try {
-        const tenantId = getEffectiveTenantId(req, res);
-        if (!tenantId) return;
+  try {
+    const scope = buildStaffScope(req, res);
+    if (!scope) return;
 
-        const role = req.auth?.role;
-        const userId = req.auth?.userId;
-        const { session, patientName, decryptedAnswers, triageEvents } = await getDecryptedSessionData(req.params.id as string, {
-            role,
-            userId,
-            tenantId,
-        });
+    const data = await getNormalizedSessionExport(req.params.id as string, scope);
+    const separator = ';';
+    const lines: string[] = [];
 
-        // BOM für Excel UTF-8 Erkennung
-        const BOM = '\uFEFF';
-        const SEP = ';';
+    lines.push(`Anamnese-Bericht${separator}${separator}${separator}`);
+    lines.push(`Patient${separator}${escapeCsvValue(data.patient.name)}${separator}${separator}`);
+    lines.push(`Geschlecht${separator}${escapeCsvValue(data.patient.gender || '-')}${separator}${separator}`);
+    lines.push(`Geburtsdatum${separator}${escapeCsvValue(data.patient.birthDate ? new Date(data.patient.birthDate).toLocaleDateString('de-DE') : '-')}${separator}${separator}`);
+    lines.push(`Versicherung${separator}${escapeCsvValue(data.patient.insuranceType || '-')}${separator}${separator}`);
+    lines.push(`Anliegen${separator}${escapeCsvValue(data.service)}${separator}${separator}`);
+    lines.push(`Status${separator}${escapeCsvValue(data.status)}${separator}${separator}`);
+    lines.push(`Erstellt am${separator}${escapeCsvValue(new Date(data.createdAt).toLocaleString('de-DE'))}${separator}${separator}`);
+    lines.push(`Exportiert am${separator}${new Date().toLocaleString('de-DE')}${separator}${separator}`);
+    lines.push('');
+    lines.push(`Sektion${separator}Frage${separator}Antwort${separator}Beantwortet am`);
+    lines.push('');
 
-        const lines: string[] = [];
-
-        // Header
-        lines.push(`Anamnese-Bericht${SEP}${SEP}${SEP}`);
-        lines.push(`Patient${SEP}${escapeCsvValue(patientName)}${SEP}${SEP}`);
-        lines.push(`Geschlecht${SEP}${escapeCsvValue(session.gender || '-')}${SEP}${SEP}`);
-        lines.push(`Geburtsdatum${SEP}${escapeCsvValue(session.birthDate ? new Date(session.birthDate).toLocaleDateString('de-DE') : '-')}${SEP}${SEP}`);
-        lines.push(`Versicherung${SEP}${escapeCsvValue(session.insuranceType || '-')}${SEP}${SEP}`);
-        lines.push(`Anliegen${SEP}${escapeCsvValue(session.selectedService)}${SEP}${SEP}`);
-        lines.push(`Status${SEP}${escapeCsvValue(session.status)}${SEP}${SEP}`);
-        lines.push(`Erstellt am${SEP}${escapeCsvValue(new Date(session.createdAt).toLocaleString('de-DE'))}${SEP}${SEP}`);
-        lines.push(`Exportiert am${SEP}${new Date().toLocaleString('de-DE')}${SEP}${SEP}`);
-        lines.push('');
-        lines.push(`Sektion${SEP}Frage${SEP}Antwort${SEP}Beantwortet am`);
-        lines.push('');
-
-        // Antworten — H-06 FIX: CSV injection prevention
-        for (const a of decryptedAnswers) {
-            const sectionLabel = SECTION_LABELS[a.section] || a.section;
-            const safeQuestion = escapeCsvValue(a.questionText);
-            const safeValue = escapeCsvValue(a.value);
-            const time = new Date(a.answeredAt).toLocaleString('de-DE');
-            lines.push(`${escapeCsvValue(sectionLabel)}${SEP}${safeQuestion}${SEP}${safeValue}${SEP}${time}`);
-        }
-
-        // Triage Events
-        if (triageEvents.length > 0) {
-            lines.push('');
-            lines.push(`Triage-Alarme${SEP}${SEP}${SEP}`);
-            for (const t of triageEvents) {
-                lines.push(`${escapeCsvValue(t.level)}${SEP}${escapeCsvValue(t.message)}${SEP}${escapeCsvValue(`Frage ${t.atomId}`)}${SEP}${escapeCsvValue(new Date(t.createdAt).toLocaleString('de-DE'))}`);
-            }
-        }
-
-        const csvContent = BOM + lines.join('\r\n');
-
-        // Audit-Log
-        await prisma.auditLog.create({
-            data: {
-                tenantId: req.tenantId || req.auth?.tenantId || 'system',
-                userId: req.auth?.userId || null,
-                action: 'EXPORT_CSV',
-                resource: `sessions/${session.id}`,
-                metadata: JSON.stringify({ format: 'csv', sessionId: session.id }),
-            },
-        });
-
-        // Usage tracking (non-blocking)
-        import('../services/serviceUsageService').then(({ logServiceUsage }) => {
-            logServiceUsage({
-                tenantId: req.tenantId || req.auth?.tenantId || 'default',
-                sessionId: session.id,
-                serviceType: 'CSV_EXPORT',
-                actionName: 'CSV-Export erstellt',
-            }).catch(() => {});
-        }).catch(() => {});
-
-        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-        res.setHeader('Content-Disposition', `attachment; filename="${buildExportFilename(patientName, 'csv')}"`);
-        res.send(csvContent);
-    } catch (err: unknown) {
-        if (err instanceof ExportRouteError) {
-            res.status(err.status).json({ error: err.message, code: err.code });
-            return;
-        }
-        console.error('[Export] CSV-Fehler:', err);
-        res.status(500).json({ error: 'Export fehlgeschlagen' });
+    for (const answer of data.answers) {
+      lines.push([
+        escapeCsvValue(answer.section),
+        escapeCsvValue(answer.questionText),
+        escapeCsvValue(answer.displayValue),
+        escapeCsvValue(new Date(answer.answeredAt).toLocaleString('de-DE')),
+      ].join(separator));
     }
+
+    if (data.triageEvents.length > 0) {
+      lines.push('');
+      lines.push(`Triage-Alarme${separator}${separator}${separator}`);
+      for (const event of data.triageEvents) {
+        lines.push([
+          escapeCsvValue(event.level),
+          escapeCsvValue(event.message),
+          escapeCsvValue(`Frage ${event.atomId}`),
+          escapeCsvValue(new Date(event.createdAt).toLocaleString('de-DE')),
+        ].join(separator));
+      }
+    }
+
+    await writeAuditLog({
+      tenantId: data.tenantId,
+      userId: req.auth?.userId,
+      action: 'EXPORT_CSV',
+      resource: `sessions/${data.sessionId}`,
+      metadata: { format: 'csv', sessionId: data.sessionId },
+    });
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${buildExportFilename(data.patient.name, 'csv')}"`);
+    res.send(`\uFEFF${lines.join('\r\n')}`);
+  } catch (err: unknown) {
+    handleExportError(res, err, '[Export] CSV-Fehler:');
+  }
 });
 
-// ─── HTML/PDF Export ─────────────────────────────────────────
+router.get('/sessions/:id/export/txt', rejectTokenQueryParameter, requireAuth, requireRole('arzt', 'admin', 'mfa'), async (req: Request, res: Response) => {
+  try {
+    const scope = buildStaffScope(req, res);
+    if (!scope) return;
+
+    const data = await getNormalizedSessionExport(req.params.id as string, scope);
+    await writeAuditLog({
+      tenantId: data.tenantId,
+      userId: req.auth?.userId,
+      action: 'EXPORT_TXT',
+      resource: `sessions/${data.sessionId}`,
+      metadata: { format: 'txt', sessionId: data.sessionId },
+    });
+
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${buildExportFilename(data.patient.name, 'txt')}"`);
+    res.send(renderTxtExport(data));
+  } catch (err: unknown) {
+    handleExportError(res, err, '[Export] TXT-Fehler:');
+  }
+});
 
 router.get('/sessions/:id/export/pdf', rejectTokenQueryParameter, requireAuth, requireRole('arzt', 'admin', 'mfa'), async (req: Request, res: Response) => {
-    try {
-        const tenantId = getEffectiveTenantId(req, res);
-        if (!tenantId) return;
+  try {
+    const scope = buildStaffScope(req, res);
+    if (!scope) return;
 
-        const role = req.auth?.role;
-        const userId = req.auth?.userId;
-        const { session, patientName, decryptedAnswers, triageEvents } = await getDecryptedSessionData(req.params.id as string, {
-            role,
-            userId,
-            tenantId,
-        });
+    const data = await getNormalizedSessionExport(req.params.id as string, scope);
+    const pdfBuffer = await renderSessionPdf(data);
 
-        // Antworten nach Sektion gruppieren
-        const sections = new Map<string, DecryptedAnswer[]>();
-        for (const a of decryptedAnswers) {
-            const key = a.section;
-            if (!sections.has(key)) sections.set(key, []);
-            sections.get(key)!.push(a);
-        }
+    await writeAuditLog({
+      tenantId: data.tenantId,
+      userId: req.auth?.userId,
+      action: 'EXPORT_PDF',
+      resource: `sessions/${data.sessionId}`,
+      metadata: { format: 'pdf', sessionId: data.sessionId },
+    });
 
-        // Triage-HTML — H-05 FIX: escapeHtml for all dynamic values
-        let triageHTML = '';
-        if (triageEvents.length > 0) {
-            triageHTML = `
-                <div style="background:#fff3cd;border:2px solid #ffc107;border-radius:8px;padding:16px;margin-bottom:24px;">
-                    <h3 style="color:#856404;margin:0 0 8px;">⚠ Triage-Alarme</h3>
-                    ${triageEvents.map(t => `
-                        <p style="margin:4px 0;color:#856404;">
-                            <strong>[${escapeHtml(t.level)}]</strong> ${escapeHtml(t.message)} 
-                            <small>(Frage ${escapeHtml(t.atomId)}, ${new Date(t.createdAt).toLocaleString('de-DE')})</small>
-                        </p>
-                    `).join('')}
-                </div>`;
-        }
-
-        // Sektionen-HTML — H-05 FIX: escapeHtml for all dynamic values
-        let sectionsHTML = '';
-        Array.from(sections.entries()).forEach(([sectionKey, answers]) => {
-            const label = escapeHtml(SECTION_LABELS[sectionKey] || sectionKey);
-            sectionsHTML += `
-                <div style="margin-bottom:20px;">
-                    <h3 style="background:#f0f4f8;padding:8px 12px;border-radius:6px;font-size:14px;color:#1a365d;margin:0 0 8px;border-left:4px solid #3182ce;">
-                        ${label}
-                    </h3>
-                    <table style="width:100%;border-collapse:collapse;font-size:12px;">
-                        ${answers.map(a => `
-                            <tr style="border-bottom:1px solid #e2e8f0;">
-                                <td style="padding:6px 8px;color:#4a5568;width:50%;vertical-align:top;">${escapeHtml(a.questionText)}</td>
-                                <td style="padding:6px 8px;color:#1a202c;font-weight:500;">${escapeHtml(a.value || '-')}</td>
-                            </tr>
-                        `).join('')}
-                    </table>
-                </div>`;
-        });
-
-        const html = `<!DOCTYPE html>
-<html lang="de">
-<head>
-    <meta charset="UTF-8">
-    <title>Anamnese-Bericht – ${escapeHtml(patientName)}</title>
-    <style>
-        @page { size: A4; margin: 20mm; }
-        body { font-family: 'Segoe UI', Arial, sans-serif; color: #1a202c; line-height: 1.5; font-size: 12px; }
-        .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #2b6cb0; padding-bottom: 12px; margin-bottom: 20px; }
-        .header-left h1 { font-size: 20px; color: #2b6cb0; margin: 0; }
-        .header-left p { color: #718096; font-size: 11px; margin: 2px 0 0; }
-        .header-right { text-align: right; font-size: 11px; color: #718096; }
-        .patient-card { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: #ebf8ff; padding: 16px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #bee3f8; }
-        .patient-card dt { color: #2c5282; font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
-        .patient-card dd { margin: 0 0 8px; color: #1a365d; font-weight: 500; }
-        .footer { margin-top: 40px; border-top: 2px solid #e2e8f0; padding-top: 16px; }
-        .signatures { display: flex; justify-content: space-between; margin-top: 60px; }
-        .sig-line { width: 200px; border-top: 1px solid #1a202c; padding-top: 4px; font-size: 10px; color: #718096; text-align: center; }
-        .dsgvo { font-size: 9px; color: #a0aec0; margin-top: 20px; line-height: 1.4; }
-        @media print { body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <div class="header-left">
-            <h1>📋 Anamnese-Bericht</h1>
-            <p>Medizinische Patientenaufnahme</p>
-        </div>
-        <div class="header-right">
-            <p><strong>Referenz:</strong> ${session.id.slice(0, 12)}</p>
-            <p><strong>Erstellt:</strong> ${new Date(session.createdAt).toLocaleString('de-DE')}</p>
-            <p><strong>Exportiert:</strong> ${new Date().toLocaleString('de-DE')}</p>
-        </div>
-    </div>
-
-    <div class="patient-card">
-        <div><dt>Patient</dt><dd>${escapeHtml(patientName)}</dd></div>
-        <div><dt>Geschlecht</dt><dd>${session.gender === 'M' ? 'Männlich' : session.gender === 'W' ? 'Weiblich' : escapeHtml(session.gender || '-')}</dd></div>
-        <div><dt>Geburtsdatum</dt><dd>${session.birthDate ? new Date(session.birthDate).toLocaleDateString('de-DE') : '-'}</dd></div>
-        <div><dt>Versicherung</dt><dd>${escapeHtml(session.insuranceType || '-')}</dd></div>
-        <div><dt>Anliegen</dt><dd>${escapeHtml(session.selectedService)}</dd></div>
-        <div><dt>Status</dt><dd>${escapeHtml(session.status)}</dd></div>
-    </div>
-
-    ${triageHTML}
-
-    ${sectionsHTML}
-
-    <div class="footer">
-        <div class="signatures">
-            <div class="sig-line">Patient / Datum</div>
-            <div class="sig-line">Arzt / Datum</div>
-        </div>
-        <p class="dsgvo">
-            Dieses Dokument enthält vertrauliche medizinische Daten gemäß Art. 9 DSGVO. 
-            Die Verarbeitung erfolgt auf Grundlage der Einwilligung des Patienten (Art. 6 Abs. 1 lit. a, Art. 9 Abs. 2 lit. a DSGVO) 
-            sowie zur Erfüllung des Behandlungsvertrags. Aufbewahrungspflicht gemäß § 630f BGB: 10 Jahre.
-            Unbefugte Weitergabe ist strafbar (§ 203 StGB).
-        </p>
-    </div>
-</body>
-</html>`;
-
-        // Audit-Log
-        await prisma.auditLog.create({
-            data: {
-                tenantId: req.tenantId || req.auth?.tenantId || 'system',
-                userId: req.auth?.userId || null,
-                action: 'EXPORT_PDF',
-                resource: `sessions/${session.id}`,
-                metadata: JSON.stringify({ format: 'pdf', sessionId: session.id }),
-            },
-        });
-
-        // Usage tracking (non-blocking)
-        import('../services/serviceUsageService').then(({ logServiceUsage }) => {
-            logServiceUsage({
-                tenantId: req.tenantId || req.auth?.tenantId || 'default',
-                sessionId: session.id,
-                serviceType: 'PDF_EXPORT',
-                actionName: 'PDF-Bericht erstellt',
-            }).catch(() => {});
-        }).catch(() => {});
-
-        res.setHeader('Content-Type', 'text/html; charset=utf-8');
-        res.setHeader('Content-Disposition', `inline; filename="${buildExportFilename(patientName, 'html')}"`);
-        res.send(html);
-    } catch (err: unknown) {
-        if (err instanceof ExportRouteError) {
-            res.status(err.status).json({ error: err.message, code: err.code });
-            return;
-        }
-        console.error('[Export] PDF-Fehler:', err);
-        res.status(500).json({ error: 'Export fehlgeschlagen' });
-    }
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${buildExportFilename(data.patient.name, 'pdf')}"`);
+    res.send(pdfBuffer);
+  } catch (err: unknown) {
+    handleExportError(res, err, '[Export] PDF-Fehler:');
+  }
 });
-
-// ─── JSON Export (raw decrypted data) ─────────────────────────
 
 router.get('/sessions/:id/export/json', rejectTokenQueryParameter, requireAuth, requireRole('arzt', 'admin'), async (req: Request, res: Response) => {
-    try {
-        const tenantId = getEffectiveTenantId(req, res);
-        if (!tenantId) return;
+  try {
+    const scope = buildStaffScope(req, res);
+    if (!scope) return;
 
-        const role = req.auth?.role;
-        const userId = req.auth?.userId;
-        const data = await getDecryptedSessionData(req.params.id as string, {
-            role,
-            userId,
-            tenantId,
-        });
+    const data = await getNormalizedSessionExport(req.params.id as string, scope);
+    await writeAuditLog({
+      tenantId: data.tenantId,
+      userId: req.auth?.userId,
+      action: 'EXPORT_JSON',
+      resource: `sessions/${data.sessionId}`,
+      metadata: { format: 'json', sessionId: data.sessionId },
+    });
 
-        await prisma.auditLog.create({
-            data: {
-                tenantId: req.tenantId || req.auth?.tenantId || 'system',
-                userId: req.auth?.userId || null,
-                action: 'EXPORT_JSON',
-                resource: `sessions/${data.session.id}`,
-                metadata: JSON.stringify({ format: 'json' }),
-            },
-        });
-
-        // Usage tracking (non-blocking)
-        import('../services/serviceUsageService').then(({ logServiceUsage }) => {
-            logServiceUsage({
-                tenantId: req.tenantId || req.auth?.tenantId || 'default',
-                sessionId: data.session.id,
-                serviceType: 'JSON_EXPORT',
-                actionName: 'JSON-Export erstellt',
-            }).catch(() => {});
-        }).catch(() => {});
-
-        res.json({
-            patient: {
-                name: data.patientName,
-                gender: data.session.gender,
-                birthDate: data.session.birthDate,
-                insuranceType: data.session.insuranceType,
-            },
-            service: data.session.selectedService,
-            status: data.session.status,
-            createdAt: data.session.createdAt,
-            completedAt: data.session.completedAt,
-            answers: data.decryptedAnswers,
-            triageEvents: data.triageEvents,
-            exportedAt: new Date(),
-        });
-    } catch (err: unknown) {
-        if (err instanceof ExportRouteError) {
-            res.status(err.status).json({ error: err.message, code: err.code });
-            return;
-        }
-        console.error('[Export] JSON-Fehler:', err);
-        res.status(500).json({ error: 'Export fehlgeschlagen' });
-    }
+    res.json({
+      patient: data.patient,
+      patientEmail: data.patientEmail,
+      service: data.service,
+      status: data.status,
+      createdAt: data.createdAt,
+      completedAt: data.completedAt,
+      answers: data.answers.map((answer) => ({
+        atomId: answer.atomId,
+        questionText: answer.questionText,
+        section: answer.section,
+        value: answer.rawValue,
+        displayValue: answer.displayValue,
+        answeredAt: answer.answeredAt,
+      })),
+      triageEvents: data.triageEvents,
+      exportedAt: new Date(),
+    });
+  } catch (err: unknown) {
+    handleExportError(res, err, '[Export] JSON-Fehler:');
+  }
 });
 
-// ─── FHIR R4 Export (M42 / Presight / Jordan Digital Health Center) ──────────
-//
-// GET /api/export/sessions/:id/export/fhir
-//   ?profile=nephrology  — include nephrology-specific resources (Dr. Sarah Al-oudat)
-//
-// Returns FHIR R4 Bundle (type: document) with:
-//   Patient, Encounter, QuestionnaireResponse, Flag (triage) [+ Nephrology profile]
+router.get('/sessions/:id/package', rejectTokenQueryParameter, requireAuth, async (req: Request, res: Response) => {
+  try {
+    const scope = buildFlexibleScope(req, res);
+    if (!scope) return;
+
+    const data = await getNormalizedSessionExport(req.params.id as string, scope);
+    const result = await createEncryptedPackage(data);
+
+    await writeAuditLog({
+      tenantId: data.tenantId,
+      userId: req.auth?.userId,
+      action: 'EXPORT_PACKAGE',
+      resource: `sessions/${data.sessionId}`,
+      metadata: { format: 'secure-package', sessionId: data.sessionId, packageId: result.package.packageId },
+    });
+
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${buildExportFilename(data.patient.name, 'secure.json')}"`);
+    res.send(JSON.stringify(result.package, null, 2));
+  } catch (err: unknown) {
+    handleExportError(res, err, '[Export] Package-Fehler:');
+  }
+});
+
+router.post('/sessions/:id/package-link', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const scope = buildFlexibleScope(req, res);
+    if (!scope) return;
+
+    const body = z.object({
+      email: z.string().email().optional().nullable(),
+    }).parse(req.body || {});
+    const data = await getNormalizedSessionExport(req.params.id as string, scope);
+    const recipientEmail = body.email?.trim() || data.patientEmail;
+
+    if (!recipientEmail) {
+      res.status(400).json({ error: 'Für diese Sitzung ist keine Patienten-E-Mail verfügbar', code: 'PACKAGE_EMAIL_REQUIRED' });
+      return;
+    }
+
+    const secureLink = await createSecureExportLink({
+      tenantId: data.tenantId,
+      sessionId: data.sessionId,
+      recipientEmail,
+    });
+    const downloadUrl = `${buildApiBaseUrl(req)}/export/download/${secureLink.token}`;
+    const practiceName = await getTenantName(data.tenantId);
+    const mailResult = await sendPackageLinkEmail({
+      recipientEmail,
+      practiceName,
+      downloadUrl,
+      expiresAt: secureLink.expiresAt,
+    });
+
+    await writeAuditLog({
+      tenantId: data.tenantId,
+      userId: req.auth?.userId,
+      action: 'EXPORT_PACKAGE_LINK',
+      resource: `sessions/${data.sessionId}`,
+      metadata: {
+        packageId: secureLink.packageId,
+        sessionId: data.sessionId,
+        sent: mailResult.sent,
+      },
+    });
+
+    res.json({
+      success: true,
+      sent: mailResult.sent,
+      expiresAt: secureLink.expiresAt.toISOString(),
+      packageId: secureLink.packageId,
+      mailtoUrl: mailResult.mailtoUrl,
+    });
+  } catch (err: unknown) {
+    handleExportError(res, err, '[Export] Package-Link-Fehler:');
+  }
+});
+
+router.get('/download/:token', async (req: Request, res: Response) => {
+  try {
+    const secureLink = await consumeSecureExportLink(req.params.token as string, getRequestIp(req));
+    const data = await getNormalizedSessionExport(secureLink.sessionId, { tenantId: secureLink.tenantId });
+    const result = await createEncryptedPackage(data, { packageId: secureLink.packageId });
+
+    await writeAuditLog({
+      tenantId: secureLink.tenantId,
+      action: 'EXPORT_PACKAGE_DOWNLOAD',
+      resource: `sessions/${secureLink.sessionId}`,
+      metadata: {
+        packageId: secureLink.packageId,
+        sessionId: secureLink.sessionId,
+      },
+    });
+
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${buildExportFilename(data.patient.name, 'secure.json')}"`);
+    res.send(JSON.stringify(result.package, null, 2));
+  } catch (err: unknown) {
+    handleExportError(res, err, '[Export] Download-Link-Fehler:');
+  }
+});
+
+router.get('/sessions/:id/export/ccd', rejectTokenQueryParameter, requireAuth, requireRole('arzt', 'admin', 'mfa'), async (req: Request, res: Response) => {
+  try {
+    const scope = buildStaffScope(req, res);
+    if (!scope) return;
+
+    const data = await getNormalizedSessionExport(req.params.id as string, scope);
+    const ccdXml = buildCcdXml({
+      sessionId: data.sessionId,
+      patientName: data.patient.name,
+      gender: data.patient.gender,
+      birthDate: data.patient.birthDate,
+      insuranceType: data.patient.insuranceType,
+      selectedService: data.service,
+      status: data.status,
+      createdAt: data.createdAt,
+      exportedAt: new Date(),
+      answers: data.answers.map((answer) => ({
+        atomId: answer.atomId,
+        questionText: answer.questionText,
+        section: answer.section,
+        value: answer.displayValue,
+        answeredAt: answer.answeredAt,
+      })),
+      triageEvents: data.triageEvents,
+    });
+
+    await writeAuditLog({
+      tenantId: data.tenantId,
+      userId: req.auth?.userId,
+      action: 'EXPORT_CCD',
+      resource: `sessions/${data.sessionId}`,
+      metadata: { format: 'ccd-cda', sessionId: data.sessionId },
+    });
+
+    res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${buildExportFilename(data.patient.name, 'xml')}"`);
+    res.send(ccdXml);
+  } catch (err: unknown) {
+    handleExportError(res, err, '[Export] CCD-Fehler:');
+  }
+});
 
 router.get('/sessions/:id/export/fhir', rejectTokenQueryParameter, requireAuth, requireRole('arzt', 'admin', 'mfa'), async (req: Request, res: Response) => {
-    try {
-        const tenantId = getEffectiveTenantId(req, res);
-        if (!tenantId) return;
+  try {
+    const scope = buildStaffScope(req, res);
+    if (!scope) return;
 
-        const role = req.auth?.role;
-        const userId = req.auth?.userId;
-        const { session, decryptedAnswers, triageEvents } = await getDecryptedSessionData(req.params.id as string, {
-            role,
-            userId,
-            tenantId,
-        });
+    const data = await getNormalizedSessionExport(req.params.id as string, scope);
+    const rawSession = await prisma.patientSession.findUnique({
+      where: { id: req.params.id as string },
+      include: { answers: true, patient: true },
+    });
 
-        // Load raw answers for nephrology extraction (before PII decryption)
-        const rawSession = await prisma.patientSession.findUnique({
-            where: { id: req.params.id as string },
-            include: { answers: true, patient: true },
-        });
+    const patient = rawSession?.patient ?? null;
+    const sessionTimestamp = new Date(data.createdAt).toISOString();
+    const patientRef = patient ? `Patient/${patient.id}` : `Patient/anonymous-${data.sessionId.slice(0, 8)}`;
+    const requestedProfile = typeof req.query.profile === 'string' ? req.query.profile : 'standard';
 
-        const patient = rawSession?.patient ?? null;
-        const sessionTs = new Date(session.createdAt).toISOString();
-        const patientRef = patient ? `Patient/${patient.id}` : `Patient/anonymous-${session.id.slice(0, 8)}`;
+    const bundleEntries: Array<{ resource: Record<string, unknown> }> = [];
 
-        // ── Patient resource ──────────────────────────────────
-        const fhirPatient = {
-            resourceType: 'Patient',
-            id: patient?.id ?? `anon-${session.id.slice(0, 8)}`,
-            meta: { profile: ['https://fhir.kbv.de/StructureDefinition/KBV_PR_Base_Patient|1.5.0'] },
-            identifier: [
-                { system: 'https://diggai.de/sid/patient-id', value: patient?.id ?? session.id },
-                patient?.patientNumber
-                    ? { system: 'https://diggai.de/sid/patient-number', value: patient.patientNumber }
-                    : null,
-            ].filter(Boolean),
-            birthDate: session.birthDate ? new Date(session.birthDate).toISOString().split('T')[0] : undefined,
-            gender: session.gender === 'M' ? 'male' : session.gender === 'W' ? 'female' : 'unknown',
-        };
+    bundleEntries.push({
+      resource: {
+        resourceType: 'Patient',
+        id: patient?.id ?? `anon-${data.sessionId.slice(0, 8)}`,
+        identifier: [
+          { system: 'https://diggai.de/sid/patient-id', value: patient?.id ?? data.sessionId },
+          patient?.patientNumber
+            ? { system: 'https://diggai.de/sid/patient-number', value: patient.patientNumber }
+            : null,
+        ].filter(Boolean),
+        birthDate: data.patient.birthDate ? new Date(data.patient.birthDate).toISOString().split('T')[0] : undefined,
+        gender: data.patient.gender === 'M' ? 'male' : data.patient.gender === 'W' ? 'female' : 'unknown',
+      },
+    });
 
-        // ── Encounter resource ────────────────────────────────
-        const fhirEncounter = {
-            resourceType: 'Encounter',
-            id: session.id,
-            status: session.status === 'COMPLETED' ? 'finished' : 'in-progress',
-            class: { system: 'http://terminology.hl7.org/CodeSystem/v3-ActCode', code: 'AMB', display: 'ambulatory' },
-            subject: { reference: patientRef },
-            reasonCode: [{ text: session.selectedService }],
-            period: {
-                start: sessionTs,
-                end: session.completedAt ? new Date(session.completedAt).toISOString() : undefined,
-            },
-        };
+    bundleEntries.push({
+      resource: {
+        resourceType: 'Encounter',
+        id: data.sessionId,
+        status: data.status === 'COMPLETED' ? 'finished' : 'in-progress',
+        class: { system: 'http://terminology.hl7.org/CodeSystem/v3-ActCode', code: 'AMB', display: 'ambulatory' },
+        subject: { reference: patientRef },
+        reasonCode: [{ text: data.service }],
+        period: {
+          start: sessionTimestamp,
+          end: data.completedAt ? new Date(data.completedAt).toISOString() : undefined,
+        },
+      },
+    });
 
-        // ── QuestionnaireResponse ─────────────────────────────
-        const fhirQR = {
-            resourceType: 'QuestionnaireResponse',
-            id: `qr-${session.id}`,
-            status: 'completed',
-            subject: { reference: patientRef },
-            encounter: { reference: `Encounter/${session.id}` },
-            authored: sessionTs,
-            item: decryptedAnswers.map(a => ({
-                linkId: a.atomId,
-                text: a.questionText,
-                answer: [{ valueString: a.value }],
-            })),
-        };
+    bundleEntries.push({
+      resource: {
+        resourceType: 'QuestionnaireResponse',
+        id: `qr-${data.sessionId}`,
+        status: 'completed',
+        subject: { reference: patientRef },
+        encounter: { reference: `Encounter/${data.sessionId}` },
+        authored: sessionTimestamp,
+        item: data.answers.map((answer) => ({
+          linkId: answer.atomId,
+          text: answer.questionText,
+          answer: [{ valueString: answer.displayValue }],
+        })),
+      },
+    });
 
-        // ── Triage Flags ──────────────────────────────────────
-        const fhirFlags = triageEvents.map((t, i) => ({
-            resourceType: 'Flag',
-            id: `flag-${i}-${session.id}`,
-            status: 'active',
-            category: [{ coding: [{ system: 'http://terminology.hl7.org/CodeSystem/flag-category', code: 'clinical' }] }],
-            code: { text: `[${t.level}] ${t.message}` },
-            subject: { reference: patientRef },
-            period: { start: new Date(t.createdAt).toISOString() },
-        }));
-
-        // ── Nephrology resources (opt-in) ─────────────────────
-        const nephrologyResources: object[] = [];
-        if (req.query.profile === 'nephrology') {
-            const { buildNephrologyResources, extractNephrologyData } = await import('../services/fhir/NephrologyProfile');
-            const rawAnswers = rawSession?.answers?.map(a => ({ atomId: a.atomId, value: a.value })) ?? [];
-            const nephrData = extractNephrologyData(patientRef, rawAnswers);
-            nephrologyResources.push(...buildNephrologyResources(nephrData));
-        }
-
-        // ── Assemble FHIR R4 Document Bundle ──────────────────
-        const bundle = {
-            resourceType: 'Bundle',
-            id: `export-${session.id}`,
-            type: 'document',
-            timestamp: new Date().toISOString(),
-            meta: {
-                source: 'https://diggai.de/anamnese',
-                tag: [{ system: 'https://diggai.de/tag', code: 'anamnese-export' }],
-            },
-            entry: [fhirPatient, fhirEncounter, fhirQR, ...fhirFlags, ...nephrologyResources]
-                .map(resource => ({ resource })),
-        };
-
-        // Audit-Log
-        await prisma.auditLog.create({
-            data: {
-                tenantId: req.tenantId || req.auth?.tenantId || 'system',
-                userId: req.auth?.userId || null,
-                action: 'EXPORT_FHIR',
-                resource: `sessions/${session.id}`,
-                metadata: JSON.stringify({ format: 'fhir-r4', profile: req.query.profile ?? 'standard' }),
-            },
-        });
-
-        import('../services/serviceUsageService').then(({ logServiceUsage }) => {
-            logServiceUsage({
-                tenantId: req.tenantId || req.auth?.tenantId || 'default',
-                sessionId: session.id,
-                serviceType: 'JSON_EXPORT',
-                actionName: `FHIR R4 Bundle exportiert (profile: ${req.query.profile ?? 'standard'})`,
-            }).catch(() => {});
-        }).catch(() => {});
-
-        res.setHeader('Content-Type', 'application/fhir+json');
-        res.json(bundle);
-    } catch (err: unknown) {
-        if (err instanceof ExportRouteError) {
-            res.status(err.status).json({ error: err.message, code: err.code });
-            return;
-        }
-        console.error('[Export] FHIR-Fehler:', err);
-        res.status(500).json({ error: 'FHIR-Export fehlgeschlagen' });
+    for (let index = 0; index < data.triageEvents.length; index += 1) {
+      const event = data.triageEvents[index];
+      bundleEntries.push({
+        resource: {
+          resourceType: 'Flag',
+          id: `flag-${index}-${data.sessionId}`,
+          status: 'active',
+          category: [{ coding: [{ system: 'http://terminology.hl7.org/CodeSystem/flag-category', code: 'clinical' }] }],
+          code: { text: `[${event.level}] ${event.message}` },
+          subject: { reference: patientRef },
+          period: { start: new Date(event.createdAt).toISOString() },
+        },
+      });
     }
+
+    if (requestedProfile === 'nephrology') {
+      const { buildNephrologyResources, extractNephrologyData } = await import('../services/fhir/NephrologyProfile');
+      const rawAnswers = rawSession?.answers?.map((answer) => ({ atomId: answer.atomId, value: answer.value })) ?? [];
+      const nephrologyData = extractNephrologyData(patientRef, rawAnswers);
+      for (const resource of buildNephrologyResources(nephrologyData)) {
+        bundleEntries.push({ resource: resource as unknown as Record<string, unknown> });
+      }
+    }
+
+    await writeAuditLog({
+      tenantId: data.tenantId,
+      userId: req.auth?.userId,
+      action: 'EXPORT_FHIR',
+      resource: `sessions/${data.sessionId}`,
+      metadata: { format: 'fhir-r4', sessionId: data.sessionId, profile: requestedProfile },
+    });
+
+    res.setHeader('Content-Type', 'application/fhir+json');
+    res.json({
+      resourceType: 'Bundle',
+      id: `export-${data.sessionId}`,
+      type: 'document',
+      timestamp: new Date().toISOString(),
+      meta: {
+        source: 'https://diggai.de/anamnese',
+        tag: [{ system: 'https://diggai.de/tag', code: 'anamnese-export' }],
+      },
+      entry: bundleEntries,
+    });
+  } catch (err: unknown) {
+    handleExportError(res, err, '[Export] FHIR-Fehler:');
+  }
 });
 
 export default router;

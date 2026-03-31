@@ -5,7 +5,7 @@
  * Keine personenbezogenen Daten werden in Themes gespeichert
  */
 
-import { PrismaClient } from '@prisma/client';
+import { getPrismaClientForDomain } from '../../db.js';
 
 // Local type definitions (mirrored from src/theme/types.ts to avoid cross-project import)
 interface ThemeColors {
@@ -49,7 +49,7 @@ interface TenantThemeConfig {
   updatedBy?: string;
 }
 
-const prisma = new PrismaClient();
+const prisma = getPrismaClientForDomain('company');
 
 /**
  * Default theme configuration for new tenants

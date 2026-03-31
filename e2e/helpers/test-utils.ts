@@ -5,15 +5,28 @@ import { Page, expect, APIRequestContext } from '@playwright/test';
 
 // ─── Test Credentials ───────────────────────────────────────
 
+const DEFAULT_ARZT_USERNAME = process.env.E2E_ARZT_USERNAME ?? 'admin';
+const DEFAULT_MFA_USERNAME = process.env.E2E_MFA_USERNAME ?? 'mfa';
+const DEFAULT_ARZT_PASSWORD = process.env.E2E_ARZT_PASSWORD ?? process.env.ARZT_PASSWORD ?? '';
+const DEFAULT_MFA_PASSWORD = process.env.E2E_MFA_PASSWORD ?? DEFAULT_ARZT_PASSWORD;
+
 export const TEST_CREDENTIALS = {
-    arzt: { username: 'admin', password: 'praxis2026' },
-    mfa: { username: 'mfa', password: 'praxis2026' }
+    arzt: { username: DEFAULT_ARZT_USERNAME, password: DEFAULT_ARZT_PASSWORD },
+    mfa: { username: DEFAULT_MFA_USERNAME, password: DEFAULT_MFA_PASSWORD }
 } as const;
+
+function assertPasswordConfigured(password: string, envHints: string) {
+    if (!password) {
+        throw new Error(`Missing E2E password configuration. Set ${envHints} in your environment.`);
+    }
+}
 
 // ─── Navigation Helpers ─────────────────────────────────────
 
 /** Click the "Weiter" (Next) button */
 export async function clickWeiter(page: Page) {
+    await dismissSessionRecoveryDialogIfPresent(page);
+
     const btn = page.getByRole('button', { name: 'Weiter', exact: true });
     await btn.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
     if (await btn.isVisible()) {
@@ -32,67 +45,288 @@ export async function clickZurueck(page: Page) {
 
 /** Wait for a question heading to be visible */
 export async function expectQuestion(page: Page, text: string, timeout = 15000) {
-    const heading = page.locator('h2').filter({ hasText: text }).first();
+    const heading = page.locator('h1, h2, h3').filter({ hasText: text }).first();
     await expect(heading).toBeVisible({ timeout });
 }
 
 /** Wait for page to be idle (network + animations) */
-export async function waitForIdle(page: Page, timeout = 3000) {
-    await page.waitForLoadState('networkidle', { timeout }).catch(() => {});
-    await page.waitForTimeout(300);
+type WaitForIdleOptions = {
+    timeout?: number;
+    includeNetworkIdle?: boolean;
+    settleMs?: number;
+};
+
+const E2E_COOKIE_CONSENT = {
+    essential: true,
+    functional: false,
+    analytics: false,
+    timestamp: '1970-01-01T00:00:00.000Z',
+    version: '1.0.0',
+} as const;
+
+const E2E_DSGVO_CONSENT = {
+    consentAt: '1970-01-01T00:00:00.000Z',
+    signatureHash: 'e2e-signature-hash',
+    signatureData: 'e2e-signature-data',
+} as const;
+
+function isTimeoutLikeError(error: unknown): boolean {
+    return error instanceof Error && /timeout|timed out/i.test(error.message);
+}
+
+async function waitForLoadStateWithPolicy(
+    page: Page,
+    state: 'domcontentloaded' | 'load' | 'networkidle',
+    timeout: number,
+    allowTimeout: boolean,
+) {
+    try {
+        await page.waitForLoadState(state, { timeout });
+    } catch (error) {
+        if (!allowTimeout || !isTimeoutLikeError(error)) {
+            throw error;
+        }
+    }
+}
+
+export async function waitForIdle(page: Page, timeoutOrOptions: number | WaitForIdleOptions = 3000) {
+    const options = typeof timeoutOrOptions === 'number'
+        ? { timeout: timeoutOrOptions }
+        : timeoutOrOptions;
+
+    const timeout = options.timeout ?? 3000;
+    const includeNetworkIdle = options.includeNetworkIdle ?? true;
+    const settleMs = options.settleMs ?? 300;
+
+    await waitForLoadStateWithPolicy(page, 'domcontentloaded', timeout, false);
+    await waitForLoadStateWithPolicy(page, 'load', timeout, true);
+
+    if (includeNetworkIdle) {
+        await waitForLoadStateWithPolicy(page, 'networkidle', Math.min(timeout, 2000), true);
+    }
+
+    await page.waitForTimeout(settleMs);
+}
+
+/** Navigate with retry to survive transient dev-server connection drops */
+export async function gotoWithRetry(page: Page, url: string, attempts = 3) {
+    let lastError: unknown;
+
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+        try {
+            await page.goto(url, { waitUntil: 'load', timeout: 20000 });
+            return;
+        } catch (error) {
+            lastError = error;
+            if (attempt === attempts) {
+                throw lastError;
+            }
+            await page.waitForTimeout(750 * attempt);
+        }
+    }
 }
 
 // ─── DSGVO / Consent ────────────────────────────────────────
 
-/** Accept the DSGVO consent modal */
-export async function acceptDSGVO(page: Page) {
-    await expect(page.getByText('Datenschutz-Einwilligung')).toBeVisible({ timeout: 10000 });
-    await page.click('text="Einwilligung in die Datenverarbeitung"');
-    await page.click('text="Verarbeitung besonderer Kategorien (Gesundheitsdaten)"');
-    await page.click('text="Widerrufsrecht & Datenlöschung"');
-    await page.click('button:has-text("Einwilligen & Fortfahren")');
+/** Reset persisted session to avoid recovery modal between tests */
+export async function resetPersistedSessionForE2E(page: Page) {
+    await page.addInitScript(() => {
+        localStorage.removeItem('anamnese-session');
+        localStorage.removeItem('anamnese_salt');
+    });
+}
+
+/** Dismiss session recovery modal if it appears */
+export async function dismissSessionRecoveryDialogIfPresent(page: Page) {
+    const recoveryTitle = page.getByText(/Sitzung fortsetzen\?/i);
+    const isVisible = await recoveryTitle.isVisible().catch(() => false);
+    if (!isVisible) {
+        return;
+    }
+
+    const discardBtn = page.getByRole('button', { name: /Verwerfen/i }).first();
+    if (await discardBtn.isVisible().catch(() => false)) {
+        await discardBtn.click();
+    } else {
+        await page.locator('button[title*="Verwerfen"]').first().click();
+    }
+
+    await recoveryTitle.waitFor({ state: 'hidden', timeout: 8000 }).catch(() => {});
+}
+
+/** Pre-seed cookie consent in localStorage for deterministic E2E startup */
+export async function seedCookieConsentForE2E(page: Page) {
+    await page.addInitScript((consent) => {
+        localStorage.setItem('cookie_consent', JSON.stringify(consent));
+    }, E2E_COOKIE_CONSENT);
+}
+
+/** Pre-seed DSGVO consent keys to skip interactive consent game in E2E */
+export async function seedDSGVOConsentForE2E(page: Page) {
+    await page.addInitScript((consent) => {
+        localStorage.setItem('dsgvo_consent', consent.consentAt);
+        localStorage.setItem('dsgvo_signature_hash', consent.signatureHash);
+        localStorage.setItem('dsgvo_signature_data', consent.signatureData);
+    }, E2E_DSGVO_CONSENT);
+}
+
+/** Dismiss cookie banner if present (TTDSG consent) */
+export async function dismissCookieBannerIfPresent(page: Page) {
+    const dialog = page.getByRole('dialog', { name: /Cookie-Einstellungen/i });
+    const isVisible = await dialog.waitFor({ state: 'visible', timeout: 2000 }).then(() => true).catch(() => false);
+    if (isVisible) {
+        const essentialOnlyButton = dialog.getByRole('button', { name: /Nur Essenzielle/i });
+        if (await essentialOnlyButton.isVisible().catch(() => false)) {
+            await essentialOnlyButton.click();
+        } else {
+            await dialog.getByRole('button', { name: /Alle akzeptieren/i }).click();
+        }
+        await expect(dialog).toBeHidden({ timeout: 5000 });
+    }
+}
+
+/**
+ * Accept initial consent step (supports modern ConsentFlow and legacy DSGVO modal).
+ * Returns true when a consent UI was detected and handled.
+ */
+export async function acceptDSGVO(page: Page): Promise<boolean> {
+    await dismissCookieBannerIfPresent(page);
+
+    // Modern clinical consent flow in Questionnaire
+    const modernConsentHeading = page.getByRole('heading', { name: /Ihre Daten sind sicher/i });
+    const isModernConsentVisible = await modernConsentHeading.isVisible().catch(() => false);
+    if (isModernConsentVisible) {
+        const treatmentCheckbox = page.locator('#consent-treatment');
+        const dataProcessingCheckbox = page.locator('#consent-data');
+
+        if (await treatmentCheckbox.count() > 0) {
+            await treatmentCheckbox.setChecked(true, { force: true });
+        }
+        if (await dataProcessingCheckbox.count() > 0) {
+            await dataProcessingCheckbox.setChecked(true, { force: true });
+        }
+
+        const startQuestionnaireBtn = page.getByRole('button', { name: /Fragebogen starten|Einwilligen & Fortfahren/i });
+        await startQuestionnaireBtn.click({ timeout: 8000 });
+        return true;
+    }
+
+    // Legacy DSGVO modal flow
+    const legacyTitle = page.getByText('Datenschutz-Einwilligung');
+    const isLegacyVisible = await legacyTitle.isVisible().catch(() => false);
+    if (isLegacyVisible) {
+        await page.click('text="Einwilligung in die Datenverarbeitung"');
+        await page.click('text="Verarbeitung besonderer Kategorien (Gesundheitsdaten)"');
+        await page.click('text="Widerrufsrecht & Datenlöschung"');
+        await page.click('button:has-text("Einwilligen & Fortfahren")');
+        return true;
+    }
+
+    return false;
+}
+
+async function clickPatientFlowStartButton(page: Page): Promise<boolean> {
+    const serviceStartButton = page.getByRole('button', { name: /termin\s*\/\s*anamnese/i }).first();
+    if (await serviceStartButton.isVisible().catch(() => false)) {
+        await serviceStartButton.click({ timeout: 10000, force: true });
+        return true;
+    }
+
+    const genericStartButton = page.getByRole('button', { name: /jetzt starten/i }).first();
+    if (await genericStartButton.isVisible().catch(() => false)) {
+        await genericStartButton.click({ timeout: 10000, force: true });
+        return true;
+    }
+
+    return false;
+}
+
+async function enterPatientServiceFlow(page: Page) {
+    const landingHeading = page.getByRole('heading', { name: /Anliegen wählen/i }).first();
+    await landingHeading.waitFor({ state: 'visible', timeout: 12000 }).catch(() => {});
+
+    let clickedStart = await clickPatientFlowStartButton(page);
+
+    if (!clickedStart) {
+        await gotoWithRetry(page, '/patient', 2);
+        await waitForIdle(page);
+        await dismissCookieBannerIfPresent(page);
+        await dismissSessionRecoveryDialogIfPresent(page);
+        clickedStart = await clickPatientFlowStartButton(page);
+    }
+
+    if (!clickedStart) {
+        throw new Error('Could not find a start button on /patient landing page.');
+    }
+
+    await waitForIdle(page, { timeout: 8000, includeNetworkIdle: true, settleMs: 400 });
+
+    const stillOnLanding = await landingHeading.isVisible().catch(() => false);
+    if (stillOnLanding) {
+        const clickedRetry = await clickPatientFlowStartButton(page);
+        if (!clickedRetry) {
+            throw new Error('Start button click did not transition away from landing page.');
+        }
+        await waitForIdle(page, { timeout: 8000, includeNetworkIdle: true, settleMs: 400 });
+    }
 }
 
 // ─── Question Flow Helpers ──────────────────────────────────
 
 /** Start a new patient flow */
 export async function startNewPatient(page: Page) {
-    await page.goto('/');
+    await resetPersistedSessionForE2E(page);
+    await seedCookieConsentForE2E(page);
+    await seedDSGVOConsentForE2E(page);
+    await gotoWithRetry(page, '/patient');
     await waitForIdle(page);
+    await dismissCookieBannerIfPresent(page);
+    await dismissSessionRecoveryDialogIfPresent(page);
 
-    // HomeScreen → Start
-    const startBtn = page.getByRole('button', { name: /anamnese starten|start|los geht/i });
-    if (await startBtn.isVisible().catch(() => false)) {
-        await startBtn.click();
-        await waitForIdle(page);
-    }
+    await enterPatientServiceFlow(page);
 
-    // DSGVO
     await acceptDSGVO(page);
     await waitForIdle(page);
 
-    // 0000: Waren Sie schon einmal hier?
-    await expectQuestion(page, 'Waren Sie schon einmal');
-    await page.click('button:has-text("Nein")');
+    // 0000: First patient-status question (wording changed in latest flow)
+    await expect(
+        page.locator('h1, h2, h3').filter({ hasText: /Waren Sie schon einmal|Sind Sie bereits als Patient/i }).first()
+    ).toBeVisible({ timeout: 15000 });
+
+    const noButton = page.getByRole('button', { name: /Nein|zum ersten Mal/i }).first();
+    if (await noButton.isVisible().catch(() => false)) {
+        await noButton.click();
+    } else {
+        await page.click('button:has-text("Nein")');
+    }
     await clickWeiter(page);
 }
 
 /** Start a returning patient flow */
 export async function startReturningPatient(page: Page) {
-    await page.goto('/');
+    await resetPersistedSessionForE2E(page);
+    await seedCookieConsentForE2E(page);
+    await seedDSGVOConsentForE2E(page);
+    await gotoWithRetry(page, '/patient');
     await waitForIdle(page);
+    await dismissCookieBannerIfPresent(page);
+    await dismissSessionRecoveryDialogIfPresent(page);
 
-    const startBtn = page.getByRole('button', { name: /anamnese starten|start|los geht/i });
-    if (await startBtn.isVisible().catch(() => false)) {
-        await startBtn.click();
-        await waitForIdle(page);
-    }
+    await enterPatientServiceFlow(page);
 
     await acceptDSGVO(page);
     await waitForIdle(page);
 
-    await expectQuestion(page, 'Waren Sie schon einmal');
-    await page.click('button:has-text("Ja")');
+    await expect(
+        page.locator('h1, h2, h3').filter({ hasText: /Waren Sie schon einmal|Sind Sie bereits als Patient/i }).first()
+    ).toBeVisible({ timeout: 15000 });
+
+    const yesButton = page.getByRole('button', { name: /Ja|bereits Patient/i }).first();
+    if (await yesButton.isVisible().catch(() => false)) {
+        await yesButton.click();
+    } else {
+        await page.click('button:has-text("Ja")');
+    }
     await clickWeiter(page);
 }
 
@@ -127,6 +361,8 @@ export async function selectService(page: Page, service: string) {
 
 /** Login to MFA dashboard */
 export async function loginMFA(page: Page, username = TEST_CREDENTIALS.mfa.username, password = TEST_CREDENTIALS.mfa.password) {
+    assertPasswordConfigured(password, 'E2E_MFA_PASSWORD, E2E_ARZT_PASSWORD, or ARZT_PASSWORD');
+
     await page.goto('/mfa');
     await page.fill('input[type="text"]', username);
     await page.fill('input[type="password"]', password);
@@ -136,6 +372,8 @@ export async function loginMFA(page: Page, username = TEST_CREDENTIALS.mfa.usern
 
 /** Login to Arzt dashboard */
 export async function loginArzt(page: Page, username = TEST_CREDENTIALS.arzt.username, password = TEST_CREDENTIALS.arzt.password) {
+    assertPasswordConfigured(password, 'E2E_ARZT_PASSWORD or ARZT_PASSWORD');
+
     await page.goto('/arzt');
     await page.fill('input[type="text"]', username);
     await page.fill('input[type="password"]', password);
@@ -145,14 +383,21 @@ export async function loginArzt(page: Page, username = TEST_CREDENTIALS.arzt.use
 
 /** Login with "remember me" option */
 export async function loginWithRememberMe(page: Page, username: string, password: string) {
+    assertPasswordConfigured(password, 'E2E_ARZT_PASSWORD or ARZT_PASSWORD');
+
     await page.goto('/arzt');
     await page.fill('input[type="text"]', username);
     await page.fill('input[type="password"]', password);
     
     // Check "remember me" checkbox if present
-    const rememberMeCheckbox = page.locator('input[type="checkbox"]').filter({ hasText: /angemeldet|remember|merken/i });
-    if (await rememberMeCheckbox.isVisible().catch(() => false)) {
-        await rememberMeCheckbox.check();
+    const rememberMeCheckboxByLabel = page.getByLabel(/angemeldet|remember|merken/i).first();
+    if (await rememberMeCheckboxByLabel.isVisible().catch(() => false)) {
+        await rememberMeCheckboxByLabel.check();
+    } else {
+        const rememberMeCheckbox = page.locator('input[type="checkbox"][name*="remember" i], input[type="checkbox"][id*="remember" i]').first();
+        if (await rememberMeCheckbox.isVisible().catch(() => false)) {
+            await rememberMeCheckbox.check();
+        }
     }
     
     await page.click('button[type="submit"]');
@@ -180,9 +425,14 @@ export async function createAuthenticatedContext(request: APIRequestContext, use
         throw new Error(`Login failed: ${response.status()}`);
     }
     
-    // Extract token from cookies or response
-    const cookies = await response.headers()['set-cookie'];
-    return cookies || '';
+    const cookieHeader = response
+        .headersArray()
+        .filter(header => header.name.toLowerCase() === 'set-cookie')
+        .map(header => header.value.split(';')[0]?.trim())
+        .filter((cookie): cookie is string => Boolean(cookie && cookie.length > 0))
+        .join('; ');
+
+    return cookieHeader;
 }
 
 /** Create a test session via API */

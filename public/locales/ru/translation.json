@@ -15,6 +15,8 @@
   "admin.content_priority": "Priority",
   "admin.content_seasonal": "Seasonal",
   "admin.content_seed": "Load Initial Data",
+  "admin.content_language": "Language",
+  "admin.content_item_title": "Title",
   "admin.content_title": "Waiting Room Content",
   "admin.content_type": "Type",
   "admin.content_views": "Views",

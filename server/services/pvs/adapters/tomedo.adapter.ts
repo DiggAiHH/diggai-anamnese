@@ -16,9 +16,15 @@ import type {
   PatientSearchResult,
   FhirPatient,
   FhirClientConfig,
+  FhirResource,
 } from '../types.js';
 import { FhirClient } from '../fhir/fhir-client.js';
 import { buildAnamneseBundle, patientToFhir } from '../fhir/fhir-mapper.js';
+import {
+  buildTomedoStatusSnapshot,
+  parseFhirReference,
+  type TomedoStatusSnapshot,
+} from '../tomedo-status.mapper.js';
 
 /**
  * Adapter for Tomedo (Zollsoft) PVS systems.
@@ -267,6 +273,39 @@ export class TomedoAdapter implements PvsAdapter {
     }
 
     return results;
+  }
+
+  /**
+   * Resolve processing status for a FHIR reference.
+   * Used by Tomedo status sync / import chain.
+   */
+  async fetchStatusByReference(reference: string): Promise<TomedoStatusSnapshot | null> {
+    if (!this.client) {
+      throw new Error('FHIR-Client nicht initialisiert');
+    }
+
+    await this.ensureValidToken();
+
+    const parsed = parseFhirReference(reference);
+    if (!parsed) {
+      return null;
+    }
+
+    try {
+      const resource = await this.client.read<FhirResource & Record<string, unknown>>(
+        parsed.resourceType,
+        parsed.id,
+      );
+
+      return buildTomedoStatusSnapshot(parsed.normalized, resource);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '';
+      if (/\b404\b/.test(message)) {
+        return null;
+      }
+
+      throw error;
+    }
   }
 
   /**

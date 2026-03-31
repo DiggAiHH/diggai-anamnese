@@ -5,7 +5,8 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import cookieParser from 'cookie-parser';
 import { createServer } from 'http';
-import { config } from './config';
+import { config, type BackendDomain } from './config';
+import { checkDatabaseHealthByDomain } from './db';
 import { setupSocketIO } from './socket';
 import { auditLogger } from './middleware/audit';
 import { etagMiddleware } from './middleware/etag';
@@ -180,6 +181,8 @@ const buildRateLimitStore = (() => {
 });
 
 const rateLimitStore = buildRateLimitStore();
+const getRequestPath = (req: express.Request) => req.originalUrl.split('?')[0] || req.originalUrl;
+const probePaths = new Set(['/api/live', '/api/system/live', '/api/system/metrics']);
 
 const globalLimiter = rateLimit({
     windowMs: config.rateLimitWindowMs,
@@ -187,6 +190,7 @@ const globalLimiter = rateLimit({
     standardHeaders: true,
     legacyHeaders: false,
     store: rateLimitStore, // undefined → in-memory (express-rate-limit default)
+    skip: (req) => probePaths.has(getRequestPath(req)),
     message: { error: 'Zu viele Anfragen. Bitte warten Sie einen Moment.' },
 });
 app.use(globalLimiter);
@@ -197,14 +201,56 @@ app.use(sentryMiddleware);
 // Prometheus Metrics Middleware
 app.use(metricsMiddleware);
 
+// Lightweight liveness endpoint for tooling/startup probes.
+// Must remain independent from DB/audit middleware to avoid readiness deadlocks.
+// Mounted after core security middleware to avoid bypassing global protections.
+app.get('/api/live', (_req, res) => {
+    res.status(200).json({ status: 'alive', timestamp: new Date().toISOString() });
+});
+
 // Per-endpoint rate limits (stricter for auth endpoints)
-const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, message: { error: 'Zu viele Login-Versuche.' } });
+const authLimiterExcludedPaths = new Set(['/api/system/live', '/api/system/metrics']);
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    skip: (req) => authLimiterExcludedPaths.has(getRequestPath(req)),
+    message: { error: 'Zu viele Login-Versuche.' }
+});
 const uploadLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 30, message: { error: 'Upload-Limit erreicht.' } });
 // Patient portal limiter — protects login/register/password-reset from brute force
 const pwaLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100, message: { error: 'Zu viele Anfragen. Bitte warten Sie einen Moment.' } });
 
+type RouteDomain = BackendDomain | 'shared';
+
+const shouldMountDomain = (domain: RouteDomain): boolean => {
+    if (!config.enforceRouteDomainIsolation || config.backendProfile === 'monolith') {
+        return true;
+    }
+
+    if (domain === 'shared') {
+        return true;
+    }
+
+    return domain === config.backendProfile;
+};
+
+const mountRoute = (
+    domain: RouteDomain,
+    path: string,
+    ...handlers: express.RequestHandler[]
+): void => {
+    if (shouldMountDomain(domain)) {
+        app.use(path, ...handlers);
+        return;
+    }
+
+    console.info(`[RouteRegistry] Skipped ${path} for profile ${config.backendProfile} (domain: ${domain})`);
+};
+
 // Stripe Webhooks - MÜSSEN vor express.json() kommen für raw body
-app.use('/api/webhooks', express.raw({ type: 'application/json' }), stripeWebhookRoutes);
+if (shouldMountDomain('company')) {
+    app.use('/api/webhooks', express.raw({ type: 'application/json' }), stripeWebhookRoutes);
+}
 
 // Body Parser
 app.use(express.json({ limit: '10mb' }));
@@ -217,7 +263,13 @@ import { sanitizeBody } from './services/sanitize';
 app.use(sanitizeBody);
 
 // HIPAA Audit Logging
-app.use(auditLogger);
+const auditExcludedPaths = new Set(['/api/live', '/api/system/live', '/api/system/metrics']);
+app.use((req, res, next) => {
+    if (auditExcludedPaths.has(getRequestPath(req))) {
+        return next();
+    }
+    return auditLogger(req, res, next);
+});
 
 // ETag support for HTTP conditional requests (caching)
 app.use(etagMiddleware);
@@ -226,8 +278,11 @@ app.use(etagMiddleware);
 setupQueryPerformanceMonitoring();
 
 // SECURITY: CSRF Protection — Double-Submit Cookie Pattern (HIGH-001 Fix)
-import { setCsrfCookie, validateCsrf } from './middleware/csrf';
+import { setCsrfCookie, validateCsrf, getCsrfToken } from './middleware/csrf';
 app.use(setCsrfCookie);  // Set CSRF token cookie on every request
+app.get('/api/csrf-token', (req, res) => {
+    res.status(200).json({ csrfToken: getCsrfToken(req) ?? null });
+});
 app.use(validateCsrf);   // Validate CSRF token on state-changing requests
 
 // SECURITY: Additional Security Headers (OWASP hardening)
@@ -242,49 +297,50 @@ app.use(resolveTenant);
 
 // ─── API Routes ─────────────────────────────────────────────
 
-app.use('/api/sessions', sessionRoutes);
-app.use('/api/answers', answerRoutes);
-app.use('/api/atoms', atomRoutes);
-app.use('/api/arzt', authLimiter, arztRoutes);
-app.use('/api/mfa', authLimiter, mfaRoutes); // H-04 FIX: authLimiter hinzugefügt
-app.use('/api/chats', chatRoutes);
-app.use('/api/export', exportRoutes);
-app.use('/api/upload', uploadLimiter, uploadRoutes);
-app.use('/api/queue', queueRoutes);
-app.use('/api/admin', authLimiter, adminRoutes);
-app.use('/api/patients', patientRoutes);
-app.use('/api/content', contentRoutes);
-app.use('/api/roi', roiRoutes);
-app.use('/api/wunschbox', wunschboxRoutes);
-app.use('/api/pvs', authLimiter, pvsRoutes);
-app.use('/api/therapy', authLimiter, therapyRoutes);
-app.use('/api/pwa', pwaLimiter, pwaRoutes);
-app.use('/api/system', authLimiter, systemRoutes);
-app.use('/api/ti', authLimiter, tiRoutes);
-app.use('/api/nfc', nfcRoutes);
-app.use('/api/flows', authLimiter, flowRoutes);
-app.use('/api/feedback', feedbackRoutes);
-app.use('/api/payment', authLimiter, paymentRoutes);
-app.use('/api/praxis-chat', praxisChatRoutes);
-app.use('/api/avatar', authLimiter, avatarRoutes);
-app.use('/api/telemedizin', authLimiter, telemedizinRoutes);
-app.use('/api/gamification', authLimiter, gamificationRoutes);
-app.use('/api/forms', authLimiter, formsRoutes);
-app.use('/api/epa', authLimiter, epaRoutes);
-app.use('/api/todos', authLimiter, todoRoutes);
-app.use('/api/signatures', authLimiter, signatureRoutes);
-app.use('/api/agents', agentRoutes);
-app.use('/api/subscriptions', subscriptionRoutes);
-app.use('/api/billing', billingRoutes);
-app.use('/api/wearables', authLimiter, wearablesRoutes);
-app.use('/api/usage', authLimiter, usageRoutes);
-app.use('/api/ai', aiRoutes);
-app.use('/api', themeRoutes);
+mountRoute('practice', '/api/sessions', sessionRoutes);
+mountRoute('practice', '/api/answers', answerRoutes);
+mountRoute('practice', '/api/atoms', atomRoutes);
+mountRoute('shared', '/api/arzt', authLimiter, arztRoutes);
+mountRoute('shared', '/api/mfa', authLimiter, mfaRoutes); // H-04 FIX: authLimiter hinzugefügt
+mountRoute('practice', '/api/chats', chatRoutes);
+mountRoute('authority', '/api/export', exportRoutes);
+mountRoute('practice', '/api/upload', uploadLimiter, uploadRoutes);
+mountRoute('practice', '/api/queue', queueRoutes);
+mountRoute('company', '/api/admin', authLimiter, adminRoutes);
+mountRoute('practice', '/api/patients', patientRoutes);
+mountRoute('company', '/api/content', contentRoutes);
+mountRoute('company', '/api/roi', roiRoutes);
+mountRoute('practice', '/api/wunschbox', wunschboxRoutes);
+mountRoute('authority', '/api/pvs', authLimiter, pvsRoutes);
+mountRoute('practice', '/api/therapy', authLimiter, therapyRoutes);
+mountRoute('practice', '/api/pwa', pwaLimiter, pwaRoutes);
+mountRoute('company', '/api/system', authLimiter, systemRoutes);
+mountRoute('authority', '/api/ti', authLimiter, tiRoutes);
+mountRoute('practice', '/api/nfc', nfcRoutes);
+mountRoute('practice', '/api/flows', authLimiter, flowRoutes);
+mountRoute('practice', '/api/feedback', feedbackRoutes);
+mountRoute('company', '/api/payment', authLimiter, paymentRoutes);
+mountRoute('practice', '/api/praxis-chat', praxisChatRoutes);
+mountRoute('practice', '/api/avatar', authLimiter, avatarRoutes);
+mountRoute('practice', '/api/telemedizin', authLimiter, telemedizinRoutes);
+mountRoute('practice', '/api/gamification', authLimiter, gamificationRoutes);
+mountRoute('practice', '/api/forms', authLimiter, formsRoutes);
+mountRoute('authority', '/api/epa', authLimiter, epaRoutes);
+mountRoute('practice', '/api/todos', authLimiter, todoRoutes);
+mountRoute('practice', '/api/signatures', authLimiter, signatureRoutes);
+mountRoute('company', '/api/agents', agentRoutes);
+mountRoute('company', '/api/subscriptions', subscriptionRoutes);
+mountRoute('company', '/api/billing', billingRoutes);
+mountRoute('practice', '/api/wearables', authLimiter, wearablesRoutes);
+mountRoute('company', '/api/usage', authLimiter, usageRoutes);
+mountRoute('practice', '/api/ai', aiRoutes);
+mountRoute('company', '/api', themeRoutes);
 
 // Health Check — includes DB + Redis connectivity with detailed checks
 app.get('/api/health', async (_req, res) => {
     const startTime = Date.now();
     const redis = getRedisClient();
+    const activeDomains = config.enabledDatabaseDomains;
     
     type HealthStatus = 'ok' | 'error' | 'degraded' | 'disabled' | 'unknown';
     const checks: {
@@ -299,20 +355,22 @@ app.get('/api/health', async (_req, res) => {
         memory: { status: 'unknown', usedPercent: 0 },
     };
 
-    // Check DB connectivity
-    try {
-        const dbStart = Date.now();
-        const { PrismaClient } = await import('@prisma/client');
-        const prisma = new PrismaClient();
-        await prisma.$queryRaw`SELECT 1`;
-        await prisma.$disconnect();
-        checks.database = { 
-            status: 'ok', 
-            responseTime: Date.now() - dbStart 
-        };
-    } catch {
-        checks.database.status = 'error';
-    }
+    // Check DB connectivity (multi-domain aware)
+    const domainChecks = await checkDatabaseHealthByDomain(activeDomains);
+    const databaseErrors = activeDomains.filter((domain) => domainChecks[domain]?.status !== 'ok');
+    const maxDomainResponseTime = activeDomains.reduce((max, domain) => {
+        const responseTime = domainChecks[domain]?.responseTime || 0;
+        return Math.max(max, responseTime);
+    }, 0);
+
+    checks.database = {
+        status: databaseErrors.length === 0
+            ? 'ok'
+            : databaseErrors.length === activeDomains.length
+                ? 'error'
+                : 'degraded',
+        responseTime: maxDomainResponseTime,
+    };
 
     // Check Redis connectivity
     if (redis && isRedisReady()) {
@@ -362,16 +420,27 @@ app.get('/api/health', async (_req, res) => {
     const agentList = agentService.listAgents().map(a => ({ name: a.name, online: a.online, busy: a.busy }));
 
     const responseTime = Date.now() - startTime;
-    const isHealthy = checks.database.status === 'ok';
-    const isDegraded = checks.database.status === 'ok' && 
-        (checks.redis.status === 'error' || checks.disk.status === 'degraded' || checks.memory.status === 'degraded');
-    
-    res.status(isHealthy ? 200 : isDegraded ? 200 : 503).json({
-        status: isHealthy ? 'ok' : isDegraded ? 'degraded' : 'error',
+    const databaseIsCritical = checks.database.status === 'error';
+    const isDegraded = checks.database.status === 'degraded' ||
+        checks.redis.status === 'error' ||
+        checks.disk.status === 'degraded' ||
+        checks.memory.status === 'degraded';
+
+    const overallStatus = databaseIsCritical
+        ? 'error'
+        : isDegraded
+            ? 'degraded'
+            : 'ok';
+
+    res.status(databaseIsCritical ? 503 : 200).json({
+        status: overallStatus,
         version: process.env.npm_package_version || '3.0.0',
         timestamp: new Date().toISOString(),
         environment: config.nodeEnv,
-        db: checks.database.status === 'ok' ? 'connected' : 'error',
+        backendProfile: config.backendProfile,
+        activeDomains,
+        db: checks.database.status === 'ok' ? 'connected' : checks.database.status,
+        databaseDomains: domainChecks,
         redis: checks.redis.status === 'ok' ? 'connected' : checks.redis.status === 'disabled' ? 'disabled' : 'error',
         uptime: Math.floor(process.uptime()),
         agents: agentList,
@@ -385,11 +454,16 @@ app.get('/api/health', async (_req, res) => {
 // GET /api/system/ready - Readiness probe
 app.get('/api/system/ready', async (_req, res) => {
     try {
-        const { PrismaClient } = await import('@prisma/client');
-        const prisma = new PrismaClient();
-        await prisma.$queryRaw`SELECT 1`;
-        await prisma.$disconnect();
-        res.status(200).json({ status: 'ready' });
+        const activeDomains = config.enabledDatabaseDomains;
+        const checks = await checkDatabaseHealthByDomain(activeDomains);
+        const allDomainsReady = activeDomains.every((domain) => checks[domain]?.status === 'ok');
+
+        res.status(allDomainsReady ? 200 : 503).json({
+            status: allDomainsReady ? 'ready' : 'not ready',
+            backendProfile: config.backendProfile,
+            activeDomains,
+            checks,
+        });
     } catch {
         res.status(503).json({ status: 'not ready' });
     }
@@ -498,11 +572,14 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 httpServer.listen(config.port, () => {
+        const activeDomainsLabel = config.enabledDatabaseDomains.join(',');
     console.log(`
   ╔═══════════════════════════════════════════╗
   ║   🏥  Anamnese Backend v2.0              ║
   ║   Port: ${config.port}                           ║
   ║   Env:  ${config.nodeEnv.padEnd(20)}       ║
+    ║   Profile: ${config.backendProfile.padEnd(16)}        ║
+    ║   Domains: ${activeDomainsLabel.padEnd(16)}        ║
   ║   CORS: ${config.frontendUrl.padEnd(20)}   ║
   ╚═══════════════════════════════════════════╝
   `);

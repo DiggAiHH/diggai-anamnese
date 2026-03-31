@@ -10,7 +10,7 @@
         "rootDir": ".",
         "strict": true,
         "esModuleInterop": true,
-        "downlevelIteration": true,
+        "ignoreDeprecations": "5.0",
         "skipLibCheck": true,
         "composite": true,
         "typeRoots": [

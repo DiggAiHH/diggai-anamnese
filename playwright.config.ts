@@ -27,10 +27,18 @@ export default defineConfig({
             use: { ...devices['Pixel 7'] },
         },
     ],
-    webServer: {
-        command: 'npm run dev',
-        url: 'http://localhost:5173',
-        reuseExistingServer: !process.env.CI,
-        timeout: 120 * 1000,
-    },
+    webServer: [
+        {
+            command: 'npm run dev:server',
+            url: 'http://localhost:3001/api/live',
+            reuseExistingServer: !process.env.CI,
+            timeout: 180 * 1000,
+        },
+        {
+            command: 'npm run dev',
+            url: 'http://localhost:5173',
+            reuseExistingServer: !process.env.CI,
+            timeout: 180 * 1000,
+        },
+    ],
 });

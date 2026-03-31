@@ -28,17 +28,14 @@ RUN apk add --no-cache tini wget
 
 # Copy production node_modules
 COPY package*.json ./
-RUN npm ci --omit=dev
+RUN npm ci --omit=dev && npm install tsx
 
 # Copy Prisma schema + generated client
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
-# Copy compiled server
-COPY --from=builder /app/dist-server ./dist-server
-
-# Copy server source as fallback (tsx can run .ts directly)
+# Copy server source (tsx runs .ts directly at runtime)
 COPY server/ ./server/
 
 # Create uploads directory

@@ -1,26 +1,19 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Globe, Check, ChevronDown } from 'lucide-react';
-
-const languages = [
-    { code: 'de', name: 'Deutsch', flag: '🇩🇪' },
-    { code: 'en', name: 'English', flag: '🇺🇸' },
-    { code: 'ar', name: 'العربية', flag: '🇸🇦', dir: 'rtl' },
-    { code: 'tr', name: 'Türkçe', flag: '🇹🇷' },
-    { code: 'uk', name: 'Українська', flag: '🇺🇦' },
-    { code: 'es', name: 'Español', flag: '🇪🇸' },
-    { code: 'fa', name: 'فارسی', flag: '🇮🇷', dir: 'rtl' },
-    { code: 'it', name: 'Italiano', flag: '🇮🇹' },
-    { code: 'fr', name: 'Français', flag: '🇫🇷' },
-    { code: 'pl', name: 'Polski', flag: '🇵🇱' }
-];
+import {
+    APP_LANGUAGES,
+    getAppLanguage,
+    normalizeAppLanguageCode,
+} from '../lib/i18n/languages';
 
 export const LanguageSelector: React.FC = () => {
     const { i18n, t } = useTranslation();
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
-    const currentLanguage = languages.find(l => l.code === i18n.language) || languages[0];
+    const currentLanguage = getAppLanguage(i18n.resolvedLanguage || i18n.language);
+    const selectedLanguageCode = currentLanguage.code;
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -33,13 +26,13 @@ export const LanguageSelector: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        const lang = languages.find(l => l.code === i18n.language);
-        document.documentElement.dir = lang?.dir || 'ltr';
-        document.documentElement.lang = i18n.language;
-    }, [i18n.language]);
+        const language = getAppLanguage(i18n.resolvedLanguage || i18n.language);
+        document.documentElement.dir = language.dir;
+        document.documentElement.lang = language.code;
+    }, [i18n.language, i18n.resolvedLanguage]);
 
     const handleLanguageChange = (code: string) => {
-        i18n.changeLanguage(code);
+        i18n.changeLanguage(normalizeAppLanguageCode(code));
         setIsOpen(false);
     };
 
@@ -47,7 +40,6 @@ export const LanguageSelector: React.FC = () => {
         <div className="relative" ref={dropdownRef}>
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                aria-expanded={isOpen ? 'true' : 'false'}
                 aria-haspopup="listbox"
                 aria-label={t('languageSelect', 'Sprache wählen')}
                 data-testid="language-selector"
@@ -61,11 +53,11 @@ export const LanguageSelector: React.FC = () => {
             {isOpen && (
                 <div className="absolute right-0 mt-2 w-48 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-2xl shadow-2xl overflow-hidden z-[100] animate-in fade-in zoom-in-95 duration-200">
                     <div className="p-2 space-y-1">
-                        {languages.map((lang) => (
+                        {APP_LANGUAGES.map((lang) => (
                             <button
                                 key={lang.code}
                                 onClick={() => handleLanguageChange(lang.code)}
-                                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-colors ${i18n.language === lang.code
+                                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-colors ${selectedLanguageCode === lang.code
                                         ? 'bg-blue-500/10 text-blue-400'
                                         : 'text-[var(--text-secondary)] hover:bg-[var(--bg-card)] hover:text-[var(--text-primary)]'
                                     }`}
@@ -74,7 +66,7 @@ export const LanguageSelector: React.FC = () => {
                                     <span className="text-lg">{lang.flag}</span>
                                     <span className="text-sm font-medium">{lang.name}</span>
                                 </div>
-                                {i18n.language === lang.code && (
+                                {selectedLanguageCode === lang.code && (
                                     <Check className="w-4 h-4" />
                                 )}
                             </button>

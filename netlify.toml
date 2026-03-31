@@ -7,8 +7,11 @@
 [build.environment]
   NODE_VERSION = "20"
   NETLIFY_SITE_ID = "aeb2a8e2-e8ac-47e0-a5bc-fef4df4aceaa"
-  # Backend API URL — must match the VPS domain configured in docker/nginx.conf
-  VITE_API_URL = "https://api-takios.diggai.de/api"
+  # IMPORTANT: Override VITE_API_URL in Netlify Dashboard > Site configuration > Environment variables
+  # Pilot (Railway):  https://YOUR_PROJECT.up.railway.app/api
+  # Pilot (Render):   https://anamnese-backend.onrender.com/api
+  # Production:       https://api.diggai.de/api
+  VITE_API_URL = "https://REPLACE_WITH_BACKEND_URL/api"
 
 # ─── DSGVO/BSI Security Headers (Section 2.2) ───────────────
 [[headers]]
@@ -25,7 +28,7 @@
     # Permissions-Policy — Kamera + Mikrofon für Videosprechstunde (self), Rest gesperrt
     Permissions-Policy = "camera=(self), microphone=(self), geolocation=(), payment=()"
     # CSP — 'unsafe-eval' required for lottie-web (uses eval() for animation expressions)
-    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://*.netlify.app wss://*.netlify.app https://api.diggai.de wss://api.diggai.de https://api-takios.diggai.de wss://api-takios.diggai.de; frame-ancestors 'none'; base-uri 'self'; form-action 'self';"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://*.netlify.app wss://*.netlify.app https://api.diggai.de wss://api.diggai.de https://api-takios.diggai.de wss://api-takios.diggai.de https://*.up.railway.app wss://*.up.railway.app https://*.onrender.com wss://*.onrender.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self';"
     # XSS-Protection deaktiviert (CSP ist zuständig, alter Header kann Bugs verursachen)
     X-XSS-Protection = "0"
     # Cross-Origin-Embedder-Policy (credentialless allows external resources like Google Fonts)

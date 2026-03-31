@@ -1,13 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { DateInput } from './DateInput';
 
 describe('DateInput', () => {
   it('should render date input', () => {
     render(<DateInput value={undefined} onChange={vi.fn()} />);
     
-    expect(screen.getByRole('textbox')).toBeInTheDocument();
+    expect(screen.getByLabelText('Datum')).toBeInTheDocument();
   });
 
   it('should display value when provided', () => {
@@ -19,7 +18,7 @@ describe('DateInput', () => {
   it('should show empty string when value is undefined', () => {
     render(<DateInput value={undefined} onChange={vi.fn()} />);
     
-    const input = screen.getByRole('textbox');
+    const input = screen.getByLabelText('Datum');
     expect(input).toHaveValue('');
   });
 
@@ -27,9 +26,9 @@ describe('DateInput', () => {
     const handleChange = vi.fn();
     render(<DateInput value="" onChange={handleChange} />);
     
-    const input = screen.getByRole('textbox');
-    await userEvent.clear(input);
-    await userEvent.type(input, '2024-06-20');
+    const input = screen.getByLabelText('Datum');
+    // Simulate native change event for date inputs
+    fireEvent.change(input, { target: { value: '2024-06-20' } });
     
     expect(handleChange).toHaveBeenCalledWith('2024-06-20');
   });
@@ -37,28 +36,28 @@ describe('DateInput', () => {
   it('should have correct input type', () => {
     render(<DateInput value="" onChange={vi.fn()} />);
     
-    const input = screen.getByRole('textbox');
+    const input = screen.getByLabelText('Datum');
     expect(input).toHaveAttribute('type', 'date');
   });
 
   it('should apply custom className', () => {
     render(<DateInput value="" onChange={vi.fn()} className="custom-date-class" />);
     
-    const input = screen.getByRole('textbox');
+    const input = screen.getByLabelText('Datum');
     expect(input).toHaveClass('custom-date-class');
   });
 
   it('should have aria-label with translated text', () => {
     render(<DateInput value="" onChange={vi.fn()} />);
     
-    const input = screen.getByRole('textbox');
+    const input = screen.getByLabelText('Datum');
     expect(input).toHaveAttribute('aria-label', 'Datum');
   });
 
   it('should have title attribute with translated text', () => {
     render(<DateInput value="" onChange={vi.fn()} />);
     
-    const input = screen.getByRole('textbox');
+    const input = screen.getByLabelText('Datum');
     expect(input).toHaveAttribute('title', 'Datum eingeben');
   });
 

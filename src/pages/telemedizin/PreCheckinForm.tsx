@@ -10,7 +10,7 @@ import {
   ChevronLeft, CheckCircle2, Upload, X, Loader2,
   Shield, Video,
 } from 'lucide-react';
-import { API_BASE_URL } from '../../api/client';
+import { API_BASE_URL, ensureCsrfToken, getCsrfToken } from '../../api/client';
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -63,15 +63,13 @@ const SCHWEREGRAD_LABELS: Record<number, { text: string; color: string }> = {
   10: { text: 'Unerträglich', color: 'text-red-700' },
 };
 
-function getCsrfTokenFromCookie(): string | null {
-  const match = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
-  return match ? decodeURIComponent(match[1]) : null;
-}
-
 // ─── Helper: submit to backend (or demo fallback) ─────────────
 
 async function submitPreCheckin(payload: PreCheckinPayload): Promise<PreCheckinResponse> {
-  const csrfToken = getCsrfTokenFromCookie();
+  let csrfToken = getCsrfToken();
+  if (!csrfToken) {
+    csrfToken = await ensureCsrfToken();
+  }
 
   const res = await fetch(`${API_BASE_URL}/telemedizin/session/pre-checkin`, {
     method: 'POST',

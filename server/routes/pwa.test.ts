@@ -14,6 +14,60 @@ const pwaServiceMocks = vi.hoisted(() => ({
   getChangesSince: vi.fn(),
 }));
 
+const prismaMocks = vi.hoisted(() => ({
+  patientAccount: {
+    findUnique: vi.fn(),
+    update: vi.fn(),
+    create: vi.fn(),
+  },
+  diaryEntry: {
+    findMany: vi.fn(),
+    count: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+    findFirst: vi.fn(),
+  },
+  therapyMeasure: {
+    count: vi.fn(),
+    findMany: vi.fn(),
+  },
+  providerMessage: {
+    count: vi.fn(),
+    findMany: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+    findFirst: vi.fn(),
+  },
+  clinicalAlert: {
+    findMany: vi.fn(),
+  },
+  therapyAlert: {
+    findMany: vi.fn(),
+  },
+  measureTracking: {
+    findMany: vi.fn(),
+    count: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    findFirst: vi.fn(),
+  },
+  patientConsent: {
+    findMany: vi.fn(),
+    upsert: vi.fn(),
+  },
+  patientDevice: {
+    findMany: vi.fn(),
+    create: vi.fn(),
+    delete: vi.fn(),
+    findFirst: vi.fn(),
+  },
+  patient: {
+    findUnique: vi.fn(),
+  },
+}));
+
 vi.mock('../middleware/auth', () => ({
   requireAuth: middlewareMocks.requireAuth,
 }));
@@ -53,56 +107,7 @@ vi.mock('../services/pwa/push.service', () => ({
 }));
 
 vi.mock('../db', () => ({
-  prisma: {
-    patientAccount: {
-      findUnique: vi.fn(),
-      update: vi.fn(),
-      create: vi.fn(),
-    },
-    diaryEntry: {
-      findMany: vi.fn(),
-      count: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-      findFirst: vi.fn(),
-    },
-    therapyMeasure: {
-      count: vi.fn(),
-      findMany: vi.fn(),
-    },
-    providerMessage: {
-      count: vi.fn(),
-      findMany: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-      findFirst: vi.fn(),
-    },
-    therapyAlert: {
-      findMany: vi.fn(),
-    },
-    measureTracking: {
-      findMany: vi.fn(),
-      count: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      findFirst: vi.fn(),
-    },
-    patientConsent: {
-      findMany: vi.fn(),
-      upsert: vi.fn(),
-    },
-    patientDevice: {
-      findMany: vi.fn(),
-      create: vi.fn(),
-      delete: vi.fn(),
-      findFirst: vi.fn(),
-    },
-    patient: {
-      findUnique: vi.fn(),
-    },
-  },
+  prisma: prismaMocks,
 }));
 
 import router from './pwa';
@@ -125,6 +130,15 @@ function getRouteHandlers(path: string, method: 'get' | 'post' | 'put' | 'delete
 
   expect(routeLayer).toBeDefined();
   return routeLayer!.route!.stack.map((s) => s.handle);
+}
+
+function createMockRequest(overrides = {}) {
+  return {
+    headers: { authorization: 'Bearer valid-token', 'accept-language': 'de' },
+    user: { accountId: 'account-1', patientId: 'patient-1' },
+    prisma: prismaMocks,
+    ...overrides,
+  };
 }
 
 function createMockResponse() {
@@ -152,6 +166,7 @@ function createMockResponse() {
 describe('pwa routes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    (globalThis as any).__prisma = prismaMocks;
   });
 
   describe('POST /auth/register', () => {
@@ -162,14 +177,14 @@ describe('pwa routes', () => {
       const handlers = getRouteHandlers('/auth/register', 'post');
       const handler = handlers[handlers.length - 1] as (req: unknown, res: unknown) => Promise<void>;
 
-      const req = {
+      const req = createMockRequest({
         body: {
           patientNumber: 'P-001',
           birthDate: '1990-01-01',
           password: 'SecurePass123',
         },
-        headers: {},
-      };
+        headers: { 'accept-language': 'de' },
+      });
       const res = createMockResponse();
 
       await handler(req, res);
@@ -182,10 +197,9 @@ describe('pwa routes', () => {
       const handlers = getRouteHandlers('/auth/register', 'post');
       const handler = handlers[handlers.length - 1] as (req: unknown, res: unknown) => Promise<void>;
 
-      const req = {
+      const req = createMockRequest({
         body: { patientNumber: 'P-001' }, // Missing required fields
-        headers: {},
-      };
+      });
       const res = createMockResponse();
 
       await handler(req, res);
@@ -202,10 +216,9 @@ describe('pwa routes', () => {
       const handlers = getRouteHandlers('/auth/login', 'post');
       const handler = handlers[handlers.length - 1] as (req: unknown, res: unknown) => Promise<void>;
 
-      const req = {
+      const req = createMockRequest({
         body: { identifier: 'P-001', password: 'SecurePass123' },
-        headers: {},
-      };
+      });
       const res = createMockResponse();
 
       await handler(req, res);
@@ -223,10 +236,9 @@ describe('pwa routes', () => {
       const handlers = getRouteHandlers('/auth/pin-login', 'post');
       const handler = handlers[handlers.length - 1] as (req: unknown, res: unknown) => Promise<void>;
 
-      const req = {
-        body: { patientId: 'patient-1', pin: '1234' },
-        headers: {},
-      };
+      const req = createMockRequest({
+        body: { patientId: '550e8400-e29b-41d4-a716-446655440000', pin: '1234' },
+      });
       const res = createMockResponse();
 
       await handler(req, res);
@@ -246,21 +258,20 @@ describe('pwa routes', () => {
     });
 
     it('should return dashboard data', async () => {
-      vi.mocked(prisma.patientAccount.findUnique).mockResolvedValue({
+      vi.mocked(prismaMocks.patientAccount.findUnique).mockResolvedValue({
         id: 'account-1',
         patient: { id: 'patient-1' },
       } as never);
-      vi.mocked(prisma.therapyMeasure.count).mockResolvedValue(2 as never);
-      vi.mocked(prisma.providerMessage.count).mockResolvedValue(1 as never);
-      vi.mocked(prisma.diaryEntry.findMany).mockResolvedValue([] as never);
-      vi.mocked(prisma.clinicalAlert.findMany).mockResolvedValue([] as never);
+      vi.mocked(prismaMocks.therapyMeasure.count).mockResolvedValue(2 as never);
+      vi.mocked(prismaMocks.providerMessage.count).mockResolvedValue(1 as never);
+      vi.mocked(prismaMocks.diaryEntry.findMany).mockResolvedValue([] as never);
+      vi.mocked(prismaMocks.therapyAlert.findMany).mockResolvedValue([] as never);
+      vi.mocked(prismaMocks.clinicalAlert.findMany).mockResolvedValue([] as never);
 
       const handlers = getRouteHandlers('/dashboard', 'get');
       const handler = handlers[handlers.length - 1] as (req: unknown, res: unknown) => Promise<void>;
 
-      const req = {
-        headers: { authorization: 'Bearer valid-token' },
-      };
+      const req = createMockRequest();
       const res = createMockResponse();
 
       await handler(req, res);
@@ -273,18 +284,17 @@ describe('pwa routes', () => {
 
   describe('GET /diary', () => {
     it('should return paginated diary entries', async () => {
-      vi.mocked(prisma.diaryEntry.findMany).mockResolvedValue([
+      vi.mocked(prismaMocks.diaryEntry.findMany).mockResolvedValue([
         { id: 'entry-1', date: new Date(), mood: 'GOOD' },
       ] as never);
-      vi.mocked(prisma.diaryEntry.count).mockResolvedValue(1 as never);
+      vi.mocked(prismaMocks.diaryEntry.count).mockResolvedValue(1 as never);
 
       const handlers = getRouteHandlers('/diary', 'get');
       const handler = handlers[handlers.length - 1] as (req: unknown, res: unknown) => Promise<void>;
 
-      const req = {
-        headers: { authorization: 'Bearer valid-token' },
+      const req = createMockRequest({
         query: { page: '1', limit: '20' },
-      };
+      });
       const res = createMockResponse();
 
       await handler(req, res);
@@ -297,7 +307,7 @@ describe('pwa routes', () => {
 
   describe('POST /diary', () => {
     it('should create diary entry', async () => {
-      vi.mocked(prisma.diaryEntry.create).mockResolvedValue({
+      vi.mocked(prismaMocks.diaryEntry.create).mockResolvedValue({
         id: 'entry-1',
         date: new Date(),
         mood: 'GOOD',
@@ -306,14 +316,13 @@ describe('pwa routes', () => {
       const handlers = getRouteHandlers('/diary', 'post');
       const handler = handlers[handlers.length - 1] as (req: unknown, res: unknown) => Promise<void>;
 
-      const req = {
-        headers: { authorization: 'Bearer valid-token' },
+      const req = createMockRequest({
         body: {
           mood: 'GOOD',
           painLevel: 2,
           notes: 'Feeling better',
         },
-      };
+      });
       const res = createMockResponse();
 
       await handler(req, res);
@@ -325,10 +334,9 @@ describe('pwa routes', () => {
       const handlers = getRouteHandlers('/diary', 'post');
       const handler = handlers[handlers.length - 1] as (req: unknown, res: unknown) => Promise<void>;
 
-      const req = {
-        headers: { authorization: 'Bearer valid-token' },
+      const req = createMockRequest({
         body: { mood: 'INVALID_MOOD' },
-      };
+      });
       const res = createMockResponse();
 
       await handler(req, res);
@@ -339,17 +347,14 @@ describe('pwa routes', () => {
 
   describe('GET /measures', () => {
     it('should return active measures for patient', async () => {
-      vi.mocked(prisma.therapyMeasure.findMany).mockResolvedValue([
+      vi.mocked(prismaMocks.therapyMeasure.findMany).mockResolvedValue([
         { id: 'measure-1', title: 'Medication A' },
       ] as never);
 
       const handlers = getRouteHandlers('/measures', 'get');
       const handler = handlers[handlers.length - 1] as (req: unknown, res: unknown) => Promise<void>;
 
-      const req = {
-        headers: { authorization: 'Bearer valid-token' },
-        user: { patientId: 'patient-1' },
-      };
+      const req = createMockRequest();
       const res = createMockResponse();
 
       await handler(req, res);
@@ -361,18 +366,17 @@ describe('pwa routes', () => {
 
   describe('GET /messages', () => {
     it('should return paginated messages', async () => {
-      vi.mocked(prisma.providerMessage.findMany).mockResolvedValue([
+      vi.mocked(prismaMocks.providerMessage.findMany).mockResolvedValue([
         { id: 'msg-1', subject: 'Test', body: 'Message body' },
       ] as never);
-      vi.mocked(prisma.providerMessage.count).mockResolvedValue(1 as never);
+      vi.mocked(prismaMocks.providerMessage.count).mockResolvedValue(1 as never);
 
       const handlers = getRouteHandlers('/messages', 'get');
       const handler = handlers[handlers.length - 1] as (req: unknown, res: unknown) => Promise<void>;
 
-      const req = {
-        headers: { authorization: 'Bearer valid-token' },
+      const req = createMockRequest({
         query: { page: '1', limit: '20' },
-      };
+      });
       const res = createMockResponse();
 
       await handler(req, res);
@@ -384,7 +388,7 @@ describe('pwa routes', () => {
 
   describe('POST /messages', () => {
     it('should create message to provider', async () => {
-      vi.mocked(prisma.providerMessage.create).mockResolvedValue({
+      vi.mocked(prismaMocks.providerMessage.create).mockResolvedValue({
         id: 'msg-1',
         body: 'Test message',
       } as never);
@@ -407,16 +411,14 @@ describe('pwa routes', () => {
 
   describe('GET /consents', () => {
     it('should return patient consents', async () => {
-      vi.mocked(prisma.patientConsent.findMany).mockResolvedValue([
+      vi.mocked(prismaMocks.patientConsent.findMany).mockResolvedValue([
         { type: 'DATA_PROCESSING', granted: true },
       ] as never);
 
       const handlers = getRouteHandlers('/consents', 'get');
       const handler = handlers[handlers.length - 1] as (req: unknown, res: unknown) => Promise<void>;
 
-      const req = {
-        headers: { authorization: 'Bearer valid-token' },
-      };
+      const req = createMockRequest();
       const res = createMockResponse();
 
       await handler(req, res);
@@ -428,16 +430,14 @@ describe('pwa routes', () => {
 
   describe('GET /devices', () => {
     it('should return registered devices', async () => {
-      vi.mocked(prisma.patientDevice.findMany).mockResolvedValue([
+      vi.mocked(prismaMocks.patientDevice.findMany).mockResolvedValue([
         { id: 'device-1', deviceName: 'iPhone 12', deviceType: 'ios' },
       ] as never);
 
       const handlers = getRouteHandlers('/devices', 'get');
       const handler = handlers[handlers.length - 1] as (req: unknown, res: unknown) => Promise<void>;
 
-      const req = {
-        headers: { authorization: 'Bearer valid-token' },
-      };
+      const req = createMockRequest();
       const res = createMockResponse();
 
       await handler(req, res);
@@ -449,7 +449,7 @@ describe('pwa routes', () => {
 
   describe('POST /devices', () => {
     it('should register new device', async () => {
-      vi.mocked(prisma.patientDevice.create).mockResolvedValue({
+      vi.mocked(prismaMocks.patientDevice.create).mockResolvedValue({
         id: 'device-1',
         deviceName: 'iPhone 12',
         deviceType: 'ios',
@@ -458,13 +458,12 @@ describe('pwa routes', () => {
       const handlers = getRouteHandlers('/devices', 'post');
       const handler = handlers[handlers.length - 1] as (req: unknown, res: unknown) => Promise<void>;
 
-      const req = {
-        headers: { authorization: 'Bearer valid-token' },
+      const req = createMockRequest({
         body: {
           deviceName: 'iPhone 12',
           deviceType: 'ios',
         },
-      };
+      });
       const res = createMockResponse();
 
       await handler(req, res);
@@ -483,14 +482,13 @@ describe('pwa routes', () => {
       const handlers = getRouteHandlers('/sync', 'post');
       const handler = handlers[handlers.length - 1] as (req: unknown, res: unknown) => Promise<void>;
 
-      const req = {
-        headers: { authorization: 'Bearer valid-token' },
+      const req = createMockRequest({
         body: {
           diaryEntries: [],
           measureTrackings: [],
           lastSyncAt: new Date().toISOString(),
         },
-      };
+      });
       const res = createMockResponse();
 
       await handler(req, res);

@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Request, Response, NextFunction } from 'express';
 
+vi.unmock('../middleware/auth');
+
 // Mock config - MUST be before any imports
 vi.mock('../config', () => ({
   config: {
@@ -34,16 +36,16 @@ vi.mock('jsonwebtoken', () => ({
   }),
   verify: vi.fn((token, secret, options) => {
     if (token === 'valid-token') {
-      return { userId: 'user-123', role: 'arzt', jti: 'jti-123' };
+      return { userId: 'user-123', role: 'arzt', jti: 'valid-jti-123' };
     }
     if (token === 'valid-patient-token') {
-      return { userId: 'patient-123', role: 'patient', sessionId: 'session-456', jti: 'jti-456' };
+      return { userId: 'patient-123', role: 'patient', sessionId: 'session-456', jti: 'valid-jti-456' };
     }
     if (token === 'valid-admin-token') {
-      return { userId: 'admin-123', role: 'admin', jti: 'jti-789' };
+      return { userId: 'admin-123', role: 'admin', jti: 'valid-jti-789' };
     }
     if (token === 'valid-mfa-token') {
-      return { userId: 'mfa-123', role: 'mfa', jti: 'jti-mfa' };
+      return { userId: 'mfa-123', role: 'mfa', jti: 'valid-jti-mfa' };
     }
     if (token === 'expired-token') {
       const error = new Error('jwt expired');
@@ -354,8 +356,8 @@ describe('Auth Middleware', () => {
       expect(next).not.toHaveBeenCalledWith(expect.any(Error));
     });
 
-    it('should allow ADMIN for arzt-protected route', () => {
-      const middleware = requireRole('arzt');
+    it('should allow ADMIN when explicitly included', () => {
+      const middleware = requireRole('arzt', 'admin');
       const req = createMockRequest({ auth: { userId: 'user-123', role: 'admin' } });
       const res = createMockResponse();
       const next = vi.fn();
@@ -547,7 +549,7 @@ describe('Auth Middleware', () => {
 
       await middleware(req, res, next);
 
-      expect(res.statusCode).toBe(403);
+      expect(res.statusCode).toBe(401);
     });
 
     it('should check role permissions in database', async () => {

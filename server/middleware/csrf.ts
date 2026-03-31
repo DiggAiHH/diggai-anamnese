@@ -25,6 +25,7 @@ declare global {
 
 const CSRF_COOKIE_NAME = 'XSRF-TOKEN';
 const CSRF_HEADER_NAME = 'x-xsrf-token';
+const CSRF_RESPONSE_HEADER_NAME = 'X-CSRF-Token';
 
 // Routes that don't require CSRF protection (GET requests are generally safe)
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS', 'TRACE']);
@@ -69,6 +70,10 @@ export function setCsrfCookie(req: Request, res: Response, next: NextFunction): 
         req.csrfToken = token;
     } else {
         req.csrfToken = existingToken;
+    }
+
+    if (req.csrfToken) {
+        res.setHeader(CSRF_RESPONSE_HEADER_NAME, req.csrfToken);
     }
     
     next();

@@ -1,6 +1,6 @@
 // ─── Server-side i18n Helper + Typed Error ───────────────────
 // Lädt Übersetzungen aus server/locales/{lang}/*.json
-// Unterstützte Sprachen: de, en, tr, ar, uk, es, fa, it, fr, pl, ru
+// Unterstützte Sprachen: de, en, tr, ar, uk, es, fa, it, fr, pl, ru, ro, bg
 
 /**
  * Typed error that carries a translation key instead of a hardcoded message.
@@ -24,7 +24,7 @@ const __dirname = path.dirname(__filename);
 type TranslationMap = Record<string, string>;
 const cache: Record<string, TranslationMap> = {};
 
-const SUPPORTED_LANGS = ['de', 'en', 'tr', 'ar', 'uk', 'es', 'fa', 'it', 'fr', 'pl', 'ru'];
+const SUPPORTED_LANGS = ['de', 'en', 'tr', 'ar', 'uk', 'es', 'fa', 'it', 'fr', 'pl', 'ru', 'ro', 'bg'];
 const FALLBACK_LANG = 'de';
 const LOCALES_DIR = path.join(__dirname, '..', 'locales');
 

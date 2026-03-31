@@ -791,7 +791,7 @@ router.post('/tenants/onboard', requireRole('admin'), async (req, res) => {
                     username: adminUsername,
                     passwordHash,
                     displayName: adminDisplayName,
-                    role: 'admin',
+                    role: 'ADMIN',
                     isActive: true,
                 },
             });

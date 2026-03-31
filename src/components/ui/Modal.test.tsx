@@ -53,7 +53,7 @@ describe('Modal', () => {
       </Modal>
     );
     
-    const closeButton = screen.getByLabelText('Close');
+    const closeButton = screen.getByLabelText('Schließen');
     await userEvent.click(closeButton);
     
     expect(mockOnClose).toHaveBeenCalledTimes(1);
@@ -92,7 +92,9 @@ describe('Modal', () => {
       </Modal>
     );
     
-    fireEvent.keyDown(document, { key: 'Escape' });
+    // useFocusTrap listens on the inner content container, not document.
+    // Fire keydown on the dialog element which also has React onKeyDown.
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
     
     expect(mockOnClose).toHaveBeenCalledTimes(1);
   });
@@ -106,7 +108,7 @@ describe('Modal', () => {
     
     const dialog = screen.getByRole('dialog');
     expect(dialog).toHaveAttribute('aria-modal', 'true');
-    expect(dialog).toHaveAttribute('aria-label', 'Test Modal');
+    expect(dialog).toHaveAttribute('aria-labelledby', 'modal-title');
   });
 
   it('should have aria-label from title when provided', () => {
@@ -117,7 +119,7 @@ describe('Modal', () => {
     );
     
     const dialog = screen.getByRole('dialog');
-    expect(dialog).toHaveAttribute('aria-label', 'Custom Label');
+    expect(dialog).toHaveAttribute('aria-labelledby', 'modal-title');
   });
 
   it('should render with small size', () => {

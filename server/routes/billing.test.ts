@@ -44,6 +44,26 @@ const billingServiceMocks = vi.hoisted(() => ({
   handleWebhookEvent: vi.fn(() => Promise.resolve()),
 }));
 
+const prismaDbMocks = vi.hoisted(() => {
+  const tenantFindUnique = vi.fn();
+  const subscriptionFindUnique = vi.fn();
+  const prismaClient = {
+    tenant: {
+      findUnique: tenantFindUnique,
+    },
+    subscription: {
+      findUnique: subscriptionFindUnique,
+    },
+  };
+
+  return {
+    tenantFindUnique,
+    subscriptionFindUnique,
+    prismaClient,
+    getPrismaClientForDomain: vi.fn(() => prismaClient),
+  };
+});
+
 vi.mock('../middleware/auth.js', () => ({
   requireAuth: middlewareMocks.requireAuth,
   requireAdmin: middlewareMocks.requireAdmin,
@@ -61,30 +81,13 @@ vi.mock('../services/billing.service.js', () => ({
   handleWebhookEvent: billingServiceMocks.handleWebhookEvent,
 }));
 
-vi.mock('@prisma/client', () => ({
-  PrismaClient: vi.fn(() => ({
-    tenant: {
-      findUnique: vi.fn(() => Promise.resolve({
-        id: 'tenant-1',
-        stripeCustomerId: 'cus-123',
-      })),
-    },
-    subscription: {
-      findUnique: vi.fn(() => Promise.resolve({
-        id: 'sub-1',
-        praxisId: 'tenant-1',
-        stripeSubId: 'sub-123',
-        tier: 'PROFESSIONAL',
-        status: 'ACTIVE',
-        aiQuotaUsed: 50,
-        aiQuotaTotal: 100,
-        startedAt: new Date(),
-      })),
-    },
-  })),
+vi.mock('../db.js', () => ({
+  getPrismaClientForDomain: prismaDbMocks.getPrismaClientForDomain,
 }));
 
 import router from './billing';
+
+const dbDomainCallsOnImport = [...prismaDbMocks.getPrismaClientForDomain.mock.calls];
 
 type RouterLayer = {
   route?: {
@@ -130,9 +133,28 @@ function createMockResponse() {
 describe('billing routes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    prismaDbMocks.getPrismaClientForDomain.mockReturnValue(prismaDbMocks.prismaClient);
+    prismaDbMocks.tenantFindUnique.mockResolvedValue({
+      id: 'tenant-1',
+      stripeCustomerId: 'cus-123',
+    });
+    prismaDbMocks.subscriptionFindUnique.mockResolvedValue({
+      id: 'sub-1',
+      praxisId: 'tenant-1',
+      stripeSubId: 'sub-123',
+      tier: 'PROFESSIONAL',
+      status: 'ACTIVE',
+      aiQuotaUsed: 50,
+      aiQuotaTotal: 100,
+      startedAt: new Date(),
+    });
     process.env.STRIPE_PRICE_STARTER = 'price_starter_123';
     process.env.STRIPE_PRICE_PROFESSIONAL = 'price_pro_123';
     process.env.STRIPE_PRICE_ENTERPRISE = 'price_ent_123';
+  });
+
+  it('uses company domain database client', () => {
+    expect(dbDomainCallsOnImport).toContainEqual(['company']);
   });
 
   describe('POST /setup-intent', () => {
@@ -213,6 +235,32 @@ describe('billing routes', () => {
       await handler(req, res);
 
       expect(res.statusCode).toBe(400);
+      expect(res.body).toMatchObject({
+        error: 'Invalid subscription payload',
+      });
+      expect(billingServiceMocks.createSubscription).not.toHaveBeenCalled();
+      expect(billingServiceMocks.createSubscriptionWithTrial).not.toHaveBeenCalled();
+    });
+
+    it('should return unknown error message for non-Error failures', async () => {
+      prismaDbMocks.tenantFindUnique.mockRejectedValueOnce('db-error-string');
+
+      const handlers = getRouteHandlers('/subscription', 'post');
+      const handler = handlers[handlers.length - 1] as (req: unknown, res: unknown) => Promise<void>;
+
+      const req = {
+        body: { tier: 'PROFESSIONAL', trial: false },
+        user: { praxisId: 'tenant-1', email: 'test@test.com' },
+      };
+      const res = createMockResponse();
+
+      await handler(req, res);
+
+      expect(res.statusCode).toBe(500);
+      expect(res.body).toMatchObject({
+        error: 'Failed to create subscription',
+        message: 'Unknown error',
+      });
     });
   });
 
@@ -233,12 +281,7 @@ describe('billing routes', () => {
     });
 
     it('should handle no subscription', async () => {
-      const { PrismaClient } = await import('@prisma/client');
-      vi.mocked(PrismaClient).mockImplementationOnce(() => ({
-        subscription: {
-          findUnique: vi.fn(() => Promise.resolve(null)),
-        },
-      } as unknown as typeof PrismaClient.prototype));
+      prismaDbMocks.subscriptionFindUnique.mockResolvedValueOnce(null);
 
       const handlers = getRouteHandlers('/subscription', 'get');
       const handler = handlers[handlers.length - 1] as (req: unknown, res: unknown) => Promise<void>;
@@ -272,12 +315,7 @@ describe('billing routes', () => {
     });
 
     it('should return 404 if no subscription', async () => {
-      const { PrismaClient } = await import('@prisma/client');
-      vi.mocked(PrismaClient).mockImplementationOnce(() => ({
-        subscription: {
-          findUnique: vi.fn(() => Promise.resolve({ stripeSubId: null })),
-        },
-      } as unknown as typeof PrismaClient.prototype));
+      prismaDbMocks.subscriptionFindUnique.mockResolvedValueOnce({ stripeSubId: null });
 
       const handlers = getRouteHandlers('/subscription', 'delete');
       const handler = handlers[handlers.length - 1] as (req: unknown, res: unknown) => Promise<void>;
@@ -311,12 +349,10 @@ describe('billing routes', () => {
     });
 
     it('should return empty array if no customer', async () => {
-      const { PrismaClient } = await import('@prisma/client');
-      vi.mocked(PrismaClient).mockImplementationOnce(() => ({
-        tenant: {
-          findUnique: vi.fn(() => Promise.resolve({ stripeCustomerId: null })),
-        },
-      } as unknown as typeof PrismaClient.prototype));
+      prismaDbMocks.tenantFindUnique.mockResolvedValueOnce({
+        id: 'tenant-1',
+        stripeCustomerId: null,
+      });
 
       const handlers = getRouteHandlers('/payment-methods', 'get');
       const handler = handlers[handlers.length - 1] as (req: unknown, res: unknown) => Promise<void>;

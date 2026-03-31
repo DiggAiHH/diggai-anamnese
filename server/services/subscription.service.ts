@@ -1,7 +1,7 @@
-import { PrismaClient } from '@prisma/client';
 import { stripe, PLANS, getQuotaForTier } from '../config/stripe.js';
+import { getPrismaClientForDomain } from '../db.js';
 
-const prisma = new PrismaClient();
+const prisma = getPrismaClientForDomain('company');
 
 export interface SubscriptionData {
   praxisId: string;

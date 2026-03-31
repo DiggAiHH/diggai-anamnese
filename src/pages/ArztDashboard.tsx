@@ -159,12 +159,12 @@ const SessionList = React.memo(function SessionList({
     const { data, isLoading } = useArztSessions();
     const sessions = useMemo(() => data?.sessions || [], [data?.sessions]);
 
-    if (isLoading) return <p className="text-white p-10">{t('arzt.loading')}</p>;
-
-    // Memoize stats calculations
+    // Memoize stats calculations — must be before any early return (Rules of Hooks)
     const activeCount = useMemo(() => sessions.filter((s: ArztSession) => s.status === 'ACTIVE').length, [sessions]);
     const completedCount = useMemo(() => sessions.filter((s: ArztSession) => s.status === 'COMPLETED').length, [sessions]);
     const redFlagsCount = useMemo(() => sessions.reduce((acc: number, s: ArztSession) => acc + (s.unresolvedCritical || 0), 0), [sessions]);
+
+    if (isLoading) return <p className="text-white p-10">{t('arzt.loading')}</p>;
 
     return (
         <div>
@@ -250,7 +250,10 @@ const SessionDetail = React.memo(function SessionDetail({
     }, [dbMessages]);
 
     React.useEffect(() => {
-        const socket = io(SOCKET_BASE_URL || window.location.origin);
+        const socket = io(SOCKET_BASE_URL || window.location.origin, {
+            withCredentials: true,
+            transports: ['websocket', 'polling'],
+        });
         socketRef.current = socket;
 
         socket.on('connect', () => {
@@ -329,20 +332,20 @@ const SessionDetail = React.memo(function SessionDetail({
         'bg-unfall': '🚧 BG-Unfall',
     }), []);
 
-    if (isLoading || !data) return <p className="text-white p-10">{t('arzt.loadingDetail')}</p>;
-
-    const session = data.session;
-
-    // Memoize grouped answers
+    // Memoize grouped answers — must be before early return (Rules of Hooks); safe via optional chaining
     const groupedAnswers = useMemo(() => {
         const sections = new Map<string, SessionAnswer[]>();
-        for (const a of (session.answers || [])) {
+        for (const a of (data?.session?.answers || [])) {
             const key = a.section || 'sonstige';
             if (!sections.has(key)) sections.set(key, []);
             sections.get(key)!.push(a);
         }
         return Array.from(sections.entries());
-    }, [session.answers]);
+    }, [data?.session?.answers]);
+
+    if (isLoading || !data) return <p className="text-white p-10">{t('arzt.loadingDetail')}</p>;
+
+    const session = data.session;
 
     return (
         <div className="animate-fade-in pb-20">
@@ -699,9 +702,13 @@ export const ArztDashboard: React.FC = React.memo(function ArztDashboard() {
     }, []);
 
     React.useEffect(() => {
-        if (!token) return;
+        if (!staffUser) return;
 
-        const socket = io(SOCKET_BASE_URL || window.location.origin, { transports: ['websocket', 'polling'] });
+        const socket = io(SOCKET_BASE_URL || window.location.origin, {
+            auth: token ? { token } : undefined,
+            withCredentials: true,
+            transports: ['websocket', 'polling'],
+        });
 
         socket.on('connect', () => {
             socket.emit('join:arzt');
@@ -815,13 +822,9 @@ export const ArztDashboard: React.FC = React.memo(function ArztDashboard() {
             socket.off('therapy:measure-due');
             socket.disconnect();
         };
-    }, [token, queryClient, t]);
+    }, [staffUser, token, queryClient, t]);
 
-    if (sessionLoading || !staffUser || !token) {
-        return null;
-    }
-
-    // Memoize tab content to prevent unnecessary re-renders
+    // Memoize tab content — must be before early return (Rules of Hooks)
     const tabContent = useMemo(() => {
         switch (activeTab) {
             case 'patients':
@@ -872,6 +875,10 @@ export const ArztDashboard: React.FC = React.memo(function ArztDashboard() {
                 return null;
         }
     }, [activeTab, selectedSessionId, activeLocks, handleSelectSession, handleBack, t]);
+
+    if (sessionLoading || !staffUser || !token) {
+        return null;
+    }
 
     return (
         <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] selection:bg-[var(--accent-primary)]/30 selection:text-[var(--text-primary)]">

@@ -40,6 +40,14 @@ export interface AuthPayload {
     jti?: string; // JWT ID für Token-Blacklist
 }
 
+export function normalizeAuthRole(role: string | null | undefined): AuthPayload['role'] | null {
+    const normalized = role?.toLowerCase();
+    if (normalized === 'patient' || normalized === 'arzt' || normalized === 'mfa' || normalized === 'admin') {
+        return normalized;
+    }
+    return null;
+}
+
 // MED-001 FIX: Properly typed Request with cookies
 declare global {
     namespace Express {
@@ -173,6 +181,11 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
         const decoded = verify(token, config.jwtSecret as Secret, {
             algorithms: ['HS256'], // Prevent algorithm confusion attacks
         }) as AuthPayload;
+        const normalizedRole = normalizeAuthRole(decoded.role);
+        if (!normalizedRole) {
+            res.status(401).json({ error: 'UngÃ¼ltiger oder abgelaufener Token' });
+            return;
+        }
 
         // Check token blacklist (async — Redis or fallback)
         if (decoded.jti) {
@@ -190,7 +203,10 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
             }
         }
 
-        req.auth = decoded;
+        req.auth = {
+            ...decoded,
+            role: normalizedRole,
+        };
         next();
     } catch (_err) {
         res.status(401).json({ error: 'Ungültiger oder abgelaufener Token' });

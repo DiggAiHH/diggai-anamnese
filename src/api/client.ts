@@ -115,6 +115,8 @@ export function deduplicatedRequest<T = unknown>(config: AxiosRequestConfig): Pr
 
 // JWT Token Management
 let currentToken: string | null = null;
+let currentCsrfToken: string | null = null;
+let csrfBootstrapPromise: Promise<string | null> | null = null;
 
 export function setAuthToken(token: string | null): void {
     currentToken = token;
@@ -124,15 +126,76 @@ export function getAuthToken(): string | null {
     return currentToken;
 }
 
-// SECURITY: Get CSRF token from cookie for state-changing requests
+export function setCsrfToken(token: string | null): void {
+    currentCsrfToken = token;
+}
+
 function getCsrfTokenFromCookie(): string | null {
     const match = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
     return match ? decodeURIComponent(match[1]) : null;
 }
 
+export function getCsrfToken(): string | null {
+    return currentCsrfToken || getCsrfTokenFromCookie();
+}
+
+function updateCsrfTokenFromHeaders(headers: unknown): void {
+    if (!headers || typeof headers !== 'object') {
+        return;
+    }
+
+    const record = headers as Record<string, unknown>;
+    const rawValue = record['x-csrf-token'] ?? record['X-CSRF-Token'];
+    if (typeof rawValue === 'string' && rawValue.trim().length > 0) {
+        currentCsrfToken = rawValue;
+    }
+}
+
+export async function ensureCsrfToken(): Promise<string | null> {
+    const existingToken = getCsrfToken();
+    if (existingToken || typeof window === 'undefined') {
+        return existingToken;
+    }
+
+    if (csrfBootstrapPromise) {
+        return csrfBootstrapPromise;
+    }
+
+    csrfBootstrapPromise = (async () => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/csrf-token`, {
+                method: 'GET',
+                credentials: 'include',
+                headers: {
+                    Accept: 'application/json',
+                },
+            });
+
+            updateCsrfTokenFromHeaders({
+                'x-csrf-token': response.headers.get('X-CSRF-Token') ?? undefined,
+            });
+
+            if (response.ok) {
+                const data = await response.json().catch(() => null) as { csrfToken?: string } | null;
+                if (!currentCsrfToken && typeof data?.csrfToken === 'string' && data.csrfToken.length > 0) {
+                    currentCsrfToken = data.csrfToken;
+                }
+            }
+        } catch {
+            // Leave token empty and let the calling request surface the real network error.
+        } finally {
+            csrfBootstrapPromise = null;
+        }
+
+        return getCsrfToken();
+    })();
+
+    return csrfBootstrapPromise;
+}
+
 // Request Interceptor – JWT automatisch anfuegen + CSRF Token + Performance Tracking
 apiClient.interceptors.request.use(
-    (config) => {
+    async (config) => {
         const token = getAuthToken();
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
@@ -141,7 +204,10 @@ apiClient.interceptors.request.use(
         // SECURITY: Add CSRF token for state-changing requests (HIGH-001 Fix)
         const safeMethods = ['get', 'head', 'options'];
         if (config.method && !safeMethods.includes(config.method.toLowerCase())) {
-            const csrfToken = getCsrfTokenFromCookie();
+            let csrfToken = getCsrfToken();
+            if (!csrfToken) {
+                csrfToken = await ensureCsrfToken();
+            }
             if (csrfToken) {
                 config.headers['x-xsrf-token'] = csrfToken;
             }
@@ -188,6 +254,8 @@ function isAbortError(error: unknown): boolean {
 
 apiClient.interceptors.response.use(
     (response) => {
+        updateCsrfTokenFromHeaders(response.headers);
+
         // PERFORMANCE: Track API response times
         const config = response.config as unknown as { metadata?: { startTime: number } };
         if (config.metadata?.startTime) {
@@ -204,6 +272,7 @@ apiClient.interceptors.response.use(
         return response;
     },
     async (error) => {
+        updateCsrfTokenFromHeaders(error.response?.headers);
         
         // AbortError soll nicht als Fehler angezeigt werden - Silent reject
         if (isAbortError(error)) {
@@ -538,6 +607,17 @@ function getDemoSessionOrThrow(sessionId: string): DemoSession {
         throw new Error('Session nicht gefunden');
     }
     return session;
+}
+
+function triggerBlobDownload(blob: Blob, filename: string): void {
+    const blobUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(blobUrl);
 }
 
 type QuestionItem = (typeof questions)[number];
@@ -980,30 +1060,21 @@ export const api = {
         const response = await apiClient.get(`/export/sessions/${sessionId}/export/pdf`, {
             responseType: 'blob',
         });
-
-        const blobUrl = URL.createObjectURL(response.data as Blob);
-        const link = document.createElement('a');
-        link.href = blobUrl;
-        link.download = `Anamnese_${sessionId}.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        URL.revokeObjectURL(blobUrl);
+        triggerBlobDownload(response.data as Blob, `Anamnese_${sessionId}.pdf`);
     },
 
     exportSessionCSV: async (sessionId: string) => {
         const response = await apiClient.get(`/export/sessions/${sessionId}/export/csv`, {
             responseType: 'blob',
         });
+        triggerBlobDownload(response.data as Blob, `Anamnese_${sessionId}.csv`);
+    },
 
-        const blobUrl = URL.createObjectURL(response.data as Blob);
-        const link = document.createElement('a');
-        link.href = blobUrl;
-        link.download = `Anamnese_${sessionId}.csv`;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        URL.revokeObjectURL(blobUrl);
+    exportSessionTXT: async (sessionId: string) => {
+        const response = await apiClient.get(`/export/sessions/${sessionId}/export/txt`, {
+            responseType: 'blob',
+        });
+        triggerBlobDownload(response.data as Blob, `Anamnese_${sessionId}.txt`);
     },
 
     exportSessionJSON: async (sessionId: string) => {
@@ -1012,6 +1083,42 @@ export const api = {
             return { session };
         }
         const response = await apiClient.get(`/export/sessions/${sessionId}/export/json`);
+        return response.data;
+    },
+
+    requestEncryptedPackage: async (sessionId: string) => {
+        if (isDemoMode()) {
+            const session = getDemoSessionOrThrow(sessionId);
+            const blob = new Blob([JSON.stringify({
+                version: 'demo-package-v1',
+                sessionId,
+                exportedAt: new Date().toISOString(),
+                data: session,
+            }, null, 2)], { type: 'application/json' });
+            triggerBlobDownload(blob, `Anamnese_${sessionId}_secure.json`);
+            return { success: true };
+        }
+
+        const response = await apiClient.get(`/export/sessions/${sessionId}/package`, {
+            responseType: 'blob',
+        });
+        triggerBlobDownload(response.data as Blob, `Anamnese_${sessionId}_secure.json`);
+        return { success: true };
+    },
+
+    sendPackageLink: async (sessionId: string, email?: string) => {
+        const response = await apiClient.post(`/export/sessions/${sessionId}/package-link`, email ? { email } : {});
+        return response.data;
+    },
+
+    importEncryptedPackage: async (file: File) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        const response = await apiClient.post('/mfa/imports', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            },
+        });
         return response.data;
     },
 

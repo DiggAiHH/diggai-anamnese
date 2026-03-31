@@ -112,8 +112,12 @@ describe('VoiceInput - Speech Recognition Events', () => {
       continuous: false,
       interimResults: false,
       lang: 'de-DE',
-      start: vi.fn(),
-      stop: vi.fn(),
+      start: vi.fn().mockImplementation(() => {
+        if (mockRecognition.onstart) mockRecognition.onstart();
+      }),
+      stop: vi.fn().mockImplementation(() => {
+        if (mockRecognition.onend) mockRecognition.onend();
+      }),
       abort: vi.fn(),
       onresult: null,
       onerror: null,
@@ -121,8 +125,8 @@ describe('VoiceInput - Speech Recognition Events', () => {
       onstart: null,
     };
 
-    window.SpeechRecognition = vi.fn(() => mockRecognition) as any;
-    window.webkitSpeechRecognition = vi.fn(() => mockRecognition) as any;
+    window.SpeechRecognition = vi.fn(function() { return mockRecognition; }) as any;
+    window.webkitSpeechRecognition = vi.fn(function() { return mockRecognition; }) as any;
   });
 
   afterEach(() => {

@@ -49,14 +49,14 @@ describe('RadioInput', () => {
   it('should apply custom className', () => {
     render(<RadioInput value={undefined} onChange={vi.fn()} options={mockOptions} className="custom-class" />);
     
-    const container = screen.getByText('Option 1').closest('.flex');
+    const container = screen.getByText('Option 1').closest('.flex-col');
     expect(container).toHaveClass('custom-class');
   });
 
   it('should render with flex-col layout by default', () => {
     render(<RadioInput value={undefined} onChange={vi.fn()} options={mockOptions} />);
     
-    const container = screen.getByText('Option 1').closest('.flex');
+    const container = screen.getByText('Option 1').closest('.flex-col');
     expect(container).toHaveClass('flex-col');
   });
 

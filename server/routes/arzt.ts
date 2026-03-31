@@ -2,7 +2,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { prisma } from '../db';
 import * as bcrypt from 'bcryptjs';
-import { createToken, requireAuth, requireRole, blacklistToken, setTokenCookie, clearTokenCookie } from '../middleware/auth';
+import { createToken, requireAuth, requireRole, blacklistToken, setTokenCookie, clearTokenCookie, normalizeAuthRole } from '../middleware/auth';
 import { aiEngine } from '../services/ai/ai-engine.service';
 import { decrypt, isPIIAtom } from '../services/encryption';
 import rateLimit from 'express-rate-limit';
@@ -23,6 +23,38 @@ const loginSchema = z.object({
     username: z.string().min(1, 'Benutzername ist erforderlich'),
     password: z.string().min(1, 'Passwort ist erforderlich'),
 });
+
+function resolveEffectiveTenant(req: Request):
+    | { ok: true; tenantId: string }
+    | { ok: false; status: 400 | 403; body: { error: string; code: 'TENANT_CONTEXT_REQUIRED' | 'TENANT_SCOPE_VIOLATION' } } {
+    const authTenantId = req.auth?.tenantId;
+    const requestTenantId = req.tenantId;
+
+    if (authTenantId && requestTenantId && authTenantId !== requestTenantId) {
+        return {
+            ok: false,
+            status: 403,
+            body: {
+                error: 'Tenant-Konflikt',
+                code: 'TENANT_SCOPE_VIOLATION',
+            },
+        };
+    }
+
+    const tenantId = requestTenantId || authTenantId;
+    if (!tenantId) {
+        return {
+            ok: false,
+            status: 400,
+            body: {
+                error: 'Tenant-Kontext fehlt',
+                code: 'TENANT_CONTEXT_REQUIRED',
+            },
+        };
+    }
+
+    return { ok: true, tenantId };
+}
 
 /**
  * @swagger
@@ -67,11 +99,20 @@ const loginSchema = z.object({
  */
 router.post('/login', loginRateLimiter, async (req: Request, res: Response) => {
     try {
+        const resolvedTenant = resolveEffectiveTenant(req);
+        if (!resolvedTenant.ok) {
+            res.status(resolvedTenant.status).json(resolvedTenant.body);
+            return;
+        }
+
         const validated = loginSchema.parse(req.body);
         const { username, password } = validated;
 
         const arzt = await prisma.arztUser.findFirst({
-            where: { username },
+            where: {
+                tenantId: resolvedTenant.tenantId,
+                username,
+            },
         });
 
         if (!arzt || arzt.isActive === false) {
@@ -85,9 +126,17 @@ router.post('/login', loginRateLimiter, async (req: Request, res: Response) => {
             return;
         }
 
+        const normalizedRole = normalizeAuthRole(arzt.role);
+        if (!normalizedRole) {
+            console.error('[Arzt] Unsupported staff role in database:', arzt.role);
+            res.status(500).json({ error: 'Interner Serverfehler' });
+            return;
+        }
+
         const token = createToken({
             userId: arzt.id,
-            role: arzt.role as 'arzt' | 'mfa' | 'admin',
+            tenantId: resolvedTenant.tenantId,
+            role: normalizedRole,
         });
 
         // Set httpOnly cookie for browser clients
@@ -98,7 +147,7 @@ router.post('/login', loginRateLimiter, async (req: Request, res: Response) => {
                 id: arzt.id,
                 username: arzt.username,
                 displayName: arzt.displayName,
-                role: arzt.role,
+                role: normalizedRole,
             },
         });
     } catch (err: unknown) {
@@ -118,8 +167,19 @@ router.get('/me', requireAuth, requireRole('arzt', 'mfa', 'admin'), async (req: 
             return;
         }
 
+        const resolvedTenant = resolveEffectiveTenant(req);
+        if (!resolvedTenant.ok) {
+            res.status(resolvedTenant.status).json(resolvedTenant.body);
+            return;
+        }
+
         const arzt = await prisma.arztUser.findUnique({
-            where: { id: req.auth.userId },
+            where: {
+                id_tenantId: {
+                    id: req.auth.userId,
+                    tenantId: resolvedTenant.tenantId,
+                },
+            },
             select: {
                 id: true,
                 username: true,
@@ -140,7 +200,7 @@ router.get('/me', requireAuth, requireRole('arzt', 'mfa', 'admin'), async (req: 
                 id: arzt.id,
                 username: arzt.username,
                 displayName: arzt.displayName,
-                role: arzt.role,
+                role: normalizeAuthRole(arzt.role) || req.auth.role,
             },
         });
     } catch (err: unknown) {
@@ -166,7 +226,17 @@ router.post('/logout', requireAuth, (req: Request, res: Response) => {
  */
 router.get('/sessions', requireAuth, requireRole('arzt', 'admin'), async (_req: Request, res: Response) => {
     try {
+        const req = _req;
+        const resolvedTenant = resolveEffectiveTenant(req);
+        if (!resolvedTenant.ok) {
+            res.status(resolvedTenant.status).json(resolvedTenant.body);
+            return;
+        }
+
         const sessions = await prisma.patientSession.findMany({
+            where: {
+                tenantId: resolvedTenant.tenantId,
+            },
             orderBy: { createdAt: 'desc' },
             take: 100,
             include: {
@@ -216,8 +286,17 @@ router.get('/sessions', requireAuth, requireRole('arzt', 'admin'), async (_req: 
 router.get('/sessions/:id', requireAuth, requireRole('arzt', 'admin', 'mfa'), async (req: Request, res: Response) => {
     try {
         const sessionId = req.params.id as string;
-        const session = await prisma.patientSession.findUnique({
-            where: { id: sessionId },
+        const resolvedTenant = resolveEffectiveTenant(req);
+        if (!resolvedTenant.ok) {
+            res.status(resolvedTenant.status).json(resolvedTenant.body);
+            return;
+        }
+
+        const session = await prisma.patientSession.findFirst({
+            where: {
+                id: sessionId,
+                tenantId: resolvedTenant.tenantId,
+            },
         });
 
         if (!session) {
@@ -281,7 +360,7 @@ router.get('/sessions/:id', requireAuth, requireRole('arzt', 'admin', 'mfa'), as
         // Audit-Log: Wer schaut sich die Daten an
         await prisma.auditLog.create({
             data: {
-                tenantId: req.tenantId || req.auth?.tenantId || 'system',
+                tenantId: resolvedTenant.tenantId,
                 userId: req.auth?.userId || null,
                 action: 'VIEW_SESSION_DETAIL',
                 resource: `sessions/${sessionId}`,
@@ -313,6 +392,27 @@ import { emitPatientMessage, emitSessionComplete } from '../socket';
 router.put('/triage/:id/ack', requireAuth, requireRole('arzt', 'admin'), async (req: Request, res: Response) => {
     try {
         const triageId = req.params.id as string;
+        const resolvedTenant = resolveEffectiveTenant(req);
+        if (!resolvedTenant.ok) {
+            res.status(resolvedTenant.status).json(resolvedTenant.body);
+            return;
+        }
+
+        const existingEvent = await prisma.triageEvent.findFirst({
+            where: {
+                id: triageId,
+                session: {
+                    tenantId: resolvedTenant.tenantId,
+                },
+            },
+            select: { id: true },
+        });
+
+        if (!existingEvent) {
+            res.status(404).json({ error: 'Triage-Event nicht gefunden' });
+            return;
+        }
+
         const event = await prisma.triageEvent.update({
             where: { id: triageId },
             data: {
@@ -335,6 +435,12 @@ router.put('/triage/:id/ack', requireAuth, requireRole('arzt', 'admin'), async (
 router.put('/sessions/:id/status', requireAuth, requireRole('arzt', 'admin', 'mfa'), async (req: Request, res: Response) => {
     try {
         const sessionId = req.params.id as string;
+        const resolvedTenant = resolveEffectiveTenant(req);
+        if (!resolvedTenant.ok) {
+            res.status(resolvedTenant.status).json(resolvedTenant.body);
+            return;
+        }
+
         const statusSchema = z.enum(['ACTIVE', 'COMPLETED', 'SUBMITTED', 'EXPIRED', 'TRIAGE']);
         const parseResult = statusSchema.safeParse(req.body.status);
         if (!parseResult.success) {
@@ -347,7 +453,7 @@ router.put('/sessions/:id/status', requireAuth, requireRole('arzt', 'admin', 'mf
             where: { id: sessionId },
         });
 
-        if (!session) {
+        if (!session || session.tenantId !== resolvedTenant.tenantId) {
             res.status(404).json({ error: 'Session nicht gefunden' });
             return;
         }
@@ -398,6 +504,25 @@ router.put('/sessions/:id/status', requireAuth, requireRole('arzt', 'admin', 'mf
 router.get('/sessions/:id/summary', requireAuth, requireRole('arzt', 'admin'), async (req: Request, res: Response) => {
     try {
         const sessionId = req.params.id as string;
+        const resolvedTenant = resolveEffectiveTenant(req);
+        if (!resolvedTenant.ok) {
+            res.status(resolvedTenant.status).json(resolvedTenant.body);
+            return;
+        }
+
+        const existingSession = await prisma.patientSession.findFirst({
+            where: {
+                id: sessionId,
+                tenantId: resolvedTenant.tenantId,
+            },
+            select: { id: true },
+        });
+
+        if (!existingSession) {
+            res.status(404).json({ error: 'Session nicht gefunden' });
+            return;
+        }
+
         const result = await aiEngine.summarizeSession(sessionId);
         res.json({
             summary: result.summary.historyOfPresentIllness || result.summary.chiefComplaint,

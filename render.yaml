@@ -1,0 +1,53 @@
+# Render.com deployment configuration for DiggAI Anamnese Backend
+# Alternative to Railway — free tier available
+# Docs: https://render.com/docs/infrastructure-as-code
+
+services:
+  - type: web
+    name: anamnese-backend
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    healthCheckPath: /api/health
+    autoDeploy: false
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3001
+      - key: BACKEND_PROFILE
+        value: monolith
+      - key: LOG_LEVEL
+        value: info
+      # --- Required secrets: set manually in Render Dashboard ---
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: ENCRYPTION_KEY
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: API_PUBLIC_URL
+        sync: false
+      - key: ARZT_PASSWORD
+        sync: false
+      # --- Optional: email, push, AI ---
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: 587
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: SENTRY_DSN
+        sync: false

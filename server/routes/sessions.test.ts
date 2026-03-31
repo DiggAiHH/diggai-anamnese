@@ -151,6 +151,11 @@ describe('sessions route authorization hardening', () => {
     await createSessionHandler(req, res);
 
     expect(middlewareMocks.setTokenCookie).toHaveBeenCalledTimes(1);
+    expect(middlewareMocks.createToken).toHaveBeenCalledWith({
+      sessionId: 's1',
+      tenantId: 'default',
+      role: 'patient',
+    });
     expect(res.statusCode).toBe(201);
     const body = res.body as JsonPayload;
     expect(body.sessionId).toBe('s1');
@@ -164,14 +169,19 @@ describe('sessions route authorization hardening', () => {
     const refreshHandler = handlers[handlers.length - 1] as (req: unknown, res: unknown) => Promise<void>;
 
     const req = {
-      auth: { sessionId: 's1', userId: 'u1', role: 'patient' },
+      auth: { sessionId: 's1', userId: 'u1', tenantId: 'tenant-a', role: 'patient' },
       headers: {},
     };
     const res = createMockResponse();
 
     await refreshHandler(req, res);
 
-    expect(middlewareMocks.createToken).toHaveBeenCalledTimes(1);
+    expect(middlewareMocks.createToken).toHaveBeenCalledWith({
+      sessionId: 's1',
+      userId: 'u1',
+      tenantId: 'tenant-a',
+      role: 'patient',
+    });
     expect(middlewareMocks.setTokenCookie).toHaveBeenCalledTimes(1);
     expect(res.statusCode).toBe(200);
     const body = res.body as JsonPayload;

@@ -124,6 +124,7 @@ router.post('/', async (req: Request, res: Response) => {
 
         const token = createToken({
             sessionId: session.id,
+            tenantId,
             role: 'patient',
         });
 
@@ -571,6 +572,7 @@ router.post('/refresh-token', requireAuth, async (req: Request, res: Response) =
         const newToken = createToken({
             sessionId: req.auth.sessionId,
             userId: req.auth.userId,
+            tenantId: req.auth.tenantId,
             role: req.auth.role,
         });
 
@@ -642,7 +644,7 @@ router.post('/start', async (req: Request, res: Response) => {
             },
         });
 
-        const token = createToken({ sessionId: session.id, role: 'patient' });
+        const token = createToken({ sessionId: session.id, tenantId, role: 'patient' });
         setTokenCookie(res, token);
 
         // Build the deep-link URL the QR code will encode

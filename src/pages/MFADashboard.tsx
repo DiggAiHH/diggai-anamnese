@@ -33,12 +33,13 @@ import { StaffChat } from '../components/StaffChat';
 import { StaffTodoList } from '../components/StaffTodoList';
 import { CertificationModal } from '../components/CertificationModal';
 import { FullscreenButton } from '../components/FullscreenButton';
+import { MfaImportVersandPanel } from '../components/mfa/MfaImportVersandPanel';
 import { clearStoredStaffUser, getStoredStaffToken } from '../lib/staffSession';
 import { STAFF_SESSION_QUERY_KEY, useStaffSession } from '../hooks/useStaffSession';
 
 // ─── Types ─────────────────────────────────────────────
 
-type TabKey = 'sessions' | 'certify' | 'chat' | 'todo';
+type TabKey = 'sessions' | 'certify' | 'imports' | 'chat' | 'todo';
 
 interface MfaSession {
     id: string;
@@ -424,7 +425,8 @@ const MFAChatModal = React.memo(function MFAChatModal({
     useEffect(() => {
         const token = getStoredStaffToken();
         const socket = io(SOCKET_BASE_URL || window.location.origin, {
-            auth: { token },
+            auth: token ? { token } : undefined,
+            withCredentials: true,
             transports: ['websocket', 'polling']
         });
         socketRef.current = socket;
@@ -524,6 +526,7 @@ const MFAChatModal = React.memo(function MFAChatModal({
 const TABS_CONFIG = [
     { key: 'sessions' as const, labelKey: 'mfa.currentRequests', labelDefault: 'Anfragen', icon: ClipboardList },
     { key: 'certify' as const, labelKey: 'mfa.certify', labelDefault: 'Zertifizierung', icon: Shield },
+    { key: 'imports' as const, labelKey: 'mfa.importVersand', labelDefault: 'Import / Versand', icon: FileText },
     { key: 'chat' as const, labelKey: 'mfa.teamChat', labelDefault: 'Team-Chat', icon: MessageSquare },
     { key: 'todo' as const, labelKey: 'mfa.todoList', labelDefault: 'Aufgaben', icon: CheckCircle },
 ] as const;
@@ -574,7 +577,8 @@ export const MFADashboard: React.FC = React.memo(function MFADashboard() {
 
         const token = getStoredStaffToken();
         const socket = io(SOCKET_BASE_URL || window.location.origin, { 
-            auth: { token },
+            auth: token ? { token } : undefined,
+            withCredentials: true,
             transports: ['websocket', 'polling'] 
         });
 
@@ -598,11 +602,7 @@ export const MFADashboard: React.FC = React.memo(function MFADashboard() {
         };
     }, [staffUser, queryClient]);
 
-    if (sessionLoading || !staffUser) {
-        return null;
-    }
-
-    // Memoize tab content
+    // Memoize tab content — must be before early return (Rules of Hooks)
     const tabContent = useMemo(() => {
         switch (activeTab) {
             case 'sessions':
@@ -662,6 +662,8 @@ export const MFADashboard: React.FC = React.memo(function MFADashboard() {
                         className="min-h-[600px]"
                     />
                 );
+            case 'imports':
+                return <MfaImportVersandPanel />;
             case 'todo':
                 return (
                     <StaffTodoList
@@ -672,6 +674,10 @@ export const MFADashboard: React.FC = React.memo(function MFADashboard() {
                 return null;
         }
     }, [activeTab, t, handleOpenChat, staffUser]);
+
+    if (sessionLoading || !staffUser) {
+        return null;
+    }
 
     return (
         <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">

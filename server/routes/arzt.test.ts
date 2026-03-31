@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   requireRole: vi.fn((_req, _res, next) => next()),
   blacklistToken: vi.fn(),
   bcryptCompare: vi.fn(async () => true),
+  normalizeAuthRole: vi.fn((role: string) => role.toLowerCase()),
 }));
 
 vi.mock('../middleware/auth', () => ({
@@ -18,6 +19,7 @@ vi.mock('../middleware/auth', () => ({
   requireAuth: mocks.requireAuth,
   requireRole: mocks.requireRoleFactory,
   blacklistToken: mocks.blacklistToken,
+  normalizeAuthRole: mocks.normalizeAuthRole,
 }));
 
 vi.mock('bcryptjs', () => ({
@@ -128,13 +130,14 @@ describe('arzt auth hardening', () => {
       username: 'dr.klaproth',
       displayName: 'Dr. Klapproth',
       passwordHash: 'hash',
-      role: 'arzt',
+      role: 'ARZT',
     } as never);
 
     const handlers = getRouteHandlers('/login', 'post');
     const loginHandler = handlers[handlers.length - 1] as (req: unknown, res: unknown) => Promise<void>;
 
     const req = {
+      tenantId: 'tenant-a',
       body: {
         username: 'dr.klaproth',
         password: 'secret123',
@@ -145,10 +148,22 @@ describe('arzt auth hardening', () => {
     await loginHandler(req, res);
 
     expect(mocks.setTokenCookie).toHaveBeenCalledTimes(1);
+    expect(mocks.createToken).toHaveBeenCalledWith({
+      userId: 'u1',
+      tenantId: 'tenant-a',
+      role: 'arzt',
+    });
+    expect(prisma.arztUser.findFirst).toHaveBeenCalledWith({
+      where: {
+        tenantId: 'tenant-a',
+        username: 'dr.klaproth',
+      },
+    });
     expect(res.statusCode).toBe(200);
     const body = res.body as Record<string, unknown>;
     expect(body).not.toHaveProperty('token');
     expect(body).toHaveProperty('user');
+    expect(body.user).toMatchObject({ role: 'arzt' });
   });
 
   it('rejects inactive user login with 401 and without token/cookie issuance', async () => {
@@ -157,7 +172,7 @@ describe('arzt auth hardening', () => {
       username: 'dr.klaproth',
       displayName: 'Dr. Klapproth',
       passwordHash: 'hash',
-      role: 'arzt',
+      role: 'ARZT',
       isActive: false,
     } as never);
 
@@ -165,6 +180,7 @@ describe('arzt auth hardening', () => {
     const loginHandler = handlers[handlers.length - 1] as (req: unknown, res: unknown) => Promise<void>;
 
     const req = {
+      tenantId: 'tenant-a',
       body: {
         username: 'dr.klaproth',
         password: 'secret123',
@@ -184,6 +200,7 @@ describe('arzt auth hardening', () => {
     const loginHandler = handlers[handlers.length - 1] as (req: unknown, res: unknown) => Promise<void>;
 
     const req = {
+      tenantId: 'tenant-a',
       body: {
         username: 'dr.klaproth',
       },

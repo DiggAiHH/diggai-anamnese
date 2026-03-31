@@ -1,10 +1,46 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
+import multer from 'multer';
 import { prisma } from '../db';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { z } from 'zod';
+import { decryptEncryptedPackage, PackageError } from '../services/export/package.service';
+import { importEncryptedPackagePayload } from '../services/export/package-import.service';
 
 const router = Router();
+const upload = multer({ storage: multer.memoryStorage() });
+
+function resolveEffectiveTenant(req: Request):
+    | { ok: true; tenantId: string }
+    | { ok: false; status: 400 | 403; body: { error: string; code: 'TENANT_CONTEXT_REQUIRED' | 'TENANT_SCOPE_VIOLATION' } } {
+    const authTenantId = req.auth?.tenantId;
+    const requestTenantId = req.tenantId;
+
+    if (authTenantId && requestTenantId && authTenantId !== requestTenantId) {
+        return {
+            ok: false,
+            status: 403,
+            body: {
+                error: 'Tenant-Konflikt',
+                code: 'TENANT_SCOPE_VIOLATION',
+            },
+        };
+    }
+
+    const tenantId = requestTenantId || authTenantId;
+    if (!tenantId) {
+        return {
+            ok: false,
+            status: 400,
+            body: {
+                error: 'Tenant-Kontext fehlt',
+                code: 'TENANT_CONTEXT_REQUIRED',
+            },
+        };
+    }
+
+    return { ok: true, tenantId };
+}
 
 /**
  * GET /api/mfa/sessions
@@ -12,7 +48,17 @@ const router = Router();
  */
 router.get('/sessions', requireAuth, requireRole('mfa', 'admin'), async (_req: Request, res: Response) => {
     try {
+        const req = _req;
+        const resolvedTenant = resolveEffectiveTenant(req);
+        if (!resolvedTenant.ok) {
+            res.status(resolvedTenant.status).json(resolvedTenant.body);
+            return;
+        }
+
         const sessions = await prisma.patientSession.findMany({
+            where: {
+                tenantId: resolvedTenant.tenantId,
+            },
             include: {
                 assignedArzt: {
                     select: {
@@ -55,8 +101,18 @@ router.get('/sessions', requireAuth, requireRole('mfa', 'admin'), async (_req: R
  */
 router.get('/doctors', requireAuth, requireRole('mfa', 'admin'), async (_req: Request, res: Response) => {
     try {
+        const req = _req;
+        const resolvedTenant = resolveEffectiveTenant(req);
+        if (!resolvedTenant.ok) {
+            res.status(resolvedTenant.status).json(resolvedTenant.body);
+            return;
+        }
+
         const doctors = await prisma.arztUser.findMany({
-            where: { role: 'ARZT' },
+            where: {
+                tenantId: resolvedTenant.tenantId,
+                role: 'ARZT',
+            },
             select: {
                 id: true,
                 displayName: true,
@@ -76,6 +132,12 @@ router.get('/doctors', requireAuth, requireRole('mfa', 'admin'), async (_req: Re
  */
 router.post('/sessions/:id/assign', requireAuth, requireRole('mfa', 'admin'), async (req: Request, res: Response) => {
     try {
+        const resolvedTenant = resolveEffectiveTenant(req);
+        if (!resolvedTenant.ok) {
+            res.status(resolvedTenant.status).json(resolvedTenant.body);
+            return;
+        }
+
         const { id } = req.params;
         const assignSchema = z.object({ arztId: z.string().uuid() });
         const parseResult = assignSchema.safeParse(req.body);
@@ -84,6 +146,37 @@ router.post('/sessions/:id/assign', requireAuth, requireRole('mfa', 'admin'), as
             return;
         }
         const { arztId } = parseResult.data;
+
+        const doctor = await prisma.arztUser.findUnique({
+            where: {
+                id_tenantId: {
+                    id: arztId,
+                    tenantId: resolvedTenant.tenantId,
+                },
+            },
+            select: {
+                id: true,
+                role: true,
+            },
+        });
+
+        if (!doctor || doctor.role !== 'ARZT') {
+            res.status(404).json({ error: 'Arzt nicht gefunden' });
+            return;
+        }
+
+        const sessionExists = await prisma.patientSession.findFirst({
+            where: {
+                id: id as string,
+                tenantId: resolvedTenant.tenantId,
+            },
+            select: { id: true },
+        });
+
+        if (!sessionExists) {
+            res.status(404).json({ error: 'Session nicht gefunden' });
+            return;
+        }
 
         const session = await prisma.patientSession.update({
             where: { id: id as string },
@@ -94,6 +187,63 @@ router.post('/sessions/:id/assign', requireAuth, requireRole('mfa', 'admin'), as
         res.json({ success: true, session });
     } catch (err: unknown) {
         console.error('[MFA] Assignment-Fehler:', err);
+        res.status(500).json({ error: 'Interner Serverfehler' });
+    }
+});
+
+router.post('/imports', requireAuth, requireRole('mfa', 'admin'), upload.single('file'), async (req: Request, res: Response) => {
+    try {
+        const resolvedTenant = resolveEffectiveTenant(req);
+        if (!resolvedTenant.ok) {
+            res.status(resolvedTenant.status).json(resolvedTenant.body);
+            return;
+        }
+        const tenantId = resolvedTenant.tenantId;
+
+        if (!req.file?.buffer) {
+            res.status(400).json({ error: 'Es wurde keine JSON-Datei hochgeladen', code: 'PACKAGE_FILE_REQUIRED' });
+            return;
+        }
+
+        let parsedPackage: unknown;
+        try {
+            parsedPackage = JSON.parse(req.file.buffer.toString('utf-8'));
+        } catch {
+            res.status(400).json({ error: 'Die hochgeladene Datei ist kein gültiges JSON-Paket', code: 'PACKAGE_JSON_INVALID' });
+            return;
+        }
+
+        const decrypted = await decryptEncryptedPackage(parsedPackage, tenantId);
+        const result = await importEncryptedPackagePayload({
+            tenantId,
+            checksum: decrypted.package.checksum,
+            payload: decrypted.payload,
+            importedByUserId: req.auth?.userId || null,
+            sourceFilename: req.file.originalname,
+        });
+
+        await prisma.auditLog.create({
+            data: {
+                tenantId,
+                userId: req.auth?.userId || null,
+                action: 'IMPORT_PACKAGE',
+                resource: `sessions/${result.sessionId}`,
+                metadata: JSON.stringify({
+                    packageId: result.packageId,
+                    sessionId: result.sessionId,
+                    status: result.status,
+                }),
+            },
+        });
+
+        res.json(result);
+    } catch (err: unknown) {
+        if (err instanceof PackageError) {
+            res.status(err.status).json({ error: err.message, code: err.code });
+            return;
+        }
+
+        console.error('[MFA] Import-Fehler:', err);
         res.status(500).json({ error: 'Interner Serverfehler' });
     }
 });

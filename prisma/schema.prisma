@@ -83,6 +83,9 @@ model Tenant {
   auditLogs     AuditLog[]
   authorityLogs AuthorityAuditLog[]
   theme         TenantTheme?
+  practiceEncryptionKeys PracticeEncryptionKey[]
+  secureExportLinks      SecureExportLink[]
+  packageImportLogs      PackageImportLog[]
 
   @@index([subdomain])
   @@index([status])
@@ -244,6 +247,8 @@ model PatientSession {
   // Modul 7: NFC TreatmentFlow
   currentFlowId String?
   flowProgress  PatientFlowProgress?
+  secureExportLinks SecureExportLink[]
+  packageImports    PackageImportLog[]
 
   @@index([tenantId])
   @@index([tenantId, status])
@@ -439,6 +444,69 @@ model AuditLog {
   @@index([tenantId, createdAt])
   @@index([tenantId, action, createdAt])
   @@index([userId, createdAt])
+}
+
+model PracticeEncryptionKey {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  kid                 String  @unique
+  algorithm           String  @default("RSA-OAEP-256")
+  publicKeyPem        String
+  encryptedPrivateKey String
+  encryptionVersion   Int     @default(1)
+  isActive            Boolean @default(true)
+  rotatedAt           DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([tenantId, isActive])
+  @@index([tenantId, createdAt])
+}
+
+model SecureExportLink {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  sessionId String
+  session   PatientSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  packageId          String
+  tokenHash          String @unique
+  recipientEmailHash String?
+  purpose            String   @default("PATIENT_DOWNLOAD")
+  expiresAt          DateTime
+  usedAt             DateTime?
+  usedByIpHash       String?
+  metadata           String?
+  createdAt          DateTime @default(now())
+
+  @@index([tenantId, sessionId, createdAt])
+  @@index([tenantId, expiresAt, usedAt])
+  @@index([tenantId, packageId])
+}
+
+model PackageImportLog {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  sessionId String?
+  session   PatientSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  packageId       String
+  checksum        String
+  importedByUserId String?
+  importStatus    String  @default("COMPLETED")
+  sourceFilename  String?
+  metadata        String?
+  createdAt       DateTime @default(now())
+
+  @@unique([tenantId, packageId])
+  @@index([tenantId, createdAt])
+  @@index([sessionId])
 }
 
 // ─── Authority Audit Log (Behörden & DSGVO Nachweise) ───────

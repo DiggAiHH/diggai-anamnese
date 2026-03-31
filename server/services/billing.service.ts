@@ -4,9 +4,9 @@
 
 import Stripe from 'stripe';
 import { stripe } from '../config/stripe.js';
-import { PrismaClient } from '@prisma/client';
+import { getPrismaClientForDomain } from '../db.js';
 
-const prisma = new PrismaClient();
+const prisma = getPrismaClientForDomain('company');
 
 // ─── Types ─────────────────────────────────────────────────
 

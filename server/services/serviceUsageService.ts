@@ -15,6 +15,8 @@ export type ServiceType =
     | 'PDF_EXPORT'
     | 'CSV_EXPORT'
     | 'JSON_EXPORT'
+    | 'CCD_EXPORT'
+    | 'FHIR_EXPORT'
     | 'PVS_EXPORT'
     | 'REZEPT'
     | 'AU'
@@ -34,6 +36,8 @@ const MANUAL_TIME_ESTIMATES: Record<string, number> = {
     'PDF_EXPORT':    4 * 60 * 1000,   // 4 Min manuell abtippen
     'CSV_EXPORT':    4 * 60 * 1000,   // 4 Min
     'JSON_EXPORT':   4 * 60 * 1000,   // 4 Min
+    'CCD_EXPORT':    5 * 60 * 1000,   // 5 Min (strukturierter Dokumentexport)
+    'FHIR_EXPORT':   5 * 60 * 1000,   // 5 Min (Interoperabilitäts-Export)
     'PVS_EXPORT':    6 * 60 * 1000,   // 6 Min manueller PVS-Import
     'REZEPT':        3 * 60 * 1000,   // 3 Min
     'AU':            4 * 60 * 1000,   // 4 Min

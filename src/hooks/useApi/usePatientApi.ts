@@ -36,8 +36,8 @@ export function useCreateSession() {
     return useMutation({
         mutationFn: (data: CreateSessionPayload) => api.createSession(data),
         onSuccess: (response) => {
-            setAuthToken(null);
-            setSession(response.sessionId, null);
+            setAuthToken(response.token ?? null);
+            setSession(response.sessionId, response.token ?? null);
             setFlowStep('questionnaire');
 
             if (response.nextAtomIds?.length > 0) {

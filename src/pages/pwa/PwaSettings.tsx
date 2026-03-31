@@ -28,15 +28,7 @@ import {
   usePwaSetPin,
 } from '../../hooks/usePatientApi';
 import { usePwaStore } from '../../store/pwaStore';
-
-const LANGUAGES = [
-  { code: 'de', label: 'Deutsch' },
-  { code: 'en', label: 'English' },
-  { code: 'tr', label: 'Türkçe' },
-  { code: 'ar', label: 'العربية' },
-  { code: 'ru', label: 'Русский' },
-  { code: 'uk', label: 'Українська' },
-] as const;
+import { APP_LANGUAGES } from '../../lib/i18n/languages';
 
 type Section = 'profile' | 'notifications' | 'consents' | 'devices' | 'security' | 'language' | null;
 
@@ -450,7 +442,7 @@ export default function PwaSettings() {
         <SectionHeader icon={Globe} label={t('Sprache wechseln')} section="language" color="bg-indigo-100 text-indigo-600" expanded={expanded} onToggle={toggle} />
         {expanded === 'language' && (
           <div className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-sm px-4 py-3 space-y-1 ml-1">
-            {LANGUAGES.map(({ code, label }) => {
+            {APP_LANGUAGES.map(({ code, name }) => {
               const isActive = (settingsData.language ?? 'de') === code;
               return (
                 <button
@@ -461,7 +453,7 @@ export default function PwaSettings() {
                     isActive ? 'bg-sky-50 text-sky-700 font-semibold' : 'text-gray-600 hover:bg-gray-50'
                   }`}
                 >
-                  <span>{label}</span>
+                  <span>{name}</span>
                   {isActive && <Check className="w-4 h-4 text-sky-500" />}
                 </button>
               );

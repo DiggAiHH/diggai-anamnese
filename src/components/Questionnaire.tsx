@@ -21,7 +21,6 @@ import { MedicationManager } from './MedicationManager';
 import { SurgeryManager } from './SurgeryManager';
 import { SchwangerschaftCheck } from './SchwangerschaftCheck';
 import { PDFExport } from './PDFExport';
-import { exportAsEncryptedJSON, downloadBlob, type ExportPayload, type ExportableAnswer } from '../utils/exportUtils';
 import { SubmittedPage } from './SubmittedPage';
 import { PatientWartezimmer } from './PatientWartezimmer';
 import { PatientIdentify } from './inputs/PatientIdentify';
@@ -39,6 +38,7 @@ import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { SessionTimeoutWarning } from './SessionTimeoutWarning';
 import { InfoBreak } from './waiting/InfoBreak';
 import { hapticTap, hapticSelect, hapticSuccess, hapticWarning } from '../utils/haptics';
+import { api } from '../api/client';
 import {
     ClipboardList,
     FilePlus,
@@ -108,7 +108,7 @@ export function Questionnaire() {
     const { t } = useTranslation();
     const store = useSessionStore();
     const { mutate: submitAnswer } = useSubmitAnswer();
-    const { mutate: submitSession } = useSubmitSession();
+    const { mutateAsync: submitSession } = useSubmitSession();
     const { mutateAsync: submitMedicationsAsync } = useSubmitMedications();
     const { mutateAsync: submitSurgeriesAsync } = useSubmitSurgeries();
     const { mutate: submitAccident } = useSubmitAccidentDetails();
@@ -170,6 +170,10 @@ export function Questionnaire() {
         const nachname = state.answers['0001']?.value || '';
         const vorname = state.answers['0011']?.value || '';
         return nachname && vorname ? `${vorname} ${nachname}` : '';
+    }, [state.answers]);
+    const patientEmail = useMemo(() => {
+        const value = state.answers['9010']?.value ?? state.answers['3003']?.value;
+        return typeof value === 'string' && value.includes('@') ? value.trim() : null;
     }, [state.answers]);
 
     // Alter berechnen
@@ -366,42 +370,14 @@ export function Questionnaire() {
             });
         }
 
-        // Letzte Frage → Absenden
+        // Letzte Frage -> Absenden
         if (currentAtomId === '9000') {
-            submitSession();
+            await submitSession();
 
-            // Build encrypted export and auto-download
             try {
-                const exportAnswers: ExportableAnswer[] = Object.entries(answers)
-                    .filter(([id]) => id !== '9000')
-                    .map(([id, a]) => {
-                        const q = allQuestions.find(q => q.id === id);
-                        return {
-                            questionId: id,
-                            questionText: q?.question || id,
-                            section: q?.section || 'unbekannt',
-                            value: Array.isArray(a?.value) ? a.value.join(', ') : String(a?.value ?? ''),
-                            answeredAt: a?.answeredAt ? new Date(a.answeredAt).toISOString() : new Date().toISOString(),
-                        };
-                    });
-
-                const payload: ExportPayload = {
-                    sessionId: useSessionStore.getState().sessionId || 'demo',
-                    exportedAt: new Date().toISOString(),
-                    patientName: patientName || undefined,
-                    answers: exportAnswers,
-                    metadata: { version: '2.0', format: 'json', encrypted: true },
-                };
-
-                const { blob } = await exportAsEncryptedJSON(payload);
-                const refCode = (useSessionStore.getState().sessionId || 'export').slice(0, 8).toUpperCase();
-                downloadBlob(blob, `anamnese-${refCode}-encrypted.json`);
-                if (import.meta.env.DEV) {
-                    // Encryption key logged in dev only – never in production
-                    // console.log('Encrypted export key (keep safe):', keyHex);
-                }
+                if (store.sessionId) await api.requestEncryptedPackage(store.sessionId);
             } catch (err) {
-                console.error('Encryption export failed:', err);
+                console.error('Encrypted package export failed:', err);
             }
 
             setIsSubmitted(true);
@@ -473,6 +449,23 @@ export function Questionnaire() {
         dispatch({ type: 'SET_CURRENT_QUESTION', payload: questionId });
     }, [dispatch]);
 
+    const handleDownloadSecurePackage = useCallback(async () => {
+        if (!store.sessionId) return;
+        await api.requestEncryptedPackage(store.sessionId);
+    }, [store.sessionId]);
+
+    const handleSendPackageLink = useCallback(async () => {
+        if (!store.sessionId) return;
+
+        try {
+            await api.sendPackageLink(store.sessionId, patientEmail || undefined);
+            const { toast } = await import('../store/toastStore');
+            toast.success('Der sichere Download-Link wurde vorbereitet.');
+        } catch (err) {
+            console.error('Package link failed:', err);
+        }
+    }, [patientEmail, store.sessionId]);
+
     // Keyboard shortcuts: Enter=next, Escape=back, 1-9=select option
     useKeyboardShortcuts({
         onNext: handleNext,
@@ -518,6 +511,9 @@ export function Questionnaire() {
                     selectedService={state.selectedReason || ''}
                     onReset={handleReset}
                     onPDF={() => setShowPDF(true)}
+                    onSecurePackage={handleDownloadSecurePackage}
+                    onSendPackageLink={handleSendPackageLink}
+                    canSendPackageLink={Boolean(patientEmail)}
                 />
                 {/* Online Wartezimmer / Waiting Room */}
                 {store.sessionId && store.token && (

@@ -8,6 +8,9 @@ interface SubmittedPageProps {
     selectedService?: string;
     onReset: () => void;
     onPDF: () => void;
+    onSecurePackage: () => void;
+    onSendPackageLink?: () => void;
+    canSendPackageLink?: boolean;
 }
 
 /**
@@ -19,6 +22,9 @@ export const SubmittedPage: React.FC<SubmittedPageProps> = ({
     selectedService,
     onReset,
     onPDF,
+    onSecurePackage,
+    onSendPackageLink,
+    canSendPackageLink = false,
 }) => {
     const { t } = useTranslation();
 
@@ -101,12 +107,28 @@ export const SubmittedPage: React.FC<SubmittedPageProps> = ({
                 {/* Actions */}
                 <div className="flex flex-col sm:flex-row items-center gap-3 justify-center">
                     <button
+                        onClick={onSecurePackage}
+                        className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium transition-all shadow-lg shadow-emerald-600/20"
+                    >
+                        <ShieldCheck className="w-4 h-4" />
+                        {t('Verschlüsselte Datei herunterladen')}
+                    </button>
+                    <button
                         onClick={onPDF}
                         className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-card)] hover:bg-[var(--bg-card-hover)] text-[var(--text-primary)] text-sm font-medium transition-all"
                     >
                         <Download className="w-4 h-4" />
-                        {t('Bericht herunterladen')}
+                        {t('PDF-Bericht herunterladen')}
                     </button>
+                    {canSendPackageLink && onSendPackageLink && (
+                        <button
+                            onClick={onSendPackageLink}
+                            className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-card)] hover:bg-[var(--bg-card-hover)] text-[var(--text-primary)] text-sm font-medium transition-all"
+                        >
+                            <Mail className="w-4 h-4" />
+                            {t('Download-Link per E-Mail')}
+                        </button>
+                    )}
                     <button
                         onClick={onReset}
                         className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium transition-all shadow-lg shadow-blue-600/20"

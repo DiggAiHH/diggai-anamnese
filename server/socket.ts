@@ -4,7 +4,7 @@ import * as jwt from 'jsonwebtoken';
 import { config } from './config';
 import { prisma } from './db';
 import type { AuthPayload } from './middleware/auth';
-import { isTokenBlacklisted } from './middleware/auth';
+import { isTokenBlacklisted, normalizeAuthRole } from './middleware/auth';
 import { sanitizeText } from './services/sanitize';
 
 let io: Server | null = null;
@@ -18,6 +18,30 @@ interface OnlineStaffUser {
     status: 'online' | 'away' | 'busy';
 }
 const onlineStaff: Map<string, OnlineStaffUser> = new Map();
+
+function getSocketToken(socket: Socket): string | null {
+    const directToken = socket.handshake.auth?.token || socket.handshake.query?.token;
+    if (typeof directToken === 'string' && directToken.trim().length > 0) {
+        return directToken;
+    }
+
+    const cookieHeader = socket.handshake.headers.cookie;
+    if (!cookieHeader) {
+        return null;
+    }
+
+    for (const cookie of cookieHeader.split(';')) {
+        const [rawName, ...rawValueParts] = cookie.trim().split('=');
+        if (rawName !== 'access_token') {
+            continue;
+        }
+
+        const rawValue = rawValueParts.join('=');
+        return rawValue ? decodeURIComponent(rawValue) : null;
+    }
+
+    return null;
+}
 
 /**
  * Returns the Socket.io server instance
@@ -63,19 +87,24 @@ export function setupSocketIO(httpServer: HttpServer): Server {
         cors: {
             origin: config.frontendUrl,
             methods: ['GET', 'POST'],
+            credentials: true,
         },
     });
 
     // ─── K-01: WebSocket JWT Auth Middleware ─────────────────────
     io.use(async (socket, next) => {
-        const token = socket.handshake.auth?.token || socket.handshake.query?.token;
-        if (!token || typeof token !== 'string') {
+        const token = getSocketToken(socket);
+        if (!token) {
             return next(new Error('Authentifizierung erforderlich'));
         }
         try {
             const decoded = jwt.verify(token, config.jwtSecret as jwt.Secret, {
                 algorithms: ['HS256'], // Prevent algorithm confusion attacks
             }) as AuthPayload;
+            const normalizedRole = normalizeAuthRole(decoded.role);
+            if (!normalizedRole) {
+                return next(new Error('UngÃ¼ltiger oder abgelaufener Token'));
+            }
 
             // Check token blacklist — same security guarantee as REST endpoints
             if (decoded.jti) {
@@ -85,7 +114,10 @@ export function setupSocketIO(httpServer: HttpServer): Server {
                 }
             }
 
-            (socket as any).auth = decoded;
+            (socket as any).auth = {
+                ...decoded,
+                role: normalizedRole,
+            } satisfies AuthPayload;
             next();
         } catch (_err) {
             return next(new Error('Ungültiger oder abgelaufener Token'));

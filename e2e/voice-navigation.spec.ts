@@ -7,8 +7,8 @@ test.describe('Voice & Keyboard Navigation', () => {
         await waitForIdle(page);
 
         // Current question should be visible
-        const h2 = page.locator('h2').first();
-        await expect(h2).toBeVisible({ timeout: 15000 });
+        const questionHeading = page.locator('h1, h2, h3').first();
+        await expect(questionHeading).toBeVisible({ timeout: 15000 });
 
         // Tab navigation should work
         await page.keyboard.press('Tab');

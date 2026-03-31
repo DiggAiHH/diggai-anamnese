@@ -164,6 +164,19 @@ vi.mock('../db', async () => {
         create: vi.fn(),
         findMany: vi.fn(),
       },
+      practiceEncryptionKey: {
+        findFirst: vi.fn(),
+        create: vi.fn(),
+      },
+      secureExportLink: {
+        create: vi.fn(),
+        findUnique: vi.fn(),
+        updateMany: vi.fn(),
+      },
+      packageImportLog: {
+        findUnique: vi.fn(),
+        create: vi.fn(),
+      },
       user: {
         findUnique: vi.fn(),
         findFirst: vi.fn(),
@@ -228,12 +241,18 @@ vi.mock('bcryptjs', () => ({
 // Security tests need the real implementation
 // Unit tests should mock it locally if needed
 
-// Mock auth middleware
-vi.mock('../middleware/auth', () => ({
-  requireAuth: vi.fn((_req, _res, next) => next()),
-  requireRole: vi.fn(() => vi.fn((_req, _res, next) => next())),
-  requireTenant: vi.fn((_req, _res, next) => next()),
-}));
+// Mock auth middleware wrappers while preserving the real auth helpers.
+// This keeps route tests lightweight without breaking middleware unit tests
+// that need the actual token/permission implementation.
+vi.mock('../middleware/auth', async () => {
+  const actual = await vi.importActual<typeof import('../middleware/auth')>('../middleware/auth');
+  return {
+    ...actual,
+    requireAuth: vi.fn((_req, _res, next) => next()),
+    requireRole: vi.fn(() => vi.fn((_req, _res, next) => next())),
+    requireTenant: vi.fn((_req, _res, next) => next()),
+  };
+});
 
 // Mock CSRF middleware
 vi.mock('../middleware/csrf', () => ({

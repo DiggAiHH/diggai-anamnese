@@ -3,17 +3,11 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Monitor, RefreshCw, QrCode, Wifi, WifiOff, Clock, Users, Globe, ChevronRight, CheckCircle2, AlertCircle } from 'lucide-react';
+import { APP_LANGUAGES, normalizeAppLanguageCode } from '../../lib/i18n/languages';
 
 type KioskView = 'home' | 'checkin' | 'status' | 'success' | 'error';
 
 const INACTIVITY_TIMEOUT = 60_000; // 60s auto-reset
-const LANGUAGES = [
-  { code: 'de', label: 'Deutsch', flag: '🇩🇪' },
-  { code: 'en', label: 'English', flag: '🇬🇧' },
-  { code: 'tr', label: 'Türkçe', flag: '🇹🇷' },
-  { code: 'ar', label: 'العربية', flag: '🇸🇦' },
-  { code: 'ru', label: 'Русский', flag: '🇷🇺' },
-];
 
 interface KioskState {
   view: KioskView;
@@ -33,7 +27,7 @@ export function KioskDashboard() {
     queuePosition: null,
     patientName: '',
     isOnline: navigator.onLine,
-  currentTime: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
+  currentTime: new Date().toLocaleTimeString('de', { hour: '2-digit', minute: '2-digit' }),
   });
   const timerRef = useRef<ReturnType<typeof setTimeout>>(null);
   const clockRef = useRef<ReturnType<typeof setInterval>>(null);
@@ -56,7 +50,7 @@ export function KioskDashboard() {
     clockRef.current = setInterval(() => {
       setState(s => ({
         ...s,
-        currentTime: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
+        currentTime: new Date().toLocaleTimeString(s.language, { hour: '2-digit', minute: '2-digit' }),
         isOnline: navigator.onLine,
       }));
     }, 10_000);
@@ -171,19 +165,19 @@ export function KioskDashboard() {
             </div>
 
             {/* Language Selector */}
-            <div className="flex items-center justify-center gap-3 pt-4">
+            <div className="flex flex-wrap items-center justify-center gap-2 pt-4 max-w-5xl mx-auto">
               <Globe className="w-5 h-5 text-gray-400" />
-              {LANGUAGES.map(lang => (
+              {APP_LANGUAGES.map(lang => (
                 <button
                   key={lang.code}
-                  onClick={() => setState(s => ({ ...s, language: lang.code }))}
-                  className={`px-4 py-2 rounded-lg text-lg transition-all ${
+                  onClick={() => setState(s => ({ ...s, language: normalizeAppLanguageCode(lang.code) }))}
+                  className={`px-3 py-2 rounded-lg text-sm md:text-base transition-all ${
                     state.language === lang.code
                       ? 'bg-blue-600 text-white shadow-md'
                       : 'bg-white text-gray-700 hover:bg-gray-100'
                   }`}
                 >
-                  {lang.flag} {lang.label}
+                  {lang.flag} {lang.name}
                 </button>
               ))}
             </div>

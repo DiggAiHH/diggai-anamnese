@@ -1,0 +1,134 @@
+version: '3.9'
+
+services:
+  # ─── Practice Backend + DB (lokale Praxisprozesse) ───────────────
+  postgres-practice:
+    image: postgres:16-alpine
+    container_name: diggai-postgres-practice
+    environment:
+      POSTGRES_DB: anamnese_practice
+      POSTGRES_USER: diggai
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-diggai_dev}
+    volumes:
+      - pgdata_practice:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U diggai -d anamnese_practice"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - diggai-tri-network
+
+  app-practice:
+    build: .
+    container_name: diggai-app-practice
+    env_file: .env
+    environment:
+      - BACKEND_PROFILE=practice
+      - ROUTE_DOMAIN_ISOLATION=true
+      - STRICT_DOMAIN_DB_ROUTING=true
+      - DATABASE_URL=postgresql://diggai:${POSTGRES_PASSWORD:-diggai_dev}@postgres-practice:5432/anamnese_practice
+      - DATABASE_URL_PRACTICE=postgresql://diggai:${POSTGRES_PASSWORD:-diggai_dev}@postgres-practice:5432/anamnese_practice
+      - DATABASE_URL_COMPANY=postgresql://blocked:blocked@127.0.0.1:1/blocked
+      - DATABASE_URL_AUTHORITY=postgresql://blocked:blocked@127.0.0.1:1/blocked
+    ports:
+      - "3101:3001"
+    depends_on:
+      postgres-practice:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - diggai-tri-network
+
+  # ─── Company Backend + DB (interne Verwaltung/Billing) ───────────
+  postgres-company:
+    image: postgres:16-alpine
+    container_name: diggai-postgres-company
+    environment:
+      POSTGRES_DB: anamnese_company
+      POSTGRES_USER: diggai
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-diggai_dev}
+    volumes:
+      - pgdata_company:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U diggai -d anamnese_company"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - diggai-tri-network
+
+  app-company:
+    build: .
+    container_name: diggai-app-company
+    env_file: .env
+    environment:
+      - BACKEND_PROFILE=company
+      - ROUTE_DOMAIN_ISOLATION=true
+      - STRICT_DOMAIN_DB_ROUTING=true
+      - DATABASE_URL=postgresql://diggai:${POSTGRES_PASSWORD:-diggai_dev}@postgres-company:5432/anamnese_company
+      - DATABASE_URL_PRACTICE=postgresql://blocked:blocked@127.0.0.1:1/blocked
+      - DATABASE_URL_COMPANY=postgresql://diggai:${POSTGRES_PASSWORD:-diggai_dev}@postgres-company:5432/anamnese_company
+      - DATABASE_URL_AUTHORITY=postgresql://blocked:blocked@127.0.0.1:1/blocked
+    ports:
+      - "3201:3001"
+    depends_on:
+      postgres-company:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - diggai-tri-network
+
+  # ─── Authority Backend + DB (Export/Behörden/Gematik/ePA) ───────
+  postgres-authority:
+    image: postgres:16-alpine
+    container_name: diggai-postgres-authority
+    environment:
+      POSTGRES_DB: anamnese_authority
+      POSTGRES_USER: diggai
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-diggai_dev}
+    volumes:
+      - pgdata_authority:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U diggai -d anamnese_authority"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - diggai-tri-network
+
+  app-authority:
+    build: .
+    container_name: diggai-app-authority
+    env_file: .env
+    environment:
+      - BACKEND_PROFILE=authority
+      - ROUTE_DOMAIN_ISOLATION=true
+      - STRICT_DOMAIN_DB_ROUTING=true
+      - DATABASE_URL=postgresql://diggai:${POSTGRES_PASSWORD:-diggai_dev}@postgres-authority:5432/anamnese_authority
+      - DATABASE_URL_PRACTICE=postgresql://blocked:blocked@127.0.0.1:1/blocked
+      - DATABASE_URL_COMPANY=postgresql://blocked:blocked@127.0.0.1:1/blocked
+      - DATABASE_URL_AUTHORITY=postgresql://diggai:${POSTGRES_PASSWORD:-diggai_dev}@postgres-authority:5432/anamnese_authority
+    ports:
+      - "3301:3001"
+    depends_on:
+      postgres-authority:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - diggai-tri-network
+
+volumes:
+  pgdata_practice:
+    driver: local
+  pgdata_company:
+    driver: local
+  pgdata_authority:
+    driver: local
+
+networks:
+  diggai-tri-network:
+    driver: bridge

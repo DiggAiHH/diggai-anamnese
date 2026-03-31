@@ -16,10 +16,10 @@ import {
   handleWebhookEvent
 } from '../services/billing.service.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
-import { PrismaClient } from '@prisma/client';
+import { getPrismaClientForDomain } from '../db.js';
 
 const router = Router();
-const prisma = new PrismaClient();
+const prisma = getPrismaClientForDomain('company');
 
 // ─── Schemas ───────────────────────────────────────────────
 
@@ -150,11 +150,19 @@ router.post('/subscription', requireAuth, async (req: Request, res: Response) =>
     }
 
     res.status(201).json(result);
-  } catch (error: any) {
+  } catch (error: unknown) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        error: 'Invalid subscription payload',
+        details: error.flatten()
+      });
+    }
+
+    const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('[Billing] Create subscription error:', error);
     res.status(500).json({
       error: 'Failed to create subscription',
-      message: error.message
+      message
     });
   }
 });

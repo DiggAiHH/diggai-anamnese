@@ -1411,6 +1411,8 @@
   "admin.content_priority": "Priorität",
   "admin.content_seasonal": "Saisonal",
   "admin.content_seed": "Initialdaten laden",
+  "admin.content_language": "Sprache",
+  "admin.content_item_title": "Titel",
   "admin.content_title": "Wartezeit-Inhalte",
   "admin.content_type": "Typ",
   "admin.content_views": "Aufrufe",

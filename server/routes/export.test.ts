@@ -84,6 +84,8 @@ describe('export route query-token hardening', () => {
     '/sessions/:id/export/csv',
     '/sessions/:id/export/pdf',
     '/sessions/:id/export/json',
+    '/sessions/:id/export/ccd',
+    '/sessions/:id/export/fhir',
   ] as const;
 
   function getQueryGuard(path: (typeof guardedRoutes)[number]) {
@@ -95,6 +97,13 @@ describe('export route query-token hardening', () => {
 
   it('protects CSV export with staff auth chain', () => {
     const handlers = getRouteHandlers('/sessions/:id/export/csv', 'get');
+    expect(handlers).toContain(middlewareMocks.requireAuth);
+    expect(handlers).toContain(middlewareMocks.requireRole);
+    expect(middlewareMocks.requireRoleFactory).toHaveBeenCalledWith('arzt', 'admin', 'mfa');
+  });
+
+  it('protects CCD export with staff auth chain', () => {
+    const handlers = getRouteHandlers('/sessions/:id/export/ccd', 'get');
     expect(handlers).toContain(middlewareMocks.requireAuth);
     expect(handlers).toContain(middlewareMocks.requireRole);
     expect(middlewareMocks.requireRoleFactory).toHaveBeenCalledWith('arzt', 'admin', 'mfa');
@@ -282,6 +291,75 @@ describe('export route query-token hardening', () => {
     const metadata = typeof metadataRaw === 'string' ? JSON.parse(metadataRaw) : metadataRaw;
     expect(metadata).not.toHaveProperty('patientName');
     expect(metadata).toMatchObject({ format: 'csv', sessionId: 's1' });
+  });
+
+  it('exports CCD XML with triage section and dedicated audit action', async () => {
+    vi.mocked(prisma.auditLog.create).mockReset();
+    vi.mocked(prisma.patientSession.findUnique).mockResolvedValue({
+      id: 's-ccd',
+      tenantId: 'tenant-a',
+      encryptedName: 'Max Mustermann',
+      gender: 'M',
+      birthDate: new Date('1988-09-20'),
+      insuranceType: 'GKV',
+      selectedService: 'AKUT',
+      status: 'ACTIVE',
+      createdAt: new Date('2026-03-30T09:00:00.000Z'),
+      answers: [
+        {
+          atomId: '1002',
+          value: 'Kopfschmerzen',
+          encryptedValue: null,
+          answeredAt: new Date('2026-03-30T09:05:00.000Z'),
+        },
+      ],
+      triageEvents: [
+        {
+          level: 'CRITICAL',
+          message: 'Sofortige Abklärung notwendig',
+          atomId: '1002',
+          createdAt: new Date('2026-03-30T09:06:00.000Z'),
+        },
+      ],
+    } as never);
+    vi.mocked(prisma.medicalAtom.findMany).mockResolvedValue([
+      {
+        id: '1002',
+        questionText: 'Wo haben Sie Beschwerden?',
+        section: 'beschwerden',
+      },
+    ] as never);
+    vi.mocked(prisma.auditLog.create).mockResolvedValue({} as never);
+
+    const handlers = getRouteHandlers('/sessions/:id/export/ccd', 'get');
+    const ccdHandler = handlers[handlers.length - 1] as (req: unknown, res: unknown) => Promise<void>;
+
+    const req = {
+      params: { id: 's-ccd' },
+      auth: { userId: 'u1', role: 'arzt', tenantId: 'tenant-a' },
+      query: {},
+    };
+    const res = createMockResponse();
+
+    await ccdHandler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    const contentType = res.headers.get('content-type');
+    expect(contentType).toBe('application/xml; charset=utf-8');
+
+    const body = String(res.body);
+    expect(body).toContain('<ClinicalDocument');
+    expect(body).toContain('<title>DiggAI Anamnese CCD Export</title>');
+    expect(body).toContain('Sofortige Abklärung notwendig');
+
+    expect(prisma.auditLog.create).toHaveBeenCalled();
+    const auditPayload = vi.mocked(prisma.auditLog.create).mock.calls[0]?.[0]?.data;
+    expect(auditPayload?.action).toBe('EXPORT_CCD');
+
+    const metadata = typeof auditPayload?.metadata === 'string'
+      ? JSON.parse(auditPayload.metadata)
+      : auditPayload?.metadata;
+    expect(metadata).toMatchObject({ format: 'ccd-cda', sessionId: 's-ccd' });
   });
 });
 

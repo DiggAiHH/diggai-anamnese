@@ -86,7 +86,9 @@ export const PatientWartezimmer: React.FC<PatientWartezimmerProps> = ({
   // Socket.IO for real-time updates
   useEffect(() => {
     const socket = io(SOCKET_BASE_URL || window.location.origin, {
-      auth: { token }
+      auth: token ? { token } : undefined,
+      withCredentials: true,
+      transports: ['websocket', 'polling'],
     });
     socketRef.current = socket;
 

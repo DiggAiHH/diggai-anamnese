@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { waitForIdle } from './helpers/test-utils';
 
 test.describe('Internationalization (i18n)', () => {
-    const locales = ['de', 'en', 'tr', 'ar', 'es', 'fr'];
+    const locales = ['de', 'en', 'ar', 'tr', 'uk', 'es', 'fa', 'it', 'fr', 'pl', 'ru', 'ro', 'bg'];
 
     for (const locale of locales) {
         test(`loads ${locale} locale without errors`, async ({ page }) => {
@@ -29,14 +29,21 @@ test.describe('Internationalization (i18n)', () => {
         await waitForIdle(page);
 
         // Find language selector
-        const langSelector = page.locator('select').filter({ hasText: /Deutsch|English/i }).first();
+        const langSelector = page.locator('[data-testid="language-selector"]').first();
         if (await langSelector.isVisible().catch(() => false)) {
+            await langSelector.click();
+
+            const englishOption = page.locator('button').filter({ hasText: /English/i }).first();
+            if (!await englishOption.isVisible().catch(() => false)) {
+                return;
+            }
+
             // Switch to English
-            await langSelector.selectOption('en');
+            await englishOption.click();
             await waitForIdle(page);
 
             // Some text should now be in English
-            const englishText = page.locator('text=/privacy|consent|welcome/i').first();
+            const englishText = page.locator('text=/privacy|consent|welcome|appointment/i').first();
             const isEnglish = await englishText.isVisible().catch(() => false);
             // May or may not switch immediately depending on implementation
             expect(typeof isEnglish).toBe('boolean');

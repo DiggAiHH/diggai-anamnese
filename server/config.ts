@@ -1,6 +1,11 @@
 import * as dotenv from 'dotenv';
 dotenv.config();
 
+export type BackendDomain = 'practice' | 'company' | 'authority';
+export type BackendProfile = BackendDomain | 'monolith';
+
+const BACKEND_DOMAINS: BackendDomain[] = ['practice', 'company', 'authority'];
+
 const requireEnv = (key: string, customMessage?: string): string => {
     const value = process.env[key];
     if (!value) {
@@ -31,6 +36,22 @@ const assertNotDefault = (value: string, forbiddenValues: string[], errorMessage
     return value;
 };
 
+const normalizeBackendProfile = (value: string | undefined): BackendProfile => {
+    const normalized = (value || 'monolith').trim().toLowerCase();
+    if (normalized === 'monolith' || normalized === 'practice' || normalized === 'company' || normalized === 'authority') {
+        return normalized;
+    }
+
+    throw new Error(`Ungültiges BACKEND_PROFILE "${value}". Erlaubte Werte: monolith | practice | company | authority`);
+};
+
+const resolveEnabledDomains = (profile: BackendProfile, strictDomainRouting: boolean): BackendDomain[] => {
+    if (profile === 'monolith') {
+        return strictDomainRouting ? [...BACKEND_DOMAINS] : ['practice'];
+    }
+    return [profile];
+};
+
 const isProduction = (process.env.NODE_ENV || 'development') === 'production';
 
 const jwtSecret = assertMinLength(
@@ -54,13 +75,64 @@ const arztDefaultPassword = isProduction
     )
     : arztDefaultPasswordRaw;
 
+const backendProfile = normalizeBackendProfile(process.env.BACKEND_PROFILE);
+const strictDomainDatabaseRouting = process.env.STRICT_DOMAIN_DB_ROUTING === 'true' || backendProfile !== 'monolith';
+const enabledDatabaseDomains = resolveEnabledDomains(backendProfile, strictDomainDatabaseRouting);
+
+const fallbackDatabaseUrl = process.env.DATABASE_URL;
+const practiceDatabaseUrl = process.env.DATABASE_URL_PRACTICE || process.env.DATABASE_URL_BACKEND_1 || fallbackDatabaseUrl;
+
+if (!practiceDatabaseUrl) {
+    throw new Error('Fehlende Datenbank-Verbindung: Setze DATABASE_URL oder DATABASE_URL_PRACTICE (oder DATABASE_URL_BACKEND_1).');
+}
+
+const companyDatabaseUrl =
+    process.env.DATABASE_URL_COMPANY ||
+    process.env.DATABASE_URL_BACKEND_2 ||
+    fallbackDatabaseUrl ||
+    practiceDatabaseUrl;
+
+const authorityDatabaseUrl =
+    process.env.DATABASE_URL_AUTHORITY ||
+    process.env.DATABASE_URL_BACKEND_3 ||
+    fallbackDatabaseUrl ||
+    practiceDatabaseUrl;
+
+if (strictDomainDatabaseRouting && backendProfile === 'company' && !process.env.DATABASE_URL_COMPANY && !process.env.DATABASE_URL_BACKEND_2) {
+    throw new Error('BACKEND_PROFILE=company erfordert DATABASE_URL_COMPANY (oder DATABASE_URL_BACKEND_2).');
+}
+
+if (strictDomainDatabaseRouting && backendProfile === 'authority' && !process.env.DATABASE_URL_AUTHORITY && !process.env.DATABASE_URL_BACKEND_3) {
+    throw new Error('BACKEND_PROFILE=authority erfordert DATABASE_URL_AUTHORITY (oder DATABASE_URL_BACKEND_3).');
+}
+
+if (strictDomainDatabaseRouting && backendProfile === 'monolith') {
+    const missingSplitDomains: string[] = [];
+    if (!process.env.DATABASE_URL_PRACTICE && !process.env.DATABASE_URL_BACKEND_1) missingSplitDomains.push('DATABASE_URL_PRACTICE');
+    if (!process.env.DATABASE_URL_COMPANY && !process.env.DATABASE_URL_BACKEND_2) missingSplitDomains.push('DATABASE_URL_COMPANY');
+    if (!process.env.DATABASE_URL_AUTHORITY && !process.env.DATABASE_URL_BACKEND_3) missingSplitDomains.push('DATABASE_URL_AUTHORITY');
+
+    if (missingSplitDomains.length > 0) {
+        throw new Error(`STRICT_DOMAIN_DB_ROUTING=true erfordert explizite Domänen-URLs: ${missingSplitDomains.join(', ')}`);
+    }
+}
+
 export const config = {
     // Server
     port: parseInt(process.env.PORT || '3001', 10),
     nodeEnv: process.env.NODE_ENV || 'development',
+    backendProfile,
+    enabledDatabaseDomains,
+    strictDomainDatabaseRouting,
+    enforceRouteDomainIsolation: process.env.ROUTE_DOMAIN_ISOLATION === 'true',
 
     // Datenbank
-    databaseUrl: requireEnv('DATABASE_URL', 'Fehlende Datenbank-Verbindung in .env (DATABASE_URL)'),
+    databaseUrl: practiceDatabaseUrl,
+    databaseUrlsByDomain: {
+        practice: practiceDatabaseUrl,
+        company: companyDatabaseUrl,
+        authority: authorityDatabaseUrl,
+    } as Record<BackendDomain, string>,
 
     // JWT
     jwtSecret,
@@ -72,6 +144,7 @@ export const config = {
 
     // CORS
     frontendUrl: requireEnv('FRONTEND_URL', 'Fehlende Frontend-Verbindung in .env (FRONTEND_URL)'),
+    apiPublicUrl: process.env.API_PUBLIC_URL || '',
 
     // Redis (Token Blacklist + Queue Persistence)
     redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
