@@ -604,6 +604,7 @@ export const MFADashboard: React.FC = React.memo(function MFADashboard() {
 
     // Memoize tab content — must be before early return (Rules of Hooks)
     const tabContent = useMemo(() => {
+        if (!staffUser) return null;
         switch (activeTab) {
             case 'sessions':
                 return (

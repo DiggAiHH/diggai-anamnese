@@ -826,6 +826,7 @@ export const ArztDashboard: React.FC = React.memo(function ArztDashboard() {
 
     // Memoize tab content — must be before early return (Rules of Hooks)
     const tabContent = useMemo(() => {
+        if (!staffUser || !token) return null;
         switch (activeTab) {
             case 'patients':
                 return selectedSessionId ? (
