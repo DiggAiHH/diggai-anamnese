@@ -16,7 +16,7 @@ jobs:
 
       - name: Install migration dependencies only
         run: |
-          npm install prisma@^6.19.2 @prisma/client@^6.19.2 tsx@^4.21.0 dotenv@^17.3.1 bcryptjs@^3.0.3 @types/bcryptjs --no-save
+          npm install prisma@^6.19.2 @prisma/client@^6.19.2 tsx@^4.21.0 dotenv@^17.3.1 bcryptjs@^3.0.3 @types/bcryptjs --no-save --legacy-peer-deps
 
       - name: Run production migration
         env:
