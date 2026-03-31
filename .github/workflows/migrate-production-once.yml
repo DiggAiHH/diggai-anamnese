@@ -18,6 +18,22 @@ jobs:
         run: |
           npm install prisma@^6.19.2 @prisma/client@^6.19.2 tsx@^4.21.0 dotenv@^17.3.1 bcryptjs@^3.0.3 @types/bcryptjs --no-save --legacy-peer-deps
 
+      - name: Test database connectivity
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_MIGRATION }}
+        run: |
+          echo "=== Connectivity Diagnostics ==="
+          # Extract host and port from DATABASE_URL
+          DB_HOST=$(echo "$DATABASE_URL" | sed -E 's|.*@([^:/]+):([0-9]+)/.*|\1|')
+          DB_PORT=$(echo "$DATABASE_URL" | sed -E 's|.*@([^:/]+):([0-9]+)/.*|\2|')
+          echo "Host: $DB_HOST"
+          echo "Port: $DB_PORT"
+          echo "DNS resolution:"
+          nslookup "$DB_HOST" || true
+          echo "TCP connectivity (nc):"
+          nc -zv -w 5 "$DB_HOST" "$DB_PORT" 2>&1 || echo "TCP FAILED"
+          echo "=== End Diagnostics ==="
+
       - name: Run production migration
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL_MIGRATION }}
