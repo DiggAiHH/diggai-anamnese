@@ -28,7 +28,7 @@ RUN apk add --no-cache tini wget
 
 # Copy production node_modules
 COPY package*.json ./
-RUN npm ci --omit=dev && npm install tsx
+RUN npm ci --omit=dev && npm install tsx bcryptjs
 
 # Copy Prisma schema + generated client
 COPY --from=builder /app/prisma ./prisma
@@ -51,4 +51,4 @@ HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
   CMD wget -qO- http://localhost:3001/api/health || exit 1
 
 ENTRYPOINT ["/sbin/tini", "--"]
-CMD ["node", "--import", "tsx", "server/index.ts"]
+CMD ["sh", "-c", "npx prisma db push --accept-data-loss && (npx prisma db seed || echo 'Seed skipped, continuing...') && node --import tsx server/index.ts"]
