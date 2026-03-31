@@ -1,55 +1,77 @@
 [build]
   command = "npm run build"
   publish = "dist"
-  # functions disabled — backend runs on Docker VPS, not Netlify Functions
+  # Backend runs on Railway — Netlify Functions not used
   functions = "netlify/no-functions-placeholder"
 
 [build.environment]
   NODE_VERSION = "20"
   NETLIFY_SITE_ID = "aeb2a8e2-e8ac-47e0-a5bc-fef4df4aceaa"
-  # IMPORTANT: Override VITE_API_URL in Netlify Dashboard > Site configuration > Environment variables
-  # Pilot (Railway):  https://YOUR_PROJECT.up.railway.app/api
-  # Pilot (Render):   https://anamnese-backend.onrender.com/api
-  # Production:       https://api.diggai.de/api
-  VITE_API_URL = "https://REPLACE_WITH_BACKEND_URL/api"
+  # VITE_API_URL is injected per-context below.
+  # Override in Netlify Dashboard > Site configuration > Environment variables
+  # if you want to test a branch against a specific backend.
 
-# ─── DSGVO/BSI Security Headers (Section 2.2) ───────────────
+# ─── Production context (main branch only) ──────────────────────────────────
+[context.production]
+  command = "npm run build"
+
+[context.production.environment]
+  # ACTION REQUIRED: Set this in Netlify Dashboard > Environment variables
+  # to your Railway production URL (after Railway deploy).
+  # Format: https://YOUR_PROJECT.up.railway.app/api
+  VITE_API_URL = "https://REPLACE_WITH_RAILWAY_URL/api"
+
+# ─── Branch deploy context (disabled in Dashboard — defined here for safety) ─
+# To disable branch deploys: Netlify Dashboard > Site configuration >
+#   Build & deploy > Branches and deploy contexts > Branch deploys = "None"
+[context.branch-deploy]
+  command = "echo 'Branch deploys are disabled for production.' && exit 1"
+
+# ─── DSGVO/BSI Security Headers ─────────────────────────────────────────────
 [[headers]]
   for = "/*"
   [headers.values]
-    # HSTS — BSI TR-02102: 1 Jahr, includeSubDomains, preload
+    # HSTS — BSI TR-02102: 1 year, includeSubDomains, preload
     Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
-    # Clickjacking-Schutz
     X-Frame-Options = "DENY"
-    # MIME-Sniffing-Schutz
     X-Content-Type-Options = "nosniff"
-    # Referrer-Policy — verhindert Datenleck über Referer-Header
     Referrer-Policy = "strict-origin-when-cross-origin"
-    # Permissions-Policy — Kamera + Mikrofon für Videosprechstunde (self), Rest gesperrt
+    # Kamera + Mikrofon für Videosprechstunde (self), rest gesperrt
     Permissions-Policy = "camera=(self), microphone=(self), geolocation=(), payment=()"
-    # CSP — 'unsafe-eval' required for lottie-web (uses eval() for animation expressions)
+    # CSP — unsafe-eval required for lottie-web animation expressions
     Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://*.netlify.app wss://*.netlify.app https://api.diggai.de wss://api.diggai.de https://api-takios.diggai.de wss://api-takios.diggai.de https://*.up.railway.app wss://*.up.railway.app https://*.onrender.com wss://*.onrender.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self';"
-    # XSS-Protection deaktiviert (CSP ist zuständig, alter Header kann Bugs verursachen)
+    # XSS-Protection off — CSP handles this; old header can trigger bugs
     X-XSS-Protection = "0"
-    # Cross-Origin-Embedder-Policy (credentialless allows external resources like Google Fonts)
     Cross-Origin-Embedder-Policy = "credentialless"
-    # Cross-Origin-Opener-Policy
     Cross-Origin-Opener-Policy = "same-origin"
-    # Cross-Origin-Resource-Policy
     Cross-Origin-Resource-Policy = "same-origin"
 
-# Cache-Control für statische Assets (immutable hashes)
+# Immutable assets — hashed filenames, 1-year cache
 [[headers]]
   for = "/assets/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
-# Kein Cache für HTML (SPA entry point)
+# Service Worker — never cache (must always be fresh for updates)
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+    Service-Worker-Allowed = "/"
+
+# SPA entry point — no cache (gets latest index.html on every load)
 [[headers]]
   for = "/index.html"
   [headers.values]
     Cache-Control = "no-cache, no-store, must-revalidate"
 
+# Locale JSON files — short-lived cache (10 min) to allow i18n hotfixes
+[[headers]]
+  for = "/locales/*"
+  [headers.values]
+    Cache-Control = "public, max-age=600, stale-while-revalidate=86400"
+
+# SPA fallback — all unmatched paths serve index.html
 [[redirects]]
   from = "/*"
   to = "/index.html"

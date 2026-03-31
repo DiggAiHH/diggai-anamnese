@@ -2,30 +2,54 @@
 # Docs: https://docs.railway.app/reference/config-as-code
 
 [build]
-# Railway auto-detects the Dockerfile in the project root
+# Railway auto-detects the multi-stage Dockerfile in anamnese-app/
 
 [deploy]
+# Health check — Express /api/health returns { status: "ok", ... }
 healthcheckPath = "/api/health"
 healthcheckTimeout = 30
+
+# Restart policy: restart on failure, max 10 retries before marking degraded
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10
 
-# Required environment variables — set these in Railway Dashboard > Variables:
+# Horizontal scaling — requires Railway Pro plan
+# Set to 1 for Hobby plan; 2+ for Pro production
+numReplicas = 2
+
+# ─── Required Environment Variables ──────────────────────────────────────────
+# Set ALL of these in Railway Dashboard > Your Service > Variables
+# Copy values from anamnese-app/.env.production (never commit that file)
 #
-#   DATABASE_URL          = postgresql://prisma:PASSWORD@db.xxxx.supabase.co:5432/postgres
-#   JWT_SECRET            = <min 32 chars random string>
-#   ENCRYPTION_KEY        = <exactly 32 chars>
-#   FRONTEND_URL          = https://diggai-drklaproth.netlify.app
-#   API_PUBLIC_URL        = https://YOUR_PROJECT.up.railway.app/api
-#   ARZT_PASSWORD         = <strong password for seeded doctor user>
 #   NODE_ENV              = production
 #   PORT                  = 3001
 #   BACKEND_PROFILE       = monolith
 #   LOG_LEVEL             = info
+#   APP_VERSION           = 3.0.0
 #
-# Optional (graceful degradation without these):
-#   REDIS_URL             = redis://...
-#   SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASS / SMTP_FROM
-#   VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY
-#   OPENAI_API_KEY
-#   SENTRY_DSN
+#   DATABASE_URL          = postgresql://postgres.[REF]:[PW]@aws-0-eu-central-1.pooler.supabase.com:5432/postgres
+#   JWT_SECRET            = (64-char hex — from .env.production)
+#   ENCRYPTION_KEY        = (exactly 32 chars — from .env.production)
+#   ARZT_PASSWORD         = (strong password — from .env.production)
+#
+#   FRONTEND_URL          = https://diggai-drklaproth.netlify.app
+#   API_PUBLIC_URL        = https://YOUR_PROJECT.up.railway.app/api  (fill after first deploy)
+#
+#   VAPID_PUBLIC_KEY      = (from .env.production)
+#   VAPID_PRIVATE_KEY     = (from .env.production)
+#
+# ─── Optional Variables (graceful degradation without them) ─────────────────
+#
+#   SENTRY_DSN            = https://...@sentry.io/...  (error tracking)
+#   REDIS_URL             = redis://default:PW@HOST:PORT  (session cache)
+#   SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASS / SMTP_FROM  (email)
+#   OPENAI_API_KEY        = sk-...  (LLM — falls back to rule-based)
+#   STRIPE_SECRET_KEY / STRIPE_WEBHOOK_SECRET  (billing — PAYMENT_ENABLED=false)
+#
+# ─── Feature Flags (all off by default — enable per-tenant via AdminDashboard) ─
+#
+#   NFC_ENABLED           = false
+#   PAYMENT_ENABLED       = false
+#   TELEMED_ENABLED       = false
+#   TI_ENABLED            = false
+#   EPA_ENABLED           = false
