@@ -1,0 +1,31 @@
+name: Migrate Production DB (one-time)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: anamnese-app
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: anamnese-app/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run production migration
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_MIGRATION }}
+          ARZT_PASSWORD: ${{ secrets.ARZT_PASSWORD }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
+        run: bash scripts/migrate-production.sh
