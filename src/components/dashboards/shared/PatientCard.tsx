@@ -72,6 +72,10 @@ export const PatientCard: React.FC<PatientCardProps> = ({
     <div
       ref={setNodeRef}
       style={style}
+      data-testid="patient-card"
+      data-patient-id={patient.id}
+      data-triage={patient.triageLevel}
+      data-status={patient.status}
       className={cn(
         'group relative bg-white/5 border border-white/10 rounded-xl p-3',
         'hover:bg-white/[0.07] hover:border-white/20',
@@ -210,6 +214,11 @@ export const PatientListItem: React.FC<{
   selected?: boolean;
   className?: string;
 }> = ({ patient, viewMode = 'privacy', onClick, selected = false, className }) => {
+  const [isRevealed, setIsRevealed] = useState(false);
+  
+  const displayName = viewMode === 'full' || isRevealed
+    ? patient.patientName
+    : patient.displayName;
   const [isRevealed, setIsRevealed] = useState(false);
   
   const displayName = viewMode === 'full' || isRevealed

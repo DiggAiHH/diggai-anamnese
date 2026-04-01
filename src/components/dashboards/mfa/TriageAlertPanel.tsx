@@ -96,6 +96,7 @@ export const TriageAlertPanel: React.FC<TriageAlertPanelProps> = ({
 
   return (
     <div
+      data-testid="triage-alert-panel"
       className={cn(
         'bg-red-500/10 border border-red-500/30 rounded-xl overflow-hidden',
         className

@@ -128,6 +128,7 @@ export const MfaKanbanBoard: React.FC<MfaKanbanBoardProps> = ({ className }) => 
       onDragEnd={handleDragEnd}
     >
       <div
+        data-testid="kanban-board"
         className={cn(
           'grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 h-full min-h-[500px]',
           className
