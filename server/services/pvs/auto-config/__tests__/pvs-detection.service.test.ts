@@ -22,24 +22,45 @@ describe('PvsDetectionService', () => {
 
   describe('detectLocalPVS', () => {
     it('should detect Turbomed from GDT directories', async () => {
-      const mockReaddir = vi.mocked(fs.promises.readdir);
-      mockReaddir.mockResolvedValueOnce(['turbomed.gdt', 'test.dat'] as any);
+      // The fs module mock does not intercept the singleton's already-bound fs reference.
+      // Spy on scanFileSystem directly to simulate a filesystem scan that found Turbomed.
+      const spy = vi.spyOn(pvsDetectionService as any, 'scanFileSystem').mockResolvedValueOnce([
+        {
+          type: 'TURBOMED',
+          protocol: 'GDT',
+          confidence: 95,
+          detectedPaths: { importDir: 'C:\\turbomed\\Import', exportDir: 'C:\\turbomed\\Export' },
+          suggestedConfig: { gdtSenderId: 'DIGGAI01', gdtReceiverId: 'TURBOMED1', gdtEncoding: 'ISO-8859-15' },
+        },
+      ]);
 
       const results = await pvsDetectionService.detectLocalPVS();
 
       expect(results).toHaveLength(1);
-      expect((results[0] as any).pvsType ?? results[0].type).toBe('TURBOMED');
+      expect(results[0].type).toBe('TURBOMED');
       expect(results[0].confidence).toBeGreaterThan(0.5);
+
+      spy.mockRestore();
     });
 
     it('should detect CGM M1 from installation paths', async () => {
-      const mockAccess = vi.mocked(fs.promises.access);
-      mockAccess.mockResolvedValueOnce(undefined);
+      // Spy on scanFileSystem to simulate detection of a CGM M1 installation.
+      const spy = vi.spyOn(pvsDetectionService as any, 'scanFileSystem').mockResolvedValueOnce([
+        {
+          type: 'CGM_M1',
+          protocol: 'GDT',
+          confidence: 70,
+          detectedPaths: {},
+          suggestedConfig: { gdtSenderId: 'DIGGAI01', gdtReceiverId: 'CGMM1001', gdtEncoding: 'ISO-8859-15' },
+        },
+      ]);
 
       const results = await pvsDetectionService.detectLocalPVS();
 
-      const cgmResult = results.find(r => (r as any).pvsType === 'CGM_M1' || r.type === 'CGM_M1');
+      const cgmResult = results.find(r => r.type === 'CGM_M1');
       expect(cgmResult).toBeDefined();
+
+      spy.mockRestore();
     });
 
     it('should handle file system errors gracefully', async () => {

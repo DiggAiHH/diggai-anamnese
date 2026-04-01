@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const middlewareMocks = vi.hoisted(() => ({
   requireAuth: vi.fn((_req, _res, next) => next()),
@@ -89,7 +89,14 @@ function createMockResponse() {
   return response;
 }
 
+// Capture requireRoleFactory call args at module load time (before clearAllMocks runs)
+let requireRoleFactoryCalls: unknown[][] = [];
+
 describe('patients routes', () => {
+  beforeAll(() => {
+    requireRoleFactoryCalls = middlewareMocks.requireRoleFactory.mock.calls.map((c) => [...c]);
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -297,6 +304,7 @@ describe('patients routes', () => {
         auth: { sessionId: validUUID('session-1'), role: 'mfa' },
         tenantId: 'tenant-1',
         ip: '127.0.0.1',
+        headers: { 'user-agent': 'Test-Agent/1.0' },
       };
       const res = createMockResponse();
 
@@ -310,7 +318,7 @@ describe('patients routes', () => {
       const handlers = getRouteHandlers('/:id/pattern', 'post');
       expect(handlers).toContain(middlewareMocks.requireAuth);
       expect(handlers).toContain(middlewareMocks.requireRole);
-      expect(middlewareMocks.requireRoleFactory).toHaveBeenCalledWith('mfa', 'admin');
+      expect(requireRoleFactoryCalls).toContainEqual(['mfa', 'admin']);
     });
   });
 
@@ -340,6 +348,7 @@ describe('patients routes', () => {
         auth: { sessionId: validUUID('session-1'), role: 'mfa', tenantId: 'tenant-1' },
         tenantId: 'tenant-1',
         ip: '127.0.0.1',
+        headers: { 'user-agent': 'Test-Agent/1.0' },
       };
       const res = createMockResponse();
 
@@ -375,7 +384,7 @@ describe('patients routes', () => {
       const handlers = getRouteHandlers('/:sessionId/certify', 'post');
       expect(handlers).toContain(middlewareMocks.requireAuth);
       expect(handlers).toContain(middlewareMocks.requireRole);
-      expect(middlewareMocks.requireRoleFactory).toHaveBeenCalledWith('mfa', 'admin', 'arzt');
+      expect(requireRoleFactoryCalls).toContainEqual(['mfa', 'admin', 'arzt']);
     });
   });
 

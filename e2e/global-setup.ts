@@ -62,6 +62,10 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
         ? await prepareLocalFixtures(baseURL, apiURL)
         : prepareExternalFixtures(baseURL, apiURL);
 
+    if (!isLocalTarget(baseURL)) {
+        await validateRemoteEnvironment(apiURL, fixtures);
+    }
+
     await mkdir(path.dirname(AUTH_FIXTURE_FILE), { recursive: true });
     await writeFile(AUTH_FIXTURE_FILE, JSON.stringify(fixtures, null, 2), 'utf8');
 }
@@ -190,6 +194,50 @@ function prepareExternalFixtures(baseURL: string, apiURL: string): AuthFixtureBu
             },
         },
     };
+}
+
+async function validateRemoteEnvironment(apiURL: string, fixtures: AuthFixtureBundle): Promise<void> {
+    // 1. Liveness check
+    const liveRes = await fetch(`${apiURL}/system/live`);
+    if (liveRes.status !== 200) {
+        throw new Error(
+            `Remote API not reachable at ${apiURL}/system/live. HTTP ${liveRes.status}. Ensure Railway service is running.`,
+        );
+    }
+
+    // 2. Staff arzt login check
+    const loginRes = await fetch(`${apiURL}/arzt/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            username: fixtures.staff.arzt.username,
+            password: fixtures.staff.arzt.password,
+        }),
+    });
+    if (loginRes.status !== 200 && loginRes.status !== 201) {
+        throw new Error(
+            `Staff user '${fixtures.staff.arzt.username}' login failed (HTTP ${loginRes.status}). Create this user in the live DB first.`,
+        );
+    }
+
+    // 3. PWA registration patient check — 201 = created, 409 = already exists, anything else = warning only
+    const regData = fixtures.pwa.registration;
+    const registerRes = await fetch(`${apiURL}/pwa/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            patientNumber: regData.patientNumber,
+            birthDate: regData.birthDate,
+            email: regData.email,
+            password: regData.password,
+        }),
+    });
+    if (registerRes.status !== 201 && registerRes.status !== 409) {
+        console.warn(
+            `[global-setup] PWA registration patient check returned HTTP ${registerRes.status}. ` +
+            `Patient '${regData.email}' may not be seeded correctly in the live DB.`,
+        );
+    }
 }
 
 async function ensureStaffUser(

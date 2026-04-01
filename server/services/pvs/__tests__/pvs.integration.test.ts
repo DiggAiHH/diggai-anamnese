@@ -6,11 +6,93 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { pvsRouter } from '../pvs-router.service.js';
 import type { PvsConnectionData, PatientSessionFull } from '../types.js';
 
-// Mock all adapters
-vi.mock('../adapters/cgm-m1.adapter.js');
-vi.mock('../adapters/fhir-generic.adapter.js');
-vi.mock('../adapters/turbomed.adapter.js');
-vi.mock('../adapters/tomedo.adapter.js');
+// Mock all adapters with minimal implementations so getCapabilities() works
+vi.mock('../adapters/cgm-m1.adapter.js', () => ({
+  CgmM1Adapter: class {
+    readonly type = 'CGM_M1';
+    readonly supportedProtocols = ['GDT'];
+    async initialize() {}
+    async testConnection() { return { ok: true, message: '' }; }
+    async disconnect() {}
+    async importPatient() { return {}; }
+    async exportPatient() { return ''; }
+    async searchPatient() { return []; }
+    async exportAnamneseResult() { return { success: true, transferLogId: '' }; }
+    getCapabilities() {
+      return {
+        canImportPatients: true, canExportResults: true, canExportTherapyPlans: false,
+        canReceiveOrders: false, canSearchPatients: true, supportsRealtime: false,
+        supportedSatzarten: ['6310', '6311', '6302', '6301'], supportedFhirResources: [],
+      };
+    }
+  },
+}));
+
+vi.mock('../adapters/fhir-generic.adapter.js', () => ({
+  FhirGenericAdapter: class {
+    readonly type = 'FHIR_GENERIC';
+    readonly supportedProtocols = ['FHIR'];
+    async initialize() {}
+    async testConnection() { return { ok: true, message: '' }; }
+    async disconnect() {}
+    async importPatient() { return {}; }
+    async exportPatient() { return ''; }
+    async searchPatient() { return []; }
+    async exportAnamneseResult() { return { success: true, transferLogId: '' }; }
+    getCapabilities() {
+      return {
+        canImportPatients: true, canExportResults: true, canExportTherapyPlans: false,
+        canReceiveOrders: false, canSearchPatients: true, supportsRealtime: false,
+        supportedSatzarten: [], supportedFhirResources: ['Patient', 'Encounter', 'QuestionnaireResponse'],
+      };
+    }
+  },
+}));
+
+vi.mock('../adapters/turbomed.adapter.js', () => ({
+  TurbomedAdapter: class {
+    readonly type = 'TURBOMED';
+    readonly supportedProtocols = ['GDT'];
+    async initialize() {}
+    async testConnection() { return { ok: true, message: '' }; }
+    async disconnect() {}
+    async importPatient() { return {}; }
+    async exportPatient() { return ''; }
+    async searchPatient() { return []; }
+    async exportAnamneseResult() { return { success: true, transferLogId: '' }; }
+    getCapabilities() {
+      return {
+        canImportPatients: true, canExportResults: true, canExportTherapyPlans: false,
+        canReceiveOrders: false, canSearchPatients: true, supportsRealtime: false,
+        supportedSatzarten: ['6310', '6311', '6302', '6301'], supportedFhirResources: [],
+      };
+    }
+  },
+}));
+
+vi.mock('../adapters/tomedo.adapter.js', () => ({
+  TomedoAdapter: class {
+    readonly type = 'TOMEDO';
+    readonly supportedProtocols = ['FHIR'];
+    async initialize() {}
+    async testConnection() { return { ok: true, message: '' }; }
+    async disconnect() {}
+    async importPatient() { return {}; }
+    async exportPatient() { return ''; }
+    async searchPatient() { return []; }
+    async exportAnamneseResult() { return { success: true, transferLogId: '' }; }
+    getCapabilities() {
+      return {
+        canImportPatients: true, canExportResults: true, canExportTherapyPlans: true,
+        canReceiveOrders: true, canSearchPatients: true, supportsRealtime: false,
+        supportedSatzarten: [], supportedFhirResources: [
+          'Patient', 'Encounter', 'QuestionnaireResponse', 'Flag',
+          'RiskAssessment', 'MedicationStatement', 'Procedure', 'CarePlan',
+        ],
+      };
+    }
+  },
+}));
 
 describe('PVS Integration', () => {
   beforeEach(() => {
