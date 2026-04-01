@@ -24,8 +24,8 @@ WORKDIR /app
 COPY package*.json ./
 COPY prisma ./prisma/
 
-# Install production dependencies only
-RUN npm ci --only=production --no-audit --no-fund && \
+# Install all dependencies (tsx needed at runtime)
+RUN npm ci --no-audit --no-fund && \
     npm cache clean --force
 
 # Generate Prisma Client
@@ -79,9 +79,8 @@ COPY --from=deps --chown=nextjs:nodejs /app/node_modules ./node_modules
 COPY --from=deps --chown=nextjs:nodejs /app/package*.json ./
 COPY --chown=nextjs:nodejs server ./server
 COPY --chown=nextjs:nodejs prisma ./prisma
-COPY --chown=nextjs:nodejs logs ./logs
 
-# Create required directories with proper permissions
+# Create required directories (logs is gitignored — create at build time)
 RUN mkdir -p /app/logs /app/tmp /app/backups && \
     chown -R nextjs:nodejs /app/logs /app/tmp /app/backups && \
     chmod 755 /app/logs /app/tmp /app/backups
@@ -100,8 +99,8 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
 # Use dumb-init for proper signal handling
 ENTRYPOINT ["dumb-init", "--"]
 
-# Start the application
-CMD ["node", "server/index.js"]
+# Start the application (tsx runs TypeScript directly — no compile step needed)
+CMD ["sh", "-c", "npx prisma db push --accept-data-loss && (npx prisma db seed || echo 'Seed skipped') && node --import tsx server/index.ts"]
 
 # -----------------------------------------------------------------------------
 # Security Notes
