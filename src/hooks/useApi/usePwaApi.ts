@@ -14,7 +14,7 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../../api/client';
+import { api, setAuthToken } from '../../api/client';
 import { useAbortableRequest, isAbortError } from './useAbortableRequest';
 
 // ─── Dashboard ─────────────────────────────────────────────
@@ -449,7 +449,10 @@ export function usePwaProfile() {
 export function usePwaLogin() {
     return useMutation({ 
         mutationFn: ({ identifier, password }: { identifier: string; password: string }) => 
-            api.pwaLogin(identifier, password) 
+            api.pwaLogin(identifier, password),
+        onSuccess: (response) => {
+            setAuthToken(response?.token ?? null);
+        },
     });
 }
 
@@ -460,6 +463,18 @@ export function usePwaRegister() {
     return useMutation({ 
         mutationFn: (data: { patientNumber: string; birthDate: string; password: string; email?: string }) => 
             api.pwaRegister(data) 
+    });
+}
+
+export function usePwaLogout() {
+    const qc = useQueryClient();
+
+    return useMutation({
+        mutationFn: () => api.pwaLogout(),
+        onSettled: () => {
+            setAuthToken(null);
+            qc.removeQueries({ queryKey: ['pwa'] });
+        },
     });
 }
 

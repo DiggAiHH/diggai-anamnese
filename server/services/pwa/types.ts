@@ -48,7 +48,7 @@ export interface PatientRegistrationData {
 }
 
 export interface PatientLoginRequest {
-  /** Either email or phone number */
+  /** Email, phone number, or patient number */
   identifier: string;
   password: string;
 }
@@ -252,6 +252,8 @@ export interface PwaJwtPayload {
   accountId: string;
   patientId: string;
   role: 'patient_portal';
+  /** JWT ID — erforderlich für Token-Blacklist bei Logout (SECURITY FIX C3) */
+  jti?: string;
   iat?: number;
   exp?: number;
 }

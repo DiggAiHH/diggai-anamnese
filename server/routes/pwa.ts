@@ -5,9 +5,12 @@
 // ============================================
 
 import { Router, Request, Response, NextFunction } from 'express';
+import rateLimit from 'express-rate-limit';
 import { t, parseLang, LocalizedError } from '../i18n';
 import { z } from 'zod';
 import { requireAuth } from '../middleware/auth';
+import { config } from '../config';
+import { SecurityEvent, logSecurityEvent, logLoginFailure } from '../services/security-audit.service';
 import {
   registerPatient,
   loginPatient,
@@ -24,7 +27,10 @@ import {
   resetPasswordWithToken,
   softDeleteAccount,
   exportAccountData,
+  revokeToken,
+  isPwaTokenRevoked,
 } from '../services/pwa/auth.service';
+import { validatePasswordStrength } from '../utils/password-policy';
 import { getTrends, syncOfflineDiary, exportDiary, MetricType, PeriodType } from '../services/pwa/diary.service';
 import {
   getReminders,
@@ -51,6 +57,17 @@ import {
 
 const router = Router();
 
+// ─── Rate Limiters (SECURITY FIX M4) ────────────────────────
+
+// Strenger Login-Limiter: max 5 Versuche pro 15 Minuten (wie arzt-Login)
+const pwaLoginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Zu viele Anmeldeversuche. Bitte warten Sie 15 Minuten.' },
+});
+
 // ─── Helpers ────────────────────────────────────────────────
 
 function getPrisma(req: Request) {
@@ -73,10 +90,19 @@ async function requirePatientAuth(req: Request, res: Response, next: NextFunctio
     const token = header.slice(7);
     const payload: PwaJwtPayload = verifyToken(token);
 
+    // SECURITY FIX C3: Blacklist prüfen — revozierte Tokens (Logout) ablehnen
+    if (payload.jti) {
+      const revoked = await isPwaTokenRevoked(payload.jti);
+      if (revoked) {
+        return res.status(401).json({ error: t(parseLang(req.headers['accept-language']), 'errors.auth.token_revoked') });
+      }
+    }
+
     (req as any).user = {
       accountId: payload.accountId,
       patientId: payload.patientId,
       role: 'patient_portal',
+      jti: payload.jti,
     };
 
     next();
@@ -90,7 +116,8 @@ async function requirePatientAuth(req: Request, res: Response, next: NextFunctio
 const registerSchema = z.object({
   patientNumber: z.string().min(1),
   birthDate: z.string().min(1),
-  password: z.string().min(8),
+  // SECURITY FIX H2: BSI TR-02102 — min. 12 Zeichen (Komplexität via password-policy.ts)
+  password: z.string().min(12, 'Mindestens 12 Zeichen erforderlich (BSI TR-02102)'),
   email: z.string().email().optional(),
   phone: z.string().optional(),
   pin: z.string().min(4).max(8).optional(),
@@ -195,7 +222,8 @@ const settingsUpdateSchema = z.object({
 
 const passwordChangeSchema = z.object({
   oldPassword: z.string().min(1),
-  newPassword: z.string().min(8),
+  // SECURITY FIX H2: BSI TR-02102 — min. 12 Zeichen
+  newPassword: z.string().min(12, 'Mindestens 12 Zeichen erforderlich (BSI TR-02102)'),
 });
 
 const pinChangeSchema = z.object({
@@ -252,16 +280,60 @@ router.post('/auth/register', async (req: Request, res: Response) => {
 });
 
 // POST /auth/login — Login mit E-Mail/Telefon + Passwort
-router.post('/auth/login', async (req: Request, res: Response) => {
+// SECURITY FIX M4: pwaLoginLimiter auf Login beschränkt (5/15min)
+router.post('/auth/login', pwaLoginLimiter, async (req: Request, res: Response) => {
+  const lang = parseLang(req.headers['accept-language']);
+  const ip = req.ip || req.socket?.remoteAddress;
+  const userAgent = req.headers['user-agent'];
   try {
     const data = loginSchema.parse(req.body);
+
+    // SECURITY FIX H1: Account Lockout für PWA-Patienten
+    const prisma = getPrisma(req);
+    if (prisma) {
+      const account = await prisma.patientAccount.findFirst({
+        where: {
+          OR: [
+            { email: data.identifier },
+            { phone: data.identifier },
+            { patient: { patientNumber: data.identifier } },
+          ],
+          isActive: true,
+        },
+        select: { id: true, lockedUntil: true, failedLoginAttempts: true },
+      });
+
+      if (account?.lockedUntil && account.lockedUntil > new Date()) {
+        const retryAfterSecs = Math.ceil((account.lockedUntil.getTime() - Date.now()) / 1000);
+        await logLoginFailure({ tenantId: 'pwa', ip, userAgent, accountLocked: true });
+        return res.status(429).json({
+          error: t(lang, 'errors.auth.account_locked'),
+          retryAfter: retryAfterSecs,
+        });
+      }
+    }
+
     const result = await loginPatient(data);
+
+    // SECURITY FIX H4: Erfolgreichen Login loggen
+    await logSecurityEvent({
+      event: SecurityEvent.LOGIN_SUCCESS,
+      tenantId: 'pwa',
+      actorId: result.account.id,
+      ip,
+      userAgent,
+    });
+
     res.json(result);
   } catch (err: any) {
-    if (err instanceof z.ZodError) return res.status(400).json({ error: t(parseLang(req.headers['accept-language']), 'errors.validation'), details: err.issues });
-    if (err instanceof LocalizedError) return res.status(401).json({ error: t(parseLang(req.headers['accept-language']), err.errorKey) });
+    if (err instanceof z.ZodError) return res.status(400).json({ error: t(lang, 'errors.validation'), details: err.issues });
+    if (err instanceof LocalizedError) {
+      // SECURITY FIX H4: Fehlgeschlagenen Login loggen
+      await logLoginFailure({ tenantId: 'pwa', ip, userAgent }).catch(() => {});
+      return res.status(401).json({ error: t(lang, err.errorKey) });
+    }
     if (err?.message) return res.status(401).json({ error: err.message });
-    res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.pwa.login_failed') });
+    res.status(500).json({ error: t(lang, 'errors.pwa.login_failed') });
   }
 });
 
@@ -276,6 +348,27 @@ router.post('/auth/pin-login', async (req: Request, res: Response) => {
     if (err instanceof LocalizedError) return res.status(401).json({ error: t(parseLang(req.headers['accept-language']), err.errorKey) });
     if (err?.message) return res.status(401).json({ error: err.message });
     res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.pwa.pin_login_failed') });
+  }
+});
+
+// POST /auth/logout — Token widerrufen (Blacklist) — SECURITY FIX C3
+router.post('/auth/logout', requirePatientAuth, async (req: Request, res: Response) => {
+  try {
+    const user = (req as any).user;
+    if (user?.jti) {
+      await revokeToken(user.jti, config.jwtCookieMaxAgeMs);
+    }
+    await logSecurityEvent({
+      event: SecurityEvent.LOGOUT,
+      tenantId: 'pwa',
+      actorId: user?.accountId,
+      ip: req.ip || req.socket?.remoteAddress,
+      userAgent: req.headers['user-agent'],
+      metadata: { tokenRevoked: !!user?.jti },
+    });
+    res.json({ message: t(parseLang(req.headers['accept-language']), 'messages.logout_success') });
+  } catch {
+    res.status(500).json({ error: 'Abmeldung fehlgeschlagen' });
   }
 });
 
@@ -994,20 +1087,28 @@ router.put('/settings', requirePatientAuth, async (req: Request, res: Response) 
 
 // PUT /settings/password — Passwort ändern
 router.put('/settings/password', requirePatientAuth, async (req: Request, res: Response) => {
+  const lang = parseLang(req.headers['accept-language']);
   try {
     const data = passwordChangeSchema.parse(req.body);
+
+    // SECURITY FIX H2: BSI TR-02102 Passwort-Policy für Passwort-Änderung erzwingen
+    const policyResult = validatePasswordStrength(data.newPassword);
+    if (!policyResult.valid) {
+      return res.status(400).json({ error: policyResult.errors[0], errors: policyResult.errors });
+    }
+
     const prisma = getPrisma(req);
     const accountId = getAccountId(req);
 
     const account = await prisma.patientAccount.findUnique({
       where: { id: accountId },
     });
-    if (!account) return res.status(404).json({ error: t(parseLang(req.headers['accept-language']), 'errors.auth.account_not_found') });
+    if (!account) return res.status(404).json({ error: t(lang, 'errors.auth.account_not_found') });
 
     // Verify old password
     const bcrypt = await import('bcryptjs');
     const valid = await bcrypt.compare(data.oldPassword, account.passwordHash);
-    if (!valid) return res.status(400).json({ error: t(parseLang(req.headers['accept-language']), 'errors.pwa.wrong_password') });
+    if (!valid) return res.status(400).json({ error: t(lang, 'errors.pwa.wrong_password') });
 
     // Hash new password
     const newHash = await bcrypt.hash(data.newPassword, 12);
@@ -1016,11 +1117,20 @@ router.put('/settings/password', requirePatientAuth, async (req: Request, res: R
       data: { passwordHash: newHash },
     });
 
+    // SECURITY FIX H4: Passwort-Änderung loggen
+    await logSecurityEvent({
+      event: SecurityEvent.PASSWORD_CHANGED,
+      tenantId: 'pwa',
+      actorId: accountId,
+      ip: req.ip || req.socket?.remoteAddress,
+      userAgent: req.headers['user-agent'],
+    });
+
     res.json({ success: true });
   } catch (err: any) {
-    if (err instanceof z.ZodError) return res.status(400).json({ error: t(parseLang(req.headers['accept-language']), 'errors.validation'), details: err.issues });
+    if (err instanceof z.ZodError) return res.status(400).json({ error: t(lang, 'errors.validation'), details: err.issues });
     console.error('[pwa] password change error:', err);
-    res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.pwa.password_change_failed') });
+    res.status(500).json({ error: t(lang, 'errors.pwa.password_change_failed') });
   }
 });
 

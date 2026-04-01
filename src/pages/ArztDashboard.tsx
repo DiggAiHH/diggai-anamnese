@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { Shield, LogOut, AlertTriangle, User, ChevronRight, CheckCircle, Activity, Sparkles, Send, MessageSquare, Download, FileText, Bell, ClipboardList, HelpCircle, Info } from 'lucide-react';
+import { Shield, LogOut, AlertTriangle, User, ChevronRight, CheckCircle, Activity, Sparkles, Send, MessageSquare, Download, FileText, Bell, ClipboardList, HelpCircle, Info, LayoutGrid } from 'lucide-react';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { io } from 'socket.io-client';
 import { useTranslation } from 'react-i18next';
@@ -17,6 +17,17 @@ import { StaffTodoList } from '../components/StaffTodoList';
 import { ClinicalAlertList } from '../components/therapy/ClinicalAlertBanner';
 import { AdminAnalyticsTab } from '../components/admin/AdminAnalyticsTab';
 import { WunschboxTab } from '../components/admin/WunschboxTab';
+
+// ═══════════════════════════════════════════════════════════
+// NEU: Phase 3 - Arzt Dashboard Components
+// ═══════════════════════════════════════════════════════════
+import { 
+  AnamneseRadar, 
+  ClinicalTags,
+  PriorityList 
+} from '../components/dashboards';
+import { useRealtimeQueue } from '../hooks/useDashboard';
+import { useDashboardStore } from '../store/dashboardStore';
 
 // ─── Types ─────────────────────────────────────────────
 
@@ -93,6 +104,132 @@ interface ChatMessage {
     from: string;
     timestamp: string;
 }
+
+// ─── NEW: Doctor Queue View Component ──────────────────
+
+/**
+ * DoctorQueueView - Neue Klinische Sicht mit Radar & Prioritaeten
+ */
+const DoctorQueueView = React.memo(function DoctorQueueView() {
+    const { t } = useTranslation();
+    const { items } = useRealtimeQueue();
+    const selectPatient = useDashboardStore(state => state.selectPatient);
+    const selectedPatient = useDashboardStore(selectSelectedPatient);
+    
+    const handleSelectPatient = useCallback((patient: typeof items[0]) => {
+        selectPatient(patient.id);
+    }, [selectPatient]);
+
+    return (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
+            {/* Linke Spalte: Prioritaetsliste */}
+            <div className="lg:col-span-1 space-y-4">
+                <div className="flex items-center justify-between">
+                    <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                        <Bell className="w-5 h-5 text-amber-400" />
+                        {t('arzt.priorities', 'Prioritäten')}
+                    </h2>
+                    <span className="text-xs text-white/40">
+                        {items.filter(p => p.status !== 'COMPLETED').length} {t('arzt.waiting')}
+                    </span>
+                </div>
+                
+                <PriorityList 
+                    patients={items}
+                    onSelectPatient={handleSelectPatient}
+                />
+            </div>
+            
+            {/* Rechte Spalte: Patienten-Detail */}
+            <div className="lg:col-span-2">
+                {selectedPatient ? (
+                    <PatientDetailView patient={selectedPatient} />
+                ) : (
+                    <div className="h-full flex flex-col items-center justify-center bg-white/5 border border-white/10 rounded-xl p-8">
+                        <User className="w-16 h-16 text-white/10 mb-4" />
+                        <h3 className="text-lg font-medium text-white/60">
+                            {t('arzt.selectPatient', 'Wählen Sie einen Patienten')}
+                        </h3>
+                        <p className="text-sm text-white/40 mt-2 text-center">
+                            {t('arzt.selectPatientDesc', 'Klicken Sie auf einen Patienten in der Liste, um Details zu sehen')}
+                        </p>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+});
+
+/**
+ * Patient Detail View mit Radar Chart
+ */
+const PatientDetailView = React.memo(function PatientDetailView({ 
+    patient 
+}: { 
+    patient: NonNullable<ReturnType<typeof selectSelectedPatient>>;
+}) {
+    const { t } = useTranslation();
+    
+    return (
+        <div className="space-y-4">
+            {/* Header */}
+            <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+                <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-4">
+                        <div className="w-14 h-14 rounded-full bg-gradient-to-br from-purple-500/40 to-blue-500/40 flex items-center justify-center text-white font-bold text-lg">
+                            {patient.patientName.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                        </div>
+                        <div>
+                            <h2 className="text-xl font-bold text-white">{patient.patientName}</h2>
+                            <p className="text-sm text-white/50">{patient.service}</p>
+                            <div className="flex items-center gap-3 mt-1 text-xs text-white/40">
+                                <span>Wartezeit: {patient.waitTimeMinutes} Min</span>
+                                <span>•</span>
+                                <span>Status: {patient.status}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                        {patient.triageLevel === 'CRITICAL' && (
+                            <span className="px-3 py-1 bg-red-500/20 text-red-400 rounded-full text-sm font-semibold animate-pulse">
+                                KRITISCH
+                            </span>
+                        )}
+                    </div>
+                </div>
+            </div>
+            
+            {/* Radar Chart & Clinical Tags */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <AnamneseRadar patient={patient} />
+                
+                <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+                    <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                        <Activity className="w-4 h-4 text-amber-400" />
+                        {t('arzt.clinicalProfile', 'Klinisches Profil')}
+                    </h3>
+                    <ClinicalTags patient={patient} />
+                </div>
+            </div>
+            
+            {/* Aktionen */}
+            <div className="flex gap-3">
+                <button className="flex-1 bg-purple-600 hover:bg-purple-500 text-white font-semibold py-3 rounded-xl transition-all">
+                    {t('arzt.callPatient', 'Patient aufrufen')}
+                </button>
+                <button className="flex-1 bg-white/10 hover:bg-white/20 text-white font-semibold py-3 rounded-xl transition-all">
+                    {t('arzt.viewAnamnese', 'Anamnese ansehen')}
+                </button>
+                {patient.triageLevel !== 'NORMAL' && (
+                    <button className="px-4 bg-red-500/20 hover:bg-red-500/30 text-red-400 font-semibold py-3 rounded-xl transition-all">
+                        {t('arzt.ackTriage', 'Bestätigen')}
+                    </button>
+                )}
+            </div>
+        </div>
+    );
+});
 
 // ─── Helper Functions ─────────────────────────────────
 
@@ -205,448 +342,10 @@ const SessionList = React.memo(function SessionList({
     );
 });
 
-/**
- * SessionDetail - Memoized session detail view
- */
-const SessionDetail = React.memo(function SessionDetail({ 
-    sessionId, 
-    onBack 
-}: { 
-    sessionId: string; 
-    onBack: () => void;
-}) {
-    const { t } = useTranslation();
-    const { data, isLoading } = useArztSessionDetail(sessionId);
-    const { data: summary, isLoading: infoLoading } = useArztSessionSummary(sessionId);
-    const { data: dbMessages } = useChatMessages(sessionId);
-    const ackTriage = useAckTriage();
-    const [chatMsg, setChatMsg] = useState('');
-    const [messages, setMessages] = useState<ChatMessage[]>([]);
-    const [patientTyping, setPatientTyping] = useState(false);
-    const patientTypingTimeout = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-    const scrollRef = React.useRef<HTMLDivElement>(null);
-    const socketRef = React.useRef<ReturnType<typeof io> | null>(null);
-    const queryClient = useQueryClient();
-
-    const completeMutation = useMutation({
-        mutationFn: () => api.updateSessionStatus(sessionId, 'COMPLETED'),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['arzt_session_detail', sessionId] });
-            queryClient.invalidateQueries({ queryKey: ['arzt_sessions'] });
-        }
-    });
-
-    // Initial load from DB - memoized
-    React.useEffect(() => {
-        if (dbMessages?.messages) {
-            const formatted = dbMessages.messages.map((m: { sessionId?: string; text: string; fromName: string; timestamp: string }) => ({
-                sessionId: m.sessionId,
-                text: m.text,
-                from: m.fromName,
-                timestamp: m.timestamp
-            }));
-            setMessages(formatted);
-        }
-    }, [dbMessages]);
-
-    React.useEffect(() => {
-        const socket = io(SOCKET_BASE_URL || window.location.origin, {
-            withCredentials: true,
-            transports: ['websocket', 'polling'],
-        });
-        socketRef.current = socket;
-
-        socket.on('connect', () => {
-            socket.emit('join:arzt');
-            // Lock die Session
-            const userStr = localStorage.getItem('arzt_user');
-            let userName = t('arzt.colleague', 'Ein Kollege');
-            if (userStr) { try { userName = JSON.parse(userStr).displayName || t('arzt.doctor', 'Arzt'); } catch { /* ignore parse errors */ } }
-            socket.emit('view:session', { sessionId, userName });
-        });
-
-        socket.on('arzt:received_message', (msg: ChatMessage) => {
-            if (msg.sessionId === sessionId) {
-                setMessages(prev => [...prev, msg]);
-            }
-        });
-
-        socket.on('patient:typing', (data: { sessionId: string }) => {
-            if (data.sessionId === sessionId) {
-                setPatientTyping(true);
-                if (patientTypingTimeout.current) clearTimeout(patientTypingTimeout.current);
-                patientTypingTimeout.current = setTimeout(() => setPatientTyping(false), 3000);
-            }
-        });
-
-        return () => {
-            // Memory Leak Fix: Clear typing timeout and remove socket listeners
-            if (patientTypingTimeout.current) {
-                clearTimeout(patientTypingTimeout.current);
-                patientTypingTimeout.current = null;
-            }
-            socket.off('connect');
-            socket.off('arzt:received_message');
-            socket.off('patient:typing');
-            socket.emit('unview:session', { sessionId });
-            socket.disconnect();
-        };
-    }, [sessionId, t]);
-
-    React.useEffect(() => {
-        if (scrollRef.current) {
-            scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-        }
-    }, [messages]);
-
-    const handleSendChat = useCallback(() => {
-        if (!chatMsg.trim()) return;
-
-        const myMsg = {
-            sessionId,
-            text: chatMsg,
-            from: 'Praxis-Team',
-            timestamp: new Date().toISOString()
-        };
-
-        socketRef.current?.emit('arzt:message', { sessionId, message: chatMsg });
-        setMessages(prev => [...prev, myMsg]);
-        setChatMsg('');
-    }, [chatMsg, sessionId]);
-
-    // Memoize section labels
-    const sectionLabels = useMemo(() => ({
-        'basis': '👤 Personalien', 'versicherung': '🏥 Versicherung', 'adresse': '📍 Adresse',
-        'kontakt': '📞 Kontaktdaten', 'beschwerden': '🩺 Aktuelle Beschwerden',
-        'koerpermasse': '📏 Körpermaße', 'rauchen': '🚬 Raucherstatus',
-        'impfungen': '💉 Impfstatus', 'familie': '👨‍👩‍👧 Familienanamnese',
-        'beruf': '💼 Beruf & Lebensstil', 'diabetes': '🩸 Diabetes',
-        'beeintraechtigung': '♿ Beeinträchtigungen', 'implantate': '🔩 Implantate',
-        'blutverduenner': '💊 Blutverdünner', 'allergien': '⚠️ Allergien',
-        'gesundheitsstoerungen': '🏥 Gesundheitsstörungen',
-        'vorerkrankungen': '📋 Vorerkrankungen', 'medikamente-freitext': '💊 Medikamente',
-        'schwangerschaft': '🤰 Schwangerschaft', 'rezepte': '📝 Rezeptanfrage',
-        'au-anfrage': '📄 AU-Anfrage', 'ueberweisung': '🔄 Überweisungsanfrage',
-        'absage': '❌ Terminabsage', 'telefon': '📱 Telefonanfrage',
-        'nachricht': '✉️ Nachricht', 'abschluss': '✅ Abschluss',
-        'bg-unfall': '🚧 BG-Unfall',
-    }), []);
-
-    // Memoize grouped answers — must be before early return (Rules of Hooks); safe via optional chaining
-    const groupedAnswers = useMemo(() => {
-        const sections = new Map<string, SessionAnswer[]>();
-        for (const a of (data?.session?.answers || [])) {
-            const key = a.section || 'sonstige';
-            if (!sections.has(key)) sections.set(key, []);
-            sections.get(key)!.push(a);
-        }
-        return Array.from(sections.entries());
-    }, [data?.session?.answers]);
-
-    if (isLoading || !data) return <p className="text-white p-10">{t('arzt.loadingDetail')}</p>;
-
-    const session = data.session;
-
-    return (
-        <div className="animate-fade-in pb-20">
-            <button onClick={onBack} className="text-sm text-white/50 hover:text-white mb-6 flex items-center gap-1 group transition-all">
-                <ChevronRight className="w-4 h-4 rotate-180 group-hover:-translate-x-1 transition-transform" /> {t('arzt.backToOverview')}
-            </button>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* Linke Spalte: Daten & KI */}
-                <div className="space-y-6">
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-md">
-                        <h2 className="text-sm font-bold text-white/40 uppercase tracking-wider mb-4">{t('arzt.patientData')}</h2>
-                        <div className="grid grid-cols-2 gap-6">
-                            {session.patientName && (
-                                <div className="space-y-1 col-span-2">
-                                    <p className="text-[10px] text-white/30 uppercase">{t('arzt.patient')}</p>
-                                    <p className="text-lg text-white font-bold">{session.patientName}</p>
-                                </div>
-                            )}
-                            <div className="space-y-1">
-                                <p className="text-[10px] text-white/30 uppercase">{t('arzt.sessionId')}</p>
-                                <p className="text-sm text-white font-mono">{session.id.slice(0, 16)}...</p>
-                            </div>
-                            <div className="space-y-1">
-                                <p className="text-[10px] text-white/30 uppercase">{t('arzt.selectedService')}</p>
-                                <p className="text-sm text-blue-400 font-bold">{session.selectedService || 'Allgemein'}</p>
-                            </div>
-                            <div className="space-y-1">
-                                <p className="text-[10px] text-white/30 uppercase">{t('arzt.status')}</p>
-                                <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-bold ${session.status === 'COMPLETED' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-blue-500/20 text-blue-400'}`}>
-                                    {session.status}
-                                </span>
-                            </div>
-                            <div className="space-y-1">
-                                <p className="text-[10px] text-white/30 uppercase">{t('arzt.createdAt')}</p>
-                                <p className="text-sm text-white/70">{new Date(session.createdAt).toLocaleString()}</p>
-                            </div>
-                        </div>
-                        {/* Export Buttons */}
-                        <div className="flex gap-3 mt-4 pt-4 border-t border-white/10 flex-wrap">
-                            <button
-                                onClick={() => api.exportSessionPDF(sessionId)}
-                                className="flex items-center gap-2 px-4 py-2.5 bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 rounded-xl text-xs font-bold transition-all border border-blue-500/30"
-                            >
-                                <FileText className="w-4 h-4" />
-                                {t('arzt.pdfReport')}
-                            </button>
-                            <button
-                                onClick={() => api.exportSessionCSV(sessionId)}
-                                className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 rounded-xl text-xs font-bold transition-all border border-emerald-500/30"
-                            >
-                                <Download className="w-4 h-4" />
-                                {t('arzt.csvExport')}
-                            </button>
-
-                            {session.status !== 'COMPLETED' && (
-                                <button
-                                    onClick={() => {
-                                        if (window.confirm(t('arzt.confirmComplete'))) {
-                                            completeMutation.mutate();
-                                        }
-                                    }}
-                                    disabled={completeMutation.isPending}
-                                    className="flex items-center gap-2 px-4 py-2.5 bg-purple-600/20 hover:bg-purple-600/40 text-purple-400 rounded-xl text-xs font-bold transition-all border border-purple-500/30 ml-auto"
-                                >
-                                    {completeMutation.isPending ? <Activity className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-                                    {t('arzt.completeCase')}
-                                </button>
-                            )}
-                        </div>
-                    </div>
-
-                    <div className="rounded-2xl border border-blue-500/30 bg-blue-500/5 p-6 backdrop-blur-md relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 blur-3xl -mr-16 -mt-16 group-hover:bg-blue-500/20 transition-all" />
-                        <h2 className="text-lg font-bold text-blue-400 mb-4 flex items-center gap-2">
-                            <Sparkles className="w-5 h-5" /> {t('arzt.aiAnalysis')}
-                        </h2>
-                        {infoLoading ? (
-                            <div className="flex items-center gap-3 text-blue-400/50 py-4">
-                                <Activity className="w-5 h-5 animate-pulse" />
-                                <p className="text-sm animate-pulse">{t('arzt.analyzing')}</p>
-                            </div>
-                        ) : (
-                            <div className="space-y-6">
-                                <div className="relative">
-                                    <div className="absolute -left-2 top-0 bottom-0 w-1 bg-blue-500/40 rounded-full" />
-                                    <p className="text-sm text-white/90 leading-relaxed pl-4 italic">"{summary?.summary}"</p>
-                                </div>
-                                <div>
-                                    <p className="text-[10px] text-white/30 uppercase mb-2 font-bold tracking-widest">{t('arzt.icdCodes')}</p>
-                                    <div className="flex flex-wrap gap-2">
-                                        {summary?.icdCodes?.map((icd: IcdCode) => (
-                                            <div key={icd.code} className="group relative">
-                                                <span className="px-3 py-1 bg-blue-500/20 text-blue-300 text-xs rounded-lg border border-blue-500/30 font-bold hover:bg-blue-500/40 transition-all cursor-help">
-                                                    {icd.code}
-                                                </span>
-                                                <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-2 py-1 bg-gray-900 border border-white/10 rounded text-[10px] text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                                                    {icd.label}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    <AmbientScribePanel sessionId={sessionId} />
-                    <BillingSuggestions sessionId={sessionId} clinicalNotes={summary?.summary || ''} />
-                    <WearableChart patientId={sessionId} />
-
-                    {/* Triage Alerts - Calm, non-panic styling */}
-                    {session.triageEvents?.length > 0 && (
-                        <div className="rounded-2xl border border-[#F4A261]/30 bg-[#F4A261]/5 p-6 backdrop-blur-md">
-                            <h2 className="text-sm font-bold text-[#F4A261] uppercase tracking-wider mb-3 flex items-center gap-2">
-                                <Info className="w-4 h-4" /> {t('arzt.triageAlarms')} ({session.triageEvents.length})
-                            </h2>
-                            <div className="space-y-2">
-                                {session.triageEvents.map((te: TriageEvent) => (
-                                    <div key={te.id} className={`flex items-start gap-3 p-3 rounded-xl border ${te.acknowledgedAt ? 'bg-green-500/10 border-green-500/20' : 'bg-red-500/10 border-red-500/20'}`}>
-                                        <span className={`shrink-0 px-2 py-0.5 rounded text-[10px] font-black uppercase ${te.level === 'CRITICAL' ? 'bg-red-600 text-white' : 'bg-yellow-500/30 text-yellow-300'}`}>
-                                            {te.level}
-                                        </span>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-xs text-white font-medium">{te.message}</p>
-                                            <p className="text-[10px] text-white/30 mt-1">{t('arzt.question')}: {te.atomId} • {new Date(te.createdAt).toLocaleString(navigator.language)}</p>
-                                            {te.acknowledgedAt && (
-                                                <p className="text-[10px] text-[#81B29A] mt-1 flex items-center gap-1">
-                                                    <CheckCircle className="w-3 h-3" /> {t('arzt.triageAckedBy', { by: te.acknowledgedBy, at: new Date(te.acknowledgedAt).toLocaleString(navigator.language) })}
-                                                </p>
-                                            )}
-                                        </div>
-                                        {!te.acknowledgedAt && (
-                                            <button
-                                                onClick={() => ackTriage.mutate(te.id)}
-                                                disabled={ackTriage.isPending}
-                                                className="shrink-0 px-4 py-2 rounded-xl bg-[#81B29A] hover:bg-[#5A8F76] text-white text-[10px] font-bold uppercase tracking-wider transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 shadow-lg shadow-[#81B29A]/20"
-                                            >
-                                                <CheckCircle className="w-3 h-3" /> {t('arzt.triageAck')}
-                                            </button>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-md">
-                        <h2 className="text-sm font-bold text-white/40 uppercase tracking-wider mb-4">{t('arzt.answersBySection')}</h2>
-                        <div className="space-y-6 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
-                            {groupedAnswers.map(([sectionKey, answers]) => (
-                                <div key={sectionKey} className="border-l-2 border-blue-500/30 pl-4">
-                                    <h3 className="text-xs font-bold text-blue-400 mb-2">
-                                        {sectionLabels[sectionKey as keyof typeof sectionLabels] || sectionKey}
-                                    </h3>
-                                    <div className="space-y-2">
-                                        {answers.map((a: SessionAnswer) => (
-                                            <div key={a.id} className="flex items-start gap-3 py-2 border-b border-white/5 last:border-0">
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="text-[11px] text-white/50">
-                                                        {a.questionText || `Frage ${a.atomId}`}
-                                                    </p>
-                                                    {a.answerType === 'file' && (a.value?.filename || a.value?.data?.filename) ? (
-                                                        <div className="mt-2">
-                                                            <button
-                                                                onClick={async () => {
-                                                                    try {
-                                                                        const res = await fetch(`${API_BASE_URL}/upload/${a.value?.filename || a.value?.data?.filename}`, {
-                                                                            headers: { Authorization: `Bearer ${getAuthToken()}` }
-                                                                        });
-                                                                        const blob = await res.blob();
-                                                                        const url = URL.createObjectURL(blob);
-                                                                        window.open(url, '_blank');
-                                                                        setTimeout(() => URL.revokeObjectURL(url), 60000);
-                                                                    } catch (err) { console.warn('Download failed:', err); }
-                                                                }}
-                                                                className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-500/20 text-blue-400 rounded-lg text-xs font-bold hover:bg-blue-500/40 cursor-pointer"
-                                                            >
-                                                                <FileText className="w-3 h-3" />
-                                                                {(a.value?.originalName || a.value?.data?.originalName) || t('arzt.viewDocument')}
-                                                            </button>
-                                                        </div>
-                                                    ) : (
-                                                        <p className="text-sm text-white font-medium mt-0.5">
-                                                            {Array.isArray(a.value?.data) ? a.value.data.join(', ') :
-                                                                typeof a.value?.data === 'object' ? JSON.stringify(a.value.data) :
-                                                                    String(a.value?.data ?? a.value ?? '-')}
-                                                        </p>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Rechte Spalte: Live Chat */}
-                <div className="flex flex-col h-[600px] sm:h-[800px] lg:h-auto">
-                    <div className="flex-1 flex flex-col rounded-2xl border border-purple-500/20 bg-purple-500/5 backdrop-blur-md overflow-hidden shadow-2xl shadow-purple-500/5">
-                        <div className="p-4 border-b border-purple-500/20 bg-purple-500/10 flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center">
-                                    <MessageSquare className="w-5 h-5 text-purple-400" />
-                                </div>
-                                <div>
-                                    <h2 className="text-sm font-bold text-white">{t('arzt.liveChat')}</h2>
-                                    <div className="flex items-center gap-1.5">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                        <p className="text-[10px] text-emerald-400 font-medium">{t('arzt.patientConnected')}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
-                            {messages.length === 0 && (
-                                <div className="h-full flex flex-col items-center justify-center text-center p-8 space-y-4">
-                                    <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center">
-                                        <MessageSquare className="w-8 h-8 text-white/10" />
-                                    </div>
-                                    <div>
-                                        <p className="text-sm text-white/40 font-medium">{t('arzt.noMessages')}</p>
-                                        <p className="text-[11px] text-white/20 mt-1">{t('arzt.sendHint')}</p>
-                                    </div>
-                                </div>
-                            )}
-                            {messages.map((m, i) => (
-                                <div key={i} className={`flex ${m.from === 'Patient' ? 'justify-start' : 'justify-end'}`}>
-                                    <div className={`max-w-[85%] group`}>
-                                        <div className={`p-4 rounded-2xl text-xs leading-relaxed shadow-lg ${m.from === 'Patient'
-                                            ? 'bg-gray-800 border border-white/10 text-white rounded-tl-none'
-                                            : 'bg-purple-600 text-white rounded-tr-none'
-                                            }`}>
-                                            {m.text}
-                                        </div>
-                                        <p className={`text-[9px] text-white/20 mt-1.5 px-1 flex items-center gap-2 ${m.from === 'Patient' ? 'justify-start' : 'justify-end'}`}>
-                                            <span className="font-bold uppercase tracking-tighter">{m.from === 'Patient' ? t('arzt.incoming') : t('arzt.sent')}</span>
-                                            <span>•</span>
-                                            <span>{new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                        </p>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-
-                        {/* Patient typing indicator */}
-                        {patientTyping && (
-                            <div className="px-4 py-2 flex items-center gap-2 text-white/40">
-                                <div className="flex gap-1">
-                                    <span className="w-1.5 h-1.5 bg-blue-400/60 rounded-full animate-bounce" />
-                                    <span className="w-1.5 h-1.5 bg-blue-400/60 rounded-full animate-bounce [animation-delay:150ms]" />
-                                    <span className="w-1.5 h-1.5 bg-blue-400/60 rounded-full animate-bounce [animation-delay:300ms]" />
-                                </div>
-                                <span className="text-[10px]">{t('arzt.patientTyping')}</span>
-                            </div>
-                        )}
-
-                        <div className="p-4 bg-gray-950/50 border-t border-purple-500/20">
-                            <div className="relative flex items-end gap-2 bg-white/5 rounded-2xl p-1 px-3 border border-white/10 focus-within:border-purple-500/50 transition-all">
-                                <textarea
-                                    rows={1}
-                                    value={chatMsg}
-                                    onChange={e => {
-                                        setChatMsg(e.target.value);
-                                        socketRef.current?.emit('arzt:typing', { sessionId });
-                                    }}
-                                    onKeyDown={e => {
-                                        if (e.key === 'Enter' && !e.shiftKey) {
-                                            e.preventDefault();
-                                            handleSendChat();
-                                        }
-                                    }}
-                                    placeholder={t('arzt.messagePlaceholder')}
-                                    className="flex-1 bg-transparent border-none focus:ring-0 text-sm text-white placeholder-white/20 py-3 resize-none max-h-32"
-                                />
-                                <button
-                                    onClick={handleSendChat}
-                                    disabled={!chatMsg.trim()}
-                                    aria-label={t('arzt.sendMessage')}
-                                    className="mb-1.5 p-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-30 disabled:hover:bg-purple-600 text-white rounded-xl transition-all shadow-lg active:scale-95"
-                                >
-                                    <Send className="w-4 h-4" />
-                                </button>
-                            </div>
-                            <p className="text-[9px] text-white/20 mt-2 text-center">{t('arzt.pushInfo')}</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div >
-    );
-});
-
-// ─── Main Component ────────────────────────────────────
-
 // Tab configuration - defined outside component to prevent recreation
 const TABS_CONFIG = [
     { key: 'patients' as const, labelKey: 'arzt.patients', labelDefault: 'Patienten', icon: User, hasBadge: false },
+    { key: 'queue' as const, labelKey: 'arzt.liveQueue', labelDefault: 'Live Queue', icon: LayoutGrid, hasBadge: false },
     { key: 'therapy' as const, labelKey: 'arzt.therapyPlans', labelDefault: 'Therapiepläne', icon: ClipboardList, hasBadge: false },
     { key: 'alerts' as const, labelKey: 'arzt.alerts', labelDefault: 'Alerts', icon: Bell, hasBadge: true },
     { key: 'chat' as const, labelKey: 'arzt.teamChat', labelDefault: 'Team-Chat', icon: MessageSquare, hasBadge: false },
@@ -670,6 +369,11 @@ export const ArztDashboard: React.FC = React.memo(function ArztDashboard() {
     const [clinicalAlertCount, setClinicalAlertCount] = useState(0);
     const { data: staffUser, isLoading: sessionLoading } = useStaffSession();
     const queryClient = useQueryClient();
+    
+    // ═══════════════════════════════════════════════════════
+    // NEU: Initialize Realtime Queue (Phase 3)
+    // ═══════════════════════════════════════════════════════
+    useRealtimeQueue({ enabled: !!staffUser });
 
     // Stable callback for session selection
     const handleSelectSession = useCallback((id: string) => {
@@ -689,12 +393,6 @@ export const ArztDashboard: React.FC = React.memo(function ArztDashboard() {
         queryClient.setQueryData(['staff-session'], null);
         void api.arztLogout().catch(() => undefined);
     }, [queryClient]);
-
-    // Stable callback for login
-    const handleLogin = useCallback((newToken: string) => {
-        setToken(newToken);
-        setAuthToken(newToken);
-    }, []);
 
     // Stable callback for removing toast
     const removeToast = useCallback((id: number) => {
@@ -725,17 +423,6 @@ export const ArztDashboard: React.FC = React.memo(function ArztDashboard() {
             queryClient.invalidateQueries({ queryKey: ['arzt'] });
         });
 
-        socket.on('arzt:received_message', (data: SocketMessage) => {
-            playAlertSound();
-            setToastAlerts(prev => [...prev, {
-                id: Date.now() + Math.random(),
-                type: 'message',
-                title: t('arzt.newMessage'),
-                message: `Patient: ${data.text.slice(0, 50)}${data.text.length > 50 ? '...' : ''}`,
-                sessionId: data.sessionId
-            }]);
-        });
-
         socket.on('session:locked', (data: SocketLock) => {
             setActiveLocks(prev => ({ ...prev, [data.sessionId]: data.userName }));
         });
@@ -748,78 +435,12 @@ export const ArztDashboard: React.FC = React.memo(function ArztDashboard() {
             });
         });
 
-        // ─── Modul 3+4: PVS & Therapy Events ───────────────
-        socket.on('therapy:alert-new', (data: { severity: string; title: string; message: string; patientId: string }) => {
-            playAlertSound();
-            setClinicalAlertCount(prev => prev + 1);
-            setToastAlerts(prev => [...prev, {
-                id: Date.now() + Math.random(),
-                type: 'triage',
-                title: data.title,
-                message: data.message,
-                level: data.severity,
-            }]);
-            queryClient.invalidateQueries({ queryKey: ['therapy'] });
-        });
-
-        socket.on('therapy:alert-critical', () => {
-            playAlertSound();
-            queryClient.invalidateQueries({ queryKey: ['therapy'] });
-        });
-
-        socket.on('pvs:export-completed', (data: { sessionId: string; pvsType: string }) => {
-            setToastAlerts(prev => [...prev, {
-                id: Date.now() + Math.random(),
-                type: 'success',
-                title: t('arzt.pvsExportSuccess', 'PVS-Export erfolgreich'),
-                message: `${data.pvsType}`,
-                sessionId: data.sessionId,
-            }]);
-        });
-
-        socket.on('pvs:export-failed', (data: { sessionId: string; error: string }) => {
-            setToastAlerts(prev => [...prev, {
-                id: Date.now() + Math.random(),
-                type: 'triage',
-                title: t('arzt.pvsExportFailed', 'PVS-Export fehlgeschlagen'),
-                message: data.error,
-                sessionId: data.sessionId,
-                level: 'WARNING',
-            }]);
-        });
-
-        socket.on('pvs:patient-imported', () => {
-            queryClient.invalidateQueries({ queryKey: ['arzt'] });
-        });
-
-        socket.on('therapy:plan-updated', () => {
-            queryClient.invalidateQueries({ queryKey: ['therapy'] });
-        });
-
-        socket.on('therapy:measure-due', (data: { title: string; planId: string }) => {
-            setToastAlerts(prev => [...prev, {
-                id: Date.now() + Math.random(),
-                type: 'message',
-                title: t('arzt.measureDue', 'Maßnahme fällig'),
-                message: data.title,
-            }]);
-        });
-
         return () => {
-            // Memory Leak Fix: Remove all event listeners before disconnect
             socket.off('connect');
             socket.off('triage:alert');
             socket.off('session:complete');
-            socket.off('arzt:received_message');
             socket.off('session:locked');
             socket.off('session:unlocked');
-            socket.off('therapy:alert-new');
-            socket.off('therapy:alert-critical');
-            socket.off('pvs:export-completed');
-            socket.off('pvs:export-failed');
-            socket.off('pvs:patient-imported');
-            socket.off('therapy:plan-updated');
-            socket.off('therapy:measure-due');
             socket.disconnect();
         };
     }, [staffUser, token, queryClient, t]);
@@ -829,21 +450,19 @@ export const ArztDashboard: React.FC = React.memo(function ArztDashboard() {
         if (!staffUser || !token) return null;
         switch (activeTab) {
             case 'patients':
-                return selectedSessionId ? (
-                    <SessionDetail sessionId={selectedSessionId} onBack={handleBack} />
-                ) : (
-                    <SessionList onSelect={handleSelectSession} activeLocks={activeLocks} />
-                );
-            case 'therapy':
                 return (
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-md">
-                        <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                            <ClipboardList className="w-5 h-5 text-blue-400" />
-                            {t('arzt.therapyPlans', 'Therapiepläne')}
-                        </h2>
-                        <p className="text-white/50 text-sm">{t('arzt.therapySelectPatient', 'Wählen Sie einen Patienten in der Patientenliste, um einen Therapieplan zu erstellen.')}</p>
-                    </div>
+                    <SessionList 
+                        onSelect={handleSelectSession} 
+                        activeLocks={activeLocks} 
+                    />
                 );
+            
+            // ═══════════════════════════════════════════════════════
+            // NEU: Live Queue Tab (Phase 3)
+            // ═══════════════════════════════════════════════════════
+            case 'queue':
+                return <DoctorQueueView />;
+                
             case 'alerts':
                 return (
                     <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-md">
@@ -875,7 +494,7 @@ export const ArztDashboard: React.FC = React.memo(function ArztDashboard() {
             default:
                 return null;
         }
-    }, [activeTab, selectedSessionId, activeLocks, handleSelectSession, handleBack, t]);
+    }, [activeTab, activeLocks, handleSelectSession, staffUser, token]);
 
     if (sessionLoading || !staffUser || !token) {
         return null;

@@ -25,6 +25,7 @@ import {
   usePwaUpdateConsents,
   usePwaDevices,
   usePwaChangePassword,
+  usePwaLogout,
   usePwaSetPin,
 } from '../../hooks/usePatientApi';
 import { usePwaStore } from '../../store/pwaStore';
@@ -136,6 +137,7 @@ export default function PwaSettings() {
   const updateConsents = usePwaUpdateConsents();
   const devices = usePwaDevices();
   const changePassword = usePwaChangePassword();
+  const logoutMutation = usePwaLogout();
   const setPin = usePwaSetPin();
 
   const [expanded, setExpanded] = useState<Section>(null);
@@ -183,7 +185,7 @@ export default function PwaSettings() {
   };
 
   const handleChangePassword = async () => {
-    if (!oldPassword || !newPassword || newPassword.length < 8) return;
+    if (!oldPassword || !newPassword || newPassword.length < 12) return;
     setPwSuccess(false);
     try {
       await changePassword.mutateAsync({ oldPassword, newPassword });
@@ -207,9 +209,15 @@ export default function PwaSettings() {
     }
   };
 
-  const handleLogout = () => {
-    logout();
-    navigate('/pwa/login');
+  const handleLogout = async () => {
+    try {
+      await logoutMutation.mutateAsync();
+    } catch {
+      /* handled */
+    } finally {
+      logout();
+      navigate('/pwa/login', { replace: true });
+    }
   };
 
   return (
@@ -373,7 +381,7 @@ export default function PwaSettings() {
                   type={showNew ? 'text' : 'password'}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder={t('Neues Passwort (min. 8 Zeichen)')}
+                  placeholder={t('Neues Passwort (mind. 12 Zeichen)')}
                   className="w-full rounded-xl border border-gray-200 px-3 py-2.5 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300"
                 />
                 <button
@@ -386,7 +394,7 @@ export default function PwaSettings() {
               </div>
               <button
                 onClick={handleChangePassword}
-                disabled={!oldPassword || newPassword.length < 8 || changePassword.isPending}
+                disabled={!oldPassword || newPassword.length < 12 || changePassword.isPending}
                 className="w-full rounded-xl bg-sky-500 text-white px-4 py-2.5 text-sm font-semibold hover:bg-sky-600 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
               >
                 {changePassword.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
@@ -463,11 +471,13 @@ export default function PwaSettings() {
 
         {/* ────────────── Logout ────────────── */}
         <button
-          onClick={handleLogout}
-          className="w-full rounded-2xl bg-white border border-red-100 shadow-sm px-4 py-4 flex items-center gap-3 hover:bg-red-50 transition-colors"
+          data-testid="pwa-logout"
+          onClick={() => { void handleLogout(); }}
+          disabled={logoutMutation.isPending}
+          className="w-full rounded-2xl bg-white border border-red-100 shadow-sm px-4 py-4 flex items-center gap-3 hover:bg-red-50 transition-colors disabled:opacity-60"
         >
           <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-red-100 text-red-500">
-            <LogOut className="w-4.5 h-4.5" />
+            {logoutMutation.isPending ? <Loader2 className="w-4.5 h-4.5 animate-spin" /> : <LogOut className="w-4.5 h-4.5" />}
           </div>
           <span className="text-sm font-medium text-red-600">{t('Abmelden')}</span>
         </button>

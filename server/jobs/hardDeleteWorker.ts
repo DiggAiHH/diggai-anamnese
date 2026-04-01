@@ -31,6 +31,14 @@ async function runHardDelete(): Promise<void> {
             await prisma.patientConsent.deleteMany({ where: { accountId: account.id } });
             await (prisma as any).consentLog?.deleteMany?.({ where: { accountId: account.id } });
 
+            // SECURITY FIX M5: MedicationReminder explizit löschen
+            await (prisma as any).medicationReminder?.deleteMany?.({ where: { accountId: account.id } });
+
+            // WebAuthnCredential + PatientDevice: CASCADE via onDelete auf PatientAccount,
+            // aber explizit löschen für Klarheit und Sicherheit
+            await prisma.webAuthnCredential.deleteMany({ where: { accountId: account.id } });
+            await prisma.patientDevice.deleteMany({ where: { accountId: account.id } });
+
             // Account selbst löschen
             await prisma.patientAccount.delete({ where: { id: account.id } });
 

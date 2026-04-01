@@ -113,6 +113,7 @@ export function StaffShell() {
           <LanguageSelector />
           <ThemeToggle />
           <button
+            data-testid="staff-logout"
             onClick={() => {
               clearStoredStaffUser();
               queryClient.setQueryData(STAFF_SESSION_QUERY_KEY, null);

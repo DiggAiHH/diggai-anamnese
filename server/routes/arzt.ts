@@ -7,6 +7,8 @@ import { aiEngine } from '../services/ai/ai-engine.service';
 import { decrypt, isPIIAtom } from '../services/encryption';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
+import { config } from '../config';
+import { SecurityEvent, logSecurityEvent, logLoginFailure } from '../services/security-audit.service';
 
 const router = Router();
 
@@ -98,6 +100,9 @@ function resolveEffectiveTenant(req: Request):
  *         description: Rate-Limit überschritten (5 Versuche/15min)
  */
 router.post('/login', loginRateLimiter, async (req: Request, res: Response) => {
+    const ip = req.ip || req.socket?.remoteAddress;
+    const userAgent = req.headers['user-agent'];
+
     try {
         const resolvedTenant = resolveEffectiveTenant(req);
         if (!resolvedTenant.ok) {
@@ -115,13 +120,50 @@ router.post('/login', loginRateLimiter, async (req: Request, res: Response) => {
             },
         });
 
+        // SECURITY: Immer gleiche Fehlermeldung — verhindert User-Enumeration (Timing Attack)
         if (!arzt || arzt.isActive === false) {
+            await logLoginFailure({ tenantId: resolvedTenant.tenantId, ip, userAgent });
             res.status(401).json({ error: 'Ungültige Anmeldedaten' });
+            return;
+        }
+
+        // SECURITY FIX H1: Account Lockout prüfen
+        if (arzt.lockedUntil && arzt.lockedUntil > new Date()) {
+            const retryAfterSecs = Math.ceil((arzt.lockedUntil.getTime() - Date.now()) / 1000);
+            await logLoginFailure({
+                tenantId: resolvedTenant.tenantId,
+                ip,
+                userAgent,
+                accountLocked: true,
+            });
+            res.status(429).json({
+                error: 'Konto temporär gesperrt nach zu vielen Fehlversuchen.',
+                retryAfter: retryAfterSecs,
+            });
             return;
         }
 
         const isValid = await bcrypt.compare(password, arzt.passwordHash);
         if (!isValid) {
+            // SECURITY FIX H1: Fehlversuch zählen und ggf. sperren
+            const newAttempts = (arzt.failedLoginAttempts ?? 0) + 1;
+            const shouldLock = newAttempts >= config.accountLockoutMaxAttempts;
+            await prisma.arztUser.update({
+                where: { id: arzt.id },
+                data: {
+                    failedLoginAttempts: newAttempts,
+                    lockedUntil: shouldLock
+                        ? new Date(Date.now() + config.accountLockoutDurationMs)
+                        : undefined,
+                },
+            });
+            await logLoginFailure({
+                tenantId: resolvedTenant.tenantId,
+                ip,
+                userAgent,
+                attemptNumber: newAttempts,
+                accountLocked: shouldLock,
+            });
             res.status(401).json({ error: 'Ungültige Anmeldedaten' });
             return;
         }
@@ -137,6 +179,27 @@ router.post('/login', loginRateLimiter, async (req: Request, res: Response) => {
             userId: arzt.id,
             tenantId: resolvedTenant.tenantId,
             role: normalizedRole,
+        });
+
+        // SECURITY FIX H3: lastLoginAt + loginCount aktualisieren, Lockout zurücksetzen
+        await prisma.arztUser.update({
+            where: { id: arzt.id },
+            data: {
+                lastLoginAt: new Date(),
+                loginCount: { increment: 1 },
+                failedLoginAttempts: 0,
+                lockedUntil: null,
+            },
+        });
+
+        // SECURITY FIX H4: Security-Event loggen
+        await logSecurityEvent({
+            event: SecurityEvent.LOGIN_SUCCESS,
+            tenantId: resolvedTenant.tenantId,
+            actorId: arzt.id,
+            ip,
+            userAgent,
+            metadata: { role: normalizedRole },
         });
 
         // Set httpOnly cookie for browser clients
@@ -212,11 +275,20 @@ router.get('/me', requireAuth, requireRole('arzt', 'mfa', 'admin'), async (req: 
 /**
  * POST /api/arzt/logout — Token widerrufen (Blacklist)
  */
-router.post('/logout', requireAuth, (req: Request, res: Response) => {
+router.post('/logout', requireAuth, async (req: Request, res: Response) => {
     if (req.auth?.jti) {
-        // Token auf Blacklist setzen (24h Ablauf = maximale Token-Lebensdauer)
-        blacklistToken(req.auth.jti, 24 * 60 * 60 * 1000);
+        // Token auf Blacklist setzen — TTL = verbleibende Token-Gültigkeit
+        await blacklistToken(req.auth.jti, config.jwtCookieMaxAgeMs);
     }
+    // SECURITY FIX H4: Logout loggen
+    await logSecurityEvent({
+        event: SecurityEvent.LOGOUT,
+        tenantId: req.auth?.tenantId || req.tenantId || 'unknown',
+        actorId: req.auth?.userId,
+        ip: req.ip || req.socket?.remoteAddress,
+        userAgent: req.headers['user-agent'],
+        metadata: { tokenRevoked: !!req.auth?.jti },
+    });
     clearTokenCookie(res);
     res.json({ message: 'Erfolgreich abgemeldet' });
 });

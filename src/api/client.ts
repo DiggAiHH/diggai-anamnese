@@ -1834,6 +1834,11 @@ export const api = {
         const response = await apiClient.post('/pwa/auth/refresh');
         return response.data;
     },
+    pwaLogout: async () => {
+        if (isDemoMode()) return { success: true };
+        const response = await apiClient.post('/pwa/auth/logout');
+        return response.data;
+    },
     pwaDashboard: async () => {
         if (isDemoMode()) return { activeMeasures: [], unreadMessages: 0, recentDiary: [], alerts: [] };
         const response = await apiClient.get('/pwa/dashboard');

@@ -75,6 +75,23 @@ const arztDefaultPassword = isProduction
     )
     : arztDefaultPasswordRaw;
 
+/**
+ * Konvertiert JWT-Ablaufzeitangaben ('15m', '1h', '24h', '7d') in Millisekunden.
+ * Wird verwendet um Cookie-maxAge synchron mit JWT-Expiry zu halten.
+ */
+function parseExpiresInToMs(value: string): number {
+    const match = value.match(/^(\d+)(s|m|h|d)$/);
+    if (!match) return 15 * 60 * 1000; // Fallback: 15 Minuten
+    const amount = parseInt(match[1], 10);
+    switch (match[2]) {
+        case 's': return amount * 1000;
+        case 'm': return amount * 60 * 1000;
+        case 'h': return amount * 60 * 60 * 1000;
+        case 'd': return amount * 24 * 60 * 60 * 1000;
+        default:  return 15 * 60 * 1000;
+    }
+}
+
 const backendProfile = normalizeBackendProfile(process.env.BACKEND_PROFILE);
 const strictDomainDatabaseRouting = process.env.STRICT_DOMAIN_DB_ROUTING === 'true' || backendProfile !== 'monolith';
 const enabledDatabaseDomains = resolveEnabledDomains(backendProfile, strictDomainDatabaseRouting);
@@ -135,8 +152,16 @@ export const config = {
     } as Record<BackendDomain, string>,
 
     // JWT
+    // SECURITY FIX M2: Default von 24h auf 15m reduziert (OWASP Empfehlung für Gesundheitsdaten).
+    // Für Produktion JWT_EXPIRES_IN in Railway/Supabase Env-Vars setzen.
     jwtSecret,
-    jwtExpiresIn: process.env.JWT_EXPIRES_IN || '24h',
+    jwtExpiresIn: process.env.JWT_EXPIRES_IN || '15m',
+    // Cookie-Ablaufzeit in ms — MUSS mit jwtExpiresIn synchron sein (SECURITY FIX M1)
+    jwtCookieMaxAgeMs: parseExpiresInToMs(process.env.JWT_EXPIRES_IN || '15m'),
+
+    // Account Lockout (SECURITY FIX H1)
+    accountLockoutMaxAttempts: parseInt(process.env.LOCKOUT_MAX_ATTEMPTS || '5', 10),
+    accountLockoutDurationMs: parseInt(process.env.LOCKOUT_DURATION_MS || String(15 * 60 * 1000), 10),
 
     // Verschlüsselung
     encryptionKey,

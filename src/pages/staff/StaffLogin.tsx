@@ -63,6 +63,7 @@ export default function StaffLogin() {
             </label>
             <input
               id="staff-user"
+              data-testid="staff-username"
               type="text"
               autoComplete="username"
               value={username}
@@ -79,6 +80,7 @@ export default function StaffLogin() {
             </label>
             <input
               id="staff-pass"
+              data-testid="staff-password"
               type="password"
               autoComplete="current-password"
               value={password}
@@ -101,6 +103,7 @@ export default function StaffLogin() {
 
           <button
             type="submit"
+            data-testid="staff-login-submit"
             disabled={loginMutation.isPending}
             className="w-full rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 flex items-center justify-center gap-2 disabled:opacity-50 transition-all shadow-lg hover:shadow-blue-600/20 active:scale-[0.98]"
           >

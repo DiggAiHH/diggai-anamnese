@@ -4,6 +4,10 @@ import * as jwt from 'jsonwebtoken';
 import * as crypto from 'crypto';
 import * as nodemailer from 'nodemailer';
 import { t, LocalizedError } from '../../i18n';
+import { config } from '../../config';
+import { blacklistToken, isTokenBlacklisted } from '../../middleware/auth';
+import { validatePasswordStrength } from '../../utils/password-policy';
+import { SecurityEvent, logSecurityEvent } from '../security-audit.service';
 
 import type {
   PatientRegistrationData,
@@ -15,8 +19,10 @@ import type {
 
 // ─── Constants ──────────────────────────────────────────────
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-pwa-secret';
-const TOKEN_EXPIRY = '7d';
+// SECURITY FIX C1: Kein Fallback auf hardcoded Secret — config.ts erzwingt min. 32 Zeichen
+const JWT_SECRET = config.jwtSecret;
+// SECURITY FIX C2: Token-Expiry jetzt über config (Standard: 15m statt 7d)
+const TOKEN_EXPIRY = config.jwtExpiresIn;
 const BCRYPT_ROUNDS = 12;
 
 // ─── Prisma helper ──────────────────────────────────────────
@@ -51,22 +57,43 @@ function toAccountData(record: any): PatientAccountData {
   };
 }
 
-export function signToken(accountId: string, patientId: string): { token: string; expiresAt: string } {
+export function signToken(accountId: string, patientId: string): { token: string; expiresAt: string; jti: string } {
+  // SECURITY FIX C3: JTI hinzugefügt — erforderlich für Token-Blacklist bei Logout
+  const jti = crypto.randomUUID();
   const payload: PwaJwtPayload = {
     accountId,
     patientId,
     role: 'patient_portal',
+    jti,
   };
 
-  const token = jwt.sign(payload, JWT_SECRET, { expiresIn: TOKEN_EXPIRY });
+  const token = jwt.sign(payload, JWT_SECRET, {
+    expiresIn: TOKEN_EXPIRY,
+    algorithm: 'HS256', // BSI TR-02102: Algorithmus explizit pinnen
+  } as jwt.SignOptions);
 
   // Decode to read actual expiry
   const decoded = jwt.decode(token) as PwaJwtPayload;
   const expiresAt = decoded.exp
     ? new Date(decoded.exp * 1000).toISOString()
-    : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    : new Date(Date.now() + config.jwtCookieMaxAgeMs).toISOString();
 
-  return { token, expiresAt };
+  return { token, expiresAt, jti };
+}
+
+/**
+ * Invalidiert einen PWA-Token (z.B. bei Logout).
+ * Nutzt dieselbe Redis/In-Memory-Blacklist wie der Hauptauth-Flow.
+ */
+export async function revokeToken(jti: string, expiresInMs: number): Promise<void> {
+  await blacklistToken(jti, expiresInMs);
+}
+
+/**
+ * Prüft ob ein PWA-Token widerrufen wurde.
+ */
+export async function isPwaTokenRevoked(jti: string): Promise<boolean> {
+  return isTokenBlacklisted(jti);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -101,15 +128,21 @@ export async function registerPatient(data: PatientRegistrationData): Promise<Pa
     throw new LocalizedError('errors.auth.account_exists');
   }
 
-  // 3. Hash password (and optional PIN)
+  // 3. Passwort-Policy prüfen (BSI TR-02102 — SECURITY FIX H2)
+  const policyResult = validatePasswordStrength(data.password);
+  if (!policyResult.valid) {
+    throw new LocalizedError('errors.auth.password_too_weak', policyResult.errors.join('; '));
+  }
+
+  // 4. Hash password (and optional PIN)
   const passwordHash = await bcrypt.hash(data.password, BCRYPT_ROUNDS);
   const pinHash = data.pin ? await bcrypt.hash(data.pin, BCRYPT_ROUNDS) : undefined;
 
-  // 4. Generate email verification token
+  // 5. Generate email verification token
   const verificationToken = crypto.randomBytes(32).toString('hex');
   const verificationExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
 
-  // 5. Create PatientAccount
+  // 6. Create PatientAccount
   const account = await prisma.patientAccount.create({
     data: {
       patientId: patient.id,
@@ -122,7 +155,7 @@ export async function registerPatient(data: PatientRegistrationData): Promise<Pa
     },
   });
 
-  // 6. Send verification email (non-blocking — log warning on failure)
+  // 7. Send verification email (non-blocking — log warning on failure)
   if (data.email) {
     sendVerificationEmail(data.email, verificationToken).catch(err => {
       console.warn('[auth] sendVerificationEmail failed (non-fatal):', err?.message);
@@ -133,17 +166,17 @@ export async function registerPatient(data: PatientRegistrationData): Promise<Pa
 }
 
 /**
- * Standard login with email/phone + password.
+ * Standard login with email/phone/patient number + password.
  */
 export async function loginPatient(req: PatientLoginRequest): Promise<PatientLoginResponse> {
   const prisma = getPrisma();
 
-  // Try to find by email first, then phone
   const account = await prisma.patientAccount.findFirst({
     where: {
       OR: [
         { email: req.identifier },
         { phone: req.identifier },
+        { patient: { patientNumber: req.identifier } },
       ],
       isActive: true,
     },
@@ -570,6 +603,12 @@ export async function resetPasswordWithToken(
   token: string,
   newPassword: string
 ): Promise<boolean> {
+  // SECURITY FIX H2: Passwort-Policy auch bei Reset erzwingen
+  const policyResult = validatePasswordStrength(newPassword);
+  if (!policyResult.valid) {
+    throw new LocalizedError('errors.auth.password_too_weak', policyResult.errors.join('; '));
+  }
+
   const prisma = getPrisma();
 
   const account = await prisma.patientAccount.findFirst({
@@ -589,16 +628,28 @@ export async function resetPasswordWithToken(
       passwordHash,
       resetToken: null,
       resetTokenExpiry: null,
+      // Reset failed attempts nach erfolgreichem Passwort-Reset
+      failedLoginAttempts: 0,
+      lockedUntil: null,
     },
+  });
+
+  await logSecurityEvent({
+    event: SecurityEvent.PASSWORD_RESET_COMPLETED,
+    tenantId: 'pwa',
+    actorId: account.id,
   });
 
   return true;
 }
 
 /**
- * DSGVO Art. 17 soft-delete with a 30-day grace period.
- * Sets deletedAt + deletionScheduledAt and invalidates all devices.
- * Personal identifiers (email, phone) are retained until the hard-delete job runs.
+ * DSGVO Art. 17 soft-delete mit 30-tägiger Karenzzeit für Hard-Delete.
+ *
+ * SECURITY FIX M3: PII (email, phone) wird SOFORT genullt — nicht erst nach 30 Tagen.
+ * DSGVO Art. 17 verlangt Löschung "ohne unangemessene Verzögerung".
+ * Die 30-Tage-Frist gilt für die technische Hard-Delete-Ausführung (Backup-Zyklen),
+ * aber identifizierende Daten müssen sofort unkenntlich gemacht werden.
  */
 export async function softDeleteAccount(accountId: string): Promise<void> {
   const prisma = getPrisma();
@@ -620,17 +671,31 @@ export async function softDeleteAccount(accountId: string): Promise<void> {
       deletedAt: now,
       deletionScheduledAt,
       isActive: false,
+      // DSGVO Art. 17: PII sofort löschen (SECURITY FIX M3)
+      email: null,
+      phone: null,
+      // Auth-Tokens invalidieren (Sicherheit)
       resetToken: null,
       resetTokenExpiry: null,
       verificationToken: null,
       verificationExpiry: null,
+      // Lockout-Status zurücksetzen
+      failedLoginAttempts: 0,
+      lockedUntil: null,
     },
   });
 
-  // Invalidate all registered devices
+  // Alle Geräte deaktivieren
   await prisma.patientDevice.updateMany({
     where: { accountId },
     data: { isActive: false },
+  });
+
+  await logSecurityEvent({
+    event: SecurityEvent.ACCOUNT_DELETED,
+    tenantId: 'pwa',
+    actorId: accountId,
+    metadata: { method: 'soft_delete', piClearedImmediately: true },
   });
 }
 

@@ -240,6 +240,7 @@ export {
     usePwaProfile,
     // Auth
     usePwaLogin,
+    usePwaLogout,
     usePwaRegister,
     usePwaVerifyEmail,
     // Appointments

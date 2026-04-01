@@ -68,8 +68,8 @@ export default function PwaLogin() {
       setLocalError(t('patternLock.mismatch'));
       return;
     }
-    if (regPassword.length < 8) {
-      setLocalError(t('Neues Passwort (min. 8 Zeichen)'));
+    if (regPassword.length < 12) {
+      setLocalError(t('Neues Passwort (mind. 12 Zeichen)'));
       return;
     }
 
@@ -121,6 +121,7 @@ export default function PwaLogin() {
           {(['login', 'register'] as Tab[]).map((tabKey) => (
             <button
               key={tabKey}
+              data-testid={tabKey === 'login' ? 'pwa-tab-login' : 'pwa-tab-register'}
               onClick={() => { setTab(tabKey); setLocalError(null); }}
               className={`flex-1 py-2.5 text-sm font-medium rounded-lg transition-colors ${
                 tab === tabKey ? 'bg-white text-sky-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
@@ -133,7 +134,7 @@ export default function PwaLogin() {
 
         {/* Error */}
         {errorMsg && (
-          <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+          <div role="alert" className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
             {errorMsg}
           </div>
         )}
@@ -145,17 +146,21 @@ export default function PwaLogin() {
               {/* Identifier */}
               <div className="space-y-1.5">
                 <label htmlFor="login-identifier" className="block text-sm font-medium text-gray-700">
-                  {t('E-Mail-Adresse')} / {t('Telefonnummer (optional)')}
+                  {t('E-Mail-Adresse, Telefonnummer oder Patientennummer')}
                 </label>
                 <input
                   id="login-identifier"
+                  data-testid="pwa-login-identifier"
                   type="text"
                   autoComplete="username"
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
-                  placeholder={t('E-Mail-Adresse (optional)')}
+                  placeholder={t('z. B. max@beispiel.de, 01701234567 oder P-10001')}
                   className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
                 />
+                <p className="text-xs text-gray-500">
+                  {t('Melden Sie sich mit Ihrer E-Mail-Adresse, Telefonnummer oder Patientennummer an.')}
+                </p>
               </div>
 
               {/* Password */}
@@ -166,6 +171,7 @@ export default function PwaLogin() {
                 <div className="relative">
                   <input
                     id="login-password"
+                    data-testid="pwa-login-password"
                     type={showPassword ? 'text' : 'password'}
                     autoComplete="current-password"
                     value={password}
@@ -187,6 +193,7 @@ export default function PwaLogin() {
 
             <button
               type="submit"
+              data-testid="pwa-login-submit"
               disabled={isLoading}
               className="w-full rounded-xl bg-sky-600 px-4 py-3.5 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
             >
@@ -217,12 +224,17 @@ export default function PwaLogin() {
                 </label>
                 <input
                   id="reg-patient"
+                  data-testid="pwa-register-patient-number"
                   type="text"
                   value={regPatientNumber}
                   onChange={(e) => setRegPatientNumber(e.target.value)}
                   placeholder={t('patientIdentify.patientNumber')}
                   className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+                  required
                 />
+                <p className="text-xs text-gray-500">
+                  {t('Wir nutzen Ihre Patientennummer nur, um Ihr bestehendes Praxiskonto sicher zuzuordnen.')}
+                </p>
               </div>
 
               {/* Birth date */}
@@ -232,20 +244,26 @@ export default function PwaLogin() {
                 </label>
                 <input
                   id="reg-birthdate"
+                  data-testid="pwa-register-birth-date"
                   type="date"
                   value={regBirthDate}
                   onChange={(e) => setRegBirthDate(e.target.value)}
                   className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+                  required
                 />
+                <p className="text-xs text-gray-500">
+                  {t('Das Geburtsdatum dient ausschließlich dem sicheren Abgleich mit Ihrer Patientenakte.')}
+                </p>
               </div>
 
               {/* Email */}
               <div className="space-y-1.5">
                 <label htmlFor="reg-email" className="block text-sm font-medium text-gray-700">
-                  {t('E-Mail-Adresse')}
+                  {t('E-Mail-Adresse (optional)')}
                 </label>
                 <input
                   id="reg-email"
+                  data-testid="pwa-register-email"
                   type="email"
                   autoComplete="email"
                   value={regEmail}
@@ -263,11 +281,13 @@ export default function PwaLogin() {
                 <div className="relative">
                   <input
                     id="reg-password"
+                    data-testid="pwa-register-password"
                     type={showRegPassword ? 'text' : 'password'}
                     autoComplete="new-password"
                     value={regPassword}
                     onChange={(e) => setRegPassword(e.target.value)}
-                    placeholder={t('Neues Passwort (min. 8 Zeichen)')}
+                    placeholder={t('Neues Passwort (mind. 12 Zeichen)')}
+                    minLength={12}
                     className="w-full rounded-xl border border-gray-200 px-4 py-3 pr-11 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
                   />
                   <button
@@ -289,6 +309,7 @@ export default function PwaLogin() {
                 <div className="relative">
                   <input
                     id="reg-confirm"
+                    data-testid="pwa-register-confirm-password"
                     type={showRegConfirm ? 'text' : 'password'}
                     autoComplete="new-password"
                     value={regConfirmPassword}
@@ -310,6 +331,7 @@ export default function PwaLogin() {
 
             <button
               type="submit"
+              data-testid="pwa-register-submit"
               disabled={isLoading}
               className="w-full rounded-xl bg-sky-600 px-4 py-3.5 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
             >

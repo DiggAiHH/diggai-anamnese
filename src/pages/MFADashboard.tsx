@@ -14,7 +14,10 @@ import {
   UserPlus, 
   LayoutDashboard, 
   CheckCircle,
-  FileText
+  FileText,
+  LayoutGrid,
+  AlertTriangle,
+  Clock
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { QRCodeSVG } from 'qrcode.react';
@@ -37,9 +40,20 @@ import { MfaImportVersandPanel } from '../components/mfa/MfaImportVersandPanel';
 import { clearStoredStaffUser, getStoredStaffToken } from '../lib/staffSession';
 import { STAFF_SESSION_QUERY_KEY, useStaffSession } from '../hooks/useStaffSession';
 
+// ═══════════════════════════════════════════════════════════
+// NEU: Dashboard Components (Phase 2)
+// ═══════════════════════════════════════════════════════════
+import { 
+  MfaKanbanBoard, 
+  TriageAlertPanel, 
+  LongestWaiters 
+} from '../components/dashboards';
+import { useRealtimeQueue, useQueueStats } from '../hooks/useDashboard';
+import { useDashboardStore } from '../store/dashboardStore';
+
 // ─── Types ─────────────────────────────────────────────
 
-type TabKey = 'sessions' | 'certify' | 'imports' | 'chat' | 'todo';
+type TabKey = 'sessions' | 'liveboard' | 'certify' | 'imports' | 'chat' | 'todo';
 
 interface MfaSession {
     id: string;
@@ -87,6 +101,105 @@ interface IncomingChatMessage {
     from: string;
     timestamp: string;
 }
+
+// ─── NEW: Live Queue Stats Component ───────────────────
+
+/**
+ * LiveQueueStats - Real-time stats from dashboard store
+ */
+const LiveQueueStats = React.memo(function LiveQueueStats() {
+    const { t } = useTranslation();
+    const stats = useQueueStats();
+    
+    return (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-white/5 border border-white/10 p-4 rounded-xl">
+                <div className="flex items-center gap-2 mb-1">
+                    <Users className="w-4 h-4 text-blue-400" />
+                    <span className="text-xs text-white/40 uppercase">{t('mfa.totalToday')}</span>
+                </div>
+                <p className="text-2xl font-bold text-white">{stats.totalToday}</p>
+            </div>
+            
+            <div className="bg-white/5 border border-white/10 p-4 rounded-xl">
+                <div className="flex items-center gap-2 mb-1">
+                    <Activity className="w-4 h-4 text-purple-400" />
+                    <span className="text-xs text-white/40 uppercase">{t('mfa.active')}</span>
+                </div>
+                <p className="text-2xl font-bold text-white">{stats.activeCount}</p>
+            </div>
+            
+            <div className="bg-white/5 border border-white/10 p-4 rounded-xl">
+                <div className="flex items-center gap-2 mb-1">
+                    <Clock className="w-4 h-4 text-amber-400" />
+                    <span className="text-xs text-white/40 uppercase">{t('mfa.avgWait')}</span>
+                </div>
+                <p className="text-2xl font-bold text-white">{stats.averageWaitTime}m</p>
+            </div>
+            
+            <div className="bg-red-500/10 border border-red-500/30 p-4 rounded-xl">
+                <div className="flex items-center gap-2 mb-1">
+                    <AlertTriangle className="w-4 h-4 text-red-400" />
+                    <span className="text-xs text-red-400/70 uppercase">{t('mfa.critical')}</span>
+                </div>
+                <p className="text-2xl font-bold text-red-400">{stats.criticalCount}</p>
+            </div>
+        </div>
+    );
+});
+
+// ─── NEW: Live Queue View Component ────────────────────
+
+/**
+ * LiveQueueView - New Kanban Board with side panels
+ */
+const LiveQueueView = React.memo(function LiveQueueView() {
+    const { t } = useTranslation();
+    const [showAlerts, setShowAlerts] = useState(true);
+    
+    return (
+        <div className="space-y-6">
+            {/* Stats Row */}
+            <LiveQueueStats />
+            
+            {/* Main Content: Kanban + Side Panels */}
+            <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+                {/* Left: Kanban Board */}
+                <div className="xl:col-span-3 space-y-4">
+                    <div className="flex items-center justify-between">
+                        <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                            <LayoutGrid className="w-5 h-5 text-purple-400" />
+                            {t('mfa.liveQueue')}
+                        </h2>
+                        <div className="flex items-center gap-2 text-sm text-white/40">
+                            <span className="flex items-center gap-1">
+                                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                {t('mfa.realtime')}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <MfaKanbanBoard />
+                </div>
+                
+                {/* Right: Side Panels */}
+                <div className="space-y-4">
+                    {/* Triage Alerts */}
+                    <TriageAlertPanel 
+                        enableSound={showAlerts}
+                    />
+                    
+                    {/* Longest Waiters */}
+                    <LongestWaiters 
+                        limit={5}
+                        warningThreshold={30}
+                        criticalThreshold={45}
+                    />
+                </div>
+            </div>
+        </div>
+    );
+});
 
 // ─── Memoized Sub-Components ───────────────────────────
 
@@ -525,6 +638,7 @@ const MFAChatModal = React.memo(function MFAChatModal({
 // Tab configuration
 const TABS_CONFIG = [
     { key: 'sessions' as const, labelKey: 'mfa.currentRequests', labelDefault: 'Anfragen', icon: ClipboardList },
+    { key: 'liveboard' as const, labelKey: 'mfa.liveBoard', labelDefault: 'Live Board', icon: LayoutGrid },
     { key: 'certify' as const, labelKey: 'mfa.certify', labelDefault: 'Zertifizierung', icon: Shield },
     { key: 'imports' as const, labelKey: 'mfa.importVersand', labelDefault: 'Import / Versand', icon: FileText },
     { key: 'chat' as const, labelKey: 'mfa.teamChat', labelDefault: 'Team-Chat', icon: MessageSquare },
@@ -542,6 +656,11 @@ export const MFADashboard: React.FC = React.memo(function MFADashboard() {
     const [activeTab, setActiveTab] = useState<TabKey>('sessions');
     const [certifySession, setCertifySession] = useState<{ sessionId: string; patientName: string; gender?: string; birthDate?: string } | null>(null);
     const queryClient = useQueryClient();
+    
+    // ═══════════════════════════════════════════════════════
+    // NEU: Initialize Realtime Queue (Phase 2)
+    // ═══════════════════════════════════════════════════════
+    useRealtimeQueue({ enabled: !!staffUser });
 
     // Stable callbacks
     const handleLogout = useCallback(() => {
@@ -631,6 +750,17 @@ export const MFADashboard: React.FC = React.memo(function MFADashboard() {
                         <WartezimmerPanel />
                     </>
                 );
+            
+            // ═══════════════════════════════════════════════════════
+            // NEU: Live Board Tab (Phase 2)
+            // ═══════════════════════════════════════════════════════
+            case 'liveboard':
+                return (
+                    <div className="animate-fade-in">
+                        <LiveQueueView />
+                    </div>
+                );
+                
             case 'certify':
                 return (
                     <div className="space-y-6">
@@ -717,12 +847,12 @@ export const MFADashboard: React.FC = React.memo(function MFADashboard() {
 
             <main className="max-w-7xl mx-auto px-6 py-10">
                 <div className="space-y-10">
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
                         {TABS_CONFIG.map(tab => (
                             <button
                                 key={tab.key}
                                 onClick={() => setActiveTab(tab.key)}
-                                className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-bold text-sm transition-all ${
+                                className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-bold text-sm transition-all whitespace-nowrap ${
                                     activeTab === tab.key 
                                     ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/20' 
                                     : 'bg-white/5 text-white/40 hover:bg-white/10 hover:text-white'

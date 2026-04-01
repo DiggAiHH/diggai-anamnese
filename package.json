@@ -20,6 +20,7 @@
     "test:changed": "vitest run --changed",
     "test:related": "vitest related",
     "test:e2e": "npx playwright test",
+    "test:e2e:remote": "node e2e/run-remote.mjs",
     "test:load": "node scripts/run-load-tests.js",
     "test:load:api": "k6 run tests/load/api-load-test.js",
     "test:load:dashboard": "k6 run tests/load/dashboard-load-test.js",

@@ -364,6 +364,11 @@ model ArztUser {
   customPermissions String? // JSON: string[] — Zusätzliche Permission-Codes über Rolle hinaus
   lastLoginAt       DateTime?
   loginCount        Int       @default(0)
+
+  // Brute-Force / Account Lockout (SECURITY FIX — H-LOCKOUT)
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
+
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @default(now()) @updatedAt
 
@@ -1256,6 +1261,10 @@ model PatientAccount {
   verifiedAt  DateTime?
   lastLoginAt DateTime?
   loginCount  Int       @default(0)
+
+  // Brute-Force / Account Lockout (SECURITY FIX — H-LOCKOUT)
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
 
   locale      String  @default("de")
   notifyEmail Boolean @default(true)

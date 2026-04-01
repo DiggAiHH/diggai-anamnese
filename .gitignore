@@ -19,6 +19,7 @@ lerna-debug.log*
 .env.production
 server/.env
 **/.env
+.env.e2e
 # But keep the example template:
 !.env.example
 

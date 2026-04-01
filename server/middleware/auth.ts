@@ -131,11 +131,12 @@ export function createToken(payload: AuthPayload): string {
 
 /** Set JWT as httpOnly cookie on the response */
 export function setTokenCookie(res: Response, token: string): void {
+    // SECURITY FIX M1: maxAge jetzt synchron mit config.jwtExpiresIn (nicht hardcoded 24h)
     res.cookie('access_token', token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'strict',
-        maxAge: 24 * 60 * 60 * 1000, // 24h
+        maxAge: config.jwtCookieMaxAgeMs,
         path: '/',
     });
 }

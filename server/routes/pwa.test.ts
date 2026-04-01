@@ -17,6 +17,7 @@ const pwaServiceMocks = vi.hoisted(() => ({
 const prismaMocks = vi.hoisted(() => ({
   patientAccount: {
     findUnique: vi.fn(),
+    findFirst: vi.fn(),
     update: vi.fn(),
     create: vi.fn(),
   },
@@ -106,6 +107,16 @@ vi.mock('../services/pwa/push.service', () => ({
   sendNotification: vi.fn(),
 }));
 
+vi.mock('../services/security-audit.service', () => ({
+  SecurityEvent: {
+    LOGIN_SUCCESS: 'LOGIN_SUCCESS',
+    LOGOUT: 'LOGOUT',
+    PASSWORD_CHANGED: 'PASSWORD_CHANGED',
+  },
+  logSecurityEvent: vi.fn(),
+  logLoginFailure: vi.fn(),
+}));
+
 vi.mock('../db', () => ({
   prisma: prismaMocks,
 }));
@@ -181,7 +192,7 @@ describe('pwa routes', () => {
         body: {
           patientNumber: 'P-001',
           birthDate: '1990-01-01',
-          password: 'SecurePass123',
+          password: 'SecurePass1234',
         },
         headers: { 'accept-language': 'de' },
       });
@@ -206,18 +217,39 @@ describe('pwa routes', () => {
 
       expect(res.statusCode).toBe(400);
     });
+
+    it('should reject passwords shorter than 12 characters', async () => {
+      const handlers = getRouteHandlers('/auth/register', 'post');
+      const handler = handlers[handlers.length - 1] as (req: unknown, res: unknown) => Promise<void>;
+
+      const req = createMockRequest({
+        body: {
+          patientNumber: 'P-001',
+          birthDate: '1990-01-01',
+          password: 'ShortPass1!',
+        },
+      });
+      const res = createMockResponse();
+
+      await handler(req, res);
+
+      expect(res.statusCode).toBe(400);
+    });
   });
 
   describe('POST /auth/login', () => {
     it('should login with valid credentials', async () => {
       const mockResult = { token: 'jwt-token', account: { id: 'account-1' } };
       pwaServiceMocks.loginPatient.mockResolvedValue(mockResult);
+      vi.mocked(prismaMocks.patientAccount.findFirst).mockResolvedValue(null as never);
 
       const handlers = getRouteHandlers('/auth/login', 'post');
       const handler = handlers[handlers.length - 1] as (req: unknown, res: unknown) => Promise<void>;
 
       const req = createMockRequest({
         body: { identifier: 'P-001', password: 'SecurePass123' },
+        ip: '127.0.0.1',
+        socket: { remoteAddress: '127.0.0.1' },
       });
       const res = createMockResponse();
 
@@ -225,6 +257,10 @@ describe('pwa routes', () => {
 
       expect(res.statusCode).toBe(200);
       expect(res.body).toEqual(mockResult);
+      expect(pwaServiceMocks.loginPatient).toHaveBeenCalledWith({
+        identifier: 'P-001',
+        password: 'SecurePass123',
+      });
     });
   });
 
