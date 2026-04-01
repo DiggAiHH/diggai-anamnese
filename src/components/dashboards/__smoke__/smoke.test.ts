@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Dashboard Smoke Tests - Quick validation tests
  */

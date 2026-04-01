@@ -27,7 +27,7 @@ import {
   PriorityList 
 } from '../components/dashboards';
 import { useRealtimeQueue } from '../hooks/useDashboard';
-import { useDashboardStore } from '../store/dashboardStore';
+import { useDashboardStore, selectSelectedPatient } from '../store/dashboardStore';
 
 // ─── Types ─────────────────────────────────────────────
 
@@ -177,7 +177,7 @@ const PatientDetailView = React.memo(function PatientDetailView({
                 <div className="flex items-start justify-between">
                     <div className="flex items-center gap-4">
                         <div className="w-14 h-14 rounded-full bg-gradient-to-br from-purple-500/40 to-blue-500/40 flex items-center justify-center text-white font-bold text-lg">
-                            {patient.patientName.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                            {patient.patientName.split(' ').map((n: string) => n[0]).join('').slice(0, 2)}
                         </div>
                         <div>
                             <h2 className="text-xl font-bold text-white">{patient.patientName}</h2>

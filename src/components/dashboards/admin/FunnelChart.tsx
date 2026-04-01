@@ -40,6 +40,77 @@ const STAGE_COLORS = [
   '#d946ef', // Fuchsia
 ];
 
+// Custom Tooltip — defined outside component to avoid recreating on each render
+const CustomTooltip = ({ active, payload }: {
+  active?: boolean;
+  payload?: Array<{ payload: ChartDataPoint }>;
+}) => {
+  if (active && payload && payload.length) {
+    const stage = payload[0].payload;
+    return (
+      <div className="bg-slate-900 border border-white/20 rounded-lg p-3 shadow-xl min-w-[200px]">
+        <p className="text-white font-semibold mb-2">{stage.name}</p>
+
+        <div className="space-y-1 text-sm">
+          <div className="flex justify-between">
+            <span className="text-white/50">Patienten:</span>
+            <span className="text-white font-medium">{stage.value}</span>
+          </div>
+
+          <div className="flex justify-between">
+            <span className="text-white/50">Conversion:</span>
+            <span className="text-emerald-400">{stage.conversionRate}%</span>
+          </div>
+
+          {stage.dropOff > 0 && (
+            <div className="flex justify-between">
+              <span className="text-white/50">Abbrüche:</span>
+              <span className="text-red-400">{stage.dropOff} ({stage.dropOffRate}%)</span>
+            </div>
+          )}
+
+          <div className="flex justify-between pt-1 border-t border-white/10">
+            <span className="text-white/50">Ø Zeit:</span>
+            <span className="text-white">{stage.avgTime} Min</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
+// Custom Label — defined outside component to avoid recreating on each render
+const CustomLabel = (props: { x?: number; y?: number; width?: number; height?: number; value?: number; payload?: ChartDataPoint }) => {
+  const { x = 0, y = 0, width = 0, value = 0, payload } = props;
+  if (!payload) return null;
+
+  return (
+    <g>
+      <text
+        x={x + width / 2}
+        y={y + (props.height || 0) / 2}
+        fill="white"
+        textAnchor="middle"
+        dominantBaseline="middle"
+        className="text-xs font-semibold"
+      >
+        {value}
+      </text>
+      <text
+        x={x + width / 2}
+        y={y + (props.height || 0) / 2 + 14}
+        fill="rgba(255,255,255,0.5)"
+        textAnchor="middle"
+        dominantBaseline="middle"
+        className="text-[10px]"
+      >
+        ({payload.conversionRate}%)
+      </text>
+    </g>
+  );
+};
+
 export const FunnelChart: React.FC<FunnelChartProps> = ({
   data,
   className,
@@ -55,77 +126,6 @@ export const FunnelChart: React.FC<FunnelChartProps> = ({
       dropOffRate: index === 0 ? 0 : Math.round((stage.dropOff / maxValue) * 100),
     }));
   }, [data]);
-
-  // Custom Tooltip
-  const CustomTooltip = ({ active, payload }: {
-    active?: boolean;
-    payload?: Array<{ payload: ChartDataPoint }>;
-  }) => {
-    if (active && payload && payload.length) {
-      const stage = payload[0].payload;
-      return (
-        <div className="bg-slate-900 border border-white/20 rounded-lg p-3 shadow-xl min-w-[200px]">
-          <p className="text-white font-semibold mb-2">{stage.name}</p>
-          
-          <div className="space-y-1 text-sm">
-            <div className="flex justify-between">
-              <span className="text-white/50">Patienten:</span>
-              <span className="text-white font-medium">{stage.value}</span>
-            </div>
-            
-            <div className="flex justify-between">
-              <span className="text-white/50">Conversion:</span>
-              <span className="text-emerald-400">{stage.conversionRate}%</span>
-            </div>
-            
-            {stage.dropOff > 0 && (
-              <div className="flex justify-between">
-                <span className="text-white/50">Abbrüche:</span>
-                <span className="text-red-400">{stage.dropOff} ({stage.dropOffRate}%)</span>
-              </div>
-            )}
-            
-            <div className="flex justify-between pt-1 border-t border-white/10">
-              <span className="text-white/50">Ø Zeit:</span>
-              <span className="text-white">{stage.avgTime} Min</span>
-            </div>
-          </div>
-        </div>
-      );
-    }
-    return null;
-  };
-
-  // Custom Label
-  const CustomLabel = (props: { x?: number; y?: number; width?: number; height?: number; value?: number; payload?: ChartDataPoint }) => {
-    const { x = 0, y = 0, width = 0, value = 0, payload } = props;
-    if (!payload) return null;
-    
-    return (
-      <g>
-        <text
-          x={x + width / 2}
-          y={y + (props.height || 0) / 2}
-          fill="white"
-          textAnchor="middle"
-          dominantBaseline="middle"
-          className="text-xs font-semibold"
-        >
-          {value}
-        </text>
-        <text
-          x={x + width / 2}
-          y={y + (props.height || 0) / 2 + 14}
-          fill="rgba(255,255,255,0.5)"
-          textAnchor="middle"
-          dominantBaseline="middle"
-          className="text-[10px]"
-        >
-          ({payload.conversionRate}%)
-        </text>
-      </g>
-    );
-  };
 
   return (
     <div className={cn('bg-white/5 border border-white/10 rounded-xl p-4', className)}>
@@ -185,7 +185,7 @@ export const FunnelChart: React.FC<FunnelChartProps> = ({
               barSize={40}
             >
               <LabelList content={<CustomLabel />} />
-              {chartData.map((entry, index) => (
+              {chartData.map((_entry, index) => (
                 <Cell 
                   key={`cell-${index}`} 
                   fill={STAGE_COLORS[index % STAGE_COLORS.length]}

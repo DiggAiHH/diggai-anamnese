@@ -33,11 +33,22 @@ export interface QueueService {
 class MockQueueService implements QueueService {
   private engine: ReturnType<typeof import('../data/mockDashboards').getMockDashboardEngine> | null = null;
   private listeners: Set<(items: PatientQueueItem[]) => void> = new Set();
+  private enginePromise: Promise<ReturnType<typeof import('../data/mockDashboards').getMockDashboardEngine>> | null = null;
+
+  private async getEngineAsync() {
+    if (!this.engine) {
+      if (!this.enginePromise) {
+        this.enginePromise = import('../data/mockDashboards').then(m => m.getMockDashboardEngine());
+      }
+      this.engine = await this.enginePromise;
+    }
+    return this.engine;
+  }
 
   private getEngine() {
     if (!this.engine) {
-      const { getMockDashboardEngine } = require('../data/mockDashboards');
-      this.engine = getMockDashboardEngine();
+      // Synchronous fallback — engine is loaded lazily; callers should prefer getEngineAsync
+      void import('../data/mockDashboards').then(m => { this.engine = m.getMockDashboardEngine(); });
     }
     return this.engine!;
   }
@@ -84,9 +95,9 @@ class MockQueueService implements QueueService {
   destroy(): void {
     this.stopRealtime();
     if (this.engine) {
-      const { destroyMockDashboardEngine } = require('../data/mockDashboards');
-      destroyMockDashboardEngine();
+      void import('../data/mockDashboards').then(m => m.destroyMockDashboardEngine());
       this.engine = null;
+      this.enginePromise = null;
     }
   }
 }

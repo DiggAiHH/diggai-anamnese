@@ -215,12 +215,7 @@ export const PatientListItem: React.FC<{
   className?: string;
 }> = ({ patient, viewMode = 'privacy', onClick, selected = false, className }) => {
   const [isRevealed, setIsRevealed] = useState(false);
-  
-  const displayName = viewMode === 'full' || isRevealed
-    ? patient.patientName
-    : patient.displayName;
-  const [isRevealed, setIsRevealed] = useState(false);
-  
+
   const displayName = viewMode === 'full' || isRevealed
     ? patient.patientName
     : patient.displayName;
