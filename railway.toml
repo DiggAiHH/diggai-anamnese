@@ -2,20 +2,18 @@
 # Docs: https://docs.railway.app/reference/config-as-code
 
 [build]
-# Railway auto-detects the multi-stage Dockerfile in anamnese-app/
+dockerfilePath = "Dockerfile"
 
 [deploy]
-# Health check — Express /api/health returns { status: "ok", ... }
-healthcheckPath = "/api/health"
-healthcheckTimeout = 30
+# Health check — Express /api/system/live is the liveness probe
+healthcheckPath = "/api/system/live"
+healthcheckTimeout = 60
 
 # Restart policy: restart on failure, max 10 retries before marking degraded
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10
 
-# Horizontal scaling — requires Railway Pro plan
-# Set to 1 for Hobby plan; 2+ for Pro production
-numReplicas = 2
+# numReplicas = 1  # Hobby plan: 1 replica; Pro plan: 2+
 
 # ─── Required Environment Variables ──────────────────────────────────────────
 # Set ALL of these in Railway Dashboard > Your Service > Variables
