@@ -51,10 +51,15 @@ import signatureRoutes from './routes/signatures';
 import agentRoutes from './routes/agents';
 import subscriptionRoutes from './routes/subscriptions';
 import billingRoutes from './routes/billing';
+import checkoutRoutes from './routes/checkout';
+import billingAnalyticsRoutes from './routes/billing-analytics';
+import { billingJobs } from './jobs/billingJobs';
 import themeRoutes from './routes/theme.routes';
 import wearablesRoutes from './routes/wearables';
 import usageRoutes from './routes/usage';
 import aiRoutes from './routes/ai';
+import authRoutes from './routes/auth';
+import { requireAuth, requireAdmin } from './middleware/auth';
 import { messageBroker } from './services/messagebroker.service';
 
 // Swagger API Docs (dev only — NOT mounted in production)
@@ -78,19 +83,20 @@ httpServer.setTimeout(30000);
 app.use(compression());
 
 // Security Headers with custom CSP — K-07 FIX: unsafe-inline entfernt für scripts
+// Stripe Integration: CSP erweitert für Stripe.js und Stripe Elements
 app.use(helmet({
     contentSecurityPolicy: {
         directives: {
             defaultSrc: ["'self'"],
-            scriptSrc: ["'self'"],
+            scriptSrc: ["'self'", "https://js.stripe.com", "https://hooks.stripe.com"],
             styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
             fontSrc: ["'self'", "https://fonts.gstatic.com"],
-            imgSrc: ["'self'", "data:", "blob:"],
-            connectSrc: ["'self'", config.frontendUrl],
-            frameSrc: ["'none'"],
+            imgSrc: ["'self'", "data:", "blob:", "https://*.stripe.com"],
+            connectSrc: ["'self'", config.frontendUrl, "https://api.stripe.com", "https://js.stripe.com"],
+            frameSrc: ["'self'", "https://js.stripe.com", "https://hooks.stripe.com", "https://*.stripe.com"],
             objectSrc: ["'none'"],
             baseUri: ["'self'"],
-            formAction: ["'self'"],
+            formAction: ["'self'", "https://*.stripe.com"],
             frameAncestors: ["'none'"],
         },
     },
@@ -219,6 +225,12 @@ const authLimiter = rateLimit({
 const uploadLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 30, message: { error: 'Upload-Limit erreicht.' } });
 // Patient portal limiter — protects login/register/password-reset from brute force
 const pwaLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100, message: { error: 'Zu viele Anfragen. Bitte warten Sie einen Moment.' } });
+// Payment limiter — strict limits for financial operations
+const paymentLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 20, // 20 requests per 15 minutes
+    message: { error: 'Zu viele Zahlungsanfragen. Bitte warten Sie einen Moment.' }
+});
 
 type RouteDomain = BackendDomain | 'shared';
 
@@ -250,6 +262,7 @@ const mountRoute = (
 // Stripe Webhooks - MÜSSEN vor express.json() kommen für raw body
 if (shouldMountDomain('company')) {
     app.use('/api/webhooks', express.raw({ type: 'application/json' }), stripeWebhookRoutes);
+    app.use('/api/billing/webhook', express.raw({ type: 'application/json' }), billingRoutes);
 }
 
 // Body Parser
@@ -319,7 +332,7 @@ mountRoute('authority', '/api/ti', authLimiter, tiRoutes);
 mountRoute('practice', '/api/nfc', nfcRoutes);
 mountRoute('practice', '/api/flows', authLimiter, flowRoutes);
 mountRoute('practice', '/api/feedback', feedbackRoutes);
-mountRoute('company', '/api/payment', authLimiter, paymentRoutes);
+mountRoute('company', '/api/payment', paymentLimiter, paymentRoutes);
 mountRoute('practice', '/api/praxis-chat', praxisChatRoutes);
 mountRoute('practice', '/api/avatar', authLimiter, avatarRoutes);
 mountRoute('practice', '/api/telemedizin', authLimiter, telemedizinRoutes);
@@ -331,9 +344,12 @@ mountRoute('practice', '/api/signatures', authLimiter, signatureRoutes);
 mountRoute('company', '/api/agents', agentRoutes);
 mountRoute('company', '/api/subscriptions', subscriptionRoutes);
 mountRoute('company', '/api/billing', billingRoutes);
+mountRoute('company', '/api/checkout', paymentLimiter, checkoutRoutes);
+mountRoute('company', '/api/billing-analytics', requireAuth, requireAdmin, billingAnalyticsRoutes);
 mountRoute('practice', '/api/wearables', authLimiter, wearablesRoutes);
 mountRoute('company', '/api/usage', authLimiter, usageRoutes);
 mountRoute('practice', '/api/ai', aiRoutes);
+mountRoute('shared', '/api/auth', authLimiter, authRoutes);
 mountRoute('company', '/api', themeRoutes);
 
 // Health Check — includes DB + Redis connectivity with detailed checks
@@ -530,6 +546,7 @@ import { startEscalationWorker, stopEscalationWorker } from './jobs/escalationWo
 import { startComplianceReporter, stopComplianceReporter } from './jobs/complianceReporter';
 import { startQueueAutoDispatch, stopQueueAutoDispatch } from './jobs/queueAutoDispatch';
 import { startBillingReconciler, stopBillingReconciler } from './jobs/billingReconciler';
+import { startTokenCleanupJob, stopTokenCleanupJob } from './jobs/token-cleanup.job';
 try { startDatabaseCleanupJob(); } catch (err) { console.error('[Server] Failed to start cleanup job:', err); }
 try { startROISnapshotJob(); } catch (err) { console.error('[Server] Failed to start ROI snapshot job:', err); }
 try { startReminderWorker(); } catch (err) { console.error('[Server] Failed to start reminder worker:', err); }
@@ -541,6 +558,7 @@ try { startEscalationWorker(); } catch (err) { console.error('[Server] Failed to
 try { startComplianceReporter(); } catch (err) { console.error('[Server] Failed to start compliance reporter:', err); }
 try { startQueueAutoDispatch(); } catch (err) { console.error('[Server] Failed to start queue auto-dispatch:', err); }
 try { startBillingReconciler(); } catch (err) { console.error('[Server] Failed to start billing reconciler:', err); }
+try { startTokenCleanupJob(); } catch (err) { console.error('[Server] Failed to start token cleanup job:', err); }
 
 // RabbitMQ — verbindet sich mit Agent-Core (non-blocking, graceful degradation)
 messageBroker.connect().catch(err =>
@@ -561,6 +579,7 @@ try { stopBackupMonitor(); } catch (err) { console.error('[Server] Error stoppin
     try { stopComplianceReporter(); } catch (err) { console.error('[Server] Error stopping compliance reporter:', err); }
     try { stopQueueAutoDispatch(); } catch (err) { console.error('[Server] Error stopping queue auto-dispatch:', err); }
     try { stopBillingReconciler(); } catch (err) { console.error('[Server] Error stopping billing reconciler:', err); }
+try { stopTokenCleanupJob(); } catch (err) { console.error('[Server] Error stopping token cleanup job:', err); }
     await messageBroker.disconnect().catch(() => {});
     await closeRedis();
     httpServer.close(() => process.exit(0));
@@ -572,7 +591,7 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 httpServer.listen(config.port, () => {
-        const activeDomainsLabel = config.enabledDatabaseDomains.join(',');
+    const activeDomainsLabel = config.enabledDatabaseDomains.join(',');
     console.log(`
   ╔═══════════════════════════════════════════╗
   ║   🏥  Anamnese Backend v2.0              ║
@@ -583,6 +602,11 @@ httpServer.listen(config.port, () => {
   ║   CORS: ${config.frontendUrl.padEnd(20)}   ║
   ╚═══════════════════════════════════════════╝
   `);
+
+    // Start Billing Cron Jobs (nur im company domain)
+    if (shouldMountDomain('company')) {
+        billingJobs.start();
+    }
 });
 
 export default app;
