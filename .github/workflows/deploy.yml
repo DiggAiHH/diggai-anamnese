@@ -55,20 +55,30 @@ jobs:
           port: ${{ secrets.VPS_SSH_PORT || 22 }}
           script: |
             set -e
-            cd /opt/diggai/anamnese-app
 
-            echo "📥 Pulling latest changes..."
-            git pull origin master
+            # Pull latest code
+            # /opt/diggai/anamnese-app is a symlink → /opt/diggai/repo (repo root = app root)
+            echo "Pulling latest changes..."
+            git -C /opt/diggai/repo pull origin master
 
-            echo "🐳 Building and starting containers..."
-            docker compose pull
-            docker compose up -d --build
+            cd /opt/diggai/repo
 
-            echo "🗄️ Running database migrations..."
+            # Refresh SSL certs if due
+            echo "Renewing SSL certs if needed..."
+            sudo certbot renew --quiet 2>/dev/null || true
+            if [ -f /etc/letsencrypt/live/api.diggai.de/fullchain.pem ]; then
+              cp /etc/letsencrypt/live/api.diggai.de/fullchain.pem docker/certs/
+              cp /etc/letsencrypt/live/api.diggai.de/privkey.pem   docker/certs/
+            fi
+
+            echo "Building and starting containers..."
+            docker compose up -d --build --remove-orphans
+
+            echo "Running database migrations..."
             docker compose exec -T app npx prisma migrate deploy
 
-            echo "🏥 Health check..."
-            sleep 5
-            curl -sf http://localhost:3001/api/health || (echo "❌ Health check failed!" && exit 1)
+            echo "Health check..."
+            sleep 8
+            curl -sf http://localhost:3001/api/health || (echo "Health check failed!" && exit 1)
 
-            echo "✅ Deployment successful!"
+            echo "Deployment successful!"
