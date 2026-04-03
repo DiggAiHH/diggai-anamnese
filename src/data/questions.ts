@@ -58,7 +58,13 @@ export const questions: Question[] = [
             { value: 'D', label: 'divers/weiß nicht' }
         ],
         validation: { required: true },
-        logic: { next: ['0003'] }
+        logic: {
+            // Returning patients (0000='ja') skip birthdate — PatientIdentify collects it
+            conditional: [
+                { when: '0000', equals: 'ja', then: ['RPT-ID'] }
+            ],
+            next: ['0003']
+        }
     },
     {
         id: '0003',
@@ -72,11 +78,10 @@ export const questions: Question[] = [
             customMessage: 'Das Alter muss mehr als 3 Jahre betragen.'
         },
         logic: {
-            next: ['2000'], // Default to enrollment for new patients
+            // Only show for new patients — returning patients enter birthdate in PatientIdentify
+            showIf: [{ questionId: '0000', operator: 'equals', value: 'nein' }],
+            next: ['2000'],
             conditional: [
-                {
-                    when: '0000', equals: 'ja', then: ['RPT-ID']
-                },
                 { when: '0000', equals: 'nein', then: ['2000'] }
             ]
         }
@@ -192,12 +197,28 @@ export const questions: Question[] = [
     {
         id: '3003',
         type: 'email',
-        question: 'E-Mail-Adresse (optional)',
-        description: 'Falls vorhanden – wird für Terminbestätigungen und Rezeptbenachrichtigungen verwendet. Ohne E-Mail erhalten Sie alles direkt in der Praxis.',
+        question: 'Elektronische Adresse (E-Mail)',
+        description: 'Wird für Terminbestätigungen, Rezeptbenachrichtigungen und wichtige Praxisnachrichten verwendet. Die Digitalisierung unserer Prozesse funktioniert mit Ihrer E-Mail am besten.',
         section: 'kontakt',
         order: 15,
-        validation: { required: false, pattern: '^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$' },
-        logic: { next: ['3004'] }
+        placeholder: 'z.B. max.mustermann@example.de',
+        validation: { required: true, pattern: '^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$' },
+        helpText: 'helpText.email',
+        whyWeAsk: 'whyWeAsk.email',
+        logic: { 
+            next: ['3004'],
+            fallback: {
+                condition: 'fieldEmpty',
+                showDialog: true,
+                dialogTitle: 'Keine E-Mail-Adresse?',
+                dialogMessage: 'Das ist in Ordnung! Wir notieren das und kontaktieren Sie telefonisch. Das System funktioniert aber besser mit Ihrer E-Mail.',
+                dialogOptions: [
+                    { value: 'continue_phone_only', label: 'Weiter ohne E-Mail' },
+                    { value: 'provide_email', label: 'Doch E-Mail eingeben' }
+                ],
+                onFallback: 'SET_FLAG emailStatus:PHONE_ONLY'
+            }
+        }
     },
     {
         id: '3004',
@@ -311,6 +332,8 @@ export const questions: Question[] = [
         section: 'beschwerden',
         order: 20,
         options: [
+            // "Keine" first — patient can proceed without selecting a complaint area
+            { value: 'keine', label: 'Keine Auffälligkeiten / Unauffällig' },
             { value: 'kopf', label: 'Kopf', followUpQuestions: ['1080'] },
             { value: 'hals', label: 'Hals / Rachen', followUpQuestions: ['1B00'] },
             { value: 'brust', label: 'Brustschmerzen / Herzensenge (Notfall!)', followUpQuestions: ['1050'] },
@@ -326,7 +349,8 @@ export const questions: Question[] = [
             { value: 'urologie', label: 'Urologisch / Gynäkologisch', followUpQuestions: ['1090'] },
             { value: 'sonstiges', label: 'Sonstiges' }
         ],
-        validation: { required: true },
+        // Optional: "Keine" covers the no-complaint path; not forcing selection reduces abandonment
+        validation: { required: false },
         logic: {
             next: ['1003'],
             triage: {

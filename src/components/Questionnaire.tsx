@@ -22,7 +22,7 @@ import { SurgeryManager } from './SurgeryManager';
 import { SchwangerschaftCheck } from './SchwangerschaftCheck';
 import { PDFExport } from './PDFExport';
 import { SubmittedPage } from './SubmittedPage';
-import { PatientWartezimmer } from './PatientWartezimmer';
+import { WaitingRoomModal } from './WaitingRoomModal';
 import { PatientIdentify } from './inputs/PatientIdentify';
 import { CameraScanner } from './inputs/CameraScanner';
 import { IGelServices } from './IGelServices';
@@ -494,7 +494,12 @@ export function Questionnaire() {
         return (
             <div className="min-h-screen bg-(--bg-primary) flex items-center justify-center p-4">
                 <ConsentFlow
-                    onContinue={() => setClinicalConsentDone(true)}
+                    onContinue={(values) => {
+                        // Persist gamification preference — default is OFF (DSGVO Art. 6 Abs. 1 lit. a)
+                        localStorage.setItem('gamification_consent', values.gamification ? 'true' : 'false');
+                        localStorage.setItem('gamification_consent_ts', new Date().toISOString());
+                        setClinicalConsentDone(true);
+                    }}
                     estimatedMinutes={estimatedMinutes || 5}
                 />
             </div>
@@ -515,16 +520,16 @@ export function Questionnaire() {
                     onSendPackageLink={handleSendPackageLink}
                     canSendPackageLink={Boolean(patientEmail)}
                 />
-                {/* Online Wartezimmer / Waiting Room */}
+                {/* Waiting Room Modal — Dismissable, theme-aware, opaque background */}
                 {store.sessionId && store.token && (
-                    <div className="fixed bottom-0 left-0 right-0 z-40 max-w-lg mx-auto px-4 pb-4">
-                        <PatientWartezimmer
-                            sessionId={store.sessionId}
-                            patientName={patientName || 'Patient'}
-                            service={state.selectedReason || ''}
-                            token={store.token}
-                        />
-                    </div>
+                    <WaitingRoomModal
+                        open={isSubmitted}
+                        onClose={handleReset}
+                        sessionId={store.sessionId}
+                        patientName={patientName || 'Patient'}
+                        service={state.selectedReason || ''}
+                        token={store.token}
+                    />
                 )}
                 {showPDF && (
                     <PDFExport
@@ -962,8 +967,11 @@ export function Questionnaire() {
                 <ChatBubble sessionId={store.sessionId} />
             )}
 
-            {/* Confetti celebration when completing the questionnaire */}
-            <CompletionCelebration show={isLastQuestion && progress >= 100} />
+            {/* Confetti celebration — only when patient opted in to gamification */}
+            <CompletionCelebration show={
+                isLastQuestion && progress >= 100 &&
+                localStorage.getItem('gamification_consent') === 'true'
+            } />
 
             {/* Session timeout warning (15 min idle → 5 min countdown) */}
             <SessionTimeoutWarning onTimeout={handleReset} />

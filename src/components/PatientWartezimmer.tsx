@@ -262,7 +262,7 @@ export const PatientWartezimmer: React.FC<PatientWartezimmerProps> = ({
   ];
 
   return (
-    <div className="w-full max-w-lg mx-auto p-6 space-y-4 animate-fade-in">
+    <div className="w-full p-6 space-y-4 animate-fade-in">
       {/* Header with compact queue display */}
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-bold flex items-center gap-2 text-[var(--text-primary)]">
