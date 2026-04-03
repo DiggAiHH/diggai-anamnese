@@ -71,6 +71,9 @@ const apiClient = axios.create({
     withCredentials: true, // Send httpOnly cookies with every request
 });
 
+// Export the apiClient for use in other modules
+export { apiClient };
+
 /**
  * Führt einen deduplizierten Request aus.
  * Identische parallele Requests (gleiche URL + Methode + Body) teilen sich

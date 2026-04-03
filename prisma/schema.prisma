@@ -1331,11 +1331,23 @@ model PatientDevice {
   lastSeenAt DateTime  @default(now())
   lastUsedAt DateTime?
 
+  // NEU: Refresh Token Rotation Support
+  fingerprintHash String? // SHA-256 des Device Fingerprints
+  isTrusted       Boolean @default(false)
+  trustedAt       DateTime?
+  trustExpiresAt  DateTime? // Wann das Vertrauen abläuft
+  lastVerifiedAt  DateTime? // Wann das Gerät zuletzt verifiziert wurde
+
+  // Relationen
+  refreshTokens RefreshToken[]
+
   createdAt DateTime @default(now())
 
   @@index([accountId])
   @@index([pushToken])
   @@index([isActive])
+  @@index([fingerprintHash])
+  @@index([isTrusted])
 }
 
 model PatientConsent {
@@ -2369,4 +2381,101 @@ model DailySummary {
   @@unique([tenantId, date])
   @@index([tenantId, date])
   @@map("daily_summaries")
+}
+
+// ============================================
+// Auth Extensions (Refresh Token Rotation)
+// ============================================
+
+enum UserType {
+  ARZT
+  PATIENT
+}
+
+model RefreshToken {
+  id            String   @id @default(uuid())
+  tokenFamily   String   @default(uuid()) // Gruppen-ID für Rotation
+  tokenHash     String   @unique // SHA-256 des Tokens (niemals Klartext!)
+
+  // User Referenz (polymorph - kann Arzt oder Patient sein)
+  userId        String
+  userType      UserType // ARZT | PATIENT
+
+  // Optional: Link zu Gerät
+  deviceId      String?
+  device        PatientDevice? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+
+  // Zeitstempel
+  issuedAt      DateTime @default(now())
+  expiresAt     DateTime
+  rotatedAt     DateTime? // Wann wurde rotiert
+
+  // Revocation
+  isRevoked     Boolean  @default(false)
+  revokedAt     DateTime?
+  revokedReason String?
+
+  // Metadata
+  ipHash        String?  // SHA-256 der IP (DSGVO-konform)
+  userAgent     String?
+
+  // Security: Token Reuse Detection
+  reuseDetected Boolean  @default(false)
+  reuseCount    Int      @default(0)
+
+  @@index([userId, userType])
+  @@index([tokenFamily])
+  @@index([expiresAt])
+  @@index([isRevoked, expiresAt])
+  @@index([tokenHash])
+  @@map("refresh_tokens")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 2FA / TOTP Authentication
+// ═══════════════════════════════════════════════════════════════
+
+model TwoFactorAuth {
+  id          String   @id @default(uuid())
+  userId      String
+  userType    String   // 'ARZT' | 'PATIENT'
+  
+  secret          String   // Base32 encoded TOTP secret
+  backupCodes     String[] // SHA-256 hashed backup codes
+  usedBackupCodes String[] @default([]) // Track used backup codes
+  
+  isEnabled   Boolean  @default(false)
+  enabledAt   DateTime?
+  verifiedAt  DateTime?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@unique([userId, userType])
+  @@index([userId])
+  @@map("two_factor_auth")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Passkey / WebAuthn Credentials
+// ═══════════════════════════════════════════════════════════════
+
+model PasskeyCredential {
+  id                  String   @id @default(uuid())
+  userId              String
+  userType            String   // 'ARZT' | 'PATIENT'
+  
+  credentialID        Bytes
+  credentialPublicKey Bytes
+  counter             Int      @default(0)
+  
+  deviceName          String
+  transports          String[] // AuthenticatorTransport[]
+  
+  createdAt           DateTime @default(now())
+  lastUsedAt          DateTime @updatedAt
+  
+  @@index([userId])
+  @@index([credentialID])
+  @@map("passkey_credentials")
 }

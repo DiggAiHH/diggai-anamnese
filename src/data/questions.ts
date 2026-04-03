@@ -209,9 +209,6 @@ export const questions: Question[] = [
             next: ['3004'],
             fallback: {
                 condition: 'fieldEmpty',
-                showDialog: true,
-                dialogTitle: 'Keine E-Mail-Adresse?',
-                dialogMessage: 'Das ist in Ordnung! Wir notieren das und kontaktieren Sie telefonisch. Das System funktioniert aber besser mit Ihrer E-Mail.',
                 dialogOptions: [
                     { value: 'continue_phone_only', label: 'Weiter ohne E-Mail' },
                     { value: 'provide_email', label: 'Doch E-Mail eingeben' }

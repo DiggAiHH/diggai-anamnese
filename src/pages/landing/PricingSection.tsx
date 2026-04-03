@@ -91,17 +91,17 @@ export function PricingSection() {
         setLoading(planId);
         setError(null);
         try {
-            const res = await fetch('/api/subscriptions/checkout', {
+            const res = await fetch('/api/checkout/session', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     planId,
-                    praxisEmail: formData.email,
+                    email: formData.email,
                     praxisName: formData.praxisName,
                 }),
             });
             const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Fehler beim Checkout');
+            if (!res.ok) throw new Error(data.error || data.message || 'Fehler beim Checkout');
             window.location.href = data.url;
         } catch (err: any) {
             setError(err.message);

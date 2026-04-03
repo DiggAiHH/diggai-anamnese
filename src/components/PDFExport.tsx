@@ -197,7 +197,7 @@ export const PDFExport: React.FC<PDFExportProps> = ({
 
             {/* Druckbarer Bereich */}
             <div className="flex-1 overflow-y-auto bg-gray-100 print:bg-white">
-                <div ref={printRef} className="max-w-[210mm] mx-auto bg-white text-gray-900 shadow-xl my-8 print:my-0 print:shadow-none">
+                <div ref={printRef} className="pdf-report max-w-[210mm] mx-auto bg-white text-gray-900 shadow-xl my-8 print:my-0 print:shadow-none">
                     {/* Briefkopf */}
                     <div className="px-12 pt-10 pb-6 border-b-2 border-blue-600">
                         <div className="flex items-start justify-between">
@@ -225,13 +225,13 @@ export const PDFExport: React.FC<PDFExportProps> = ({
                     {/* Inhalt */}
                     <div className="px-12 py-8 space-y-8">
                         {grouped.map((group, gi) => (
-                            <div key={gi}>
+                            <div key={gi} className="pdf-section">
                                 <h2 className="text-sm font-bold text-blue-800 uppercase tracking-wider pb-2 mb-4 border-b border-gray-200">
                                     {group.label}
                                 </h2>
                                 <div className="space-y-2">
                                     {group.items.map((item, i) => (
-                                        <div key={i} className="flex py-1.5">
+                                        <div key={i} className="pdf-row flex py-1.5">
                                             <span className="text-xs text-gray-500 w-[60%] leading-relaxed">
                                                 {item.question.question}
                                             </span>
@@ -245,7 +245,7 @@ export const PDFExport: React.FC<PDFExportProps> = ({
                         ))}
 
                         {/* Unterschriftenfeld */}
-                        <div className="mt-12 pt-8 border-t-2 border-gray-200">
+                        <div className="pdf-signature mt-12 pt-8 border-t-2 border-gray-200">
                             <h3 className="text-sm font-bold text-gray-700 mb-4 flex items-center gap-2">
                                 <PenTool className="w-4 h-4" />
                                 {t('pdfPatientConfirm', 'Bestätigung des Patienten')}

@@ -1,0 +1,77 @@
+{
+  "title": "Security",
+  "subtitle": "Manage your security settings and active sessions",
+  "active": "Active",
+  "inactive": "Inactive",
+  "cancel": "Cancel",
+  "verifying": "Verifying...",
+  "disabling": "Disabling...",
+  "score": {
+    "title": "Security Status",
+    "good": "Your account is well protected",
+    "improve": "There is room for improvement"
+  },
+  "password": {
+    "title": "Password",
+    "lastChanged": "Last changed 3 months ago",
+    "current": "Current Password",
+    "new": "New Password",
+    "reqLength": "At least 12 characters",
+    "change": "Change Password"
+  },
+  "2fa": {
+    "title": "Two-Factor Authentication",
+    "enabled": "Enabled via Authenticator App",
+    "disabled": "Not enabled - increases security",
+    "setup": "Set up 2FA",
+    "disable": "Disable 2FA",
+    "backupCodes": "View Backup Codes",
+    "active": {
+      "title": "2FA is enabled",
+      "description": "Your account is additionally protected."
+    },
+    "inactive": {
+      "title": "2FA is not enabled",
+      "description": "Enable 2FA for additional protection."
+    },
+    "setup": {
+      "title": "2FA Setup",
+      "loading": "Generating QR code...",
+      "scanQr": "Scan the QR code with your Authenticator app:",
+      "manualEntry": "Manual entry:",
+      "enterCode": "Enter verification code",
+      "verify": "Activate",
+      "downloadCodes": "Download codes",
+      "backupCodesTitle": "Save Backup Codes",
+      "backupCodesDesc": "Keep these codes safe. They allow access if you lose your device."
+    },
+    "disableConfirm": {
+      "title": "Disable 2FA",
+      "warning": "Security Warning",
+      "description": "Disabling 2FA reduces your account security. You must enter a valid 2FA code to proceed.",
+      "enterCode": "2FA code for confirmation",
+      "confirm": "Disable"
+    },
+    "errors": {
+      "setupFailed": "Setup failed. Please try again.",
+      "verifyFailed": "Verification failed. Please check the code.",
+      "disableFailed": "Disable failed. Please check the code.",
+      "invalidCode": "Please enter a valid 6-digit code."
+    }
+  },
+  "sessions": {
+    "title": "Active Sessions",
+    "loading": "Loading...",
+    "count": "{{count}} active sessions",
+    "current": "Current",
+    "trusted": "Trusted",
+    "terminate": "Terminate",
+    "terminateAll": "Terminate all other sessions",
+    "terminating": "Terminating..."
+  },
+  "devices": {
+    "title": "Trusted Devices",
+    "count": "{{count}} trusted devices",
+    "manage": "Manage"
+  }
+}

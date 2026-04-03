@@ -8,6 +8,7 @@
  * - Algorithm Pinning: Nur HS256 (verhindert Algorithm Confusion Attacks)
  * - Token Blacklist: Redis (primär) + In-Memory-Map (Fallback) für Logout-Invalidierung
  * - HttpOnly Cookie: JWT wird als `access_token` Cookie gesetzt (XSS-immun)
+ * - Refresh Token Rotation: Kurzlebige Access Tokens (15min) + rotierende Refresh Tokens (7d)
  * - Fail-closed: Bei Blacklist-Fehlern → 503 statt 200 (DSGVO/HIPAA deny-by-default)
  *
  * @rbac RBAC Rollen und Zugriffsbereiche:
@@ -37,6 +38,7 @@ export interface AuthPayload {
     userId?: string;
     tenantId?: string;
     role: 'patient' | 'arzt' | 'mfa' | 'admin';
+    userType?: 'ARZT' | 'PATIENT';
     jti?: string; // JWT ID für Token-Blacklist
 }
 

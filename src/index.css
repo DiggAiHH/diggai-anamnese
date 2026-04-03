@@ -370,14 +370,14 @@ html[lang="fa"],
   --bg-overlay: rgba(245, 241, 231, 0.9);
   --bg-warm: #FFFBF5;
   
-  --border-primary: rgba(44, 95, 138, 0.12);
-  --border-hover: rgba(44, 95, 138, 0.25);
-  --border-subtle: rgba(94, 139, 158, 0.15);
-  
-  --text-primary: #2C5F8A;
-  --text-secondary: #6B8BA4;
-  --text-muted: #9BB0C0;
-  --text-trust: #4A90E2;
+  --border-primary: rgba(44, 95, 138, 0.22);   /* was 0.12 — more visible */
+  --border-hover: rgba(44, 95, 138, 0.40);     /* was 0.25 */
+  --border-subtle: rgba(94, 139, 158, 0.20);   /* was 0.15 */
+
+  --text-primary: #1E4A6E;                     /* darkened for WCAG AA on warm-beige bg */
+  --text-secondary: #3D5E73;                   /* was #6B8BA4 — contrast 6.3:1 on #F5F1E7 */
+  --text-muted: #4A6878;                       /* was #9BB0C0 — contrast 5.5:1 on #F5F1E7 */
+  --text-trust: #2C78C8;                       /* was #4A90E2 — slight darkening for contrast */
   
   --accent: #4A90E2;
   --accent-hover: #6BA3E7;
@@ -1171,6 +1171,62 @@ html[lang="fa"],
   th {
     background-color: #F5F1E7 !important;
     font-weight: 700 !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   PDF / PRINT PAGINATION
+   Fixes content being cut off at page boundaries when printing via window.print()
+   ═══════════════════════════════════════════════════════════════════════════════ */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 15mm 12mm;
+  }
+
+  /* Remove shadows/backgrounds not needed on paper */
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 11pt !important;
+  }
+
+  /* The PDF report container */
+  .pdf-report {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+  }
+
+  /* Each data section should not break mid-section */
+  .pdf-section {
+    page-break-inside: avoid;
+    break-inside: avoid;
+    margin-bottom: 12pt;
+  }
+
+  /* Q&A rows should not orphan */
+  .pdf-row {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Signature block always starts on same page — force new page if needed */
+  .pdf-signature {
+    page-break-before: auto;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Footer repeated on every page */
+  .pdf-footer {
+    position: running(footer);
+  }
+
+  /* Hide interactive UI elements */
+  .print\:hidden {
+    display: none !important;
   }
 }
 

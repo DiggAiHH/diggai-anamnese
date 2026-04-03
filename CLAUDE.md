@@ -37,25 +37,38 @@ npm run check-all        # type-check + lint + i18n check + prisma migrate statu
 npm run lint             # ESLint (frontend src/ only — server/ is excluded)
 
 # Unit / Integration Tests (Vitest)
-npm test                 # vitest (watch mode)
-npm run test:run         # vitest run (single pass)
-npm run test:server      # server tests only (node env, vitest.server.config.ts)
-npm run test:coverage    # vitest with v8 coverage report
+npm test                          # vitest (watch mode)
+npm run test:run                  # vitest run (single pass)
+npm run test:unit                 # frontend src/ only
+npm run test:server               # server tests only (node env, vitest.server.config.ts)
+npm run test:server:services      # server/services subset
+npm run test:server:middleware    # server/middleware subset
+npm run test:coverage             # vitest with v8 coverage report
+npm run test:changed              # only files changed since last commit
 
 # E2E Tests (Playwright — Chromium + Mobile Chrome)
-npx playwright test                          # Full suite (34 specs)
+npm run test:e2e                             # Full suite
 npx playwright test e2e/anamnese.spec.ts     # Single spec
 npx playwright test --ui                     # Interactive runner
+
+# Load Tests (k6 — requires k6 installed)
+npm run test:load         # all k6 load tests
+npm run test:load:api     # API endpoints
+npm run test:load:websocket  # Socket.IO under load
 
 # Database (Prisma)
 npx prisma migrate dev --name <name>   # Create + apply migration
 npx prisma generate                    # Regenerate client after schema change
 npx prisma db seed                     # Seed 270+ questions + admin user
+npm run db:seed:full                   # Comprehensive seed (50+ patients)
+npm run db:seed:demo                   # Demo seed data
 npx prisma studio                      # Visual DB browser GUI
 
 # Local Infrastructure
-docker-compose -f docker-compose.local.yml up -d    # PostgreSQL 16 + Redis 7
-docker-compose -f docker-compose.local.yml down
+npm run docker:up      # docker compose up -d --build (app + PostgreSQL + Redis)
+npm run docker:down    # docker compose down
+npm run docker:logs    # follow app container logs
+npm run monitoring:up  # Prometheus + Grafana monitoring stack
 
 # i18n
 node scripts/generate-i18n.ts          # Detect missing translation keys
@@ -201,6 +214,7 @@ Medical application — violations cause DSGVO fines or patient harm.
 DATABASE_URL="postgresql://user:pass@host:5432/dbname"
 JWT_SECRET="minimum-32-character-random-string"
 ENCRYPTION_KEY="exactly-32-characters-for-aes256!!"
+ARZT_PASSWORD="staff-seed-password"   # default staff password used by prisma/seed.ts
 ```
 
 ### Frontend
@@ -229,6 +243,104 @@ PAYMENT_ENABLED="true"   # Payment processing
 TELEMED_ENABLED="true"   # Video consultation
 TI_ENABLED="false"       # Gematik TI (requires dedicated Docker profile)
 ```
+
+---
+
+## Pre-commit Hooks
+
+Husky runs `lint-staged` on every commit:
+
+- `src/**/*.{ts,tsx}` → ESLint `--fix`
+- `public/locales/**/*.json` → JSON parse validation
+
+Commits will fail if ESLint finds unfixable errors. Fix before committing, not after.
+
+---
+
+## File Naming Conventions
+
+- **Components**: PascalCase (`SignaturePad.tsx`, `PatternLock.tsx`)
+- **Utilities / services**: camelCase (`patternAuth.ts`, `signatureService.ts`)
+- **Server routes**: camelCase (`signatures.ts`, `patients.ts`)
+- **E2E tests**: `*.spec.ts` in `e2e/`
+- **Zustand stores**: `*Store.ts` in `src/store/`
+
+---
+
+## Code Patterns
+
+### New API endpoint (server)
+
+```typescript
+// server/routes/<domain>.ts
+router.get('/resource', requireAuth, requireRole('arzt'), async (req, res) => {
+  const { id } = req.params; // audit logger middleware handles logging
+  const data = await prisma.model.findUnique({ where: { id } });
+  res.json(data);
+});
+```
+
+### New React Query hook (frontend)
+
+```typescript
+// src/hooks/useApi.ts — add to the relevant section
+export function useResource(id: string) {
+  return useQuery({
+    queryKey: ['resource', id],
+    queryFn: () => api.get(`/resource/${id}`).then(r => r.data),
+    enabled: !!id,
+  });
+}
+```
+
+### Encrypted Zustand store (for PII/patient context)
+
+```typescript
+export const useSecureStore = create<SecureState>()(
+  persist(
+    (set) => ({ ... }),
+    { name: 'diggai-secure-store', storage: encryptedStorage },
+  ),
+);
+```
+
+### Socket.IO event contracts
+
+```typescript
+// Always type events explicitly — no stringly-typed ad-hoc events
+interface ServerToClientEvents {
+  triageAlert: (payload: TriageAlertPayload) => void;
+  queueUpdated: (payload: QueueSnapshot) => void;
+}
+```
+
+---
+
+## Phase 11 Key Files
+
+| File | Purpose |
+| --- | --- |
+| `src/components/inputs/PatternLock.tsx` | 4×4 dot-grid security pattern (Canvas, touch+mouse+keyboard) |
+| `src/components/inputs/PatientIdentify.tsx` | Returning-patient identification form |
+| `src/components/CertificationModal.tsx` | MFA 4-step patient certification flow |
+| `src/utils/patternAuth.ts` | SHA-256 pattern hashing + complexity validation |
+| `server/routes/patients.ts` | 5 endpoints: identify, verify-pattern, set-pattern, certify, get |
+| `src/design/tokens.ts` | Central design tokens (spacing, radii, shadows, z-index) |
+| `src/components/ui/` | Shared UI primitives: Button, Card, Input, Modal, Badge, Spinner |
+| `e2e/helpers/test-utils.ts` | Playwright shared helpers |
+
+---
+
+## Netlify Deployment
+
+```bash
+npm run deploy          # Guided production deploy (builds if dist/ missing)
+npm run deploy:preview  # Preview deploy
+```
+
+- Site ID: `d4c9bba2-71cc-48a1-81a4-14cb9ac5cb90`
+- Script: `scripts/deploy-guided.mjs` — uses `NETLIFY_AUTH_TOKEN`, falls back to `npx netlify login`
+- NEVER store Netlify passwords in repo files.
 
 ---
 

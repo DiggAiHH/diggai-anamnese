@@ -24,6 +24,7 @@ async function getPrisma() {
 // ─── Security Event Enum ────────────────────────────────────
 
 export enum SecurityEvent {
+  // Authentication Events
   LOGIN_SUCCESS          = 'SECURITY:LOGIN_SUCCESS',
   LOGIN_FAILED           = 'SECURITY:LOGIN_FAILED',
   ACCOUNT_LOCKED         = 'SECURITY:ACCOUNT_LOCKED',
@@ -37,6 +38,25 @@ export enum SecurityEvent {
   ACCOUNT_DELETED        = 'SECURITY:ACCOUNT_DELETED',
   ACCOUNT_HARD_DELETED   = 'SECURITY:ACCOUNT_HARD_DELETED',
   SUSPICIOUS_ACTIVITY    = 'SECURITY:SUSPICIOUS_ACTIVITY',
+
+  // MFA Events
+  MFA_ENABLED            = 'SECURITY:MFA_ENABLED',
+  MFA_DISABLED           = 'SECURITY:MFA_DISABLED',
+  MFA_CHALLENGE_SUCCESS  = 'SECURITY:MFA_CHALLENGE_SUCCESS',
+  MFA_CHALLENGE_FAILED   = 'SECURITY:MFA_CHALLENGE_FAILED',
+
+  // Token & Session Events
+  TOKEN_REFRESHED        = 'SECURITY:TOKEN_REFRESHED',
+  TOKEN_FAMILY_BROKEN    = 'SECURITY:TOKEN_FAMILY_BROKEN',
+  SESSION_TERMINATED     = 'SECURITY:SESSION_TERMINATED',
+  ALL_SESSIONS_TERMINATED = 'SECURITY:ALL_SESSIONS_TERMINATED',
+
+  // Device & Location Events
+  DEVICE_TRUSTED         = 'SECURITY:DEVICE_TRUSTED',
+  DEVICE_UNTRUSTED       = 'SECURITY:DEVICE_UNTRUSTED',
+  NEW_DEVICE_DETECTED    = 'SECURITY:NEW_DEVICE_DETECTED',
+  SUSPICIOUS_LOCATION    = 'SECURITY:SUSPICIOUS_LOCATION',
+  IMPOSSIBLE_TRAVEL      = 'SECURITY:IMPOSSIBLE_TRAVEL',
 }
 
 // ─── Options Interface ──────────────────────────────────────
@@ -56,6 +76,12 @@ export interface SecurityAuditOptions {
    * Allowed: attempt counts, boolean flags, role names, timestamps, error codes.
    */
   metadata?: Record<string, unknown>;
+  /** Device fingerprint for device tracking — hashed, no PII */
+  deviceFingerprint?: string;
+  /** Geolocation data (country, region) — no exact coordinates */
+  geoLocation?: { country?: string; region?: string };
+  /** Session ID for session tracking — internal ID, no PII */
+  sessionId?: string;
 }
 
 // ─── IP Hashing ─────────────────────────────────────────────
@@ -81,6 +107,23 @@ function sanitizeUserAgent(ua: string): string {
 export async function logSecurityEvent(opts: SecurityAuditOptions): Promise<void> {
   try {
     const prisma = await getPrisma();
+
+    // Build metadata object including new optional fields
+    const metadata: Record<string, unknown> = { ...opts.metadata };
+
+    if (opts.sessionId) {
+      metadata.sessionId = opts.sessionId;
+    }
+
+    if (opts.deviceFingerprint) {
+      // Hash the device fingerprint for privacy (same as IP hashing approach)
+      metadata.deviceFingerprintHash = hashIp(opts.deviceFingerprint);
+    }
+
+    if (opts.geoLocation) {
+      metadata.geoLocation = opts.geoLocation;
+    }
+
     await prisma.auditLog.create({
       data: {
         tenantId:  opts.tenantId,
@@ -89,7 +132,7 @@ export async function logSecurityEvent(opts: SecurityAuditOptions): Promise<void
         resource:  'auth/security',
         ipAddress: opts.ip ? hashIp(opts.ip) : null,
         userAgent: opts.userAgent ? sanitizeUserAgent(opts.userAgent) : null,
-        metadata:  opts.metadata ? JSON.stringify(opts.metadata) : null,
+        metadata:  Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : null,
       },
     });
   } catch (err) {
@@ -120,6 +163,168 @@ export async function logLoginFailure(opts: {
     metadata: {
       attemptNumber: opts.attemptNumber,
       accountLocked: opts.accountLocked ?? false,
+    },
+  });
+}
+
+// ─── MFA Event Helpers ──────────────────────────────────────
+
+/**
+ * Loggt MFA-Status-Änderungen (Aktivierung/Deaktivierung).
+ * Non-blocking für Request-Flow.
+ */
+export async function logMfaStatusChange(opts: {
+  event: SecurityEvent.MFA_ENABLED | SecurityEvent.MFA_DISABLED;
+  tenantId: string;
+  actorId: string;
+  method: 'totp' | 'sms' | 'email' | 'backup_codes';
+  ip?: string;
+  userAgent?: string;
+  deviceFingerprint?: string;
+}): Promise<void> {
+  await logSecurityEvent({
+    event: opts.event,
+    tenantId: opts.tenantId,
+    actorId: opts.actorId,
+    ip: opts.ip,
+    userAgent: opts.userAgent,
+    deviceFingerprint: opts.deviceFingerprint,
+    metadata: { method: opts.method },
+  });
+}
+
+/**
+ * Loggt MFA-Challenge-Ergebnisse (Erfolg/Fehlschlag).
+ * Non-blocking für Request-Flow.
+ */
+export async function logMfaChallenge(opts: {
+  event: SecurityEvent.MFA_CHALLENGE_SUCCESS | SecurityEvent.MFA_CHALLENGE_FAILED;
+  tenantId: string;
+  actorId: string;
+  method: 'totp' | 'sms' | 'email' | 'backup_code';
+  attemptNumber?: number;
+  ip?: string;
+  userAgent?: string;
+  deviceFingerprint?: string;
+}): Promise<void> {
+  await logSecurityEvent({
+    event: opts.event,
+    tenantId: opts.tenantId,
+    actorId: opts.actorId,
+    ip: opts.ip,
+    userAgent: opts.userAgent,
+    deviceFingerprint: opts.deviceFingerprint,
+    metadata: {
+      method: opts.method,
+      attemptNumber: opts.attemptNumber,
+    },
+  });
+}
+
+// ─── Token & Session Event Helpers ──────────────────────────
+
+/**
+ * Loggt Token-Refresh-Events.
+ * Non-blocking für Request-Flow.
+ */
+export async function logTokenRefresh(opts: {
+  event: SecurityEvent.TOKEN_REFRESHED | SecurityEvent.TOKEN_FAMILY_BROKEN;
+  tenantId: string;
+  actorId: string;
+  sessionId?: string;
+  ip?: string;
+  userAgent?: string;
+  deviceFingerprint?: string;
+}): Promise<void> {
+  await logSecurityEvent({
+    event: opts.event,
+    tenantId: opts.tenantId,
+    actorId: opts.actorId,
+    ip: opts.ip,
+    userAgent: opts.userAgent,
+    deviceFingerprint: opts.deviceFingerprint,
+    sessionId: opts.sessionId,
+  });
+}
+
+/**
+ * Loggt Session-Terminierungs-Events.
+ * Non-blocking für Request-Flow.
+ */
+export async function logSessionEvent(opts: {
+  event: SecurityEvent.SESSION_TERMINATED | SecurityEvent.ALL_SESSIONS_TERMINATED;
+  tenantId: string;
+  actorId: string;
+  sessionId?: string;
+  terminatedCount?: number;
+  ip?: string;
+  userAgent?: string;
+}): Promise<void> {
+  await logSecurityEvent({
+    event: opts.event,
+    tenantId: opts.tenantId,
+    actorId: opts.actorId,
+    ip: opts.ip,
+    userAgent: opts.userAgent,
+    sessionId: opts.sessionId,
+    metadata: { terminatedCount: opts.terminatedCount },
+  });
+}
+
+// ─── Device & Location Event Helpers ────────────────────────
+
+/**
+ * Loggt Device-Vertrauens-Events.
+ * Non-blocking für Request-Flow.
+ */
+export async function logDeviceEvent(opts: {
+  event: SecurityEvent.DEVICE_TRUSTED | SecurityEvent.DEVICE_UNTRUSTED | SecurityEvent.NEW_DEVICE_DETECTED;
+  tenantId: string;
+  actorId: string;
+  deviceFingerprint: string;
+  deviceName?: string;
+  ip?: string;
+  userAgent?: string;
+  geoLocation?: { country?: string; region?: string };
+}): Promise<void> {
+  await logSecurityEvent({
+    event: opts.event,
+    tenantId: opts.tenantId,
+    actorId: opts.actorId,
+    ip: opts.ip,
+    userAgent: opts.userAgent,
+    deviceFingerprint: opts.deviceFingerprint,
+    geoLocation: opts.geoLocation,
+    metadata: { deviceName: opts.deviceName },
+  });
+}
+
+/**
+ * Loggt verdächtige Standort-Events.
+ * Non-blocking für Request-Flow.
+ */
+export async function logLocationAlert(opts: {
+  event: SecurityEvent.SUSPICIOUS_LOCATION | SecurityEvent.IMPOSSIBLE_TRAVEL;
+  tenantId: string;
+  actorId: string;
+  currentLocation: { country: string; region: string };
+  previousLocation: { country: string; region: string };
+  timeDeltaMinutes?: number;
+  ip?: string;
+  userAgent?: string;
+  deviceFingerprint?: string;
+}): Promise<void> {
+  await logSecurityEvent({
+    event: opts.event,
+    tenantId: opts.tenantId,
+    actorId: opts.actorId,
+    ip: opts.ip,
+    userAgent: opts.userAgent,
+    deviceFingerprint: opts.deviceFingerprint,
+    metadata: {
+      currentLocation: opts.currentLocation,
+      previousLocation: opts.previousLocation,
+      timeDeltaMinutes: opts.timeDeltaMinutes,
     },
   });
 }

@@ -10,6 +10,29 @@
 // Existing hooks
 export * from './useAgentApi';
 export { useBilling } from './useBilling';
+export { 
+  usePayment,
+  type PaymentType,
+  type PaymentState,
+  type PaymentIntentData,
+  type PaymentIntentResponse,
+  type NfcPaymentData,
+  type NfcPaymentResponse,
+  type ReceiptData,
+  type PaymentError,
+  PAYMENT_TYPE_LABELS,
+  PAYMENT_TYPE_DESCRIPTIONS,
+} from './usePayment';
+
+// Session Management hooks
+export {
+  useSessions,
+  useActivityLog,
+  useTerminateSession,
+  useTerminateAllSessions,
+  type Session,
+  type ActivityEvent,
+} from './useSessions';
 export { useFullscreen } from './useFullscreen';
 export { useKeyboardShortcuts } from './useKeyboardShortcuts';
 export * from './useOpsApi';
@@ -40,3 +63,15 @@ export type {
   AnimationOptions, 
   UseCalmAnimationReturn 
 } from './useCalmAnimation';
+
+// Tomedo Bridge hooks (Phase 7 - In Development)
+// export {
+//   useTomedoBridge,
+//   type BridgeExecuteOptions,
+//   type BridgeStatus,
+//   type DLQItem,
+//   type DLQStats,
+//   type BridgeStats,
+//   type BridgeConnectionStatus,
+//   type BridgeRealtimeEvent,
+// } from './useTomedoBridge';

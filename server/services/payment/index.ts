@@ -6,4 +6,7 @@ export {
   getReceipt,
   getPaymentStats,
   refundTransaction,
+  createSetupIntent,
+  createStripeCustomer,
+  getCustomerPaymentMethods,
 } from './paymentService';

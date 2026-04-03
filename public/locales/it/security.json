@@ -1,0 +1,77 @@
+{
+  "title": "Sicurezza",
+  "subtitle": "Gestisci le tue impostazioni di sicurezza e le sessioni attive",
+  "active": "Attivo",
+  "inactive": "Inattivo",
+  "cancel": "Annulla",
+  "verifying": "Verifica in corso...",
+  "disabling": "Disattivazione in corso...",
+  "score": {
+    "title": "Stato di Sicurezza",
+    "good": "Il tuo account è ben protetto",
+    "improve": "C'è spazio per miglioramenti"
+  },
+  "password": {
+    "title": "Password",
+    "lastChanged": "Ultima modifica 3 mesi fa",
+    "current": "Password Attuale",
+    "new": "Nuova Password",
+    "reqLength": "Almeno 12 caratteri",
+    "change": "Cambia Password"
+  },
+  "2fa": {
+    "title": "Autenticazione a Due Fattori",
+    "enabled": "Abilitato tramite App di Autenticazione",
+    "disabled": "Non abilitato - aumenta la sicurezza",
+    "setup": "Configura 2FA",
+    "disable": "Disabilita 2FA",
+    "backupCodes": "Visualizza Codici di Backup",
+    "active": {
+      "title": "2FA è abilitato",
+      "description": "Il tuo account è protetto ulteriormente."
+    },
+    "inactive": {
+      "title": "2FA non è abilitato",
+      "description": "Abilita 2FA per protezione aggiuntiva."
+    },
+    "setup": {
+      "title": "Configurazione 2FA",
+      "loading": "Generazione codice QR...",
+      "scanQr": "Scansiona il codice QR con la tua app di autenticazione:",
+      "manualEntry": "Inserimento manuale:",
+      "enterCode": "Inserisci il codice di verifica",
+      "verify": "Attiva",
+      "downloadCodes": "Scarica codici",
+      "backupCodesTitle": "Salva i Codici di Backup",
+      "backupCodesDesc": "Conserva questi codici al sicuro. Permettono l'accesso se perdi il tuo dispositivo."
+    },
+    "disableConfirm": {
+      "title": "Disabilita 2FA",
+      "warning": "Avviso di Sicurezza",
+      "description": "La disabilitazione di 2FA riduce la sicurezza del tuo account. Devi inserire un codice 2FA valido per procedere.",
+      "enterCode": "Codice 2FA per conferma",
+      "confirm": "Disabilita"
+    },
+    "errors": {
+      "setupFailed": "Configurazione fallita. Riprova.",
+      "verifyFailed": "Verifica fallita. Controlla il codice.",
+      "disableFailed": "Disabilitazione fallita. Controlla il codice.",
+      "invalidCode": "Inserisci un codice valido di 6 cifre."
+    }
+  },
+  "sessions": {
+    "title": "Sessioni Attive",
+    "loading": "Caricamento...",
+    "count": "{{count}} sessioni attive",
+    "current": "Attuale",
+    "trusted": "Affidabile",
+    "terminate": "Termina",
+    "terminateAll": "Termina tutte le altre sessioni",
+    "terminating": "Terminazione in corso..."
+  },
+  "devices": {
+    "title": "Dispositivi Affidabili",
+    "count": "{{count}} dispositivi affidabili",
+    "manage": "Gestisci"
+  }
+}

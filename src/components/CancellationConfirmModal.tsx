@@ -225,7 +225,7 @@ export const CancellationConfirmModal: React.FC<CancellationConfirmModalProps> =
               variant="danger"
               onClick={handleConfirmCancellation}
               disabled={isLoading}
-              isLoading={isLoading}
+              loading={isLoading}
             >
               {t('cancellation.confirmButton', 'Termin absagen')}
             </Button>
@@ -312,7 +312,7 @@ export const CancellationConfirmModal: React.FC<CancellationConfirmModalProps> =
               variant="danger"
               onClick={handleConfirmCancellation}
               disabled={!selectedAppointmentId || isLoading}
-              isLoading={isLoading}
+              loading={isLoading}
             >
               {t('cancellation.confirmButton', 'Termin absagen')}
             </Button>

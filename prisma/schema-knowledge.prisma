@@ -1,0 +1,234 @@
+// DiggAI Knowledge Harnessing Schema Extension
+// Error Pattern Recognition, Performance Insights & Continuous Improvement
+// Version: 1.0.0
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Learning Records (Zentrales Knowledge Repository) ───────
+
+model Learning {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+
+  type            String   @db.VarChar(50) // ERROR_PATTERN, PERFORMANCE_INSIGHT, etc.
+  status          String   @db.VarChar(50) @default("DETECTED")
+  severity        String   @db.VarChar(20) @default("medium")
+  category        String   @db.VarChar(100)
+  tags            String[]
+  title           String
+  description     String
+  context         Json?    @db.JsonB
+  evidence        Json?    @db.JsonB
+
+  // Source Tracking
+  sourceType      String   @db.VarChar(50)
+  sourceId        String?
+  createdBy       String?
+
+  // Analysis Fields
+  rootCause       String?
+  hypothesis      String?
+  solution        String?
+
+  // Metrics
+  occurrenceCount Int      @default(1)
+  firstSeenAt     DateTime @default(now()) @db.Timestamptz(6)
+  lastSeenAt      DateTime @updatedAt @db.Timestamptz(6)
+  affectedUsers   Int?
+  affectedSessions Int?
+
+  // Action Tracking
+  actionTaken     String?
+  actionTakenAt   DateTime? @db.Timestamptz(6)
+  actionTakenBy   String?
+  validatedAt     DateTime? @db.Timestamptz(6)
+  validationResult String?
+
+  // Soft Delete
+  deletedAt       DateTime? @db.Timestamptz(6)
+
+  // Timestamps
+  createdAt       DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @db.Timestamptz(6)
+
+  // Relations
+  errorPattern    ErrorPattern?
+  outgoingRelations KnowledgeRelation[] @relation("SourceLearning")
+  incomingRelations KnowledgeRelation[] @relation("TargetLearning")
+
+  @@index([tenantId, status])
+  @@index([tenantId, type, createdAt])
+  @@index([category, severity])
+  @@index([sourceType, sourceId])
+  @@index([firstSeenAt])
+  @@map("learnings")
+}
+
+// ─── Error Pattern (Fehler-Fingerprinting) ───────────────────
+
+model ErrorPattern {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+
+  fingerprint            String   @unique @db.VarChar(64)
+  signature              String
+  errorType              String   @db.VarChar(100)
+  occurrenceCount        Int      @default(1)
+  firstSeenAt            DateTime @default(now()) @db.Timestamptz(6)
+  lastSeenAt             DateTime @updatedAt @db.Timestamptz(6)
+  lastOccurrenceId       String?
+  affectedRoutes         String[]
+  affectedVersions       String[]
+  affectedEnvironments   String[]
+  status                 String   @db.VarChar(50) @default("new")
+  assignedTo             String?
+  rootCause              String?
+  solution               String?
+  workaround             String?
+  autoResolved           Boolean  @default(false)
+  resolutionScript       String?
+
+  // Relation to Learning
+  learningId             String?  @unique
+  learning               Learning? @relation(fields: [learningId], references: [id])
+
+  // Timestamps
+  createdAt              DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt              DateTime @updatedAt @db.Timestamptz(6)
+
+  @@index([tenantId, status])
+  @@index([fingerprint])
+  @@index([errorType, status])
+  @@index([lastSeenAt])
+  @@map("error_patterns")
+}
+
+// ─── Metric Snapshots (Performance & Health Metrics) ─────────
+
+model MetricSnapshot {
+  id          String   @id @default(cuid())
+  tenantId    String
+
+  timestamp       DateTime @db.Timestamptz(6)
+  metricType      String   @db.VarChar(100)
+  value           Float
+  unit            String?  @db.VarChar(50)
+  baselineAvg     Float?
+  baselineStd     Float?
+  anomalyScore    Float?
+  isAnomaly       Boolean  @default(false)
+
+  // Context
+  route           String?  @db.VarChar(255)
+  method          String?  @db.VarChar(10)
+  statusCode      Int?
+  userRole        String?  @db.VarChar(50)
+  relatedLearningId String?
+
+  // Timestamp
+  createdAt       DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([tenantId, metricType, timestamp])
+  @@index([metricType, isAnomaly])
+  @@index([timestamp])
+  @@index([tenantId, timestamp])
+  @@map("metric_snapshots")
+}
+
+// ─── Knowledge Relations (Graph-Verknüpfungen) ───────────────
+
+model KnowledgeRelation {
+  id          String   @id @default(cuid())
+
+  sourceId    String
+  source      Learning @relation("SourceLearning", fields: [sourceId], references: [id], onDelete: Cascade)
+
+  targetId    String
+  target      Learning @relation("TargetLearning", fields: [targetId], references: [id], onDelete: Cascade)
+
+  relationType String @db.VarChar(50) // similar, causes, resolves, supersedes
+  confidence   Float  @default(0.5)
+  createdAt    DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([sourceId, targetId, relationType])
+  @@index([sourceId])
+  @@index([targetId])
+  @@map("knowledge_relations")
+}
+
+// ─── Improvement Cycles (Continuous Improvement) ─────────────
+
+model ImprovementCycle {
+  id          String   @id @default(cuid())
+  tenantId    String
+
+  title           String
+  description     String
+  hypothesis      String
+  expectedOutcome String
+  successCriteria String
+
+  // Status Tracking
+  status          String   @db.VarChar(50) @default("planned")
+  priority        String   @db.VarChar(20) @default("medium")
+
+  // Timeline
+  plannedStart    DateTime? @db.Timestamptz(6)
+  actualStart     DateTime? @db.Timestamptz(6)
+  plannedEnd      DateTime? @db.Timestamptz(6)
+  actualEnd       DateTime? @db.Timestamptz(6)
+
+  // Outcome
+  actualOutcome   String?
+  outcomeMet      Boolean?
+  roi             Float?
+  learnings       Json?    @db.JsonB
+
+  // Relations
+  relatedLearningIds String[]
+  teamMembers        String[]
+
+  // Audit
+  createdBy       String
+  createdAt       DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @db.Timestamptz(6)
+
+  @@index([tenantId, status])
+  @@index([status, priority])
+  @@index([createdAt])
+  @@map("improvement_cycles")
+}
+
+// ─── Tenant Reference (Bestehendes Model) ────────────────────
+
+model Tenant {
+  id        String  @id @default(uuid())
+  subdomain String  @unique
+  name      String
+
+  // Knowledge Harnessing Relations
+  learnings         Learning[]
+  errorPatterns     ErrorPattern[]
+  improvementCycles ImprovementCycle[]
+
+  @@index([subdomain])
+  @@index([status])
+}
+
+// ─── TenantStatus Enum (für Tenant Referenz) ────────────────
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+  PENDING_SETUP
+}

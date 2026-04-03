@@ -103,7 +103,7 @@ export function setupSocketIO(httpServer: HttpServer): Server {
             }) as AuthPayload;
             const normalizedRole = normalizeAuthRole(decoded.role);
             if (!normalizedRole) {
-                return next(new Error('UngÃ¼ltiger oder abgelaufener Token'));
+                return next(new Error('Ungültiger oder abgelaufener Token'));
             }
 
             // Check token blacklist — same security guarantee as REST endpoints
@@ -377,6 +377,7 @@ export function setupSocketIO(httpServer: HttpServer): Server {
         function relaySignal(eventName: string, data: SignalPayload) {
             // Security: ensure fromId matches authenticated user
             if (data.fromId !== auth.userId) return;
+            
             // Relay to same session room — only participants receive it
             socket.to(`session:${data.sessionId}`).emit(eventName, {
                 ...data,
@@ -409,6 +410,25 @@ export function setupSocketIO(httpServer: HttpServer): Server {
         socket.on('rtc:screen-share-stop', (data: SignalPayload) => relaySignal('rtc:screen-share-stop', data));
 
         // ─── End WebRTC Signaling ────────────────────────────────────
+
+        // ─── Tomedo Bridge Events ────────────────────────────────────
+        // @phase PHASE_4_WEBSOCKET - Real-time Bridge Updates
+        
+        // Subscribe to bridge events for a specific session
+        socket.on('bridge:subscribe', (data: { tenantId: string; patientSessionId: string }) => {
+            if (!['arzt', 'admin', 'mfa'].includes(auth.role)) {
+                socket.emit('error', { message: 'Nur Personal kann Bridge-Events abonnieren' });
+                return;
+            }
+            socket.join(`bridge:${data.tenantId}:${data.patientSessionId}`);
+            console.log(`[Socket.io] Bridge-Subscription: ${data.tenantId}/${data.patientSessionId}`);
+        });
+
+        // Unsubscribe from bridge events
+        socket.on('bridge:unsubscribe', (data: { tenantId: string; patientSessionId: string }) => {
+            socket.leave(`bridge:${data.tenantId}:${data.patientSessionId}`);
+            console.log(`[Socket.io] Bridge-Unsubscription: ${data.tenantId}/${data.patientSessionId}`);
+        });
 
         socket.on('disconnect', () => {
             // Remove from online staff
@@ -444,7 +464,7 @@ export function emitTriageAlert(sessionId: string, alert: {
 }
 
 /**
- * Senachrichtigt Ärzte über eine abgeschlossene Session
+ * Benachrichtigt Ärzte über eine abgeschlossene Session
  */
 export function emitSessionComplete(sessionId: string, service: string): void {
     if (io) {
@@ -479,21 +499,18 @@ export function emitAnswerSubmitted(sessionId: string, data: {
  */
 export function emitSessionProgress(sessionId: string, progress: number): void {
     if (io) {
-        io.to(`session:${sessionId}`).emit('session:progress', {
+        const payload = {
             sessionId,
             progress,
             timestamp: new Date().toISOString(),
-        });
-        io.to('arzt').emit('session:progress', {
-            sessionId,
-            progress,
-            timestamp: new Date().toISOString(),
-        });
+        };
+        io.to(`session:${sessionId}`).emit('session:progress', payload);
+        io.to('arzt').emit('session:progress', payload);
     }
 }
 
 /**
- * Sendet eine Chat-Nachricht an einen spezifischen Patienten
+ * Sendet eine Chat-Nachricht an den Patienten
  */
 export function emitPatientMessage(sessionId: string, message: { text: string; from: string; timestamp: string }): void {
     if (io) {
@@ -502,92 +519,119 @@ export function emitPatientMessage(sessionId: string, message: { text: string; f
 }
 
 /**
- * Pushes entertainment content to a waiting patient
+ * Sendet Unterhaltungsinhalte an wartende Patienten
  */
 export function emitQueueEntertainment(sessionId: string, content: any, reason: string): void {
     if (io) {
-        io.to(`session:${sessionId}`).emit('queue:entertainment', { content, reason });
+        io.to(`session:${sessionId}`).emit('queue:entertainment', {
+            content,
+            reason,
+            timestamp: new Date().toISOString(),
+        });
     }
 }
 
 /**
- * Sends a practice-wide announcement to all waiting patients
+ * Broadcasts an announcement to all waiting patients
  */
 export function emitQueueAnnouncement(title: string, body: string, type: 'info' | 'urgent'): void {
     if (io) {
-        io.emit('queue:announcement', { title, body, type, timestamp: new Date().toISOString() });
+        io.emit('queue:announcement', {
+            title,
+            body,
+            type,
+            timestamp: new Date().toISOString(),
+        });
     }
 }
 
 /**
- * Sends a mood check to a specific patient
+ * Requests a mood check from the patient
  */
 export function emitMoodCheck(sessionId: string): void {
     if (io) {
         io.to(`session:${sessionId}`).emit('queue:mood-check', {
-            question: 'Wie geht es Ihnen gerade?',
-            options: ['😊 Gut', '😐 Geht so', '😟 Ungeduldig', '😰 Besorgt'],
+            sessionId,
+            timestamp: new Date().toISOString(),
         });
     }
 }
 
 /**
- * Triggers an InfoBreak in the questionnaire flow
+ * Sends an info break to the patient
  */
 export function emitInfoBreak(sessionId: string, contentId: string, type: string, durationSec: number): void {
     if (io) {
-        io.to(`session:${sessionId}`).emit('queue:infobreak-trigger', { contentId, type, durationSec });
+        io.to(`session:${sessionId}`).emit('queue:info-break', {
+            sessionId,
+            contentId,
+            type,
+            durationSec,
+            timestamp: new Date().toISOString(),
+        });
     }
 }
 
-// ─── Modul 3: PVS Events ───────────────────────────────────
-
+/**
+ * Notifies staff that a patient was imported from PVS
+ */
 export function emitPvsPatientImported(sessionId: string, data: {
     patientId: string;
+    pvsPatientId: string;
     pvsType: string;
-    patientNumber: string;
+    patientName: string;
 }): void {
     if (io) {
         io.to('arzt').emit('pvs:patient-imported', {
-            ...data,
             sessionId,
+            ...data,
             timestamp: new Date().toISOString(),
         });
     }
 }
 
+/**
+ * Notifies staff that PVS export completed
+ */
 export function emitPvsExportCompleted(sessionId: string, data: {
-    connectionId: string;
     pvsType: string;
-    fieldsExported: number;
+    transferLogId: string;
+    pvsReferenceId?: string;
 }): void {
     if (io) {
         io.to('arzt').emit('pvs:export-completed', {
-            ...data,
             sessionId,
+            ...data,
             timestamp: new Date().toISOString(),
         });
     }
 }
 
+/**
+ * Notifies staff that PVS export failed
+ */
 export function emitPvsExportFailed(sessionId: string, data: {
-    connectionId: string;
     pvsType: string;
     error: string;
+    transferLogId: string;
 }): void {
     if (io) {
         io.to('arzt').emit('pvs:export-failed', {
-            ...data,
             sessionId,
+            ...data,
             timestamp: new Date().toISOString(),
         });
     }
 }
 
+/**
+ * Notifies staff about a new PVS session request
+ */
 export function emitPvsSessionRequested(data: {
-    patientNumber: string;
+    sessionId: string;
     pvsType: string;
-    connectionId: string;
+    patientName: string;
+    service: string;
 }): void {
     if (io) {
         io.to('arzt').emit('pvs:session-requested', {
@@ -597,11 +641,14 @@ export function emitPvsSessionRequested(data: {
     }
 }
 
+/**
+ * Broadcasts PVS connection status change
+ */
 export function emitPvsConnectionStatus(data: {
     connectionId: string;
     pvsType: string;
-    status: 'connected' | 'disconnected' | 'error';
-    message?: string;
+    status: 'ONLINE' | 'OFFLINE' | 'DEGRADED';
+    message: string;
 }): void {
     if (io) {
         io.to('arzt').emit('pvs:connection-status', {
@@ -611,12 +658,13 @@ export function emitPvsConnectionStatus(data: {
     }
 }
 
-// ─── Modul 4: Therapy Events ────────────────────────────────
-
+/**
+ * Notifies staff that a therapy plan was updated
+ */
 export function emitTherapyPlanUpdated(data: {
     planId: string;
     patientId: string;
-    status: string;
+    patientName: string;
     updatedBy: string;
 }): void {
     if (io) {
@@ -627,12 +675,17 @@ export function emitTherapyPlanUpdated(data: {
     }
 }
 
+/**
+ * Sends AI therapy suggestion to staff
+ */
 export function emitTherapyAiSuggestion(data: {
-    planId: string;
+    sessionId: string;
     patientId: string;
-    suggestionType: string;
-    confidence: number;
-    summary: string;
+    suggestions: Array<{
+        type: string;
+        description: string;
+        confidence: number;
+    }>;
 }): void {
     if (io) {
         io.to('arzt').emit('therapy:ai-suggestion', {
@@ -642,22 +695,96 @@ export function emitTherapyAiSuggestion(data: {
     }
 }
 
+/**
+ * Streams real-time therapy AI output
+ */
 export function emitTherapyAiRealtime(sessionId: string, data: {
-    type: 'analysis' | 'suggestion' | 'warning';
-    content: string;
-    confidence?: number;
+    chunk: string;
+    isComplete: boolean;
 }): void {
     if (io) {
-        io.to(`session:${sessionId}`).emit('therapy:ai-realtime', {
-            ...data,
+        io.to(`session:${sessionId}`).to('arzt').emit('therapy:ai-realtime', {
             sessionId,
+            ...data,
             timestamp: new Date().toISOString(),
         });
     }
 }
 
+// ─── Tomedo Bridge Batch Events ─────────────────────────────────
+// @phase PHASE_6_BATCH_PROCESSING
+
+export interface BridgeBatchEvent {
+    jobId: string;
+    tenantId: string;
+    total?: number;
+    progress?: number;
+    current?: number;
+}
+
+/**
+ * Emits batch job started event
+ */
+export function emitBridgeBatchStarted(data: BridgeBatchEvent): void {
+    if (io) {
+        io.to('arzt').emit('bridge:batch:started', {
+            ...data,
+            timestamp: new Date().toISOString(),
+        });
+    }
+}
+
+/**
+ * Emits batch job progress event
+ */
+export function emitBridgeBatchProgress(data: BridgeBatchEvent & { progress: number; current: number }): void {
+    if (io) {
+        io.to('arzt').emit('bridge:batch:progress', {
+            ...data,
+            timestamp: new Date().toISOString(),
+        });
+    }
+}
+
+/**
+ * Emits batch job completed event
+ */
+export function emitBridgeBatchCompleted(data: BridgeBatchEvent): void {
+    if (io) {
+        io.to('arzt').emit('bridge:batch:completed', {
+            ...data,
+            timestamp: new Date().toISOString(),
+        });
+    }
+}
+
+// ─── FHIR Subscription Events ─────────────────────────────────
+// @phase PHASE_7_FHIR_SUBSCRIPTIONS
+
+export interface FhirNotificationEvent {
+    subscriptionId: string;
+    tenantId: string;
+    resourceType: string;
+    event: string;
+    resourceId: string;
+}
+
+/**
+ * Emits FHIR subscription notification
+ */
+export function emitFhirNotification(data: FhirNotificationEvent): void {
+    if (io) {
+        io.to('arzt').emit('fhir:notification', {
+            ...data,
+            timestamp: new Date().toISOString(),
+        });
+    }
+}
+
+/**
+ * Notifies about therapy measure due date
+ */
 export function emitTherapyMeasureDue(data: {
-    planId: string;
     measureId: string;
     patientId: string;
     title: string;
@@ -668,5 +795,93 @@ export function emitTherapyMeasureDue(data: {
             ...data,
             timestamp: new Date().toISOString(),
         });
+    }
+}
+
+// ─── Tomedo Bridge Event Emitters ─────────────────────────────────
+// @phase PHASE_4_WEBSOCKET - Real-time Bridge Updates
+
+export interface BridgeEventData {
+    patientSessionId: string;
+    tenantId: string;
+    taskId?: string;
+    team?: string;
+    agent?: string;
+    progress?: number;
+    error?: string;
+    dlqCount?: number;
+}
+
+/**
+ * Emits bridge started event
+ */
+export function emitBridgeStarted(data: BridgeEventData): void {
+    if (io) {
+        const event = {
+            type: 'bridge:started',
+            timestamp: new Date().toISOString(),
+            data,
+        };
+        io.to(`bridge:${data.tenantId}:${data.patientSessionId}`).emit('bridge:event', event);
+        io.to('arzt').emit('bridge:event', event);
+    }
+}
+
+/**
+ * Emits bridge completed event
+ */
+export function emitBridgeCompleted(data: BridgeEventData & { result?: unknown }): void {
+    if (io) {
+        const event = {
+            type: 'bridge:completed',
+            timestamp: new Date().toISOString(),
+            data,
+        };
+        io.to(`bridge:${data.tenantId}:${data.patientSessionId}`).emit('bridge:event', event);
+        io.to('arzt').emit('bridge:event', event);
+    }
+}
+
+/**
+ * Emits bridge failed event
+ */
+export function emitBridgeFailed(data: BridgeEventData & { error: string }): void {
+    if (io) {
+        const event = {
+            type: 'bridge:failed',
+            timestamp: new Date().toISOString(),
+            data,
+        };
+        io.to(`bridge:${data.tenantId}:${data.patientSessionId}`).emit('bridge:event', event);
+        io.to('arzt').emit('bridge:event', event);
+    }
+}
+
+/**
+ * Emits DLQ updated event
+ */
+export function emitBridgeDLQUpdated(data: BridgeEventData & { dlqCount: number }): void {
+    if (io) {
+        const event = {
+            type: 'bridge:dlq:updated',
+            timestamp: new Date().toISOString(),
+            data,
+        };
+        io.to(`bridge:${data.tenantId}:${data.patientSessionId}`).emit('bridge:event', event);
+        io.to('arzt').emit('bridge:event', event);
+    }
+}
+
+/**
+ * Emits team progress event
+ */
+export function emitBridgeTeamProgress(data: BridgeEventData & { team: string; agent: string; progress: number }): void {
+    if (io) {
+        const event = {
+            type: 'bridge:team:progress',
+            timestamp: new Date().toISOString(),
+            data,
+        };
+        io.to(`bridge:${data.tenantId}:${data.patientSessionId}`).emit('bridge:event', event);
     }
 }

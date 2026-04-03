@@ -3,6 +3,37 @@
 // ============================================
 
 export { pvsRouter } from './pvs-router.service.js';
+export {
+  TomedoApiClient,
+  createTomedoApiClient,
+  type TomedoAuthResult,
+  type TomedoPatient,
+  type TomedoFallakte,
+  type Karteieintrag,
+  type ExportStatus,
+  type TomedoApiError,
+  type TomedoSearchParams,
+} from './tomedo-api.client.js';
+export {
+  TomedoDLQService,
+  tomedoDLQ,
+  type DLQItem,
+  type DLQStats,
+} from './tomedo-dlq.service.js';
+export {
+  TomedoBatchService,
+  tomedoBatchService,
+  type BatchJob,
+  type BatchJobResult,
+  type BatchJobStatus,
+  type BatchSession,
+} from './tomedo-batch.service.js';
+export {
+  FhirSubscriptionManager,
+  subscriptionManager,
+  type FhirSubscription,
+  type SubscriptionNotification,
+} from './fhir/fhir-subscription-manager.js';
 export { buildBefundtext, countExportFields } from './mapping-engine.js';
 export { parseGdtFile, extractPatientData, validateGdtRecord } from './gdt/gdt-parser.js';
 export { buildAnamneseResult, writeGdtFile, buildStammdatenAnfordern } from './gdt/gdt-writer.js';
@@ -94,7 +125,6 @@ export {
   gdtExportDLQ,
   fhirExportDLQ,
   type DeadLetterItem,
-  type DLQStats,
 } from './resilience/dead-letter-queue.js';
 
 // Monitoring

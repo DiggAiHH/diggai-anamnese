@@ -1,0 +1,77 @@
+{
+  "title": "Seguridad",
+  "subtitle": "Gestiona tus ajustes de seguridad y sesiones activas",
+  "active": "Activo",
+  "inactive": "Inactivo",
+  "cancel": "Cancelar",
+  "verifying": "Verificando...",
+  "disabling": "Desactivando...",
+  "score": {
+    "title": "Estado de Seguridad",
+    "good": "Tu cuenta está bien protegida",
+    "improve": "Hay margen de mejora"
+  },
+  "password": {
+    "title": "Contraseña",
+    "lastChanged": "Último cambio hace 3 meses",
+    "current": "Contraseña Actual",
+    "new": "Nueva Contraseña",
+    "reqLength": "Al menos 12 caracteres",
+    "change": "Cambiar Contraseña"
+  },
+  "2fa": {
+    "title": "Autenticación de Dos Factores",
+    "enabled": "Activado mediante Aplicación de Autenticación",
+    "disabled": "No activado - aumenta la seguridad",
+    "setup": "Configurar 2FA",
+    "disable": "Desactivar 2FA",
+    "backupCodes": "Ver Códigos de Respaldo",
+    "active": {
+      "title": "2FA está activado",
+      "description": "Tu cuenta está protegida adicionalmente."
+    },
+    "inactive": {
+      "title": "2FA no está activado",
+      "description": "Activa 2FA para protección adicional."
+    },
+    "setup": {
+      "title": "Configuración de 2FA",
+      "loading": "Generando código QR...",
+      "scanQr": "Escanea el código QR con tu aplicación de autenticación:",
+      "manualEntry": "Entrada manual:",
+      "enterCode": "Introduce el código de verificación",
+      "verify": "Activar",
+      "downloadCodes": "Descargar códigos",
+      "backupCodesTitle": "Guardar Códigos de Respaldo",
+      "backupCodesDesc": "Mantén estos códigos seguros. Permiten el acceso si pierdes tu dispositivo."
+    },
+    "disableConfirm": {
+      "title": "Desactivar 2FA",
+      "warning": "Advertencia de Seguridad",
+      "description": "Desactivar 2FA reduce la seguridad de tu cuenta. Debes introducir un código 2FA válido para continuar.",
+      "enterCode": "Código 2FA para confirmación",
+      "confirm": "Desactivar"
+    },
+    "errors": {
+      "setupFailed": "Error en la configuración. Inténtalo de nuevo.",
+      "verifyFailed": "Error de verificación. Comprueba el código.",
+      "disableFailed": "Error al desactivar. Comprueba el código.",
+      "invalidCode": "Introduce un código válido de 6 dígitos."
+    }
+  },
+  "sessions": {
+    "title": "Sesiones Activas",
+    "loading": "Cargando...",
+    "count": "{{count}} sesiones activas",
+    "current": "Actual",
+    "trusted": "Confiable",
+    "terminate": "Terminar",
+    "terminateAll": "Terminar todas las demás sesiones",
+    "terminating": "Terminando..."
+  },
+  "devices": {
+    "title": "Dispositivos Confiables",
+    "count": "{{count}} dispositivos confiables",
+    "manage": "Gestionar"
+  }
+}

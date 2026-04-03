@@ -2,13 +2,15 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { prisma } from '../db';
 import * as bcrypt from 'bcryptjs';
-import { createToken, requireAuth, requireRole, blacklistToken, setTokenCookie, clearTokenCookie, normalizeAuthRole } from '../middleware/auth';
+import { requireAuth, requireRole, blacklistToken, setTokenCookie, clearTokenCookie, normalizeAuthRole } from '../middleware/auth';
+import { createTokenPair } from '../services/auth/refresh-token.service';
 import { aiEngine } from '../services/ai/ai-engine.service';
 import { decrypt, isPIIAtom } from '../services/encryption';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import { config } from '../config';
 import { SecurityEvent, logSecurityEvent, logLoginFailure } from '../services/security-audit.service';
+import type { UserType } from '@prisma/client';
 
 const router = Router();
 
@@ -175,12 +177,6 @@ router.post('/login', loginRateLimiter, async (req: Request, res: Response) => {
             return;
         }
 
-        const token = createToken({
-            userId: arzt.id,
-            tenantId: resolvedTenant.tenantId,
-            role: normalizedRole,
-        });
-
         // SECURITY FIX H3: lastLoginAt + loginCount aktualisieren, Lockout zurücksetzen
         await prisma.arztUser.update({
             where: { id: arzt.id },
@@ -192,6 +188,17 @@ router.post('/login', loginRateLimiter, async (req: Request, res: Response) => {
             },
         });
 
+        // Erstelle Token-Paar (Access + Refresh Token)
+        const tokenPair = await createTokenPair(
+            arzt.id,
+            'ARZT' as UserType,
+            resolvedTenant.tenantId,
+            normalizedRole,
+            undefined, // deviceId
+            ip,
+            userAgent
+        );
+
         // SECURITY FIX H4: Security-Event loggen
         await logSecurityEvent({
             event: SecurityEvent.LOGIN_SUCCESS,
@@ -202,8 +209,8 @@ router.post('/login', loginRateLimiter, async (req: Request, res: Response) => {
             metadata: { role: normalizedRole },
         });
 
-        // Set httpOnly cookie for browser clients
-        setTokenCookie(res, token);
+        // Set httpOnly cookie für Access Token
+        setTokenCookie(res, tokenPair.accessToken);
 
         res.json({
             user: {
@@ -212,6 +219,9 @@ router.post('/login', loginRateLimiter, async (req: Request, res: Response) => {
                 displayName: arzt.displayName,
                 role: normalizedRole,
             },
+            accessToken: tokenPair.accessToken,
+            refreshToken: tokenPair.refreshToken,
+            expiresAt: tokenPair.expiresAt.toISOString(),
         });
     } catch (err: unknown) {
         if (err instanceof z.ZodError) {

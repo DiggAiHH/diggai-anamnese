@@ -15,13 +15,15 @@
 
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ShieldCheck, FileText, FlaskConical, ChevronDown, ChevronUp, CheckCircle2, Lock } from 'lucide-react';
+import { ShieldCheck, FileText, FlaskConical, ChevronDown, ChevronUp, CheckCircle2, Lock, Gamepad2 } from 'lucide-react';
 import { TrustBadgeBar } from './TrustBadgeBar';
 
 export interface ConsentValues {
   treatment: boolean;
   dataProcessing: boolean;
   research: boolean;
+  /** Opt-in for gamified anamnese experience. Default: false. DSGVO Art. 6 Abs. 1 lit. a */
+  gamification: boolean;
 }
 
 interface ConsentItemProps {
@@ -157,6 +159,7 @@ export function ConsentFlow({
     treatment: false,
     dataProcessing: false,
     research: false,
+    gamification: false, // DEFAULT: off — patient must actively opt in
   });
 
   const canContinue = values.treatment && values.dataProcessing;
@@ -247,6 +250,21 @@ export function ConsentFlow({
           required={false}
           checked={values.research}
           onChange={set('research')}
+        />
+
+        {/* Gamification opt-in — DSGVO Art. 6 Abs. 1 lit. a (explicit opt-in, default OFF) */}
+        <ConsentItem
+          id="consent-gamification"
+          icon={<Gamepad2 className="w-4 h-4" />}
+          titleKey="consent.gamification.title"
+          titleFallback="Spielerische Darstellung (optional)"
+          descKey="consent.gamification.desc"
+          descFallback="Ich möchte den Fragebogen mit motivierenden Animationen und Fortschrittsanzeigen erleben."
+          detailKey="consent.gamification.detail"
+          detailFallback="Aktiviert visuelle Fortschrittsanzeigen, Abschluss-Animationen und Bestätigungs-Effekte während des Fragebogens. Keine zusätzlichen Daten werden erhoben. Rein ästhetisch — kein Einfluss auf medizinische Inhalte. Standard: deaktiviert."
+          required={false}
+          checked={values.gamification}
+          onChange={set('gamification')}
         />
       </div>
 

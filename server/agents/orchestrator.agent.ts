@@ -14,6 +14,7 @@ import './empfang.agent';
 import './triage.agent';
 import './abrechnung.agent';
 import './dokumentation.agent';
+import './tomedo-bridge.agent'; // Multi-Agent Bridge (9 Subagenten)
 
 // Load CommonJS runtime modules (BSI: bin/lib/ is CJS)
 const _require = createRequire(import.meta.url);

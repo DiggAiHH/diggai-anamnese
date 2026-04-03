@@ -59,6 +59,10 @@ import wearablesRoutes from './routes/wearables';
 import usageRoutes from './routes/usage';
 import aiRoutes from './routes/ai';
 import authRoutes from './routes/auth';
+import tomedoBridgeRoutes from './routes/tomedo-bridge.routes';
+import tomedoBatchRoutes from './routes/tomedo-batch.routes';
+import fhirWebhookRoutes from './routes/fhir-webhook.routes';
+import fhirSubscriptionRoutes from './routes/fhir-subscription.routes';
 import { requireAuth, requireAdmin } from './middleware/auth';
 import { messageBroker } from './services/messagebroker.service';
 
@@ -350,6 +354,10 @@ mountRoute('practice', '/api/wearables', authLimiter, wearablesRoutes);
 mountRoute('company', '/api/usage', authLimiter, usageRoutes);
 mountRoute('practice', '/api/ai', aiRoutes);
 mountRoute('shared', '/api/auth', authLimiter, authRoutes);
+mountRoute('authority', '/api/tomedo-bridge', authLimiter, tomedoBridgeRoutes);
+mountRoute('authority', '/api/tomedo-bridge', authLimiter, tomedoBatchRoutes);
+mountRoute('authority', '/api/tomedo-bridge', authLimiter, fhirSubscriptionRoutes);
+mountRoute('authority', '/api/webhooks/fhir', fhirWebhookRoutes);
 mountRoute('company', '/api', themeRoutes);
 
 // Health Check — includes DB + Redis connectivity with detailed checks

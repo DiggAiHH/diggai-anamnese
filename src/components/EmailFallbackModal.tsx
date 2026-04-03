@@ -85,8 +85,7 @@ export const EmailFallbackModal: React.FC<EmailFallbackModalProps> = ({
             variant="primary"
             onClick={onProvideEmail}
             disabled={isLoading}
-            fullWidth
-            className="!bg-emerald-600 hover:!bg-emerald-700"
+            className="!bg-emerald-600 hover:!bg-emerald-700 w-full"
           >
             {t('emailFallback.buttonProvideNow', '📧 Jetzt E-Mail eingeben')}
           </Button>
@@ -95,7 +94,7 @@ export const EmailFallbackModal: React.FC<EmailFallbackModalProps> = ({
             variant="secondary"
             onClick={onContinuePhoneOnly}
             disabled={isLoading}
-            fullWidth
+            className="w-full"
           >
             {t('emailFallback.buttonPhoneOnly', '📞 Ohne E-Mail weitermachen')}
           </Button>

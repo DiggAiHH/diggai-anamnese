@@ -1,7 +1,20 @@
-import { stripe, PLANS, getQuotaForTier } from '../config/stripe.js';
+import { stripe, PLANS, getQuotaForTier, canUpgrade, getAiQuotaForTier } from '../config/stripe.js';
 import { getPrismaClientForDomain } from '../db.js';
 
 const prisma = getPrismaClientForDomain('company');
+
+// Audit Log Types
+type AuditAction = 'SUBSCRIPTION_UPGRADE' | 'SUBSCRIPTION_DOWNGRADE' | 'SUBSCRIPTION_CREATED' | 'SUBSCRIPTION_CANCELLED' | 'PRORATION_CALCULATED';
+
+interface AuditLogData {
+  subscriptionId: string;
+  fromTier?: string;
+  toTier?: string;
+  stripeSubscriptionId?: string;
+  prorationAmount?: number;
+  error?: string;
+  [key: string]: any;
+}
 
 export interface SubscriptionData {
   praxisId: string;
@@ -287,6 +300,406 @@ export class SubscriptionService {
         data: { status: statusMap[status] }
       });
     }
+  }
+
+  /**
+   * Upgrade Subscription (immediate with proration)
+   */
+  async upgradeSubscription(
+    subscriptionId: string,
+    newTier: 'ESSENTIAL' | 'PROFESSIONAL' | 'ENTERPRISE'
+  ) {
+    const idempotencyKey = `upgrade_${subscriptionId}_${newTier}_${Date.now()}`;
+    
+    try {
+      const subscription = await prisma.subscription.findUnique({
+        where: { id: subscriptionId },
+        include: { tenant: true }
+      });
+
+      if (!subscription?.stripeSubId) {
+        throw new Error('No active subscription found');
+      }
+
+      // Normalize tier names (handle legacy STARTER -> ESSENTIAL)
+      const currentTier = this.normalizeTier(subscription.tier);
+      const targetTier = this.normalizeTier(newTier);
+
+      // Verify this is actually an upgrade
+      if (!canUpgrade(currentTier, targetTier)) {
+        throw new Error(`Cannot upgrade from ${currentTier} to ${targetTier}. Target tier must be higher.`);
+      }
+
+      // Retrieve current Stripe subscription
+      const stripeSub = await stripe.subscriptions.retrieve(subscription.stripeSubId);
+      const priceId = this.getPriceIdForTier(targetTier);
+
+      // Update Stripe subscription with proration
+      const updatedStripeSub = await stripe.subscriptions.update(
+        subscription.stripeSubId,
+        {
+          items: [{
+            id: stripeSub.items.data[0].id,
+            price: priceId
+          }],
+          proration_behavior: 'create_prorations',
+          metadata: { 
+            ...stripeSub.metadata, 
+            tier: targetTier,
+            upgradedAt: new Date().toISOString()
+          }
+        },
+        { idempotencyKey }
+      );
+
+      // Get proration amount from upcoming invoice
+      const upcomingInvoice = await stripe.invoices.retrieveUpcoming({
+        subscription: subscription.stripeSubId
+      });
+
+      const prorationAmount = upcomingInvoice.amount_due;
+
+      // Update local database
+      const plan = PLANS[targetTier];
+      const updated = await prisma.subscription.update({
+        where: { id: subscriptionId },
+        data: {
+          tier: targetTier,
+          aiQuotaTotal: plan.aiQuota === Infinity ? -1 : plan.aiQuota,
+          // Don't reset used quota on upgrade - user keeps what they used
+        }
+      });
+
+      // Audit log
+      await this.auditLog('SUBSCRIPTION_UPGRADE', {
+        subscriptionId,
+        fromTier: currentTier,
+        toTier: targetTier,
+        stripeSubscriptionId: subscription.stripeSubId,
+        prorationAmount,
+        idempotencyKey
+      });
+
+      return { 
+        subscription: updated, 
+        stripeSubscription: updatedStripeSub,
+        prorationAmount,
+        upcomingInvoice: {
+          amountDue: upcomingInvoice.amount_due,
+          currency: upcomingInvoice.currency,
+          periodStart: upcomingInvoice.period_start,
+          periodEnd: upcomingInvoice.period_end
+        }
+      };
+    } catch (error: any) {
+      // Log failed attempt
+      await this.auditLog('SUBSCRIPTION_UPGRADE', {
+        subscriptionId,
+        toTier: newTier,
+        error: error.message,
+        idempotencyKey
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Downgrade Subscription (effective at period end)
+   */
+  async downgradeSubscription(
+    subscriptionId: string,
+    newTier: 'ESSENTIAL' | 'PROFESSIONAL' | 'ENTERPRISE'
+  ) {
+    const idempotencyKey = `downgrade_${subscriptionId}_${newTier}_${Date.now()}`;
+    
+    try {
+      const subscription = await prisma.subscription.findUnique({
+        where: { id: subscriptionId },
+        include: { tenant: true }
+      });
+
+      if (!subscription?.stripeSubId) {
+        throw new Error('No active subscription found');
+      }
+
+      // Normalize tier names
+      const currentTier = this.normalizeTier(subscription.tier);
+      const targetTier = this.normalizeTier(newTier);
+
+      // Verify this is actually a downgrade
+      if (canUpgrade(currentTier, targetTier) || currentTier === targetTier) {
+        throw new Error(`Cannot downgrade from ${currentTier} to ${targetTier}. Target tier must be lower.`);
+      }
+
+      // Retrieve current Stripe subscription
+      const stripeSub = await stripe.subscriptions.retrieve(subscription.stripeSubId);
+      const priceId = this.getPriceIdForTier(targetTier);
+
+      // For downgrade: schedule change at period end
+      // Strategy: Update subscription to cancel at period end, then create new one
+      const updatedStripeSub = await stripe.subscriptions.update(
+        subscription.stripeSubId,
+        {
+          cancel_at_period_end: true,
+          metadata: {
+            ...stripeSub.metadata,
+            downgradeScheduled: 'true',
+            downgradeToTier: targetTier,
+            downgradeAt: stripeSub.current_period_end
+          }
+        },
+        { idempotencyKey }
+      );
+
+      // Schedule the new subscription for next period
+      // Store scheduled downgrade info in DB
+      const updated = await prisma.subscription.update({
+        where: { id: subscriptionId },
+        data: {
+          metadata: {
+            ...(subscription.metadata as any || {}),
+            scheduledDowngrade: {
+              toTier: targetTier,
+              effectiveAt: new Date(stripeSub.current_period_end * 1000).toISOString(),
+              newPriceId: priceId
+            }
+          }
+        }
+      });
+
+      // Calculate what the next period will cost
+      const scheduledInvoice = await stripe.invoices.retrieveUpcoming({
+        subscription: subscription.stripeSubId,
+        subscription_items: [{
+          id: stripeSub.items.data[0].id,
+          price: priceId,
+          quantity: 1
+        }]
+      });
+
+      // Audit log
+      await this.auditLog('SUBSCRIPTION_DOWNGRADE', {
+        subscriptionId,
+        fromTier: currentTier,
+        toTier: targetTier,
+        stripeSubscriptionId: subscription.stripeSubId,
+        effectiveAt: stripeSub.current_period_end,
+        nextPeriodAmount: scheduledInvoice.amount_due,
+        idempotencyKey
+      });
+
+      return {
+        subscription: updated,
+        stripeSubscription: updatedStripeSub,
+        scheduledDowngrade: {
+          toTier: targetTier,
+          effectiveAt: new Date(stripeSub.current_period_end * 1000).toISOString(),
+          nextPeriodAmount: scheduledInvoice.amount_due
+        }
+      };
+    } catch (error: any) {
+      await this.auditLog('SUBSCRIPTION_DOWNGRADE', {
+        subscriptionId,
+        toTier: newTier,
+        error: error.message,
+        idempotencyKey
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Get proration information for an upgrade
+   */
+  async getProrationInfo(
+    subscriptionId: string,
+    newTier: 'ESSENTIAL' | 'PROFESSIONAL' | 'ENTERPRISE'
+  ): Promise<{
+    prorationDate: Date;
+    costNow: number;
+    costNextPeriod: number;
+    currency: string;
+    currentTier: string;
+    newTier: string;
+  }> {
+    const subscription = await prisma.subscription.findUnique({
+      where: { id: subscriptionId }
+    });
+
+    if (!subscription?.stripeSubId) {
+      throw new Error('No active subscription found');
+    }
+
+    const targetTier = this.normalizeTier(newTier);
+    const priceId = this.getPriceIdForTier(targetTier);
+
+    // Get current Stripe subscription
+    const stripeSub = await stripe.subscriptions.retrieve(subscription.stripeSubId);
+
+    // Calculate proration using Stripe's upcoming invoice
+    const upcomingInvoice = await stripe.invoices.retrieveUpcoming({
+      subscription: subscription.stripeSubId,
+      subscription_items: [{
+        id: stripeSub.items.data[0].id,
+        price: priceId,
+        quantity: 1
+      }]
+    });
+
+    // Get next period cost (without proration)
+    const nextPeriodInvoice = await stripe.invoices.retrieveUpcoming({
+      subscription: subscription.stripeSubId,
+      subscription_items: [{
+        id: stripeSub.items.data[0].id,
+        price: priceId,
+        quantity: 1
+      }],
+      subscription_proration_date: stripeSub.current_period_end
+    });
+
+    await this.auditLog('PRORATION_CALCULATED', {
+      subscriptionId,
+      fromTier: subscription.tier,
+      toTier: targetTier,
+      prorationAmount: upcomingInvoice.amount_due,
+      nextPeriodAmount: nextPeriodInvoice.amount_due
+    });
+
+    return {
+      prorationDate: new Date(),
+      costNow: upcomingInvoice.amount_due,
+      costNextPeriod: nextPeriodInvoice.amount_due,
+      currency: upcomingInvoice.currency,
+      currentTier: subscription.tier,
+      newTier: targetTier
+    };
+  }
+
+  /**
+   * Process scheduled downgrade at period end
+   * This should be called by a webhook or cron job
+   */
+  async processScheduledDowngrade(subscriptionId: string) {
+    const subscription = await prisma.subscription.findUnique({
+      where: { id: subscriptionId }
+    });
+
+    if (!subscription?.metadata) {
+      throw new Error('No scheduled downgrade found');
+    }
+
+    const metadata = subscription.metadata as any;
+    if (!metadata.scheduledDowngrade) {
+      throw new Error('No scheduled downgrade found');
+    }
+
+    const { toTier, newPriceId } = metadata.scheduledDowngrade;
+    const idempotencyKey = `process_downgrade_${subscriptionId}_${Date.now()}`;
+
+    // Create new subscription for the downgraded tier
+    const stripeSub = await stripe.subscriptions.retrieve(subscription.stripeSubId!);
+    
+    const newStripeSub = await stripe.subscriptions.create({
+      customer: stripeSub.customer as string,
+      items: [{ price: newPriceId }],
+      metadata: { 
+        praxisId: subscription.praxisId,
+        tier: toTier,
+        downgradedFrom: subscription.tier
+      }
+    }, { idempotencyKey });
+
+    // Update local subscription
+    const plan = PLANS[toTier];
+    const updated = await prisma.subscription.update({
+      where: { id: subscriptionId },
+      data: {
+        tier: toTier,
+        stripeSubId: newStripeSub.id,
+        aiQuotaTotal: plan.aiQuota === Infinity ? -1 : plan.aiQuota,
+        metadata: {
+          ...metadata,
+          scheduledDowngrade: null, // Clear scheduled downgrade
+          downgradedAt: new Date().toISOString()
+        }
+      }
+    });
+
+    return { subscription: updated, stripeSubscription: newStripeSub };
+  }
+
+  /**
+   * Cancel a scheduled downgrade
+   */
+  async cancelScheduledDowngrade(subscriptionId: string) {
+    const subscription = await prisma.subscription.findUnique({
+      where: { id: subscriptionId }
+    });
+
+    if (!subscription?.stripeSubId) {
+      throw new Error('No active subscription found');
+    }
+
+    // Re-enable the subscription (cancel the cancellation)
+    await stripe.subscriptions.update(subscription.stripeSubId, {
+      cancel_at_period_end: false
+    });
+
+    // Clear scheduled downgrade from metadata
+    const updated = await prisma.subscription.update({
+      where: { id: subscriptionId },
+      data: {
+        metadata: {
+          ...(subscription.metadata as any || {}),
+          scheduledDowngrade: null
+        }
+      }
+    });
+
+    return updated;
+  }
+
+  /**
+   * Audit logging for subscription changes
+   */
+  private async auditLog(action: AuditAction, data: AuditLogData) {
+    const timestamp = new Date().toISOString();
+    const logEntry = {
+      timestamp,
+      action,
+      ...data
+    };
+
+    // Log to console (structured)
+    console.log(`[Subscription Audit] ${action}:`, JSON.stringify(logEntry));
+
+    // Persist to database if audit log table exists
+    try {
+      await (prisma as any).auditLog.create({
+        data: {
+          action,
+          entityType: 'SUBSCRIPTION',
+          entityId: data.subscriptionId,
+          details: JSON.stringify(data),
+          createdAt: new Date()
+        }
+      });
+    } catch {
+      // Audit log table may not exist, continue silently
+    }
+  }
+
+  /**
+   * Normalize tier names (handle legacy STARTER -> ESSENTIAL)
+   */
+  private normalizeTier(tier: string): 'ESSENTIAL' | 'PROFESSIONAL' | 'ENTERPRISE' {
+    const legacyMap: Record<string, 'ESSENTIAL' | 'PROFESSIONAL' | 'ENTERPRISE'> = {
+      'STARTER': 'ESSENTIAL',
+      'ESSENTIAL': 'ESSENTIAL',
+      'PROFESSIONAL': 'PROFESSIONAL',
+      'ENTERPRISE': 'ENTERPRISE'
+    };
+    return legacyMap[tier.toUpperCase()] || 'ESSENTIAL';
   }
 
   private getPriceIdForTier(tier: string): string {

@@ -7,6 +7,7 @@ import { useEffect, lazy, Suspense, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp';
 import { CookieConsent } from './components/CookieConsent';
+import { ThemeToggle } from './components/ThemeToggle';
 import { PWAShell } from './components/pwa/PWAShell';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { RouteErrorBoundary } from './components/RouteErrorBoundary';
@@ -31,6 +32,8 @@ const AnonymousFeedbackForm = lazy(() => import('./pages/checkout/AnonymousFeedb
 const KioskDashboard = lazy(() => import('./pages/kiosk/KioskDashboard').then(m => ({ default: m.KioskDashboard })));
 const TreatmentFlowBuilder = lazy(() => import('./pages/flows/TreatmentFlowBuilder').then(m => ({ default: m.TreatmentFlowBuilder })));
 const DataDeletionConfirm = lazy(() => import('./pages/checkout/DataDeletionConfirm').then(m => ({ default: m.DataDeletionConfirm })));
+const CheckoutSuccess = lazy(() => import('./pages/checkout/CheckoutSuccess').then(m => ({ default: m.CheckoutSuccess })));
+const BillingDashboard = lazy(() => import('./pages/billing/BillingDashboard').then(m => ({ default: m.BillingDashboard })));
 const VideoRoom = lazy(() => import('./pages/telemedizin/VideoRoom').then(m => ({ default: m.VideoRoom })));
 const TelemedizinScheduler = lazy(() => import('./pages/telemedizin/TelemedizinScheduler').then(m => ({ default: m.TelemedizinScheduler })));
 const FormBuilderPage = lazy(() => import('./pages/forms/FormBuilderPage').then(m => ({ default: m.FormBuilderPage })));
@@ -61,6 +64,7 @@ const DatenschutzPage = lazy(() => import('./pages/DatenschutzPage').then(m => (
 const ImpressumPage = lazy(() => import('./pages/ImpressumPage').then(m => ({ default: m.ImpressumPage })));
 const Pricing = lazy(() => import('./pages/Pricing').then(m => ({ default: m.Pricing })));
 const StaffLogin = lazy(() => import('./pages/staff/StaffLogin'));
+const SecuritySettingsPage = lazy(() => import('./pages/settings/SecuritySettingsPage').then(m => ({ default: m.SecuritySettingsPage })));
 
 // Suspense fallback for lazy routes
 function DashboardLoading() {
@@ -147,6 +151,11 @@ function App() {
         <OfflineIndicator position="top" showQueueDetails />
         <InstallPrompt minVisits={2} dismissCooldownDays={30} />
         <UpdateNotification position="top" />
+
+        {/* Global theme toggle — fixed bottom-right, visible on every route */}
+        <div className="fixed bottom-5 right-5 z-[8000] print:hidden">
+          <ThemeToggle />
+        </div>
         
         {/* Skip-to-content link for keyboard/screen-reader users */}
         <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[9999] focus:px-4 focus:py-2 focus:bg-blue-600 focus:text-white focus:rounded-lg focus:text-sm focus:font-bold">
@@ -198,6 +207,8 @@ function App() {
           <Route path="/flows/builder" element={<ProtectedRoute allowedRoles={['arzt', 'admin']}><RouteErrorBoundary routeType="staff"><Suspense fallback={<DashboardLoading />}><TreatmentFlowBuilder /></Suspense></RouteErrorBoundary></ProtectedRoute>} />
           <Route path="/flows/builder/:flowId" element={<ProtectedRoute allowedRoles={['arzt', 'admin']}><RouteErrorBoundary routeType="staff"><Suspense fallback={<DashboardLoading />}><TreatmentFlowBuilder /></Suspense></RouteErrorBoundary></ProtectedRoute>} />
           <Route path="/checkout/:sessionId/delete" element={<RouteErrorBoundary routeType="patient"><Suspense fallback={<DashboardLoading />}><DataDeletionConfirmRoute /></Suspense></RouteErrorBoundary>} />
+          <Route path="/checkout/success" element={<RouteErrorBoundary routeType="patient"><Suspense fallback={<DashboardLoading />}><CheckoutSuccess /></Suspense></RouteErrorBoundary>} />
+          <Route path="/verwaltung/billing" element={<RouteErrorBoundary routeType="staff"><Suspense fallback={<DashboardLoading />}><BillingDashboard /></Suspense></RouteErrorBoundary>} />
 
           {/* Modul 9: Telemedizin */}
           <Route path="/telemedizin" element={<RouteErrorBoundary routeType="default"><Suspense fallback={<DashboardLoading />}><TelemedizinScheduler /></Suspense></RouteErrorBoundary>} />
@@ -211,6 +222,9 @@ function App() {
           {/* Modul 11: Private ePA (role-protected) */}
           <Route path="/epa/:patientId" element={<ProtectedRoute allowedRoles={['arzt', 'admin']}><RouteErrorBoundary routeType="staff"><Suspense fallback={<DashboardLoading />}><PrivateEpaDashboard /></Suspense></RouteErrorBoundary></ProtectedRoute>} />
           <Route path="/epa/shared/:token" element={<RouteErrorBoundary routeType="default"><Suspense fallback={<DashboardLoading />}><SharedEpaView /></Suspense></RouteErrorBoundary>} />
+
+          {/* Settings Pages */}
+          <Route path="/settings/security" element={<RouteErrorBoundary routeType="default"><Suspense fallback={<DashboardLoading />}><SecuritySettingsPage /></Suspense></RouteErrorBoundary>} />
 
           {/* PWA Patient Portal */}
           <Route path="/pwa/login" element={<RouteErrorBoundary routeType="pwa"><Suspense fallback={<DashboardLoading />}><PwaLogin /></Suspense></RouteErrorBoundary>} />

@@ -1,0 +1,18 @@
+{
+  "title": "Passkeys",
+  "add": "Dodaj",
+  "delete": "Usun",
+  "deleteConfirm": "Czy na pewno chcesz usunac ten passkey?",
+  "deviceName": "Nazwa urzadzenia (np., iPhone 15)",
+  "lastUsed": "Ostatnie uzycie",
+  "never": "Nigdy",
+  "noKeys": "Brak zarejestrowanych passkeys",
+  "register": "Zarejestruj Passkey",
+  "registering": "Rejestrowanie...",
+  "authenticate": "Zaloguj sie za pomoca Passkey",
+  "authenticating": "Logowanie...",
+  "login": "Zaloguj sie za pomoca Passkey",
+  "checking": "Sprawdzanie wsparcia...",
+  "notSupported": "Passkeys nie sa obslugiwane",
+  "authFailed": "Uwierzytelnienie nie powiodlo sie"
+}

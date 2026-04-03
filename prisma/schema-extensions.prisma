@@ -1,0 +1,230 @@
+// Knowledge-Harnessing Core Models
+
+enum LearningType {
+  ERROR_PATTERN
+  PERFORMANCE_INSIGHT
+  USER_BEHAVIOR
+  SECURITY_INCIDENT
+  BUSINESS_INSIGHT
+  OPERATIONAL_LESSON
+}
+
+enum LearningStatus {
+  DETECTED
+  ANALYZING
+  DOCUMENTED
+  ACTION_PLANNED
+  IMPLEMENTED
+  VALIDATED
+  ARCHIVED
+}
+
+enum ErrorPatternStatus {
+  NEW
+  ANALYZING
+  RESOLVED
+  IGNORED
+}
+
+model Learning {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  
+  type        LearningType
+  status      LearningStatus @default(DETECTED)
+  severity    String         @default("medium") @db.VarChar(20)
+  category    String         @db.VarChar(100)
+  tags        String[]       @db.VarChar(50)
+  
+  title       String         @db.VarChar(255)
+  description String
+  context     Json?          @db.JsonB
+  evidence    Json?          @db.JsonB
+  
+  sourceType  String         @db.VarChar(50)
+  sourceId    String?        @db.VarChar(255)
+  createdBy   String?        @db.VarChar(255)
+  
+  rootCause   String?
+  hypothesis  String?
+  solution    String?
+  
+  occurrenceCount Int        @default(1)
+  firstSeenAt DateTime       @default(now()) @db.Timestamptz(6)
+  lastSeenAt  DateTime       @updatedAt @db.Timestamptz(6)
+  affectedUsers Int?
+  affectedSessions Int?
+  
+  actionTaken String?
+  actionTakenAt DateTime?    @db.Timestamptz(6)
+  actionTakenBy String?      @db.VarChar(255)
+  validatedAt DateTime?      @db.Timestamptz(6)
+  validationResult String?   @db.VarChar(50)
+  
+  createdAt   DateTime       @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime       @updatedAt @db.Timestamptz(6)
+
+  // Relations
+  errorPattern ErrorPattern?
+  sourceRelations KnowledgeRelation[] @relation("SourceLearning")
+  targetRelations KnowledgeRelation[] @relation("TargetLearning")
+
+  @@index([tenantId, status])
+  @@index([tenantId, type, createdAt])
+  @@index([category, severity])
+  @@index([sourceType, sourceId])
+  @@index([createdAt])
+  @@map("learnings")
+}
+
+model ErrorPattern {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  
+  fingerprint String   @unique @db.VarChar(64)
+  signature   String   @db.VarChar(255)
+  errorType   String   @db.VarChar(100)
+  
+  occurrenceCount  Int  @default(1)
+  firstSeenAt      DateTime @default(now()) @db.Timestamptz(6)
+  lastSeenAt       DateTime @updatedAt @db.Timestamptz(6)
+  lastOccurrenceId String?  @db.VarChar(255)
+  
+  affectedRoutes   String[] @db.VarChar(100)
+  affectedVersions String[] @db.VarChar(50)
+  affectedEnvironments String[] @db.VarChar(50)
+  
+  status          ErrorPatternStatus @default(NEW)
+  assignedTo      String?    @db.VarChar(255)
+  rootCause       String?
+  solution        String?
+  workaround      String?
+  
+  autoResolved    Boolean  @default(false)
+  resolutionScript String?
+  
+  learningId      String?  @unique @db.VarChar(255)
+  learning        Learning? @relation(fields: [learningId], references: [id])
+  
+  createdAt       DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @db.Timestamptz(6)
+
+  @@index([tenantId, status])
+  @@index([fingerprint])
+  @@index([errorType, status])
+  @@index([createdAt])
+  @@map("error_patterns")
+}
+
+model MetricSnapshot {
+  id          String   @id @default(cuid())
+  tenantId    String
+  
+  timestamp   DateTime @default(now()) @db.Timestamptz(6)
+  metricType  String   @db.VarChar(50)
+  value       Float
+  unit        String?  @db.VarChar(20)
+  
+  baselineAvg Float?
+  baselineStd Float?
+  anomalyScore Float?
+  isAnomaly   Boolean  @default(false)
+  
+  route       String?  @db.VarChar(100)
+  method      String?  @db.VarChar(10)
+  statusCode  Int?
+  userRole    String?  @db.VarChar(20)
+  
+  relatedLearningId String? @db.VarChar(255)
+  
+  @@index([tenantId, metricType, timestamp])
+  @@index([metricType, isAnomaly])
+  @@index([timestamp])
+  @@index([isAnomaly, anomalyScore])
+  @@map("metric_snapshots")
+}
+
+model KnowledgeRelation {
+  id          String   @id @default(cuid())
+  sourceId    String   @db.VarChar(255)
+  source      Learning @relation("SourceLearning", fields: [sourceId], references: [id], onDelete: Cascade)
+  targetId    String   @db.VarChar(255)
+  target      Learning @relation("TargetLearning", fields: [targetId], references: [id], onDelete: Cascade)
+  relationType String  @db.VarChar(20)
+  confidence  Float    @default(0.5)
+  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([sourceId, targetId, relationType])
+  @@index([sourceId])
+  @@index([targetId])
+  @@map("knowledge_relations")
+}
+
+model ImprovementCycle {
+  id          String   @id @default(cuid())
+  tenantId    String
+  
+  title       String   @db.VarChar(255)
+  description String
+  
+  hypothesis  String
+  expectedOutcome String
+  successCriteria String
+  
+  status      String   @default("planned") @db.VarChar(20)
+  priority    String   @default("medium") @db.VarChar(20)
+  
+  plannedStart DateTime? @db.Timestamptz(6)
+  actualStart  DateTime? @db.Timestamptz(6)
+  plannedEnd   DateTime? @db.Timestamptz(6)
+  actualEnd    DateTime? @db.Timestamptz(6)
+  
+  actualOutcome String?
+  outcomeMet    Boolean?
+  roi           Float?
+  learnings     Json?    @db.JsonB
+  
+  relatedLearningIds String[] @db.VarChar(255)
+  teamMembers        String[] @db.VarChar(255)
+  
+  createdBy   String   @db.VarChar(255)
+  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(6)
+
+  @@index([tenantId, status])
+  @@index([status, priority])
+  @@index([createdAt])
+  @@map("improvement_cycles")
+}
+
+model KnowledgeCapture {
+  id          String   @id @default(cuid())
+  tenantId    String
+  
+  captureType String   @db.VarChar(20)
+  sourceUrl   String?  @db.VarChar(500)
+  
+  title       String   @db.VarChar(255)
+  content     String
+  category    String   @db.VarChar(50)
+  
+  authorId    String   @db.VarChar(255)
+  tags        String[] @db.VarChar(50)
+  
+  status      String   @default("raw") @db.VarChar(20)
+  processedBy String?  @db.VarChar(255)
+  processedAt DateTime? @db.Timestamptz(6)
+  
+  actionItems Json?    @db.JsonB
+  
+  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(6)
+
+  @@index([tenantId, captureType])
+  @@index([status, category])
+  @@index([authorId])
+  @@index([createdAt])
+  @@map("knowledge_captures")
+}

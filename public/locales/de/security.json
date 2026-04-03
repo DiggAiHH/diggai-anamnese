@@ -1,0 +1,77 @@
+{
+  "title": "Sicherheit",
+  "subtitle": "Verwalten Sie Ihre Sicherheitseinstellungen und aktiven Sessions",
+  "active": "Aktiv",
+  "inactive": "Inaktiv",
+  "cancel": "Abbrechen",
+  "verifying": "Wird überprüft...",
+  "disabling": "Wird deaktiviert...",
+  "score": {
+    "title": "Sicherheitsstatus",
+    "good": "Ihr Account ist gut geschützt",
+    "improve": "Es gibt Verbesserungspotenzial"
+  },
+  "password": {
+    "title": "Passwort",
+    "lastChanged": "Zuletzt geändert vor 3 Monaten",
+    "current": "Aktuelles Passwort",
+    "new": "Neues Passwort",
+    "reqLength": "Mindestens 12 Zeichen",
+    "change": "Passwort ändern"
+  },
+  "2fa": {
+    "title": "Zwei-Faktor-Authentifizierung",
+    "enabled": "Aktiviert über Authenticator-App",
+    "disabled": "Nicht aktiviert - erhöht die Sicherheit",
+    "setup": "2FA einrichten",
+    "disable": "2FA deaktivieren",
+    "backupCodes": "Backup-Codes anzeigen",
+    "active": {
+      "title": "2FA ist aktiviert",
+      "description": "Ihr Account ist zusätzlich geschützt."
+    },
+    "inactive": {
+      "title": "2FA ist nicht aktiviert",
+      "description": "Aktivieren Sie 2FA für zusätzlichen Schutz."
+    },
+    "setup": {
+      "title": "2FA Einrichtung",
+      "loading": "QR-Code wird generiert...",
+      "scanQr": "Scannen Sie den QR-Code mit Ihrer Authenticator-App:",
+      "manualEntry": "Manuelle Eingabe:",
+      "enterCode": "Verifizierungscode eingeben",
+      "verify": "Aktivieren",
+      "downloadCodes": "Codes herunterladen",
+      "backupCodesTitle": "Backup-Codes speichern",
+      "backupCodesDesc": "Bewahren Sie diese Codes sicher auf. Sie ermöglichen den Zugriff, wenn Sie Ihr Gerät verlieren."
+    },
+    "disableConfirm": {
+      "title": "2FA deaktivieren",
+      "warning": "Sicherheitswarnung",
+      "description": "Das Deaktivieren von 2FA verringert die Sicherheit Ihres Accounts. Sie müssen einen gültigen 2FA-Code eingeben, um fortzufahren.",
+      "enterCode": "2FA-Code zur Bestätigung",
+      "confirm": "Deaktivieren"
+    },
+    "errors": {
+      "setupFailed": "Setup fehlgeschlagen. Bitte versuchen Sie es erneut.",
+      "verifyFailed": "Verifizierung fehlgeschlagen. Bitte überprüfen Sie den Code.",
+      "disableFailed": "Deaktivierung fehlgeschlagen. Bitte überprüfen Sie den Code.",
+      "invalidCode": "Bitte geben Sie einen gültigen 6-stelligen Code ein."
+    }
+  },
+  "sessions": {
+    "title": "Aktive Sitzungen",
+    "loading": "Laden...",
+    "count": "{{count}} aktive Sitzungen",
+    "current": "Aktuell",
+    "trusted": "Vertraut",
+    "terminate": "Beenden",
+    "terminateAll": "Alle anderen Sitzungen beenden",
+    "terminating": "Wird beendet..."
+  },
+  "devices": {
+    "title": "Vertraute Geräte",
+    "count": "{{count}} vertraute Geräte",
+    "manage": "Verwalten"
+  }
+}

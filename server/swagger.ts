@@ -116,9 +116,50 @@ DSGVO-konforme, klinische Patientenaufnahme-Plattform für Arztpraxen.
                     },
                     required: ['error'],
                 },
+                Session: {
+                    type: 'object',
+                    properties: {
+                        id: { type: 'string', format: 'uuid', description: 'Session-ID' },
+                        deviceName: { type: 'string', example: 'Chrome on Windows' },
+                        deviceType: { type: 'string', enum: ['web', 'mobile', 'tablet', 'desktop'] },
+                        browser: { type: 'string', example: 'Chrome' },
+                        os: { type: 'string', example: 'Windows' },
+                        location: { type: 'string', example: 'Berlin, DE' },
+                        ipHash: { type: 'string', example: 'a1b2c3***' },
+                        lastActiveAt: { type: 'string', format: 'date-time' },
+                        isCurrentSession: { type: 'boolean' },
+                        isTrusted: { type: 'boolean' },
+                    },
+                },
             },
         },
         security: [{ BearerAuth: [] }, { CookieAuth: [] }],
+        tags: [
+            {
+                name: 'Auth',
+                description: 'Authentifizierung',
+            },
+            {
+                name: 'Auth - Sessions',
+                description: 'Session Management - Aktive Sessions anzeigen und beenden',
+            },
+            {
+                name: 'Auth - Security',
+                description: 'Sicherheitseinstellungen und Audit-Logs',
+            },
+            {
+                name: 'Patient',
+                description: 'Patienten-Anamnese und Antworten',
+            },
+            {
+                name: 'Triage',
+                description: 'Triage-Engine und kritische Ereignisse',
+            },
+            {
+                name: 'Dashboard',
+                description: 'Arzt- und MFA-Dashboard',
+            },
+        ],
     },
     apis: [
         './server/routes/*.ts',

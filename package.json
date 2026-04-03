@@ -56,6 +56,8 @@
     "backup:restore": "tsx scripts/restore-database.ts",
     "backup:status": "curl -s http://localhost:3001/api/system/backup-status | jq",
     "backup:ops": "bash scripts/backup-operations.sh",
+    "backup:billing": "tsx scripts/backup-billing.ts",
+    "backup:billing:dry": "tsx scripts/backup-billing.ts --dry-run",
     "docker:up": "docker compose up -d --build",
     "docker:down": "docker compose down",
     "docker:logs": "docker compose logs -f app",

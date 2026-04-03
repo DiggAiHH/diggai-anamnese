@@ -15,6 +15,7 @@ import {
   constructWebhookEvent,
   handleWebhookEvent
 } from '../services/billing.service.js';
+import { subscriptionService } from '../services/subscription.service.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 import { getPrismaClientForDomain } from '../db.js';
 
@@ -36,6 +37,18 @@ const createSubscriptionSchema = z.object({
 
 const cancelSubscriptionSchema = z.object({
   stripeSubscriptionId: z.string()
+});
+
+const upgradeSubscriptionSchema = z.object({
+  tier: z.enum(['ESSENTIAL', 'PROFESSIONAL', 'ENTERPRISE'])
+});
+
+const downgradeSubscriptionSchema = z.object({
+  tier: z.enum(['ESSENTIAL', 'PROFESSIONAL', 'ENTERPRISE'])
+});
+
+const prorationInfoSchema = z.object({
+  tier: z.enum(['ESSENTIAL', 'PROFESSIONAL', 'ENTERPRISE'])
 });
 
 // ─── Setup Intent Routes ───────────────────────────────────
@@ -256,6 +269,217 @@ router.delete('/subscription', requireAuth, async (req: Request, res: Response) 
   }
 });
 
+/**
+ * POST /api/billing/subscription/upgrade
+ * Upgrade subscription to higher tier (immediate with proration)
+ */
+router.post('/subscription/upgrade', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const { tier } = upgradeSubscriptionSchema.parse(req.body);
+    const user = (req as any).user;
+    const praxisId = user?.praxisId || user?.tenantId;
+
+    if (!praxisId) {
+      return res.status(400).json({ error: 'No praxis ID found' });
+    }
+
+    const subscription = await prisma.subscription.findUnique({
+      where: { praxisId }
+    });
+
+    if (!subscription) {
+      return res.status(404).json({ error: 'No subscription found' });
+    }
+
+    // Check if already on target tier
+    if (subscription.tier === tier) {
+      return res.status(400).json({ 
+        error: 'Already on this tier',
+        currentTier: subscription.tier
+      });
+    }
+
+    const result = await subscriptionService.upgradeSubscription(
+      subscription.id,
+      tier
+    );
+
+    res.json({
+      success: true,
+      subscription: result.subscription,
+      prorationAmount: result.prorationAmount,
+      upcomingInvoice: result.upcomingInvoice,
+      message: `Successfully upgraded to ${tier}. Proration amount: ${(result.prorationAmount / 100).toFixed(2)} ${result.upcomingInvoice.currency.toUpperCase()}`
+    });
+  } catch (error: unknown) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        error: 'Invalid upgrade payload',
+        details: error.flatten()
+      });
+    }
+
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Billing] Upgrade error:', error);
+    res.status(400).json({
+      error: 'Upgrade failed',
+      message
+    });
+  }
+});
+
+/**
+ * POST /api/billing/subscription/downgrade
+ * Downgrade subscription (effective at period end)
+ */
+router.post('/subscription/downgrade', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const { tier } = downgradeSubscriptionSchema.parse(req.body);
+    const user = (req as any).user;
+    const praxisId = user?.praxisId || user?.tenantId;
+
+    if (!praxisId) {
+      return res.status(400).json({ error: 'No praxis ID found' });
+    }
+
+    const subscription = await prisma.subscription.findUnique({
+      where: { praxisId }
+    });
+
+    if (!subscription) {
+      return res.status(404).json({ error: 'No subscription found' });
+    }
+
+    // Check if already on target tier
+    if (subscription.tier === tier) {
+      return res.status(400).json({ 
+        error: 'Already on this tier',
+        currentTier: subscription.tier
+      });
+    }
+
+    const result = await subscriptionService.downgradeSubscription(
+      subscription.id,
+      tier
+    );
+
+    res.json({
+      success: true,
+      subscription: result.subscription,
+      scheduledDowngrade: result.scheduledDowngrade,
+      message: `Downgrade to ${tier} scheduled. Will take effect at period end. Next period cost: ${(result.scheduledDowngrade.nextPeriodAmount / 100).toFixed(2)}`
+    });
+  } catch (error: unknown) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        error: 'Invalid downgrade payload',
+        details: error.flatten()
+      });
+    }
+
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Billing] Downgrade error:', error);
+    res.status(400).json({
+      error: 'Downgrade failed',
+      message
+    });
+  }
+});
+
+/**
+ * GET /api/billing/subscription/proration
+ * Get proration information for a potential upgrade
+ */
+router.get('/subscription/proration', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const tier = req.query.tier as string;
+    
+    if (!tier || !['ESSENTIAL', 'PROFESSIONAL', 'ENTERPRISE'].includes(tier)) {
+      return res.status(400).json({ 
+        error: 'Invalid tier parameter',
+        validTiers: ['ESSENTIAL', 'PROFESSIONAL', 'ENTERPRISE']
+      });
+    }
+
+    const user = (req as any).user;
+    const praxisId = user?.praxisId || user?.tenantId;
+
+    if (!praxisId) {
+      return res.status(400).json({ error: 'No praxis ID found' });
+    }
+
+    const subscription = await prisma.subscription.findUnique({
+      where: { praxisId }
+    });
+
+    if (!subscription) {
+      return res.status(404).json({ error: 'No subscription found' });
+    }
+
+    const prorationInfo = await subscriptionService.getProrationInfo(
+      subscription.id,
+      tier as 'ESSENTIAL' | 'PROFESSIONAL' | 'ENTERPRISE'
+    );
+
+    res.json({
+      success: true,
+      proration: {
+        currentTier: prorationInfo.currentTier,
+        newTier: prorationInfo.newTier,
+        costNow: prorationInfo.costNow,
+        costNowFormatted: `${(prorationInfo.costNow / 100).toFixed(2)} ${prorationInfo.currency.toUpperCase()}`,
+        costNextPeriod: prorationInfo.costNextPeriod,
+        costNextPeriodFormatted: `${(prorationInfo.costNextPeriod / 100).toFixed(2)} ${prorationInfo.currency.toUpperCase()}`,
+        currency: prorationInfo.currency,
+        prorationDate: prorationInfo.prorationDate
+      }
+    });
+  } catch (error: any) {
+    console.error('[Billing] Proration info error:', error);
+    res.status(500).json({
+      error: 'Failed to calculate proration',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/billing/subscription/cancel-downgrade
+ * Cancel a scheduled downgrade
+ */
+router.post('/subscription/cancel-downgrade', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const user = (req as any).user;
+    const praxisId = user?.praxisId || user?.tenantId;
+
+    if (!praxisId) {
+      return res.status(400).json({ error: 'No praxis ID found' });
+    }
+
+    const subscription = await prisma.subscription.findUnique({
+      where: { praxisId }
+    });
+
+    if (!subscription) {
+      return res.status(404).json({ error: 'No subscription found' });
+    }
+
+    const updated = await subscriptionService.cancelScheduledDowngrade(subscription.id);
+
+    res.json({
+      success: true,
+      subscription: updated,
+      message: 'Scheduled downgrade cancelled successfully'
+    });
+  } catch (error: any) {
+    console.error('[Billing] Cancel downgrade error:', error);
+    res.status(500).json({
+      error: 'Failed to cancel downgrade',
+      message: error.message
+    });
+  }
+});
+
 // ─── Payment Method Routes ─────────────────────────────────
 
 /**
@@ -355,6 +579,52 @@ router.get('/invoices', requireAuth, async (req: Request, res: Response) => {
     console.error('[Billing] List invoices error:', error);
     res.status(500).json({
       error: 'Failed to fetch invoices',
+      message: error.message
+    });
+  }
+});
+
+// ─── Payment Method Routes ─────────────────────────────────
+
+/**
+ * DELETE /api/billing/payment-methods/:id
+ * Detach a payment method from customer
+ */
+router.delete('/payment-methods/:id', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const user = (req as any).user;
+    const praxisId = user?.praxisId || user?.tenantId;
+
+    if (!praxisId) {
+      return res.status(400).json({ error: 'No praxis ID found' });
+    }
+
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: praxisId }
+    });
+
+    if (!tenant?.stripeCustomerId) {
+      return res.status(404).json({ error: 'No Stripe customer found' });
+    }
+
+    // Verify the payment method belongs to this customer
+    const methods = await listPaymentMethods(tenant.stripeCustomerId);
+    const method = methods.find(m => m.id === id);
+
+    if (!method) {
+      return res.status(404).json({ error: 'Payment method not found' });
+    }
+
+    // Detach the payment method
+    const { stripe } = await import('../config/stripe.js');
+    await stripe.paymentMethods.detach(id);
+
+    res.json({ success: true, message: 'Payment method removed' });
+  } catch (error: any) {
+    console.error('[Billing] Remove payment method error:', error);
+    res.status(500).json({
+      error: 'Failed to remove payment method',
       message: error.message
     });
   }
