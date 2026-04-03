@@ -130,27 +130,21 @@ export const CancellationConfirmModal: React.FC<CancellationConfirmModalProps> =
             </p>
           </div>
 
-          <div className="space-y-3">
-            <RadioInput
-              id="certainty-sure"
-              name="certainty"
-              value="certain"
-              label={t('cancellation.optionSure', '✅ 100% sicher — Termin absagen')}
-              checked={certainty === 'certain'}
-              onChange={(value) => handleCertaintySelect(value)}
-              description={t('cancellation.sureDesc', 'Ich möchte diesen Termin definitiv absagen')}
-            />
-
-            <RadioInput
-              id="certainty-unsure"
-              name="certainty"
-              value="unsure"
-              label={t('cancellation.optionUnsure', '❓ Nicht sicher — Ich brauche Hilfe')}
-              checked={certainty === 'unsure'}
-              onChange={(value) => handleCertaintySelect(value)}
-              description={t('cancellation.unsureDesc', 'Ich möchte einen anderen Termin sehen oder bin mir unsicher')}
-            />
-          </div>
+          <RadioInput
+            value={certainty || undefined}
+            onChange={handleCertaintySelect}
+            options={[
+              {
+                value: 'certain',
+                label: t('cancellation.optionSure', '✅ 100% sicher — Termin absagen')
+              },
+              {
+                value: 'unsure',
+                label: t('cancellation.optionUnsure', '❓ Nicht sicher — Ich brauche Hilfe')
+              }
+            ]}
+            className="gap-3"
+          />
 
           <div className="flex gap-3 pt-4">
             <Button

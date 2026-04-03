@@ -75,6 +75,11 @@ export interface QuestionLogic {
     level: 'warning' | 'critical';
     message: string;
   };
+  fallback?: {
+    condition: 'fieldEmpty' | 'validationFail' | 'custom';
+    dialogOptions: Array<{ value: string; label?: string; }>;
+    onFallback?: string; // Flag mechanism (e.g., 'SET_FLAG emailStatus:PHONE_ONLY')
+  };
 }
 
 export interface ConditionalRouting {
