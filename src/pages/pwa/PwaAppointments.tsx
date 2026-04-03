@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Calendar, Clock, Plus, X, Loader2, CheckCircle } from 'lucide-react';
 import { usePwaAppointments, usePwaAppointmentSlots, usePwaAppointmentCreate, usePwaAppointmentCancel } from '../../hooks/usePatientApi';
+import { CancellationConfirmModal } from '../../components/CancellationConfirmModal';
 
 interface Appointment {
   id: string;
@@ -49,6 +50,8 @@ export default function PwaAppointments() {
   const [date, setDate] = useState('');
   const [selectedSlot, setSelectedSlot] = useState('');
   const [notes, setNotes] = useState('');
+  const [showCancellationModal, setShowCancellationModal] = useState(false);
+  const [selectedAppointmentForCancel, setSelectedAppointmentForCancel] = useState<Appointment | null>(null);
 
   const { data: appointments, isLoading } = usePwaAppointments();
   const { data: slots, isLoading: slotsLoading } = usePwaAppointmentSlots(date, service);
@@ -121,7 +124,10 @@ export default function PwaAppointments() {
                     {STATUS_LABELS[apt.status] ?? apt.status}
                   </span>
                   {apt.status === 'REQUESTED' || apt.status === 'SCHEDULED' ? (
-                    <button onClick={() => cancelMutation.mutate(apt.id)}
+                    <button onClick={() => {
+                      setSelectedAppointmentForCancel(apt);
+                      setShowCancellationModal(true);
+                    }}
                       disabled={cancelMutation.isPending}
                       className="text-xs text-red-500 hover:text-red-700 flex items-center gap-1">
                       <X className="w-3 h-3" /> Absagen
@@ -203,6 +209,27 @@ export default function PwaAppointments() {
           </div>
         </div>
       )}
+
+      <CancellationConfirmModal
+        open={showCancellationModal}
+        onClose={() => {
+          setShowCancellationModal(false);
+          setSelectedAppointmentForCancel(null);
+        }}
+        appointments={appointmentList.map(apt => ({
+          id: apt.id,
+          date: (apt.scheduledAt || apt.requestedAt || new Date().toISOString()).split('T')[0],
+          time: apt.scheduledAt ? new Date(apt.scheduledAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '',
+          reason: SERVICES.find(s => s.key === apt.type)?.label || apt.type,
+          status: apt.status as 'SCHEDULED' | 'REQUESTED'
+        }))}
+        onConfirmCancel={(appointmentId) => {
+          cancelMutation.mutate(appointmentId);
+          setShowCancellationModal(false);
+          setSelectedAppointmentForCancel(null);
+        }}
+        isLoading={cancelMutation.isPending}
+      />
     </div>
   );
 }

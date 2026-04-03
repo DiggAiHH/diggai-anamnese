@@ -23,6 +23,7 @@ import { SchwangerschaftCheck } from './SchwangerschaftCheck';
 import { PDFExport } from './PDFExport';
 import { SubmittedPage } from './SubmittedPage';
 import { WaitingRoomModal } from './WaitingRoomModal';
+import { EmailFallbackModal } from './EmailFallbackModal';
 import { PatientIdentify } from './inputs/PatientIdentify';
 import { CameraScanner } from './inputs/CameraScanner';
 import { IGelServices } from './IGelServices';
@@ -143,6 +144,7 @@ export function Questionnaire() {
     const [criticalOverlay, setCriticalOverlay] = useState<{ level: 'WARNING' | 'CRITICAL'; atomId: string; message: string; triggerValues: Record<string, unknown> | null } | null>(null);
     const [showPDF, setShowPDF] = useState(false);
     const [isSubmitted, setIsSubmitted] = useState(false);
+    const [showEmailFallback, setShowEmailFallback] = useState(false);
     const [clinicalConsentDone, setClinicalConsentDone] = useState(false);
     const [medications, setMedications] = useState<{ id: string; name: string; dosage: string; frequency: string; sinceWhen: string }[]>([]);
     const [surgeries, setSurgeries] = useState<{ id: string; surgeryName: string; date: string; complications: string; notes: string }[]>([]);
@@ -295,6 +297,16 @@ export function Questionnaire() {
         hapticTap();
         const { currentAtomId, answers, selectedService } = useSessionStore.getState();
         if (!currentAtomId) return;
+
+        // Email Fallback Check (Question 3003): Before proceeding to next question
+        if (currentAtomId === '3003') {
+            const emailValue = (answers['3003']?.value as string || '').trim();
+            if (!emailValue) {
+                // Email is required but empty - show fallback modal instead of error
+                setShowEmailFallback(true);
+                return;
+            }
+        }
 
         const currentQuestion = allQuestions.find(q => q.id === currentAtomId);
         if (!currentQuestion) {
@@ -926,6 +938,32 @@ export function Questionnaire() {
                 <CameraScanner
                     onScan={handleCameraScan}
                     onClose={() => setShowCameraScanner(false)}
+                />
+            )}
+
+            {/* Email Fallback Modal (Phase 3) */}
+            {showEmailFallback && (
+                <EmailFallbackModal
+                    open={showEmailFallback}
+                    onContinuePhoneOnly={() => {
+                        // Set flag and proceed
+                        dispatch({
+                            type: 'ANSWER_QUESTION',
+                            payload: {
+                                questionId: '3003',
+                                value: '__PHONE_ONLY__',
+                                answeredAt: new Date()
+                            }
+                        });
+                        setShowEmailFallback(false);
+                        handleNext();
+                    }}
+                    onProvideEmail={() => {
+                        // Refocus email field
+                        setShowEmailFallback(false);
+                        // Email input will auto-focus
+                    }}
+                    isLoading={false}
                 />
             )}
 
