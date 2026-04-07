@@ -41,6 +41,53 @@ Digitalisiert den Anamnese-Prozess mit 270+ medizinischen Fragen, Echtzeit-Triag
 
 ---
 
+---
+
+## Feature Matrix
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| **Medical Questionnaire** | ✅ Production | 270+ questions, 10 languages |
+| **Triage Engine** | ✅ Production | 10 rules, real-time alerts |
+| **AI Reporting** | ✅ Production | ICD-10 codes, SOAP summaries |
+| **White-Labeling** | ✅ Production | Custom colors, logos, domains |
+| **PVS Integration** | ✅ Production | Tomedo, medistar, CGM M1 |
+| **Multi-Factor Auth** | ✅ Production | TOTP, Email OTP, WebAuthn |
+| **Billing/Stripe** | ✅ Production | Subscriptions, invoices |
+| **Telemedicine** | ✅ Production | Video calls, screen sharing |
+| **Offline/PWA** | ✅ Production | IndexedDB, background sync |
+| **Gamification** | ✅ Q2 2026 | Achievements, leaderboards |
+| **Mobile App** | ⚠️ Q3 2026 | React Native |
+
+---
+
+## Getting Started
+
+**5-minute quickstart (recommended):**
+```bash
+docker compose up -d
+# Frontend: http://localhost:5173
+# Backend: http://localhost:3001
+```
+
+**Full guide:** [QUICKSTART.md](./docs/QUICKSTART.md)
+
+---
+
+## Documentation
+
+| Document | Purpose |
+|----------|---------|
+| [QUICKSTART.md](./docs/QUICKSTART.md) | Get running in 10 minutes |
+| [API_REFERENCE.md](./docs/API_REFERENCE.md) | All API endpoints with examples |
+| [CUSTOMIZATION.md](./docs/CUSTOMIZATION.md) | White-label, custom questions, integrations |
+| [DEPLOYMENT_GUIDE.md](./docs/DEPLOYMENT_GUIDE.md) | Production deployment, SSL, scaling |
+| [SECURITY.md](./docs/SECURITY.md) | DSGVO, encryption, compliance |
+| [TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md) | Common issues & fixes |
+| [CHANGELOG.md](./docs/CHANGELOG.md) | Version history & upgrade guide |
+
+---
+
 ## Schnellstart (Lokale Entwicklung)
 
 ### Voraussetzungen

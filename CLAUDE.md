@@ -10,7 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 |---|---|
 | **Product** | DiggAI Anamnese Platform |
 | **Version** | 3.0.0 |
-| **Live URL** | https://diggai-drklaproth.netlify.app |
+| **Live URL** | https://diggai.de (Vercel — pending DNS) \| API: https://api.diggai.de |
 | **Purpose** | DSGVO-compliant digital patient intake for German medical practices (Arztpraxis) |
 | **Stack** | React 19 + TypeScript 5.9 + Vite 8 + Express 5 + Prisma 6 + PostgreSQL 16 |
 | **Compliance** | DSGVO, HIPAA audit logging, BSI TR-03161, gematik TI/ePA, eIDAS |
