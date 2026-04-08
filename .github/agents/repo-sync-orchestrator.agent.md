@@ -30,6 +30,7 @@ Your mission is to keep these four spaces in deterministic parity:
 ## Preferred Automation Entry Points
 - `scripts/sync-master-codespace.ps1`
 - `scripts/export-onedrive-backup.ps1`
+- `scripts/restore-onedrive-backup.ps1`
 
 ## Output Format
 - Objective
