@@ -142,6 +142,11 @@ async function resolveTenantFromHost(host: string): Promise<TenantContext | null
  * Main tenant resolution middleware
  */
 export async function resolveTenant(req: Request, res: Response, next: NextFunction): Promise<void> {
+    // Bypass tenant resolution for public endpoints
+    if (req.path === '/api/health' || req.path.startsWith('/api/health?')) {
+        return next();
+    }
+
     const identifier = extractTenantIdentifier(req);
     const host = req.headers.host || '';
     const hostSubdomain = extractConcreteHostSubdomain(host);
