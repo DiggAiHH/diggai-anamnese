@@ -2,7 +2,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import multer from 'multer';
 import { resolve, normalize, sep, extname } from 'path';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import { prisma } from '../db';
 import { requireAuth } from '../middleware/auth';
 
@@ -27,7 +27,7 @@ const storage = multer.diskStorage({
     },
     filename: (_req, file, cb) => {
         // Generate a secure, random filename to prevent overwriting and path traversal
-        const uniqueName = `${uuidv4()}${extname(file.originalname)}`;
+        const uniqueName = `${randomUUID()}${extname(file.originalname)}`;
         cb(null, uniqueName);
     }
 });

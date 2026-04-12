@@ -4,7 +4,7 @@
  * @phase PHASE_5_TESTS
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
 import { TomedoDLQService, tomedoDLQ } from '../tomedo-dlq.service.js';
 
 // Mock Redis
@@ -95,7 +95,7 @@ describe('TomedoDLQService', () => {
     it('should fallback to database if Redis unavailable', async () => {
       // Temporarily make Redis unavailable
       const { getRedisClient } = await import('../../../redis.js');
-      (getRedisClient as vi.Mock).mockReturnValueOnce(null);
+      (getRedisClient as unknown as Mock).mockReturnValueOnce(null);
 
       const id = await service.add({
         type: 'patient',
@@ -230,7 +230,7 @@ describe('TomedoDLQService', () => {
 
     it('should fallback to database if Redis unavailable', async () => {
       const { getRedisClient } = await import('../../../redis.js');
-      (getRedisClient as vi.Mock).mockReturnValueOnce(null);
+      (getRedisClient as unknown as Mock).mockReturnValueOnce(null);
 
       await service.remove('dlq-1');
 
@@ -310,7 +310,7 @@ describe('TomedoDLQService', () => {
 
     it('should clear from database if Redis unavailable', async () => {
       const { getRedisClient } = await import('../../../redis.js');
-      (getRedisClient as vi.Mock).mockReturnValueOnce(null);
+      (getRedisClient as unknown as Mock).mockReturnValueOnce(null);
 
       await service.clear();
 

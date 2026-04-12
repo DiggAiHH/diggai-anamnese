@@ -172,14 +172,6 @@ export {
   type PvsNotificationType,
 } from './realtime/websocket-notifier.js';
 
-// FHIR Subscriptions
-export {
-  FhirSubscriptionManager,
-  createSubscriptionManager,
-  type FhirSubscription,
-  type SubscriptionNotification,
-} from './fhir/fhir-subscription-manager.js';
-
 // Conflict Resolution
 export {
   ConflictResolver,

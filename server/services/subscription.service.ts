@@ -353,7 +353,7 @@ export class SubscriptionService {
       );
 
       // Get proration amount from upcoming invoice
-      const upcomingInvoice = await stripe.invoices.retrieveUpcoming({
+          const upcomingInvoice = await (stripe.invoices as any).retrieveUpcoming({
         subscription: subscription.stripeSubId
       });
 
@@ -364,7 +364,7 @@ export class SubscriptionService {
       const updated = await prisma.subscription.update({
         where: { id: subscriptionId },
         data: {
-          tier: targetTier,
+          tier: targetTier as any,
           aiQuotaTotal: plan.aiQuota === Infinity ? -1 : plan.aiQuota,
           // Don't reset used quota on upgrade - user keeps what they used
         }
@@ -433,6 +433,7 @@ export class SubscriptionService {
 
       // Retrieve current Stripe subscription
       const stripeSub = await stripe.subscriptions.retrieve(subscription.stripeSubId);
+      const stripeSubAny = stripeSub as any;
       const priceId = this.getPriceIdForTier(targetTier);
 
       // For downgrade: schedule change at period end
@@ -445,7 +446,7 @@ export class SubscriptionService {
             ...stripeSub.metadata,
             downgradeScheduled: 'true',
             downgradeToTier: targetTier,
-            downgradeAt: stripeSub.current_period_end
+                downgradeAt: stripeSubAny.current_period_end
           }
         },
         { idempotencyKey }
@@ -453,14 +454,14 @@ export class SubscriptionService {
 
       // Schedule the new subscription for next period
       // Store scheduled downgrade info in DB
-      const updated = await prisma.subscription.update({
+      const updated = await (prisma as any).subscription.update({
         where: { id: subscriptionId },
         data: {
           metadata: {
-            ...(subscription.metadata as any || {}),
+            ...((subscription as any).metadata as any || {}),
             scheduledDowngrade: {
               toTier: targetTier,
-              effectiveAt: new Date(stripeSub.current_period_end * 1000).toISOString(),
+              effectiveAt: new Date(stripeSubAny.current_period_end * 1000).toISOString(),
               newPriceId: priceId
             }
           }
@@ -468,7 +469,7 @@ export class SubscriptionService {
       });
 
       // Calculate what the next period will cost
-      const scheduledInvoice = await stripe.invoices.retrieveUpcoming({
+      const scheduledInvoice = await (stripe.invoices as any).retrieveUpcoming({
         subscription: subscription.stripeSubId,
         subscription_items: [{
           id: stripeSub.items.data[0].id,
@@ -483,7 +484,7 @@ export class SubscriptionService {
         fromTier: currentTier,
         toTier: targetTier,
         stripeSubscriptionId: subscription.stripeSubId,
-        effectiveAt: stripeSub.current_period_end,
+        effectiveAt: stripeSubAny.current_period_end,
         nextPeriodAmount: scheduledInvoice.amount_due,
         idempotencyKey
       });
@@ -493,7 +494,7 @@ export class SubscriptionService {
         stripeSubscription: updatedStripeSub,
         scheduledDowngrade: {
           toTier: targetTier,
-          effectiveAt: new Date(stripeSub.current_period_end * 1000).toISOString(),
+          effectiveAt: new Date(stripeSubAny.current_period_end * 1000).toISOString(),
           nextPeriodAmount: scheduledInvoice.amount_due
         }
       };
@@ -535,9 +536,10 @@ export class SubscriptionService {
 
     // Get current Stripe subscription
     const stripeSub = await stripe.subscriptions.retrieve(subscription.stripeSubId);
+    const stripeSubAny = stripeSub as any;
 
     // Calculate proration using Stripe's upcoming invoice
-    const upcomingInvoice = await stripe.invoices.retrieveUpcoming({
+      const upcomingInvoice = await (stripe.invoices as any).retrieveUpcoming({
       subscription: subscription.stripeSubId,
       subscription_items: [{
         id: stripeSub.items.data[0].id,
@@ -547,14 +549,14 @@ export class SubscriptionService {
     });
 
     // Get next period cost (without proration)
-    const nextPeriodInvoice = await stripe.invoices.retrieveUpcoming({
+    const nextPeriodInvoice = await (stripe.invoices as any).retrieveUpcoming({
       subscription: subscription.stripeSubId,
       subscription_items: [{
         id: stripeSub.items.data[0].id,
         price: priceId,
         quantity: 1
       }],
-      subscription_proration_date: stripeSub.current_period_end
+      subscription_proration_date: stripeSubAny.current_period_end
     });
 
     await this.auditLog('PRORATION_CALCULATED', {
@@ -583,12 +585,13 @@ export class SubscriptionService {
     const subscription = await prisma.subscription.findUnique({
       where: { id: subscriptionId }
     });
+    const subscriptionAny = subscription as any;
 
-    if (!subscription?.metadata) {
+    if (!subscriptionAny?.metadata) {
       throw new Error('No scheduled downgrade found');
     }
 
-    const metadata = subscription.metadata as any;
+    const metadata = subscriptionAny.metadata as any;
     if (!metadata.scheduledDowngrade) {
       throw new Error('No scheduled downgrade found');
     }
@@ -597,24 +600,24 @@ export class SubscriptionService {
     const idempotencyKey = `process_downgrade_${subscriptionId}_${Date.now()}`;
 
     // Create new subscription for the downgraded tier
-    const stripeSub = await stripe.subscriptions.retrieve(subscription.stripeSubId!);
+    const stripeSub = await stripe.subscriptions.retrieve(subscriptionAny.stripeSubId as string);
     
     const newStripeSub = await stripe.subscriptions.create({
       customer: stripeSub.customer as string,
       items: [{ price: newPriceId }],
       metadata: { 
-        praxisId: subscription.praxisId,
+        praxisId: subscriptionAny.praxisId,
         tier: toTier,
-        downgradedFrom: subscription.tier
+        downgradedFrom: subscriptionAny.tier
       }
     }, { idempotencyKey });
 
     // Update local subscription
-    const plan = PLANS[toTier];
-    const updated = await prisma.subscription.update({
+    const plan = PLANS[toTier as keyof typeof PLANS];
+    const updated = await (prisma as any).subscription.update({
       where: { id: subscriptionId },
       data: {
-        tier: toTier,
+        tier: toTier as any,
         stripeSubId: newStripeSub.id,
         aiQuotaTotal: plan.aiQuota === Infinity ? -1 : plan.aiQuota,
         metadata: {
@@ -635,6 +638,7 @@ export class SubscriptionService {
     const subscription = await prisma.subscription.findUnique({
       where: { id: subscriptionId }
     });
+    const subscriptionAny = subscription as any;
 
     if (!subscription?.stripeSubId) {
       throw new Error('No active subscription found');
@@ -646,11 +650,11 @@ export class SubscriptionService {
     });
 
     // Clear scheduled downgrade from metadata
-    const updated = await prisma.subscription.update({
+    const updated = await (prisma as any).subscription.update({
       where: { id: subscriptionId },
       data: {
         metadata: {
-          ...(subscription.metadata as any || {}),
+          ...(subscriptionAny.metadata as any || {}),
           scheduledDowngrade: null
         }
       }
