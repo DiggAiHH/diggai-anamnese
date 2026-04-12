@@ -67,24 +67,24 @@ fi
 
 # ── 4. Build and start containers ─────────────────────────
 echo "→ [4/7] Building and starting containers..."
-docker compose down 2>/dev/null || true
-docker compose up -d --build
+docker compose --env-file .env.production down 2>/dev/null || true
+docker compose --env-file .env.production up -d --build
 
 echo "  Waiting for containers to be healthy..."
 sleep 15
 
 # ── 5. Check container status ─────────────────────────────
 echo "→ [5/7] Container status:"
-docker compose ps
+docker compose --env-file .env.production ps
 
 # ── 6. Run migrations ─────────────────────────────────────
 echo "→ [6/7] Running database migrations..."
-docker compose exec -T app npx prisma migrate deploy 2>/dev/null || \
-    docker compose exec -T app npx prisma db push --accept-data-loss
+docker compose --env-file .env.production exec -T app npx prisma migrate deploy 2>/dev/null || \
+    docker compose --env-file .env.production exec -T app npx prisma db push --accept-data-loss
 echo "  ✓ Database schema applied"
 
 # Seed (skip errors if already seeded)
-docker compose exec -T app npx prisma db seed 2>/dev/null || echo "  Seed skipped (may already exist)"
+docker compose --env-file .env.production exec -T app npx prisma db seed 2>/dev/null || echo "  Seed skipped (may already exist)"
 
 # ── 7. Health check ───────────────────────────────────────
 echo "→ [7/7] Health checks..."
@@ -92,7 +92,7 @@ sleep 5
 
 # Internal health check
 echo "  Internal (container):"
-docker compose exec -T app wget -qO- http://localhost:3001/api/health 2>/dev/null | jq . || echo "  ⚠️  Internal check failed"
+docker compose --env-file .env.production exec -T app wget -qO- http://localhost:3001/api/health 2>/dev/null | jq . || echo "  ⚠️  Internal check failed"
 
 # External health check
 echo "  External (via nginx):"
