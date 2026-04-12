@@ -117,7 +117,7 @@ app.use(helmet({
     // Cross-Origin-Embedder/Opener/Resource-Policy
     crossOriginEmbedderPolicy: { policy: 'require-corp' },
     crossOriginOpenerPolicy: { policy: 'same-origin' },
-    crossOriginResourcePolicy: { policy: 'same-origin' },
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
 }));
 
 // Permissions-Policy Header (via custom middleware, Helmet doesn't support it)
