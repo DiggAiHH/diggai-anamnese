@@ -7,34 +7,32 @@
  * 3. PatientWartezimmer.tsx can be used inside Modal without layout breaks
  */
 
-import React from 'react';
-import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { describe, expect, test, vi } from 'vitest';
 
 // Mock Socket.IO
-jest.mock('socket.io-client', () => ({
-  io: jest.fn(() => ({
-    on: jest.fn(),
-    emit: jest.fn(),
-    disconnect: jest.fn(),
-    off: jest.fn(),
+vi.mock('socket.io-client', () => ({
+  io: vi.fn(() => ({
+    on: vi.fn(),
+    emit: vi.fn(),
+    disconnect: vi.fn(),
+    off: vi.fn(),
   })),
 }));
 
 // Mock i18next
-jest.mock('react-i18next', () => ({
+vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => key,
   }),
 }));
 
 // Mock API hooks
-jest.mock('../hooks/usePatientApi', () => ({
-  useQueuePosition: jest.fn(() => ({ data: null })),
-  useWaitingContent: jest.fn(() => ({ data: { items: [] } })),
-  useTrackContentView: jest.fn(() => ({ mutate: jest.fn() })),
-  useLikeContent: jest.fn(() => ({ mutate: jest.fn() })),
-  useTrackQuizAnswer: jest.fn(() => ({ mutate: jest.fn() })),
+vi.mock('../hooks/usePatientApi', () => ({
+  useQueuePosition: vi.fn(() => ({ data: null })),
+  useWaitingContent: vi.fn(() => ({ data: { items: [] } })),
+  useTrackContentView: vi.fn(() => ({ mutate: vi.fn() })),
+  useLikeContent: vi.fn(() => ({ mutate: vi.fn() })),
+  useTrackQuizAnswer: vi.fn(() => ({ mutate: vi.fn() })),
 }));
 
 describe('Phase 1: Waiting Room Modal Integration', () => {
@@ -42,7 +40,7 @@ describe('Phase 1: Waiting Room Modal Integration', () => {
     // Verify props interface
     const requiredProps = {
       open: true,
-      onClose: jest.fn(),
+      onClose: vi.fn(),
       sessionId: '123',
       patientName: 'Max Mustermann',
       service: 'Allgemeine Untersuchung',
@@ -59,7 +57,7 @@ describe('Phase 1: Waiting Room Modal Integration', () => {
     // Props that WaitingRoomModal passes to Modal:
     const modalProps = {
       open: true,
-      onClose: jest.fn(),
+      onClose: vi.fn(),
       size: 'lg' as const,
       showCloseButton: true,
       trapFocus: true,
