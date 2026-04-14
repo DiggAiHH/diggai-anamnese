@@ -82,6 +82,15 @@ export interface SessionState {
 
     // Phase Trust: Auto-save indicator
     lastSavedAt: number | null;       // Unix timestamp of last persist
+
+    // Tenant identification via URL (BSNR = Betriebsstättennummer)
+    bsnr: string | null;
+
+    // DSGVO consent state
+    dsgvoConsentFlags: Record<string, boolean>;  // checkbox IDs → checked
+    dsgvoSignatureData: string | null;            // Base64 PNG
+    dsgvoSignatureHash: string | null;            // SHA-256 document hash
+    dsgvoConsentAt: string | null;                // ISO timestamp
 }
 
 export interface SessionActions {
@@ -121,6 +130,14 @@ export interface SessionActions {
 
     // Phase Trust: Save indicator
     markSaved: () => void;
+
+    // Tenant BSNR
+    setBsnr: (bsnr: string) => void;
+
+    // DSGVO consent
+    setDsgvoConsentFlag: (id: string, checked: boolean) => void;
+    setDsgvoSignature: (data: string, hash: string) => void;
+    completeDsgvoConsent: () => void;
 }
 
 const initialState: SessionState = {
@@ -146,6 +163,11 @@ const initialState: SessionState = {
     entertainmentMode: 'AUTO',
     simpleMode: true,   // Default to simple mode for new/stressed patients (Hick's Law)
     lastSavedAt: null,
+    bsnr: null,
+    dsgvoConsentFlags: {},
+    dsgvoSignatureData: null,
+    dsgvoSignatureHash: null,
+    dsgvoConsentAt: null,
 };
 
 // ─── Store ──────────────────────────────────────────────────
@@ -250,6 +272,21 @@ export const useSessionStore = create<SessionState & SessionActions>()(
 
             // Phase Trust: Save indicator
             markSaved: () => set({ lastSavedAt: Date.now() }),
+
+            // Tenant BSNR
+            setBsnr: (bsnr: string) => set({ bsnr }),
+
+            // DSGVO consent
+            setDsgvoConsentFlag: (id, checked) => set((state) => ({
+                dsgvoConsentFlags: { ...state.dsgvoConsentFlags, [id]: checked },
+            })),
+            setDsgvoSignature: (data, hash) => set({
+                dsgvoSignatureData: data,
+                dsgvoSignatureHash: hash,
+            }),
+            completeDsgvoConsent: () => set({
+                dsgvoConsentAt: new Date().toISOString(),
+            }),
         }),
         {
             name: 'anamnese-session',
@@ -268,6 +305,11 @@ export const useSessionStore = create<SessionState & SessionActions>()(
                 answers: state.answers,
                 simpleMode: state.simpleMode,  // Persist user preference
                 lastSavedAt: state.lastSavedAt,
+                bsnr: state.bsnr,             // Persist tenant identifier
+                dsgvoConsentFlags: state.dsgvoConsentFlags,
+                dsgvoSignatureData: state.dsgvoSignatureData,
+                dsgvoSignatureHash: state.dsgvoSignatureHash,
+                dsgvoConsentAt: state.dsgvoConsentAt,
             }),
             onRehydrateStorage: () => (rehydratedState) => {
                 if (rehydratedState) {

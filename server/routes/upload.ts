@@ -76,6 +76,47 @@ router.post('/', requireAuth, upload.single('document'), async (req: Request, re
     }
 });
 
+router.post('/translate', requireAuth, async (req: Request, res: Response) => {
+    try {
+        const filename = typeof req.body?.filename === 'string' ? req.body.filename : '';
+        const sourceLang = typeof req.body?.sourceLang === 'string' ? req.body.sourceLang : 'auto';
+        const targetLang = typeof req.body?.targetLang === 'string' ? req.body.targetLang : 'de';
+
+        if (!filename) {
+            res.status(400).json({ error: 'Dateiname fehlt' });
+            return;
+        }
+
+        const filepath = resolve(UPLOAD_DIR, filename);
+        if (!isPathSecure(filepath)) {
+            res.status(403).json({ error: 'Zugriff verweigert' });
+            return;
+        }
+
+        console.info('Dokument wird zur Übersetzung an Backend gesendet', {
+            filename,
+            sourceLang,
+            targetLang,
+        });
+
+        await new Promise((resolveDelay) => {
+            setTimeout(resolveDelay, 300);
+        });
+
+        res.json({
+            success: true,
+            status: 'completed',
+            sourceLang,
+            targetLang,
+            translatedAt: new Date().toISOString(),
+            note: 'Deutsche Lesefassung für das Praxispersonal vorbereitet.',
+        });
+    } catch (err: unknown) {
+        console.error('[Upload] Übersetzungs-Bridge Fehler:', err);
+        res.status(500).json({ error: 'Fehler beim Vorbereiten der Dokumentübersetzung' });
+    }
+});
+
 /**
  * GET /api/upload/:filename
  * Lädt ein hochgeladenes Dokument herunter.

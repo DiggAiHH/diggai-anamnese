@@ -30,14 +30,40 @@ const answerSubmissionLimiter = rateLimit({
     },
 });
 
+const encryptedPayloadSchema = z.object({
+    iv: z.string().min(1),
+    ciphertext: z.string().min(1),
+    alg: z.literal('AES-256-GCM'),
+    encryptedAt: z.string().min(1),
+});
+
 const submitAnswerSchema = z.object({
     atomId: z.string().min(1),
-    value: z.any(),
+    value: z.unknown(),
     timeSpentMs: z.number().optional().default(0),
+    encrypted: encryptedPayloadSchema.optional(),
 });
+
+const CLIENT_ENCRYPTED_ATOM_IDS = new Set([
+    '3000',
+    '3001',
+    '3002',
+    '3004',
+    '9011',
+]);
+
+const E2EE_REDACTED_VALUE = '[E2EE]';
 
 function isStaffRole(role?: string): boolean {
     return role === 'arzt' || role === 'admin';
+}
+
+function requiresEncryptedTransport(atomId: string): boolean {
+    return CLIENT_ENCRYPTED_ATOM_IDS.has(atomId);
+}
+
+function isPersistedEmailHash(value: string | null | undefined): boolean {
+    return typeof value === 'string' && /^[a-f0-9]{64}$/i.test(value);
 }
 
 /**
@@ -76,16 +102,42 @@ router.post('/:id', requireAuth, requireSessionOwner, answerSubmissionLimiter, a
         }
 
         const containsPii = isPIIAtom(atomId);
+        const usesClientEncryption = !!validated.encrypted;
+
+        if (usesClientEncryption && value !== E2EE_REDACTED_VALUE) {
+            res.status(400).json({
+                error: 'Client-verschlüsselte Antworten dürfen keinen Klartext enthalten',
+            });
+            return;
+        }
+
+        if (requiresEncryptedTransport(atomId) && !usesClientEncryption) {
+            res.status(400).json({
+                error: 'Dieses Feld muss clientseitig verschlüsselt übertragen werden',
+            });
+            return;
+        }
+
         let encryptedValue: string | null = null;
-        if (containsPii && typeof value === 'string') {
+        if (containsPii && typeof value === 'string' && !usesClientEncryption) {
             encryptedValue = encrypt(value);
         }
 
-        const jsonValue = JSON.stringify({
-            type: typeof value === 'string' ? 'text' : Array.isArray(value) ? 'multiselect' : 'other',
-            data: containsPii ? '[encrypted]' : value,
-            redacted: containsPii,
-        });
+        const jsonValue = JSON.stringify(
+            usesClientEncryption
+                ? {
+                    type: 'encrypted',
+                    data: '[client-encrypted]',
+                    redacted: true,
+                    clientEncrypted: true,
+                    encrypted: validated.encrypted,
+                }
+                : {
+                    type: typeof value === 'string' ? 'text' : Array.isArray(value) ? 'multiselect' : 'other',
+                    data: containsPii ? '[encrypted]' : value,
+                    redacted: containsPii,
+                },
+        );
 
         const answer = await prisma.answer.upsert({
             where: {
@@ -113,11 +165,15 @@ router.post('/:id', requireAuth, requireSessionOwner, answerSubmissionLimiter, a
         const answerMap: Record<string, { value: unknown }> = {};
         for (const a of allAnswers) {
             const jsonVal = JSON.parse(a.value);
-            const answerValue = jsonVal?.redacted && a.encryptedValue
+            const answerValue = jsonVal?.clientEncrypted && jsonVal?.encrypted
+                ? '[client-encrypted]'
+                : jsonVal?.redacted && a.encryptedValue
                 ? decrypt(a.encryptedValue)
                 : jsonVal?.data ?? jsonVal;
             answerMap[a.atomId] = { value: answerValue };
         }
+
+        const canUsePlainValueForDerivedFields = !usesClientEncryption;
 
         // Dynamische Aktualisierung der Session-Daten, sobald neue Demografien reinkommen
         const updates: any = {};
@@ -132,7 +188,7 @@ router.post('/:id', requireAuth, requireSessionOwner, answerSubmissionLimiter, a
             updates.birthDate = parsedBirthDate;
         }
         if (atomId === '2000') updates.insuranceType = value;
-        if (atomId === '0001' || atomId === '0011') {
+        if ((atomId === '0001' || atomId === '0011') && canUsePlainValueForDerivedFields) {
             const name = answerMap['0011']?.value;
             const nachname = answerMap['0001']?.value;
             if (name && nachname) updates.encryptedName = encrypt(`${name} ${nachname}`);
@@ -147,20 +203,53 @@ router.post('/:id', requireAuth, requireSessionOwner, answerSubmissionLimiter, a
         }
 
         // Echte E-Mail erhalten? -> Echten Hash+Patient verknüpfen!
-        if (atomId === '9010' || atomId === '3003') {
+        if ((atomId === '9010' || atomId === '3003') && canUsePlainValueForDerivedFields) {
             const realEmail = Array.isArray(value) ? value[0] : value;
             if (typeof realEmail === 'string' && realEmail.includes('@')) {
                 const { hashEmail } = await import('../services/encryption');
                 const realHash = hashEmail(realEmail);
                 const tenantId = session.tenantId;
+
+                const currentPatient = session.patientId
+                    ? await prisma.patient.findUnique({
+                        where: { id: session.patientId },
+                        select: {
+                            id: true,
+                            hashedEmail: true,
+                        },
+                    })
+                    : null;
+
+                if (
+                    currentPatient?.hashedEmail
+                    && isPersistedEmailHash(currentPatient.hashedEmail)
+                    && currentPatient.hashedEmail !== realHash
+                ) {
+                    res.status(409).json({
+                        error: 'Session ist bereits einem anderen Patienten zugeordnet',
+                    });
+                    return;
+                }
+
                 let realPatient = await prisma.patient.findFirst({ where: { hashedEmail: realHash, tenantId } });
                 if (!realPatient) {
-                    realPatient = await prisma.patient.create({ data: { hashedEmail: realHash, tenantId } });
+                    realPatient = await prisma.patient.create({
+                        data: {
+                            hashedEmail: realHash,
+                            tenantId,
+                            birthDate: updatedSession.birthDate ?? null,
+                            gender: updatedSession.gender ?? null,
+                            encryptedName: updatedSession.encryptedName ?? null,
+                        },
+                    });
                 }
-                updatedSession = await prisma.patientSession.update({
-                    where: { id: sessionId },
-                    data: { patientId: realPatient.id },
-                });
+
+                if (updatedSession.patientId !== realPatient.id) {
+                    updatedSession = await prisma.patientSession.update({
+                        where: { id: sessionId },
+                        data: { patientId: realPatient.id },
+                    });
+                }
             }
         }
 

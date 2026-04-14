@@ -166,6 +166,112 @@ export function useMfaAssignDoctor() {
     });
 }
 
+export function useMfaReceptionInbox() {
+    return useQuery({
+        queryKey: ['mfa', 'reception', 'inbox'],
+        queryFn: async () => api.mfaReceptionInbox(),
+        refetchInterval: REFETCH_INTERVAL.FAST,
+    });
+}
+
+export function useMfaReceptionStats() {
+    return useQuery({
+        queryKey: ['mfa', 'reception', 'stats'],
+        queryFn: async () => api.mfaReceptionStats(),
+        refetchInterval: REFETCH_INTERVAL.FAST,
+    });
+}
+
+export function useMfaReceptionDetail(sessionId: string) {
+    return useQuery({
+        queryKey: ['mfa', 'reception', 'detail', sessionId],
+        queryFn: async () => api.mfaReceptionDetail(sessionId),
+        enabled: !!sessionId,
+        staleTime: STALE_TIME.NORMAL,
+    });
+}
+
+export function useMfaReceptionMarkRead() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (sessionId: string) => api.mfaReceptionMarkRead(sessionId),
+        onSuccess: (_data, sessionId) => {
+            queryClient.invalidateQueries({ queryKey: ['mfa', 'reception'] });
+            queryClient.invalidateQueries({ queryKey: ['mfa', 'reception', 'detail', sessionId] });
+        },
+    });
+}
+
+export function useMfaReceptionMarkProcessed() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (sessionId: string) => api.mfaReceptionMarkProcessed(sessionId),
+        onSuccess: (_data, sessionId) => {
+            queryClient.invalidateQueries({ queryKey: ['mfa', 'reception'] });
+            queryClient.invalidateQueries({ queryKey: ['mfa', 'reception', 'detail', sessionId] });
+        },
+    });
+}
+
+export function useMfaReceptionMarkCompleted() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (sessionId: string) => api.mfaReceptionMarkCompleted(sessionId),
+        onSuccess: (_data, sessionId) => {
+            queryClient.invalidateQueries({ queryKey: ['mfa', 'reception'] });
+            queryClient.invalidateQueries({ queryKey: ['mfa', 'reception', 'detail', sessionId] });
+        },
+    });
+}
+
+export function useMfaReceptionPracticeCopy() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (sessionId: string) => api.mfaReceptionPracticeCopy(sessionId),
+        onSuccess: (_data, sessionId) => {
+            queryClient.invalidateQueries({ queryKey: ['mfa', 'reception'] });
+            queryClient.invalidateQueries({ queryKey: ['mfa', 'reception', 'detail', sessionId] });
+        },
+    });
+}
+
+export function useMfaReceptionRespond() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({
+            sessionId,
+            ...data
+        }: {
+            sessionId: string;
+            templateKey: 'received' | 'in_review' | 'completed' | 'callback';
+            customNote?: string | null;
+            mode?: 'auto' | 'smtp' | 'manual';
+        }) => api.mfaReceptionRespond(sessionId, data),
+        onSuccess: (_data, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['mfa', 'reception'] });
+            queryClient.invalidateQueries({ queryKey: ['mfa', 'reception', 'detail', variables.sessionId] });
+        },
+    });
+}
+
+export function useMfaReceptionConfirm() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ sessionId, kind }: { sessionId: string; kind: 'practice-copy' | 'response' }) =>
+            api.mfaReceptionConfirm(sessionId, kind),
+        onSuccess: (_data, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['mfa', 'reception'] });
+            queryClient.invalidateQueries({ queryKey: ['mfa', 'reception', 'detail', variables.sessionId] });
+        },
+    });
+}
+
 // ─── Chat Hooks ───────────────────────────────────────────
 
 /**

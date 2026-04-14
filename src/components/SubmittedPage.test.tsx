@@ -5,7 +5,7 @@ import { SubmittedPage } from './SubmittedPage';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (value: string) => value,
+    t: (value: string, options?: { defaultValue?: string }) => options?.defaultValue ?? value,
   }),
 }));
 

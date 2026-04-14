@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Download, Printer, FileText, Check, PenTool, RotateCcw } from 'lucide-react';
 import type { Question, Answer } from '../types/question';
+import { formatQuestionValue, translateQuestionLabel } from '../lib/patientFlow';
 
 interface PDFExportProps {
     questions: Question[];
@@ -26,7 +27,7 @@ export const PDFExport: React.FC<PDFExportProps> = ({
 }) => {
     const printRef = useRef<HTMLDivElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const [isSigned, setIsSigned] = useState(false);
     const [isDrawing, setIsDrawing] = useState(false);
 
@@ -37,18 +38,7 @@ export const PDFExport: React.FC<PDFExportProps> = ({
             const answer = answers[id];
             if (!question || !answer) return null;
 
-            let displayValue: string;
-            if (Array.isArray(answer.value)) {
-                const labels = answer.value.map(v => {
-                    const opt = question.options?.find(o => o.value === v);
-                    return opt?.label || v;
-                });
-                displayValue = labels.join(', ');
-            } else if (question.options) {
-                displayValue = question.options.find(o => o.value === answer.value)?.label || String(answer.value);
-            } else {
-                displayValue = String(answer.value || '');
-            }
+            const displayValue = formatQuestionValue(question, answer.value, t, i18n.language);
 
             return { question, displayValue, section: question.section };
         })
@@ -233,7 +223,7 @@ export const PDFExport: React.FC<PDFExportProps> = ({
                                     {group.items.map((item, i) => (
                                         <div key={i} className="pdf-row flex py-1.5">
                                             <span className="text-xs text-gray-500 w-[60%] leading-relaxed">
-                                                {item.question.question}
+                                                {translateQuestionLabel(t, item.question)}
                                             </span>
                                             <span className="text-xs font-medium text-gray-900 w-[40%] leading-relaxed">
                                                 {item.displayValue}

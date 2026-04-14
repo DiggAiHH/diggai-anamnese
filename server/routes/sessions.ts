@@ -45,6 +45,19 @@ const createSessionSchema = z.object({
     encryptedName: z.string().optional(),
 });
 
+function parseOptionalBirthDate(value: string | undefined): Date | null {
+    if (!value || value.trim().length === 0) {
+        return null;
+    }
+
+    const parsedDate = new Date(value);
+    if (Number.isNaN(parsedDate.getTime())) {
+        throw new LocalizedError('Ungültiges Geburtsdatum');
+    }
+
+    return parsedDate;
+}
+
 /**
  * @swagger
  * /sessions:
@@ -96,15 +109,30 @@ router.post('/', async (req: Request, res: Response) => {
     try {
         const validatedData = createSessionSchema.parse(req.body);
         const { email, isNewPatient, gender, birthDate, selectedService, insuranceType, encryptedName } = validatedData;
+        const tenantId = req.tenantId || req.auth?.tenantId || null;
+
+        if (!tenantId) {
+            res.status(400).json({ error: 'Tenant-Kontext fehlt' });
+            return;
+        }
+
+        const normalizedEmail = email?.trim() || undefined;
+        const parsedBirthDate = parseOptionalBirthDate(birthDate);
+        const encryptedSessionName = encryptedName ? encrypt(encryptedName) : null;
 
         // 1. Finde oder erstelle einen "Anonymen" Patient, falls noch keine E-Mail vorliegt
-        const tenantId = req.tenantId || 'default';
-        const emailHash = email ? hashEmail(email) : `anonymous - ${Date.now()} -${Math.random()} `;
+        const emailHash = normalizedEmail ? hashEmail(normalizedEmail) : `anonymous - ${Date.now()} -${Math.random()} `;
         let patient = await prisma.patient.findFirst({ where: { hashedEmail: emailHash, tenantId } });
 
         if (!patient) {
             patient = await prisma.patient.create({
-                data: { hashedEmail: emailHash, tenantId },
+                data: {
+                    hashedEmail: emailHash,
+                    tenantId,
+                    birthDate: parsedBirthDate,
+                    gender: gender || null,
+                    encryptedName: encryptedSessionName,
+                },
             });
         }
 
@@ -114,11 +142,11 @@ router.post('/', async (req: Request, res: Response) => {
                 tenantId,
                 patientId: patient.id,
                 isNewPatient: isNewPatient ?? true,
-                gender: gender || null,
-                birthDate: birthDate ? new Date(birthDate) : null,
+                gender: gender || patient.gender || null,
+                birthDate: parsedBirthDate ?? patient.birthDate ?? null,
                 selectedService,
                 insuranceType: insuranceType || null,
-                encryptedName: encryptedName ? encrypt(encryptedName) : null,
+                encryptedName: encryptedSessionName ?? patient.encryptedName ?? null,
             },
         });
 
@@ -134,6 +162,16 @@ router.post('/', async (req: Request, res: Response) => {
             nextAtomIds: ['0000'],
         });
     } catch (err: unknown) {
+        if (err instanceof LocalizedError) {
+            res.status(400).json({ error: err.message });
+            return;
+        }
+
+        if (err instanceof z.ZodError) {
+            res.status(400).json({ error: 'Ungültige Sitzungsdaten', details: err.flatten() });
+            return;
+        }
+
         console.error('[Sessions] Fehler beim Erstellen:', err);
         res.status(500).json({ error: t(parseLang(req.headers['accept-language']), 'errors.generic') });
     }

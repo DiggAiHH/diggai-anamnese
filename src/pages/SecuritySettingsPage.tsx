@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Shield, Lock, Smartphone, History, AlertTriangle } from 'lucide-react';
 import { TOTPInput } from '../components/auth/TOTPInput';
+import { apiClient } from '../api/client';
 
 // Sections
 function PasswordChangeSection() {
@@ -26,9 +27,20 @@ function PasswordChangeSection() {
       return;
     }
     
-    // TODO: API call
-    setSuccess(true);
-    setTimeout(() => setSuccess(false), 3000);
+    // Change password via /api/arzt/change-password or /api/auth/change-password
+    try {
+      await apiClient.put('/arzt/change-password', {
+        currentPassword,
+        newPassword,
+      });
+      setSuccess(true);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setTimeout(() => setSuccess(false), 3000);
+    } catch {
+      setError(t('security.password.error', 'Passwort konnte nicht geändert werden. Bitte prüfen Sie Ihr aktuelles Passwort.'));
+    }
   };
 
   return (
@@ -116,9 +128,14 @@ function TwoFactorSection() {
     setSetupStep('intro');
   };
 
-  const handleVerify = () => {
-    // TODO: API call
-    setSetupStep('backup');
+  const handleVerify = async () => {
+    if (verificationCode.length !== 6) return;
+    try {
+      await apiClient.post('/auth/2fa/verify-setup', { token: verificationCode });
+      setSetupStep('backup');
+    } catch {
+      // verificationCode stays — user can retry
+    }
   };
 
   if (showSetup) {

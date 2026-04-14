@@ -118,6 +118,27 @@ function getRadarColor(avgScore: number): { stroke: string; fill: string } {
   return { stroke: '#10b981', fill: '#10b981' }; // Emerald
 }
 
+const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ payload: RadarDataPoint }> }) => {
+  if (active && payload && payload.length) {
+    const point = payload[0].payload;
+    return (
+      <div className="bg-slate-900 border border-white/20 rounded-lg p-3 shadow-xl">
+        <p className="font-semibold text-white mb-1">{point.subject}</p>
+        <p className="text-sm text-white/70">Score: {point.value}/100</p>
+        {point.details.length > 0 && (
+          <div className="mt-2 pt-2 border-t border-white/10">
+            <p className="text-xs text-white/50 mb-1">Details:</p>
+            {point.details.map((detail, i) => (
+              <p key={i} className="text-xs text-white/70">• {detail}</p>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+  return null;
+};
+
 export const AnamneseRadar: React.FC<AnamneseRadarProps> = ({ patient, className }) => {
   const { t } = useTranslation();
   
@@ -127,28 +148,6 @@ export const AnamneseRadar: React.FC<AnamneseRadarProps> = ({ patient, className
     [data]
   );
   const colors = useMemo(() => getRadarColor(avgScore), [avgScore]);
-
-  // Custom Tooltip
-  const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ payload: RadarDataPoint }> }) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      return (
-        <div className="bg-slate-900 border border-white/20 rounded-lg p-3 shadow-xl">
-          <p className="font-semibold text-white mb-1">{data.subject}</p>
-          <p className="text-sm text-white/70">Score: {data.value}/100</p>
-          {data.details.length > 0 && (
-            <div className="mt-2 pt-2 border-t border-white/10">
-              <p className="text-xs text-white/50 mb-1">Details:</p>
-              {data.details.map((detail, i) => (
-                <p key={i} className="text-xs text-white/70">• {detail}</p>
-              ))}
-            </div>
-          )}
-        </div>
-      );
-    }
-    return null;
-  };
 
   return (
     <div className={cn('bg-white/5 border border-white/10 rounded-xl p-4', className)}>

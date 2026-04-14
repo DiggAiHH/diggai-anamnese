@@ -599,8 +599,25 @@ async function main() {
     // Ensure default tenant
     const tenant = await prisma.tenant.upsert({
         where: { subdomain: 'default' },
-        update: {},
-        create: { subdomain: 'default', name: 'Default Praxis' },
+        update: {
+            bsnr: '999999999',
+            name: 'Praxis Dr. Klaproth',
+            settings: {
+                features: {
+                    showWaitingRoom: false,
+                },
+            },
+        },
+        create: {
+            subdomain: 'default',
+            name: 'Praxis Dr. Klaproth',
+            bsnr: '999999999',
+            settings: {
+                features: {
+                    showWaitingRoom: false,
+                },
+            },
+        },
     });
 
     const staffUsers: Record<string, string> = {};

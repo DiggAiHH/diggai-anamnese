@@ -14,6 +14,23 @@ import type { UserType } from '@prisma/client';
 
 const router = Router();
 
+function isEncryptedPayload(value: unknown): value is {
+    iv: string;
+    ciphertext: string;
+    alg: 'AES-256-GCM';
+    encryptedAt: string;
+} {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        return false;
+    }
+
+    const payload = value as Record<string, unknown>;
+    return typeof payload.iv === 'string'
+        && typeof payload.ciphertext === 'string'
+        && payload.alg === 'AES-256-GCM'
+        && typeof payload.encryptedAt === 'string';
+}
+
 // Brute-Force Schutz für Logins (max 5 Versuche pro 15 Minuten)
 const loginRateLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
@@ -413,10 +430,30 @@ router.get('/sessions/:id', requireAuth, requireRole('arzt', 'admin', 'mfa'), as
         // Antworten mit Fragetexten und entschlüsselten PII-Werten anreichern
         const enrichedAnswers = answers.map((a) => {
             const atom = atomMap.get(a.atomId);
-            let displayValue: any;
+            let displayValue: { data: unknown };
+            let parsedValue: unknown = null;
 
-            // PII entschlüsseln
-            if (isPIIAtom(a.atomId) && a.encryptedValue) {
+            try {
+                parsedValue = JSON.parse(a.value);
+            } catch {
+                parsedValue = null;
+            }
+
+            if (
+                parsedValue
+                && typeof parsedValue === 'object'
+                && !Array.isArray(parsedValue)
+                && (parsedValue as Record<string, unknown>).clientEncrypted === true
+                && isEncryptedPayload((parsedValue as Record<string, unknown>).encrypted)
+            ) {
+                displayValue = {
+                    data: {
+                        clientEncrypted: true,
+                        encrypted: (parsedValue as Record<string, unknown>).encrypted,
+                    },
+                };
+            } else if (isPIIAtom(a.atomId) && a.encryptedValue) {
+                // Legacy server-side encrypted values stay compatible.
                 try {
                     displayValue = { data: decrypt(a.encryptedValue) };
                 } catch {
@@ -432,6 +469,7 @@ router.get('/sessions/:id', requireAuth, requireRole('arzt', 'admin', 'mfa'), as
 
             return {
                 ...a,
+                displayValue,
                 value: displayValue,
                 questionText: atom?.questionText || `Frage ${a.atomId}`,
                 section: atom?.section || 'sonstige',

@@ -40,6 +40,7 @@ type GamePhase = 'intro' | 'consent-journey' | 'quiz' | 'summary' | 'complete';
 interface DatenschutzGameProps {
   onAccept: () => void;
   onDecline: () => void;
+  onSkip?: () => void;
   praxisName?: string;
 }
 
@@ -48,6 +49,7 @@ interface DatenschutzGameProps {
 export const DatenschutzGame: React.FC<DatenschutzGameProps> = ({
   onAccept,
   onDecline,
+  onSkip,
   praxisName = 'Gemeinschaftspraxis'
 }) => {
   const { t } = useTranslation();
@@ -318,6 +320,15 @@ export const DatenschutzGame: React.FC<DatenschutzGameProps> = ({
                 {t('dsgvoGame.startJourney', 'Entdeckungsreise starten')}
                 <ArrowRight className="w-4 h-4" />
               </button>
+              {onSkip && (
+                <button
+                  onClick={onSkip}
+                  className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-xl border border-blue-500/30 text-blue-400 hover:bg-blue-500/10 text-sm font-medium transition-all"
+                >
+                  <ArrowRight className="w-4 h-4" />
+                  {t('dsgvoGame.skipToConsent', 'Direkt zur Zustimmung')}
+                </button>
+              )}
               <button
                 onClick={onDecline}
                 className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-xl border border-[var(--border-primary)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] text-sm transition-all"
@@ -489,12 +500,22 @@ export const DatenschutzGame: React.FC<DatenschutzGameProps> = ({
 
             {/* Footer */}
             <div className="px-6 py-4 border-t border-[var(--border-primary)] flex items-center justify-between">
-              <button
-                onClick={onDecline}
-                className="text-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
-              >
-                {t('Ablehnen')}
-              </button>
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={onDecline}
+                  className="text-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
+                >
+                  {t('Ablehnen')}
+                </button>
+                {onSkip && (
+                  <button
+                    onClick={onSkip}
+                    className="text-sm text-blue-400/70 hover:text-blue-400 transition-colors"
+                  >
+                    {t('dsgvoGame.skipToConsent', 'Direkt zur Zustimmung')}
+                  </button>
+                )}
+              </div>
               <button
                 onClick={() => completeSection(currentItem.id)}
                 disabled={!currentItem.quizQuestions.every(q => quizFeedback[q.id])}

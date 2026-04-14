@@ -48,14 +48,18 @@ const CACHE_TTL_MS = 5 * 60 * 1000;
 
 /**
  * Extract tenant identifier from request
- * Priority: 1. Custom header, 2. Subdomain, 3. Query param
+ * Priority: 1. BSNR header, 2. Custom X-Tenant-ID header, 3. Subdomain, 4. Query param
  */
 function extractTenantIdentifier(req: Request): string | null {
-    // 1. Check X-Tenant-ID header (for API clients, mobile apps)
+    // 1. Check X-Tenant-BSNR header (BSNR-based routing: diggai.de/<bsnr>)
+    const bsnrHeader = req.headers['x-tenant-bsnr'] as string;
+    if (bsnrHeader && /^\d{9}$/.test(bsnrHeader)) return bsnrHeader;
+
+    // 2. Check X-Tenant-ID header (for API clients, mobile apps)
     const headerTenant = req.headers['x-tenant-id'] as string;
     if (headerTenant) return headerTenant.toLowerCase();
     
-    // 2. Extract from subdomain (praxis-name.diggai.de)
+    // 3. Extract from subdomain (praxis-name.diggai.de)
     const host = req.headers.host || '';
     const cleanHost = host.split(':')[0].toLowerCase();
     const subdomain = cleanHost.split('.')[0];
@@ -63,11 +67,11 @@ function extractTenantIdentifier(req: Request): string | null {
         return subdomain.toLowerCase();
     }
     
-    // 3. Check query parameter (for development/testing)
+    // 4. Check query parameter (for development/testing)
     const queryTenant = req.query.tenant as string;
     if (queryTenant) return queryTenant.toLowerCase();
     
-    // 4. Check custom domain mapping (requires DB lookup)
+    // 5. Check custom domain mapping (requires DB lookup)
     // This is handled in resolveTenantFromHost
     
     return null;
@@ -143,7 +147,12 @@ async function resolveTenantFromHost(host: string): Promise<TenantContext | null
  */
 export async function resolveTenant(req: Request, res: Response, next: NextFunction): Promise<void> {
     // Bypass tenant resolution for public endpoints
-    if (req.path === '/api/health' || req.path.startsWith('/api/health?')) {
+    if (
+        req.path === '/api/health' ||
+        req.path.startsWith('/api/health?') ||
+        // Public BSNR lookup — tenant context is the query parameter itself
+        req.path.startsWith('/api/tenants/by-bsnr/')
+    ) {
         return next();
     }
 
@@ -171,9 +180,12 @@ export async function resolveTenant(req: Request, res: Response, next: NextFunct
             tenant = cached.tenant;
         } else {
             try {
+                // Check if identifier is a 9-digit BSNR
+                const isBsnr = /^\d{9}$/.test(identifier);
                 const dbTenant = await prisma.tenant.findFirst({
                     where: {
                         OR: [
+                            ...(isBsnr ? [{ bsnr: identifier }] : []),
                             { subdomain: identifier },
                             { id: identifier },
                         ],

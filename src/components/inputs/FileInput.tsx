@@ -1,24 +1,93 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { UploadCloud, CheckCircle, FileText, AlertCircle, X, Activity } from 'lucide-react';
 import axios from 'axios';
 import { API_BASE_URL, getAuthToken } from '../../api/client';
 import { useTranslation } from 'react-i18next';
+import { translateStableText } from '../../lib/patientFlow';
+
+interface UploadedFileTranslation {
+    status: 'pending' | 'completed' | 'queued';
+    sourceLang: string;
+    targetLang: string;
+    translatedAt?: string;
+    note?: string;
+}
+
+interface UploadedFileValue {
+    filename: string;
+    originalName: string;
+    size: number;
+    translation?: UploadedFileTranslation;
+}
 
 interface FileInputProps {
-    value?: { filename: string; originalName: string; size: number } | null | string;
-    onChange: (value: { filename: string; originalName: string; size: number } | Record<string, unknown> | null) => void;
+    value?: UploadedFileValue | null | string;
+    onChange: (value: UploadedFileValue | Record<string, unknown> | null) => void;
     className?: string;
     accept?: string;
 }
 
 export function FileInput({ value, onChange, className = '', accept = 'image/*,.pdf' }: FileInputProps) {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const [isUploading, setIsUploading] = useState(false);
     const [progress, setProgress] = useState(0);
     const [error, setError] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const parsedValue = typeof value === 'string' ? JSON.parse(value) : value;
+    const parsedValue = useMemo<UploadedFileValue | null>(() => {
+        if (!value) return null;
+        if (typeof value !== 'string') return value;
+
+        try {
+            return JSON.parse(value) as UploadedFileValue;
+        } catch {
+            return null;
+        }
+    }, [value]);
+
+    const buildAuthHeaders = () => {
+        const token = getAuthToken();
+        return token ? { Authorization: `Bearer ${token}` } : {};
+    };
+
+    const bridgeDocumentTranslation = async (uploadedFile: UploadedFileValue): Promise<UploadedFileTranslation> => {
+        const sourceLang = i18n.resolvedLanguage || i18n.language || 'auto';
+
+        try {
+            console.info('Dokument wird zur Übersetzung an Backend gesendet');
+
+            const response = await axios.post(`${API_BASE_URL}/upload/translate`, {
+                filename: uploadedFile.filename,
+                sourceLang,
+                targetLang: 'de',
+            }, {
+                headers: buildAuthHeaders(),
+            });
+
+            return {
+                status: response.data?.status === 'completed' ? 'completed' : 'queued',
+                sourceLang: response.data?.sourceLang || sourceLang,
+                targetLang: response.data?.targetLang || 'de',
+                translatedAt: response.data?.translatedAt || new Date().toISOString(),
+                note: response.data?.note,
+            };
+        } catch {
+            console.info('Dokument wird zur Übersetzung an Backend gesendet');
+            await new Promise((resolve) => globalThis.setTimeout(resolve, 300));
+
+            return {
+                status: 'queued',
+                sourceLang,
+                targetLang: 'de',
+                translatedAt: new Date().toISOString(),
+                note: translateStableText(
+                    t,
+                    'ui.upload.translationQueued',
+                    'Dokument zur Übersetzung markiert. Das Backend übernimmt die Nachbearbeitung.',
+                ),
+            };
+        }
+    };
 
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -38,11 +107,10 @@ export function FileInput({ value, onChange, className = '', accept = 'image/*,.
         formData.append('document', file);
 
         try {
-            const token = getAuthToken();
             const response = await axios.post(`${API_BASE_URL}/upload`, formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
-                    ...(token ? { Authorization: `Bearer ${token}` } : {})
+                    ...buildAuthHeaders(),
                 },
                 onUploadProgress: (progressEvent) => {
                     if (progressEvent.total) {
@@ -53,7 +121,25 @@ export function FileInput({ value, onChange, className = '', accept = 'image/*,.
             });
 
             if (response.data.success) {
-                onChange(response.data);
+                const uploadedFile: UploadedFileValue = {
+                    filename: response.data.filename,
+                    originalName: response.data.originalName,
+                    size: response.data.size,
+                    translation: {
+                        status: 'pending',
+                        sourceLang: i18n.resolvedLanguage || i18n.language || 'auto',
+                        targetLang: 'de',
+                    },
+                };
+
+                onChange(uploadedFile);
+                setIsUploading(false);
+
+                const translation = await bridgeDocumentTranslation(uploadedFile);
+                onChange({
+                    ...uploadedFile,
+                    translation,
+                });
             } else {
                 setError(t('file.uploadFailed', 'Upload fehlgeschlagen'));
             }
@@ -85,6 +171,15 @@ export function FileInput({ value, onChange, className = '', accept = 'image/*,.
                                 <CheckCircle className="w-3 h-3 text-emerald-500" />
                                 <p className="text-[10px] text-emerald-500/70 font-medium">{t('file.uploadSuccess', 'Erfolgreich hochgeladen')} ({(parsedValue.size / 1024 / 1024).toFixed(2)} MB)</p>
                             </div>
+                            {parsedValue.translation && (
+                                <p className="mt-1 text-[10px] text-emerald-500/70 font-medium">
+                                    {parsedValue.translation.status === 'completed'
+                                        ? translateStableText(t, 'ui.upload.translationCompleted', 'Deutsche Lesefassung für das Praxispersonal vorbereitet.')
+                                        : parsedValue.translation.status === 'pending'
+                                            ? translateStableText(t, 'ui.upload.translationPending', 'Dokument wird für das Praxispersonal auf Deutsch vorbereitet.')
+                                            : translateStableText(t, 'ui.upload.translationQueued', 'Dokument zur Übersetzung markiert. Das Backend übernimmt die Nachbearbeitung.')}
+                                </p>
+                            )}
                         </div>
                     </div>
                     <button

@@ -44,6 +44,7 @@ model Tenant {
   subdomain String  @unique
   name      String
   legalName String?
+  bsnr      String? @unique
 
   plan   TenantPlan   @default(STARTER)
   status TenantStatus @default(ACTIVE)

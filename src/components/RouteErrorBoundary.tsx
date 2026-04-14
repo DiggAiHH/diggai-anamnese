@@ -299,7 +299,7 @@ export class RouteErrorBoundary extends Component<RouteErrorBoundaryProps, Route
                     timestamp: new Date().toISOString(),
                 }),
             }).catch(() => {});
-        } catch {}
+        } catch (_e) { /* noop */ }
     }
 
     private resetErrorBoundary = () => {

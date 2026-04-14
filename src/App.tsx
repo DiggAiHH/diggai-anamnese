@@ -1,9 +1,12 @@
-import { BrowserRouter, Routes, Route, Navigate, useParams, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Outlet, useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useSessionStore } from './store/sessionStore';
 import { useThemeStore } from './store/themeStore';
+import { useTenantStore, type TenantConfig } from './store/tenantStore';
+import { DEFAULT_FEATURE_FLAGS } from './lib/featureFlags';
+import { API_BASE_URL } from './api/client';
 import './index.css';
-import { useEffect, lazy, Suspense, memo } from 'react';
+import { useEffect, useState, lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp';
 import { CookieConsent } from './components/CookieConsent';
@@ -17,6 +20,8 @@ import { OfflineIndicator } from './components/OfflineIndicator';
 import { InstallPrompt } from './components/InstallPrompt';
 import { UpdateNotification } from './components/UpdateNotification';
 import { preloadPatientFlow } from './lib/routePreloaders';
+import { ScrollToTop } from './components/ScrollToTop';
+import { getPatientServiceById } from './lib/patientFlow';
 const HomeScreen = lazy(() => import('./components/HomeScreen').then(m => ({ default: m.HomeScreen })));
 const LandingPage = lazy(() => import('./components/LandingPage').then(m => ({ default: m.LandingPage })));
 const Questionnaire = lazy(() => import('./components/Questionnaire').then(m => ({ default: m.Questionnaire })));
@@ -46,6 +51,7 @@ const ArztDashboard = lazy(() => import('./pages/ArztDashboard').then(m => ({ de
 const MFADashboard = lazy(() => import('./pages/MFADashboard').then(m => ({ default: m.MFADashboard })));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
 const PraxisDashboard = lazy(() => import('./pages/PraxisDashboard').then(m => ({ default: m.PraxisDashboard })));
+const SessionDashboard = lazy(() => import('./components/pages/Dashboard').then(m => ({ default: m.SessionDashboard })));
 const DokumentationPage = lazy(() => import('./pages/DokumentationPage').then(m => ({ default: m.DokumentationPage })));
 const PwaLogin = lazy(() => import('./pages/pwa/PwaLogin'));
 const PwaDashboard = lazy(() => import('./pages/pwa/PwaDashboard'));
@@ -65,6 +71,11 @@ const ImpressumPage = lazy(() => import('./pages/ImpressumPage').then(m => ({ de
 const Pricing = lazy(() => import('./pages/Pricing').then(m => ({ default: m.Pricing })));
 const StaffLogin = lazy(() => import('./pages/staff/StaffLogin'));
 const SecuritySettingsPage = lazy(() => import('./pages/settings/SecuritySettingsPage').then(m => ({ default: m.SecuritySettingsPage })));
+const AnamnesePage = lazy(() => import('./pages/services/AnamnesePage').then(m => ({ default: m.AnamnesePage })));
+const RezeptePage = lazy(() => import('./pages/services/RezeptePage').then(m => ({ default: m.RezeptePage })));
+const KrankschreibungPage = lazy(() => import('./pages/services/KrankschreibungPage').then(m => ({ default: m.KrankschreibungPage })));
+const UnfallmeldungPage = lazy(() => import('./pages/services/UnfallmeldungPage').then(m => ({ default: m.UnfallmeldungPage })));
+const PraxisAdminPage = lazy(() => import('./pages/admin/PraxisAdminPage').then(m => ({ default: m.PraxisAdminPage })));
 
 // Suspense fallback for lazy routes
 function DashboardLoading() {
@@ -114,8 +125,126 @@ function DataDeletionConfirmRoute() {
   );
 }
 
+/** Validates a German BSNR: exactly 9 digits. */
+function isValidBsnr(value: string): boolean {
+  return /^\d{9}$/.test(value);
+}
+
+/**
+ * BsnrLayout — Layout wrapper for all BSNR-scoped patient routes.
+ * URL prefix: /:bsnr  (e.g. /999999999, /999999999/anamnese)
+ *
+ * - Validates the 9-digit BSNR format.
+ * - Fetches practice config from GET /api/tenants/by-bsnr/:bsnr.
+ * - Stores BSNR in sessionStore (for X-Tenant-BSNR API header).
+ * - Stores tenant config in TenantStore (for branding/welcome).
+ * - Renders <Outlet /> on success, NotFoundPage on invalid/unknown BSNR.
+ */
+function BsnrLayout() {
+  const { bsnr } = useParams<{ bsnr: string }>();
+  const setBsnr = useSessionStore(state => state.setBsnr);
+  const { setPraxis, setLoading, setError, tenant } = useTenantStore();
+  const [resolved, setResolved] = useState(false);
+  const [notFound, setNotFound] = useState(false);
+
+  useEffect(() => {
+    if (!bsnr || !isValidBsnr(bsnr)) {
+      setNotFound(true);
+      setResolved(true);
+      return;
+    }
+
+    // Already resolved for the same BSNR — skip re-fetch
+    if (tenant?.bsnr === bsnr) {
+      setBsnr(bsnr);
+      setResolved(true);
+      return;
+    }
+
+    setLoading(true);
+
+    fetch(`${API_BASE_URL}/tenants/by-bsnr/${encodeURIComponent(bsnr)}`, {
+      method: 'GET',
+      credentials: 'include',
+      headers: { Accept: 'application/json' },
+    })
+      .then(async (res) => {
+        if (res.status === 404) {
+          setNotFound(true);
+          setError('Praxis nicht gefunden');
+          return;
+        }
+        if (!res.ok) {
+          setNotFound(true);
+          setError('Fehler beim Laden der Praxis');
+          return;
+        }
+        const raw = await res.json() as Omit<TenantConfig, 'features'> & { features?: TenantConfig['features'] };
+        const config: TenantConfig = {
+          ...raw,
+          // Older API versions may not include features — fall back to defaults
+          features: raw.features ?? { ...DEFAULT_FEATURE_FLAGS },
+        };
+        setPraxis(config);
+        setBsnr(bsnr);
+      })
+      .catch(() => {
+        setNotFound(true);
+        setError('Netzwerkfehler beim Laden der Praxis');
+      })
+      .finally(() => {
+        setResolved(true);
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bsnr]);
+
+  if (!resolved) {
+    return <DashboardLoading />;
+  }
+
+  if (notFound || !bsnr || !isValidBsnr(bsnr)) {
+    return (
+      <Suspense fallback={<DashboardLoading />}>
+        <NotFoundPage />
+      </Suspense>
+    );
+  }
+
+  return (
+    <RouteErrorBoundary routeType="default">
+      <Outlet />
+    </RouteErrorBoundary>
+  );
+}
+
+/**
+ * BsnrEntryGate — Index route inside BsnrLayout.
+ * Renders the HomeScreen as the practice entry page.
+ */
+function BsnrEntryGate() {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <HomeScreen />
+    </Suspense>
+  );
+}
+
 function PatientApp() {
   const flowStep = useSessionStore(state => state.flowStep);
+  const selectedService = useSessionStore(state => state.selectedService);
+  const setPatientData = useSessionStore(state => state.setPatientData);
+  const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    const requestedServiceId = searchParams.get('service');
+    const service = getPatientServiceById(requestedServiceId);
+
+    if (!service || selectedService === service.flowValue) {
+      return;
+    }
+
+    setPatientData({ selectedService: service.flowValue });
+  }, [searchParams, selectedService, setPatientData]);
 
   useEffect(() => {
     void preloadPatientFlow();
@@ -147,6 +276,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
+        <ScrollToTop />
         <ToastContainer />
         <OfflineIndicator position="top" showQueueDetails />
         <InstallPrompt minVisits={2} dismissCooldownDays={30} />
@@ -169,6 +299,12 @@ function App() {
           {/* Patient-Flow */}
           <Route path="/patient" element={<RouteErrorBoundary routeType="patient"><PatientApp /></RouteErrorBoundary>} />
 
+          {/* Dedicated Service Pages */}
+          <Route path="/anamnese" element={<RouteErrorBoundary routeType="patient"><Suspense fallback={<DashboardLoading />}><AnamnesePage /></Suspense></RouteErrorBoundary>} />
+          <Route path="/rezepte" element={<RouteErrorBoundary routeType="patient"><Suspense fallback={<DashboardLoading />}><RezeptePage /></Suspense></RouteErrorBoundary>} />
+          <Route path="/krankschreibung" element={<RouteErrorBoundary routeType="patient"><Suspense fallback={<DashboardLoading />}><KrankschreibungPage /></Suspense></RouteErrorBoundary>} />
+          <Route path="/unfallmeldung" element={<RouteErrorBoundary routeType="patient"><Suspense fallback={<DashboardLoading />}><UnfallmeldungPage /></Suspense></RouteErrorBoundary>} />
+
           {/* Verwaltungsansicht */}
           <Route path="/verwaltung/login" element={<RouteErrorBoundary routeType="staff"><Suspense fallback={<DashboardLoading />}><StaffLogin /></Suspense></RouteErrorBoundary>} />
           <Route path="/verwaltung" element={<RouteErrorBoundary routeType="staff"><StaffShell /></RouteErrorBoundary>}>
@@ -185,6 +321,8 @@ function App() {
             <Route path="agents" element={<ProtectedRoute allowedRoles={['arzt', 'mfa', 'admin']} redirectTo="/verwaltung/login"><RouteErrorBoundary routeType="staff"><Suspense fallback={<DashboardLoading />}><AgentDashboard /></Suspense></RouteErrorBoundary></ProtectedRoute>} />
             {/* Praxis Business Dashboard (ROI, Leistungen, Rechnungen) */}
             <Route path="business" element={<ProtectedRoute allowedRoles={['arzt', 'admin']} redirectTo="/verwaltung/login"><RouteErrorBoundary routeType="staff"><Suspense fallback={<DashboardLoading />}><PraxisDashboard /></Suspense></RouteErrorBoundary></ProtectedRoute>} />
+            {/* Session Overview — completed sessions + Tomedo GDT tunnel */}
+            <Route path="sessions" element={<ProtectedRoute allowedRoles={['arzt', 'mfa', 'admin']} redirectTo="/verwaltung/login"><RouteErrorBoundary routeType="staff"><Suspense fallback={<DashboardLoading />}><SessionDashboard /></Suspense></RouteErrorBoundary></ProtectedRoute>} />
           </Route>
 
           {/* Datenschutzerklärung — DSGVO Art. 13/14 (lazy-loaded) */}
@@ -251,6 +389,21 @@ function App() {
           <Route path="/admin/ti" element={<Navigate to="/verwaltung/ti" replace />} />
           <Route path="/docs" element={<Navigate to="/verwaltung/docs" replace />} />
           <Route path="/handbuch" element={<Navigate to="/verwaltung/handbuch" replace />} />
+
+          {/* BSNR-based tenant entry: /:bsnr → loads practice by Betriebsstättennummer.
+              Sub-routes allow bookmarkable BSNR-prefixed patient URLs,
+              e.g. /999999999/anamnese, /999999999/rezepte */}
+          <Route path="/:bsnr" element={<BsnrLayout />}>
+            <Route index element={<BsnrEntryGate />} />
+            <Route path="anamnese" element={<RouteErrorBoundary routeType="patient"><Suspense fallback={<DashboardLoading />}><AnamnesePage /></Suspense></RouteErrorBoundary>} />
+            <Route path="rezepte" element={<RouteErrorBoundary routeType="patient"><Suspense fallback={<DashboardLoading />}><RezeptePage /></Suspense></RouteErrorBoundary>} />
+            <Route path="krankschreibung" element={<RouteErrorBoundary routeType="patient"><Suspense fallback={<DashboardLoading />}><KrankschreibungPage /></Suspense></RouteErrorBoundary>} />
+            <Route path="unfallmeldung" element={<RouteErrorBoundary routeType="patient"><Suspense fallback={<DashboardLoading />}><UnfallmeldungPage /></Suspense></RouteErrorBoundary>} />
+            <Route path="patient" element={<RouteErrorBoundary routeType="patient"><PatientApp /></RouteErrorBoundary>} />
+            <Route path="datenschutz" element={<Suspense fallback={<DashboardLoading />}><DatenschutzPage /></Suspense>} />
+            <Route path="impressum" element={<Suspense fallback={<DashboardLoading />}><ImpressumPage /></Suspense>} />
+            <Route path="admin" element={<RouteErrorBoundary routeType="staff"><Suspense fallback={<DashboardLoading />}><PraxisAdminPage /></Suspense></RouteErrorBoundary>} />
+          </Route>
 
           {/* 404 Fallback */}
           <Route path="*" element={<Suspense fallback={<DashboardLoading />}><NotFoundPage /></Suspense>} />

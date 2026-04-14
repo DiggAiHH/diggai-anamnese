@@ -72,6 +72,11 @@
     Cache-Control = "public, max-age=600, stale-while-revalidate=86400"
 
 # SPA fallback — all unmatched paths serve index.html
+# This covers BSNR-prefixed routes such as:
+#   /123456789          → BsnrLayout (index = HomeScreen)
+#   /123456789/anamnese → BsnrLayout > AnamnesePage
+#   /123456789/patient  → BsnrLayout > PatientApp
+# React Router handles client-side routing after index.html is served.
 [[redirects]]
   from = "/*"
   to = "/index.html"

@@ -78,6 +78,12 @@ export type IntentId =
   | 'INFO_LEISTUNGEN'
   | 'INFO_TEAM'
   | 'INFO_ANFAHRT'
+  | 'INFO_VERSICHERUNG'
+  | 'INFO_KOSTEN'
+  | 'INFO_WARTEZEIT'
+  | 'INFO_IMPFUNG'
+  | 'INFO_DATENLOESUNG'
+  | 'INFO_ANFRAGE_STATUS'
   // Actions
   | 'ACTION_TERMIN'
   | 'ACTION_REZEPT_BESTELLEN'
@@ -236,6 +242,47 @@ const INTENTS: IntentDef[] = [
     response: 'Anfahrt:\n🚇 U-Bahn: Hauptbahnhof (5 Min. Fußweg)\n🚌 Bus: Linie 6, Haltestelle Musterstraße\n🅿️ Parkhaus am Hauptbahnhof (5 Min.)\n♿ Barrierefrei zugänglich',
   },
 
+  {
+    id: 'INFO_VERSICHERUNG',
+    keywords: ['versicherung', 'versichert', 'gkv', 'pkv', 'krankenkasse', 'kasse', 'karte', 'versichertenkarte', 'chipkarte', 'selbstzahler', 'privatpatient', 'kassenpatient'],
+    synonyms: ['insurance', 'krankenversicherung'],
+    patterns: [/bin.*privat.*versichert/i, /akzeptieren.*sie.*pkv/i, /nehmen.*sie.*kasse/i],
+    response: 'Wir akzeptieren gesetzlich (GKV) und privat (PKV) versicherte Patienten sowie Selbstzahler. Bitte halten Sie Ihre Versichertenkarte bereit.',
+  },
+  {
+    id: 'INFO_KOSTEN',
+    keywords: ['kosten', 'preis', 'was kostet', 'rechnung', 'abrechnung', 'igel', 'privatleistung', 'goä', 'selbstbeteiligung', 'zuzahlung', 'bezahlen', 'gebühr'],
+    synonyms: ['billing', 'cost', 'price', 'fee'],
+    patterns: [/was.*kostet/i, /muss.*ich.*zahlen/i, /igel.*leistung/i],
+    response: 'Kassenärztliche Leistungen werden direkt über Ihre Versichertenkarte abgerechnet. Privatleistungen (IGeL) werden nach GOÄ berechnet. Sie werden vor der Behandlung über eventuelle Kosten informiert.',
+  },
+  {
+    id: 'INFO_WARTEZEIT',
+    keywords: ['wartezeit', 'wartezimmer', 'warte', 'wie lange', 'warteschlange', 'position', 'queue', 'an der reihe', 'wann dran'],
+    patterns: [/wie lange.*warten/i, /wie viel.*warten/i, /bin ich.*dran/i, /wartezimmer.*voll/i],
+    response: 'Ihre aktuelle Warteposition können Sie in der App jederzeit einsehen. Notfälle werden immer priorisiert. Die Durchschnittswartezeit beträgt 15–30 Minuten.',
+  },
+  {
+    id: 'INFO_IMPFUNG',
+    keywords: ['impfung', 'impfen', 'impfpass', 'stiko', 'grippe', 'grippeschutz', 'corona', 'covid', 'reiseimpfung', 'tetanus', 'masern', 'hepatitis'],
+    synonyms: ['vaccination', 'vaccine', 'flu shot'],
+    patterns: [/brauche.*impfung/i, /impf.*status/i, /ist.*impfung.*fällig/i],
+    response: 'Wir bieten alle STIKO-empfohlenen Impfungen an:\n• Grippe (saisonal)\n• COVID-19\n• Tetanus, Diphtherie, Pertussis\n• Masern-Mumps-Röteln\n• Reiseimpfungen\nBitte bringen Sie Ihren Impfpass mit.',
+  },
+  {
+    id: 'INFO_DATENLOESUNG',
+    keywords: ['daten löschen', 'löschung', 'recht auf löschung', 'art 17', 'dsgvo löschung', 'datenlöschung', 'daten entfernen', 'vergessen werden'],
+    patterns: [/möchte.*daten.*löschen/i, /recht.*löschung/i, /daten.*entfernen/i],
+    response: 'Ihre Daten werden 24 Stunden nach Sitzungsende automatisch gelöscht. Sie können jederzeit eine sofortige Löschung gemäß DSGVO Art. 17 beantragen – sprechen Sie dazu unser Praxisteam an.',
+    route: '/datenschutz',
+  },
+  {
+    id: 'INFO_ANFRAGE_STATUS',
+    keywords: ['anfrage status', 'status meiner anfrage', 'bearbeitungsstand', 'rückmeldung', 'rueckmeldung', 'wann antwort', 'email von praxis'],
+    patterns: [/wurde.*anfrage.*bearbeitet/i, /status.*anfrage/i, /wann.*antwort/i, /bekomme.*mail/i],
+    response: 'Sobald Ihre Anfrage bearbeitet wurde, erhalten Sie eine strukturierte Rückmeldung per E-Mail oder direkt im Praxis-Chat. Wenn keine E-Mail hinterlegt ist, meldet sich das Praxisteam telefonisch oder vor Ort.',
+  },
+
   // ─── Actions ─────────────────────
   {
     id: 'ACTION_TERMIN',
@@ -276,9 +323,9 @@ const INTENTS: IntentDef[] = [
   },
   {
     id: 'ACTION_NACHRICHT',
-    keywords: ['nachricht', 'nachricht senden', 'message', 'frage an arzt', 'dem arzt schreiben'],
-    patterns: [/möchte.*arzt.*schreiben/i, /nachricht.*arzt/i],
-    response: 'Ich öffne das Nachrichtenformular.',
+    keywords: ['nachricht', 'nachricht senden', 'message', 'frage an arzt', 'dem arzt schreiben', 'postfach', 'kontakt zur praxis', 'frage an praxis', 'email an praxis'],
+    patterns: [/möchte.*arzt.*schreiben/i, /nachricht.*arzt/i, /anliegen.*senden/i, /praxis.*kontaktieren/i],
+    response: 'Ich öffne das Nachrichtenformular. Dort können Sie Ihr Anliegen sicher an das Praxisteam senden und später eine strukturierte Rückmeldung erhalten.',
     route: '/patient',
     action: 'START_NACHRICHT',
   },
@@ -432,7 +479,7 @@ export function matchIntent(userInput: string): IntentMatch {
     return {
       intent: 'UNKNOWN',
       confidence: bestMatch.confidence,
-      response: 'Tut mir leid, das habe ich nicht ganz verstanden. Probieren Sie:\n• "Termin" — Termin vorbereiten\n• "Rezept" — Rezeptanforderung\n• "Krankschreibung" — AU anfragen\n• "Öffnungszeiten" — Sprechzeiten\n• "Hilfe" — Alle Funktionen',
+      response: 'Tut mir leid, das habe ich nicht ganz verstanden. Probieren Sie:\n• "Termin" — Termin vorbereiten\n• "Rezept" — Rezeptanforderung\n• "Nachricht" — Anliegen an die Praxis senden\n• "Status meiner Anfrage" — Rückmeldung prüfen\n• "Hilfe" — Alle Funktionen',
     };
   }
 
@@ -490,6 +537,7 @@ export function getQuickSuggestions(): { label: string; query: string }[] {
     { label: '📋 Termin vorbereiten', query: 'anamnese' },
     { label: '💊 Rezept anfragen', query: 'rezept bestellen' },
     { label: '🏥 Krankschreibung', query: 'krankschreibung' },
+    { label: '✉️ Nachricht an Praxis', query: 'nachricht an praxis' },
     { label: '🕐 Öffnungszeiten', query: 'öffnungszeiten' },
     { label: '📍 Anfahrt', query: 'anfahrt' },
     { label: '📞 Kontakt', query: 'telefon' },

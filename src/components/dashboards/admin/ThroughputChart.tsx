@@ -36,6 +36,33 @@ interface ChartDataPoint {
   alerts: number;
 }
 
+const CustomTooltip = ({ active, payload, label }: {
+  active?: boolean;
+  payload?: Array<{ color: string; name: string; value: number }>;
+  label?: string;
+}) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-slate-900 border border-white/20 rounded-lg p-3 shadow-xl">
+        <p className="text-white font-semibold mb-2">{label} Uhr</p>
+        {payload.map((entry, index) => (
+          <div key={index} className="flex items-center gap-2 text-sm">
+            <div 
+              className="w-3 h-3 rounded-full" 
+              style={{ backgroundColor: entry.color }}
+            />
+            <span className="text-white/60">{entry.name}:</span>
+            <span className="text-white font-medium">
+              {entry.value} {entry.name.includes('Wartezeit') ? 'Min' : 'Patienten'}
+            </span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
+
 export const ThroughputChart: React.FC<ThroughputChartProps> = ({
   data,
   averageData,
@@ -53,34 +80,6 @@ export const ThroughputChart: React.FC<ThroughputChartProps> = ({
       alerts: point.triageAlerts,
     }));
   }, [data, averageData]);
-
-  // Custom Tooltip
-  const CustomTooltip = ({ active, payload, label }: {
-    active?: boolean;
-    payload?: Array<{ color: string; name: string; value: number }>;
-    label?: string;
-  }) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-slate-900 border border-white/20 rounded-lg p-3 shadow-xl">
-          <p className="text-white font-semibold mb-2">{label} Uhr</p>
-          {payload.map((entry, index) => (
-            <div key={index} className="flex items-center gap-2 text-sm">
-              <div 
-                className="w-3 h-3 rounded-full" 
-                style={{ backgroundColor: entry.color }}
-              />
-              <span className="text-white/60">{entry.name}:</span>
-              <span className="text-white font-medium">
-                {entry.value} {entry.name.includes('Wartezeit') ? 'Min' : 'Patienten'}
-              </span>
-            </div>
-          ))}
-        </div>
-      );
-    }
-    return null;
-  };
 
   // Bestimme den hoechsten Wert fuer die Y-Achse
   const maxValue = useMemo(() => {

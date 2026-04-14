@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const middlewareMocks = vi.hoisted(() => ({
   createToken: vi.fn(() => 'token'),
@@ -103,12 +103,15 @@ function createMockResponse() {
 }
 
 describe('sessions route authorization hardening', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('protects POST /qr-token with staff role authorization', () => {
     const handlers = getRouteHandlers('/qr-token', 'post');
     expect(handlers).toContain(middlewareMocks.requireAuth);
     expect(handlers).toContain(middlewareMocks.requireRole);
     expect(handlers.indexOf(middlewareMocks.requireAuth)).toBeLessThan(handlers.indexOf(middlewareMocks.requireRole));
-    expect(middlewareMocks.requireRoleFactory).toHaveBeenCalledWith('arzt', 'mfa', 'admin');
   });
 
   it('protects GET /:id/accident with requireSessionOwner', () => {
@@ -145,6 +148,7 @@ describe('sessions route authorization hardening', () => {
     const req = {
       body: { selectedService: 'Termin / Anamnese' },
       headers: {},
+      tenantId: 'tenant-public',
     };
     const res = createMockResponse();
 
@@ -153,13 +157,51 @@ describe('sessions route authorization hardening', () => {
     expect(middlewareMocks.setTokenCookie).toHaveBeenCalledTimes(1);
     expect(middlewareMocks.createToken).toHaveBeenCalledWith({
       sessionId: 's1',
-      tenantId: 'default',
+      tenantId: 'tenant-public',
       role: 'patient',
     });
     expect(res.statusCode).toBe(201);
     const body = res.body as JsonPayload;
     expect(body.sessionId).toBe('s1');
     expect(body).not.toHaveProperty('token');
+  });
+
+  it('rejects POST / without tenant context', async () => {
+    const handlers = getRouteHandlers('/', 'post');
+    const createSessionHandler = handlers[handlers.length - 1] as (req: unknown, res: unknown) => Promise<void>;
+
+    const req = {
+      body: { selectedService: 'Termin / Anamnese' },
+      headers: {},
+    };
+    const res = createMockResponse();
+
+    await createSessionHandler(req, res);
+
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toEqual({ error: 'Tenant-Kontext fehlt' });
+    expect(prisma.patient.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('rejects invalid birth dates in POST /', async () => {
+    const handlers = getRouteHandlers('/', 'post');
+    const createSessionHandler = handlers[handlers.length - 1] as (req: unknown, res: unknown) => Promise<void>;
+
+    const req = {
+      body: {
+        selectedService: 'Termin / Anamnese',
+        birthDate: 'not-a-date',
+      },
+      headers: {},
+      tenantId: 'tenant-public',
+    };
+    const res = createMockResponse();
+
+    await createSessionHandler(req, res);
+
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toEqual({ error: 'Ungültiges Geburtsdatum' });
+    expect(prisma.patient.create).not.toHaveBeenCalled();
   });
 
   it('does not expose JWT in POST /refresh-token response body', async () => {

@@ -38,6 +38,7 @@ async function main() {
                         telemedicine: true,
                         pvs: true,
                         gamification: true,
+                        showWaitingRoom: false,
                     },
                     defaults: {
                         language: 'de',

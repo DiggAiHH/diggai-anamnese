@@ -1,7 +1,16 @@
 ﻿import axios, { type AxiosRequestConfig, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios';
 import { questions } from '../data/questions';
 import { isDemoMode } from '../store/modeStore';
+import { useSessionStore } from '../store/sessionStore';
 import type { StaffUser } from '../lib/staffSession';
+import {
+    clearSessionEncryption,
+    getActiveSessionKey,
+    encryptPayload,
+    initSessionEncryption,
+    isSessionEncryptionActive,
+    type EncryptedPayload,
+} from '../utils/clientEncryption';
 
 // =============================================================================
 // REQUEST DEDUPLICATION
@@ -204,6 +213,12 @@ apiClient.interceptors.request.use(
             config.headers.Authorization = `Bearer ${token}`;
         }
 
+        // TENANT: Attach BSNR header so backend can resolve the correct practice
+        const bsnr = useSessionStore.getState().bsnr;
+        if (bsnr) {
+            config.headers['x-tenant-bsnr'] = bsnr;
+        }
+
         // SECURITY: Add CSRF token for state-changing requests (HIGH-001 Fix)
         const safeMethods = ['get', 'head', 'options'];
         if (config.method && !safeMethods.includes(config.method.toLowerCase())) {
@@ -383,7 +398,17 @@ export interface SubmitAnswerPayload {
     atomId: string;
     value: unknown;
     timeSpentMs?: number;
+    /** Present only when the answer was encrypted client-side (AES-256-GCM). */
+    encrypted?: EncryptedPayload;
 }
+
+const CLIENT_SIDE_ENCRYPTED_ATOM_IDS = new Set([
+    '3000',
+    '3001',
+    '3002',
+    '3004',
+    '9011',
+]);
 
 type DemoAnswer = {
     atomId: string;
@@ -673,9 +698,13 @@ export const api = {
                 chatMessages: [],
             };
             writeDemoDb(db);
+            clearSessionEncryption();
+            await initSessionEncryption(sessionId);
             return { sessionId, token, nextAtomIds: ['0000'] };
         }
         const response = await apiClient.post('/sessions', data);
+        clearSessionEncryption();
+        await initSessionEncryption(response.data.sessionId);
         return response.data;
     },
 
@@ -720,6 +749,7 @@ export const api = {
             session.status = 'COMPLETED';
             session.completedAt = new Date().toISOString();
             writeDemoDb(db);
+            clearSessionEncryption();
             return {
                 success: true,
                 sessionId,
@@ -727,6 +757,7 @@ export const api = {
             };
         }
         const response = await apiClient.post(`/sessions/${sessionId}/submit`);
+        clearSessionEncryption();
         return response.data;
     },
 
@@ -775,7 +806,31 @@ export const api = {
                 progress,
             };
         }
-        const response = await apiClient.post(`/answers/${sessionId}`, data);
+        // ─── E2EE: encrypt answer value before sending to server ────
+        // If a session encryption key is active (initSessionEncryption was called
+        // on session start), the plaintext value is AES-256-GCM encrypted here.
+        // The server receives only { atomId, encrypted: { iv, ciphertext, alg } }.
+        // Plaintext NEVER transits the network — verifiable in the Network tab.
+        const key = getActiveSessionKey();
+        let payload: SubmitAnswerPayload;
+
+        if (key && isSessionEncryptionActive() && CLIENT_SIDE_ENCRYPTED_ATOM_IDS.has(data.atomId)) {
+            const encrypted = await encryptPayload(
+                { value: data.value, atomId: data.atomId },
+                key,
+            );
+            payload = {
+                atomId: data.atomId,
+                // Redact plaintext value — server stores only the encrypted blob
+                value: '[E2EE]',
+                timeSpentMs: data.timeSpentMs,
+                encrypted,
+            };
+        } else {
+            payload = data;
+        }
+
+        const response = await apiClient.post(`/answers/${sessionId}`, payload);
         return response.data;
     },
 
@@ -934,20 +989,18 @@ export const api = {
                 value: { data: a.value },
             }));
             return {
-                session: {
-                    id: session.id,
-                    patientName: session.patientName || null,
-                    selectedService: session.selectedService,
-                    gender: session.gender || null,
-                    status: session.status,
-                    createdAt: session.createdAt,
-                    triageEvents: session.triageEvents || [],
-                    answers,
-                },
+                id: session.id,
+                patientName: session.patientName || null,
+                selectedService: session.selectedService,
+                gender: session.gender || null,
+                status: session.status,
+                createdAt: session.createdAt,
+                triageEvents: session.triageEvents || [],
+                answers,
             };
         }
         const response = await apiClient.get(`/arzt/sessions/${sessionId}`);
-        return response.data;
+        return response.data.session ?? response.data;
     },
 
     arztAckTriage: async (triageId: string) => {
@@ -1021,6 +1074,215 @@ export const api = {
             return { success: true };
         }
         const response = await apiClient.post(`/mfa/sessions/${sessionId}/assign`, { arztId });
+        return response.data;
+    },
+
+    mfaReceptionInbox: async () => {
+        if (isDemoMode()) {
+            const now = Date.now();
+            return {
+                items: [
+                    {
+                        sessionId: 'demo-session-1',
+                        referenceId: 'REQ-DEMO123',
+                        patientName: 'Max Beispiel',
+                        service: 'Rezeptanfrage',
+                        sessionStatus: 'COMPLETED',
+                        patientEmailAvailable: true,
+                        unresolvedCritical: 0,
+                        triageLevel: 'NORMAL',
+                        createdAt: new Date(now - 4 * 3600000).toISOString(),
+                        completedAt: new Date(now - 3.5 * 3600000).toISOString(),
+                        expiresAt: new Date(now + 26 * 24 * 3600000).toISOString(),
+                        assignedArztName: 'Dr. Demo',
+                        trackingStatus: 'GELESEN',
+                        trackingStatusLabel: 'Gelesen',
+                        practiceCopyStatus: { code: 'SENT', label: 'Per Praxis-E-Mail gesendet', at: new Date(now - 3 * 3600000).toISOString(), channel: 'SMTP', templateKey: null },
+                        responseStatus: { code: 'PENDING', label: 'Antwort offen', at: null, channel: null, templateKey: null },
+                        syncStatus: { code: 'IN_PROGRESS', label: 'In Bearbeitung', at: null, channel: null, templateKey: null },
+                        lastActivityAt: new Date(now - 45 * 60000).toISOString(),
+                        requiresManualFollowUp: false,
+                    },
+                    {
+                        sessionId: 'demo-session-2',
+                        referenceId: 'REQ-DEMO456',
+                        patientName: 'Eva Muster',
+                        service: 'Telefonanfrage',
+                        sessionStatus: 'COMPLETED',
+                        patientEmailAvailable: false,
+                        unresolvedCritical: 1,
+                        triageLevel: 'HIGH',
+                        createdAt: new Date(now - 7 * 3600000).toISOString(),
+                        completedAt: new Date(now - 6.5 * 3600000).toISOString(),
+                        expiresAt: new Date(now + 24 * 24 * 3600000).toISOString(),
+                        assignedArztName: null,
+                        trackingStatus: 'VERSCHLUESSELT_VERSENDET',
+                        trackingStatusLabel: 'Neu',
+                        practiceCopyStatus: { code: 'READY', label: 'Apple Mail vorbereiten', at: new Date(now - 6 * 3600000).toISOString(), channel: 'MAILTO_SAFE_SUBJECT', templateKey: null },
+                        responseStatus: { code: 'NO_EMAIL', label: 'Keine E-Mail hinterlegt', at: null, channel: 'NONE', templateKey: null },
+                        syncStatus: { code: 'PENDING', label: 'Offen', at: null, channel: null, templateKey: null },
+                        lastActivityAt: new Date(now - 2 * 3600000).toISOString(),
+                        requiresManualFollowUp: true,
+                    },
+                ],
+                stats: {
+                    openCount: 2,
+                    responsePendingCount: 1,
+                    missingEmailCount: 1,
+                    practiceCopyPendingCount: 0,
+                    syncedCount: 0,
+                    averageResponseMinutes: 0,
+                },
+            };
+        }
+
+        const response = await apiClient.get('/mfa/reception/inbox');
+        return response.data;
+    },
+
+    mfaReceptionStats: async () => {
+        if (isDemoMode()) {
+            return {
+                openCount: 2,
+                responsePendingCount: 1,
+                missingEmailCount: 1,
+                practiceCopyPendingCount: 0,
+                syncedCount: 0,
+                averageResponseMinutes: 45,
+            };
+        }
+
+        const response = await apiClient.get('/mfa/reception/stats');
+        return response.data;
+    },
+
+    mfaReceptionDetail: async (sessionId: string) => {
+        if (isDemoMode()) {
+            return {
+                item: {
+                    sessionId,
+                    referenceId: 'REQ-DEMO123',
+                    patientName: 'Max Beispiel',
+                    service: 'Rezeptanfrage',
+                    sessionStatus: 'COMPLETED',
+                    patientEmailAvailable: true,
+                    unresolvedCritical: 0,
+                    triageLevel: 'NORMAL',
+                    createdAt: new Date(Date.now() - 4 * 3600000).toISOString(),
+                    completedAt: new Date(Date.now() - 3.5 * 3600000).toISOString(),
+                    expiresAt: new Date(Date.now() + 26 * 24 * 3600000).toISOString(),
+                    assignedArztName: 'Dr. Demo',
+                    trackingStatus: 'GELESEN',
+                    trackingStatusLabel: 'Gelesen',
+                    practiceCopyStatus: { code: 'SENT', label: 'Per Praxis-E-Mail gesendet', at: new Date(Date.now() - 3 * 3600000).toISOString(), channel: 'SMTP', templateKey: null },
+                    responseStatus: { code: 'PENDING', label: 'Antwort offen', at: null, channel: null, templateKey: null },
+                    syncStatus: { code: 'IN_PROGRESS', label: 'In Bearbeitung', at: null, channel: null, templateKey: null },
+                    lastActivityAt: new Date(Date.now() - 45 * 60000).toISOString(),
+                    requiresManualFollowUp: false,
+                },
+                patientEmail: 'max@example.com',
+                patientBirthDate: '1987-02-14T00:00:00.000Z',
+                insuranceType: 'GKV',
+                triageEvents: [],
+                answerSections: [
+                    {
+                        key: 'rezepte',
+                        label: 'Rezeptanfrage',
+                        answers: [
+                            { atomId: 'RX-1', questionText: 'Welches Medikament benötigen Sie?', value: 'Ramipril 5 mg' },
+                            { atomId: 'RX-2', questionText: 'Seit wann nehmen Sie das Medikament?', value: 'Seit 2023' },
+                        ],
+                    },
+                ],
+                practiceCopyPreview: {
+                    to: 'praxis@example.com',
+                    subject: '[DiggAI] Praxispostfach REQ-DEMO123',
+                    body: 'DIGGAI ONLINE-REZEPTION -> PRAXISPOSTFACH / TOMEDO\n\nReferenz: REQ-DEMO123',
+                    mailtoUrl: 'mailto:praxis%40example.com?subject=%5BDiggAI%5D%20Praxispostfach%20REQ-DEMO123',
+                    directSendAvailable: false,
+                },
+                responseTemplates: [
+                    {
+                        key: 'received',
+                        label: 'Eingang bestätigen',
+                        subject: '[REQ-DEMO123] Eingang Ihrer Anfrage',
+                        body: 'Guten Tag Max Beispiel,\n\nwir bestätigen den Eingang Ihrer Anfrage.',
+                        recommended: true,
+                    },
+                    {
+                        key: 'completed',
+                        label: 'Bearbeitet',
+                        subject: '[REQ-DEMO123] Ihre Anfrage wurde bearbeitet',
+                        body: 'Guten Tag Max Beispiel,\n\nIhre Anfrage wurde bearbeitet.',
+                        recommended: false,
+                    },
+                ],
+            };
+        }
+
+        const response = await apiClient.get(`/mfa/reception/inbox/${sessionId}`);
+        return response.data;
+    },
+
+    mfaReceptionMarkRead: async (sessionId: string) => {
+        if (isDemoMode()) return { success: true };
+        const response = await apiClient.post(`/mfa/reception/inbox/${sessionId}/read`);
+        return response.data;
+    },
+
+    mfaReceptionMarkProcessed: async (sessionId: string) => {
+        if (isDemoMode()) return { success: true };
+        const response = await apiClient.post(`/mfa/reception/inbox/${sessionId}/process`);
+        return response.data;
+    },
+
+    mfaReceptionMarkCompleted: async (sessionId: string) => {
+        if (isDemoMode()) return { success: true };
+        const response = await apiClient.post(`/mfa/reception/inbox/${sessionId}/complete`);
+        return response.data;
+    },
+
+    mfaReceptionPracticeCopy: async (sessionId: string) => {
+        if (isDemoMode()) {
+            return {
+                sent: false,
+                mode: 'manual',
+                mailtoUrl: 'mailto:praxis%40example.com?subject=%5BDiggAI%5D%20Praxispostfach%20REQ-DEMO123',
+                manualCompose: {
+                    to: 'praxis@example.com',
+                    subject: '[DiggAI] Praxispostfach REQ-DEMO123',
+                    body: 'Praxispostfach-Vorschau',
+                },
+                recipientAvailable: true,
+            };
+        }
+
+        const response = await apiClient.post(`/mfa/reception/inbox/${sessionId}/practice-copy`);
+        return response.data;
+    },
+
+    mfaReceptionRespond: async (sessionId: string, data: { templateKey: 'received' | 'in_review' | 'completed' | 'callback'; customNote?: string | null; mode?: 'auto' | 'smtp' | 'manual' }) => {
+        if (isDemoMode()) {
+            return {
+                sent: false,
+                mode: 'manual',
+                mailtoUrl: 'mailto:?subject=%5BREQ-DEMO123%5D%20Eingang%20Ihrer%20Anfrage',
+                manualCompose: {
+                    to: 'max@example.com',
+                    subject: '[REQ-DEMO123] Eingang Ihrer Anfrage',
+                    body: 'Guten Tag Max Beispiel,\n\nIhre Anfrage ist eingegangen.',
+                },
+                recipientAvailable: true,
+            };
+        }
+
+        const response = await apiClient.post(`/mfa/reception/inbox/${sessionId}/respond`, data);
+        return response.data;
+    },
+
+    mfaReceptionConfirm: async (sessionId: string, kind: 'practice-copy' | 'response') => {
+        if (isDemoMode()) return { success: true };
+        const response = await apiClient.post(`/mfa/reception/inbox/${sessionId}/confirm`, { kind });
         return response.data;
     },
 

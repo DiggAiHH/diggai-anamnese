@@ -116,6 +116,10 @@ async function ensureTrackingEntry(sessionId: string) {
   });
 }
 
+export async function ensureVersandTracking(sessionId: string) {
+  return ensureTrackingEntry(sessionId);
+}
+
 async function writeAuditEntry(params: {
   tenantId: string;
   sessionId: string;
@@ -209,6 +213,14 @@ export async function updateVersandStatus(
   });
 
   return updated;
+}
+
+export async function setVersandStatus(
+  sessionId: string,
+  nextStatus: VersandStatus,
+  options: StatusUpdateOptions = {},
+) {
+  return updateVersandStatus(sessionId, nextStatus, options);
 }
 
 export async function processVersand(sessionId: string, channels: string[]): Promise<VersandProcessResult> {

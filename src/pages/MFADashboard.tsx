@@ -4,6 +4,7 @@ import {
   ClipboardList, 
   Search, 
   Filter, 
+    Inbox,
   LogOut, 
   QrCode, 
   X, 
@@ -32,11 +33,13 @@ import {
 import { useGenerateQrToken } from '../hooks/useStaffApi';
 import { SOCKET_BASE_URL, api } from '../api/client';
 import { WartezimmerPanel } from '../components/WartezimmerPanel';
+import { useTenantStore } from '../store/tenantStore';
 import { StaffChat } from '../components/StaffChat';
 import { StaffTodoList } from '../components/StaffTodoList';
 import { CertificationModal } from '../components/CertificationModal';
 import { FullscreenButton } from '../components/FullscreenButton';
 import { MfaImportVersandPanel } from '../components/mfa/MfaImportVersandPanel';
+import { MfaReceptionInboxPanel } from '../components/mfa/MfaReceptionInboxPanel';
 import { clearStoredStaffUser, getStoredStaffToken } from '../lib/staffSession';
 import { STAFF_SESSION_QUERY_KEY, useStaffSession } from '../hooks/useStaffSession';
 
@@ -53,7 +56,7 @@ import { useDashboardStore } from '../store/dashboardStore';
 
 // ─── Types ─────────────────────────────────────────────
 
-type TabKey = 'sessions' | 'liveboard' | 'certify' | 'imports' | 'chat' | 'todo';
+type TabKey = 'sessions' | 'inbox' | 'liveboard' | 'certify' | 'imports' | 'chat' | 'todo';
 
 interface MfaSession {
     id: string;
@@ -638,6 +641,7 @@ const MFAChatModal = React.memo(function MFAChatModal({
 // Tab configuration
 const TABS_CONFIG = [
     { key: 'sessions' as const, labelKey: 'mfa.currentRequests', labelDefault: 'Anfragen', icon: ClipboardList },
+    { key: 'inbox' as const, labelKey: 'mfa.receptionInbox', labelDefault: 'Rezeptions-Inbox', icon: Inbox },
     { key: 'liveboard' as const, labelKey: 'mfa.liveBoard', labelDefault: 'Live Board', icon: LayoutGrid },
     { key: 'certify' as const, labelKey: 'mfa.certify', labelDefault: 'Zertifizierung', icon: Shield },
     { key: 'imports' as const, labelKey: 'mfa.importVersand', labelDefault: 'Import / Versand', icon: FileText },
@@ -656,6 +660,7 @@ export const MFADashboard: React.FC = React.memo(function MFADashboard() {
     const [activeTab, setActiveTab] = useState<TabKey>('sessions');
     const [certifySession, setCertifySession] = useState<{ sessionId: string; patientName: string; gender?: string; birthDate?: string } | null>(null);
     const queryClient = useQueryClient();
+    const features = useTenantStore((s) => s.features);
     
     // ═══════════════════════════════════════════════════════
     // NEU: Initialize Realtime Queue (Phase 2)
@@ -707,10 +712,12 @@ export const MFADashboard: React.FC = React.memo(function MFADashboard() {
 
         socket.on('triage:alert', () => {
             queryClient.invalidateQueries({ queryKey: ['mfa'] });
+            queryClient.invalidateQueries({ queryKey: ['mfa', 'reception'] });
         });
 
         socket.on('session:complete', () => {
             queryClient.invalidateQueries({ queryKey: ['mfa'] });
+            queryClient.invalidateQueries({ queryKey: ['mfa', 'reception'] });
         });
 
         return () => {
@@ -747,7 +754,7 @@ export const MFADashboard: React.FC = React.memo(function MFADashboard() {
 
                             <SessionManagementList onOpenChat={handleOpenChat} />
                         </div>
-                        <WartezimmerPanel />
+                        {features.showWaitingRoom && <WartezimmerPanel />}
                     </>
                 );
             
@@ -760,6 +767,9 @@ export const MFADashboard: React.FC = React.memo(function MFADashboard() {
                         <LiveQueueView />
                     </div>
                 );
+
+            case 'inbox':
+                return <MfaReceptionInboxPanel />;
                 
             case 'certify':
                 return (

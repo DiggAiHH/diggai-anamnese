@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { requireAuth } from '../../middleware/auth';
+import { requireAuth, createToken, setTokenCookie } from '../../middleware/auth';
+import { prisma } from '../../db';
 import {
   generatePasskeyRegistrationOptions,
   verifyAndStorePasskey,
@@ -188,8 +189,26 @@ router.post('/authenticate', async (req: Request, res: Response) => {
       return res.status(400).json({ error: result.error });
     }
     
-    // Create session for authenticated user
-    // TODO: Create JWT tokens for the user
+    // Resolve tenantId for the authenticated user
+    let tenantId: string | undefined;
+    try {
+      const user = await prisma.arztUser.findUnique({
+        where: { id: result.userId },
+        select: { tenantId: true },
+      });
+      tenantId = user?.tenantId ?? undefined;
+    } catch {
+      // Non-fatal: token still issued without tenantId
+    }
+
+    // Issue JWT and set as httpOnly cookie
+    const token = createToken({
+      userId: result.userId,
+      role: result.userType === 'ARZT' ? 'arzt' : 'patient',
+      tenantId,
+    });
+    setTokenCookie(res, token);
+
     res.json({
       success: true,
       userId: result.userId,

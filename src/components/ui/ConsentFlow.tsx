@@ -162,10 +162,20 @@ export function ConsentFlow({
     gamification: false, // DEFAULT: off — patient must actively opt in
   });
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const canContinue = values.treatment && values.dataProcessing;
 
   const set = (key: keyof ConsentValues) => (checked: boolean) =>
     setValues((v) => ({ ...v, [key]: checked }));
+
+  const handleContinue = () => {
+    if (!canContinue || isSubmitting) return;
+    setIsSubmitting(true);
+    // Brief visual confirmation before handing off
+    setTimeout(() => {
+      onContinue(values);
+    }, 600);
+  };
 
   return (
     <div className="max-w-xl mx-auto px-4 py-6 space-y-6">
@@ -272,20 +282,27 @@ export function ConsentFlow({
       <div className="space-y-3">
         <button
           type="button"
-          onClick={() => onContinue(values)}
-          disabled={!canContinue}
-          aria-disabled={!canContinue}
+          onClick={handleContinue}
+          disabled={!canContinue || isSubmitting}
+          aria-disabled={!canContinue || isSubmitting}
           className={[
             'w-full py-4 px-6 rounded-2xl text-base font-bold transition-all duration-200',
             'focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-400 focus-visible:ring-offset-2',
-            canContinue
+            canContinue && !isSubmitting
               ? 'bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white shadow-md'
               : 'bg-slate-200 dark:bg-slate-700 text-slate-400 dark:text-slate-500 cursor-not-allowed',
           ].join(' ')}
         >
-          {canContinue
-            ? t('consent.cta_ready', 'Fragebogen starten →')
-            : t('consent.cta_waiting', 'Bitte beide Pflicht-Felder bestätigen')}
+          {isSubmitting ? (
+            <span className="flex items-center justify-center gap-3">
+              <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin inline-block" aria-hidden="true" />
+              {t('consent.cta_loading', 'Wird gestartet…')}
+            </span>
+          ) : canContinue ? (
+            t('consent.cta_ready', 'Fragebogen starten →')
+          ) : (
+            t('consent.cta_waiting', 'Bitte beide Pflicht-Felder bestätigen')
+          )}
         </button>
 
         {/* Datenschutz-Link + Impressum */}

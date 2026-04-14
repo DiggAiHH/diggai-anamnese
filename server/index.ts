@@ -22,6 +22,7 @@ import answerRoutes from './routes/answers';
 import atomRoutes from './routes/atoms';
 import arztRoutes from './routes/arzt';
 import mfaRoutes from './routes/mfa';
+import mfaReceptionRoutes from './routes/mfa-reception';
 import chatRoutes from './routes/chats';
 import exportRoutes from './routes/export';
 import uploadRoutes from './routes/upload';
@@ -64,6 +65,7 @@ import tomedoBatchRoutes from './routes/tomedo-batch.routes';
 import fhirWebhookRoutes from './routes/fhir-webhook.routes';
 import fhirSubscriptionRoutes from './routes/fhir-subscription.routes';
 import { requireAuth, requireAdmin } from './middleware/auth';
+import tenantsRoutes from './routes/tenants';
 import { messageBroker } from './services/messagebroker.service';
 
 // Swagger API Docs (dev only — NOT mounted in production)
@@ -310,6 +312,10 @@ app.use('/api', apiSecurityHeaders); // API-specific headers
 
 // Multi-Tenancy: Resolve tenant from subdomain/custom domain
 import { resolveTenant } from './middleware/tenant';
+// Public tenant lookup — mounted BEFORE resolveTenant so BSNR can be resolved
+// without an existing tenant context. The route also has an explicit bypass
+// in resolveTenant for extra safety.
+app.use('/api/tenants', tenantsRoutes);
 app.use(resolveTenant);
 
 // ─── API Routes ─────────────────────────────────────────────
@@ -319,6 +325,7 @@ mountRoute('practice', '/api/answers', answerRoutes);
 mountRoute('practice', '/api/atoms', atomRoutes);
 mountRoute('shared', '/api/arzt', authLimiter, arztRoutes);
 mountRoute('shared', '/api/mfa', authLimiter, mfaRoutes); // H-04 FIX: authLimiter hinzugefügt
+mountRoute('shared', '/api/mfa/reception', authLimiter, mfaReceptionRoutes);
 mountRoute('practice', '/api/chats', chatRoutes);
 mountRoute('authority', '/api/export', exportRoutes);
 mountRoute('practice', '/api/upload', uploadLimiter, uploadRoutes);
@@ -547,6 +554,7 @@ import { startDatabaseCleanupJob } from './jobs/cleanup';
 import { startROISnapshotJob, stopROISnapshotJob } from './jobs/roiSnapshot';
 import { startReminderWorker, stopReminderWorker } from './jobs/reminderWorker';
 import { startHardDeleteWorker } from './jobs/hardDeleteWorker';
+import { startReceptionInboxCleanupJob } from './jobs/receptionInboxCleanup';
 import { startAgentOrchestrator } from './agents/orchestrator.agent';
 import { startBackupScheduler, stopBackupScheduler } from './jobs/backupScheduler';
 import { startBackupMonitor, stopBackupMonitor } from './jobs/backupMonitor';
@@ -559,6 +567,7 @@ try { startDatabaseCleanupJob(); } catch (err) { console.error('[Server] Failed 
 try { startROISnapshotJob(); } catch (err) { console.error('[Server] Failed to start ROI snapshot job:', err); }
 try { startReminderWorker(); } catch (err) { console.error('[Server] Failed to start reminder worker:', err); }
 try { startHardDeleteWorker(); } catch (err) { console.error('[Server] Failed to start hard-delete worker:', err); }
+try { startReceptionInboxCleanupJob(); } catch (err) { console.error('[Server] Failed to start reception inbox cleanup job:', err); }
 try { startAgentOrchestrator(); } catch (err) { console.error('[Server] Failed to start agent orchestrator:', err); }
 try { startBackupScheduler(); } catch (err) { console.error('[Server] Failed to start backup scheduler:', err); }
 try { startBackupMonitor(); } catch (err) { console.error('[Server] Failed to start backup monitor:', err); }

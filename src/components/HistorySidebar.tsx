@@ -3,6 +3,7 @@ import { CheckCircle2, ChevronRight, History, Edit3 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { NavLink } from 'react-router-dom';
 import type { Question, Answer } from '../types/question';
+import { formatQuestionValue, translateQuestionLabel } from '../lib/patientFlow';
 
 interface HistorySidebarProps {
     questions: Question[];
@@ -27,11 +28,8 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({
     const answeredCount = activePathIds.filter(id => answers[id]).length;
     const progress = Math.round((answeredCount / Math.max(activePathIds.length, 1)) * 100);
 
-    const formatValue = (value: unknown): string => {
-        if (value === undefined || value === null || value === '') return '-';
-        if (Array.isArray(value)) return value.length > 0 ? value.join(', ') : '-';
-        if (value instanceof Date) return value.toLocaleDateString('de-DE');
-        const str = String(value);
+    const formatValue = (question: Question, value: unknown): string => {
+        const str = formatQuestionValue(question, value as Answer['value'], t, 'de-DE');
         return str.length > 25 ? str.substring(0, 22) + '...' : str;
     };
 
@@ -121,12 +119,12 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({
                                         <p className={`text-xs font-medium truncate mb-0.5 transition-colors
                                             ${isActive ? 'text-blue-400' : 'text-gray-400'}`}
                                         >
-                                            {question.question}
+                                            {translateQuestionLabel(t, question)}
                                         </p>
                                         {isAnswered && (
                                             <div className="flex items-center justify-between gap-2">
                                                 <p className="text-sm text-[var(--text-primary)] font-medium truncate">
-                                                    {formatValue(answer.value)}
+                                                    {formatValue(question, answer.value)}
                                                 </p>
                                                 <Edit3 className="w-3.5 h-3.5 text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity" />
                                             </div>

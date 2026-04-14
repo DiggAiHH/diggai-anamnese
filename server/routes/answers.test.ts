@@ -52,6 +52,7 @@ vi.mock('../db', () => ({
     },
     patient: {
       findFirst: vi.fn(),
+      findUnique: vi.fn(),
       create: vi.fn(),
     },
   },
@@ -230,6 +231,65 @@ describe('answers routes', () => {
       }));
     });
 
+    it('should reject plaintext alongside a client-encrypted payload', async () => {
+      vi.mocked(prisma.patientSession.findUnique).mockResolvedValue({
+        id: 'session-1',
+        tenantId: 'tenant-1',
+        status: 'ACTIVE',
+      } as never);
+
+      const handlers = getRouteHandlers('/:id', 'post');
+      const handler = handlers[handlers.length - 1] as (req: unknown, res: unknown) => Promise<void>;
+
+      const req = {
+        params: { id: 'session-1' },
+        body: {
+          atomId: '3000',
+          value: 'Musterstrasse 1',
+          encrypted: {
+            iv: 'aa',
+            ciphertext: 'bb',
+            alg: 'AES-256-GCM',
+            encryptedAt: new Date().toISOString(),
+          },
+        },
+      };
+      const res = createMockResponse();
+
+      await handler(req, res);
+
+      expect(res.statusCode).toBe(400);
+      expect(res.body).toEqual({
+        error: 'Client-verschlüsselte Antworten dürfen keinen Klartext enthalten',
+      });
+      expect(prisma.answer.upsert).not.toHaveBeenCalled();
+    });
+
+    it('should require encrypted transport for protected client-side atoms', async () => {
+      vi.mocked(prisma.patientSession.findUnique).mockResolvedValue({
+        id: 'session-1',
+        tenantId: 'tenant-1',
+        status: 'ACTIVE',
+      } as never);
+
+      const handlers = getRouteHandlers('/:id', 'post');
+      const handler = handlers[handlers.length - 1] as (req: unknown, res: unknown) => Promise<void>;
+
+      const req = {
+        params: { id: 'session-1' },
+        body: { atomId: '3000', value: 'Musterstrasse 1' },
+      };
+      const res = createMockResponse();
+
+      await handler(req, res);
+
+      expect(res.statusCode).toBe(400);
+      expect(res.body).toEqual({
+        error: 'Dieses Feld muss clientseitig verschlüsselt übertragen werden',
+      });
+      expect(prisma.answer.upsert).not.toHaveBeenCalled();
+    });
+
     it('should evaluate triage and create events', async () => {
       vi.mocked(prisma.patientSession.findUnique).mockResolvedValue({
         id: 'session-1',
@@ -322,6 +382,43 @@ describe('answers routes', () => {
       expect(prisma.patient.findFirst).toHaveBeenCalledWith({
         where: { hashedEmail: 'hash-test@example.com', tenantId: 'tenant-1' },
       });
+    });
+
+    it('should reject reassigning a session to a different persisted patient hash', async () => {
+      vi.mocked(prisma.patientSession.findUnique).mockResolvedValue({
+        id: 'session-1',
+        tenantId: 'tenant-1',
+        status: 'ACTIVE',
+        patientId: 'patient-locked',
+      } as never);
+      vi.mocked(prisma.answer.upsert).mockResolvedValue({ id: 'answer-1' } as never);
+      vi.mocked(prisma.answer.findMany).mockResolvedValue([
+        { atomId: '9010', value: '{"type":"text","data":"other@example.com"}' },
+      ] as never);
+      vi.mocked(prisma.patient.findUnique).mockResolvedValue({
+        id: 'patient-locked',
+        hashedEmail: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      } as never);
+      triageEngineMocks.evaluateForAtom.mockReturnValue([]);
+
+      const handlers = getRouteHandlers('/:id', 'post');
+      const handler = handlers[handlers.length - 1] as (req: unknown, res: unknown) => Promise<void>;
+
+      const req = {
+        params: { id: 'session-1' },
+        body: { atomId: '9010', value: 'other@example.com' },
+        tenantId: 'tenant-1',
+        auth: { tenantId: 'tenant-1' },
+      };
+      const res = createMockResponse();
+
+      await handler(req, res);
+
+      expect(res.statusCode).toBe(409);
+      expect(res.body).toEqual({
+        error: 'Session ist bereits einem anderen Patienten zugeordnet',
+      });
+      expect(prisma.patientSession.update).not.toHaveBeenCalled();
     });
 
     it('should reject staff requests without matching tenant context', async () => {

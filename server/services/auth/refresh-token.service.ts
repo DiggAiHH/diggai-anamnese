@@ -385,10 +385,22 @@ export async function rotateRefreshToken(
             storedToken.userType
         );
 
+        // Resolve tenantId for the user (best-effort; non-fatal on failure)
+        let resolvedTenantId = 'system';
+        try {
+            const user = await prisma.arztUser.findUnique({
+                where: { id: storedToken.userId },
+                select: { tenantId: true },
+            });
+            if (user?.tenantId) resolvedTenantId = user.tenantId;
+        } catch {
+            // Non-fatal: fall back to 'system'
+        }
+
         // Log rotation event
         await logSecurityEvent({
             event: SecurityEvent.TOKEN_REFRESHED,
-            tenantId: 'system', // TODO: Lookup tenant for user
+            tenantId: resolvedTenantId,
             actorId: storedToken.userId,
             ip,
             userAgent,

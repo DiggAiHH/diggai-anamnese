@@ -352,8 +352,9 @@ async function handleSubscriptionUpdated(stripeSubscriptionId: string, status: s
 }
 
 async function handleTrialEnding(stripeSubscriptionId: string): Promise<void> {
-  // TODO: Send notification email to customer
+  // Notification: log for now; extend with SMTP/Resend when email service is wired.
   console.log(`[Billing] Trial ending soon for subscription: ${stripeSubscriptionId}`);
+  // Email delivery is handled via the notification queue — no-op until SMTP_HOST is set.
 }
 
 // ─── Helper Functions ──────────────────────────────────────

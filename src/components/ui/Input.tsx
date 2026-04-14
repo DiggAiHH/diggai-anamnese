@@ -1,4 +1,5 @@
 import { forwardRef, type InputHTMLAttributes, type ReactNode } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
@@ -82,16 +83,22 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         </div>
         
         {/* Error Message */}
-        {error && (
-          <p 
-            id={`${inputId}-error`}
-            className="text-sm text-[#C75A3E] animate-gentleFadeIn flex items-center gap-1.5"
-            role="alert"
-          >
-            <span className="inline-block w-1 h-1 rounded-full bg-[#E07A5F]" />
-            {error}
-          </p>
-        )}
+        <AnimatePresence mode="wait">
+          {error && (
+            <motion.p
+              key={error}
+              id={`${inputId}-error`}
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0, transition: { duration: 0.18 } }}
+              exit={{ opacity: 0, transition: { duration: 0.1 } }}
+              className="text-sm text-[#C75A3E] flex items-center gap-1.5"
+              role="alert"
+            >
+              <span className="inline-block w-1 h-1 rounded-full bg-[#E07A5F]" />
+              {error}
+            </motion.p>
+          )}
+        </AnimatePresence>
         
         {/* Helper Text */}
         {helperText && !error && (

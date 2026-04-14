@@ -1,6 +1,7 @@
 import React from 'react';
 import { CheckCircle, Download, Home, Clock, ShieldCheck, Mail } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { translateStableText } from '../lib/patientFlow';
 
 interface SubmittedPageProps {
     sessionId?: string;
@@ -44,10 +45,10 @@ export const SubmittedPage: React.FC<SubmittedPageProps> = ({
                         </div>
                     </div>
                     <h1 className="text-3xl font-bold text-[var(--text-primary)] mb-3">
-                        {t('Vielen Dank!')}
+                        {translateStableText(t, 'ui.submitted.title', 'Vielen Dank!')}
                     </h1>
                     <p className="text-lg text-[var(--text-secondary)] leading-relaxed">
-                        {t('Ihre Angaben wurden erfolgreich übermittelt.')}
+                        {translateStableText(t, 'ui.submitted.subtitle', 'Ihre Angaben wurden erfolgreich übermittelt.')}
                     </p>
                 </div>
 
@@ -57,7 +58,7 @@ export const SubmittedPage: React.FC<SubmittedPageProps> = ({
                         <div className="flex items-center gap-3">
                             <Mail className="w-4 h-4 text-[var(--text-muted)]" />
                             <span className="text-sm text-[var(--text-secondary)]">
-                                {t('Patient:')} <strong className="text-[var(--text-primary)]">{patientName}</strong>
+                                {translateStableText(t, 'ui.submitted.patientLabel', 'Patient:')} <strong className="text-[var(--text-primary)]">{patientName}</strong>
                             </span>
                         </div>
                     )}
@@ -65,7 +66,7 @@ export const SubmittedPage: React.FC<SubmittedPageProps> = ({
                         <div className="flex items-center gap-3">
                             <Clock className="w-4 h-4 text-[var(--text-muted)]" />
                             <span className="text-sm text-[var(--text-secondary)]">
-                                {t('Anliegen:')} <strong className="text-[var(--text-primary)]">{t(selectedService)}</strong>
+                                {translateStableText(t, 'ui.submitted.concernLabel', 'Anliegen:')} <strong className="text-[var(--text-primary)]">{t(selectedService)}</strong>
                             </span>
                         </div>
                     )}
@@ -73,7 +74,7 @@ export const SubmittedPage: React.FC<SubmittedPageProps> = ({
                         <div className="flex items-center gap-3">
                             <ShieldCheck className="w-4 h-4 text-[var(--text-muted)]" />
                             <span className="text-sm text-[var(--text-secondary)]">
-                                {t('Referenz:')} <span className="font-mono text-lg tracking-widest font-bold text-[var(--accent)]">{sessionId.slice(0, 8).toUpperCase()}</span>
+                                {translateStableText(t, 'ui.submitted.referenceLabel', 'Referenz:')} <span className="font-mono text-lg tracking-widest font-bold text-[var(--accent)]">{sessionId.slice(0, 8).toUpperCase()}</span>
                             </span>
                         </div>
                     )}
@@ -81,25 +82,25 @@ export const SubmittedPage: React.FC<SubmittedPageProps> = ({
 
                 {/* Was passiert jetzt? */}
                 <div className="rounded-2xl border border-[var(--border-primary)] bg-[var(--bg-card)] p-6 mb-8 text-left">
-                    <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-3">{t('Was passiert als Nächstes?')}</h3>
+                    <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-3">{translateStableText(t, 'ui.submitted.nextStepsTitle', 'Was passiert als Nächstes?')}</h3>
                     <ul className="space-y-3">
                         <li className="flex items-start gap-3 text-sm text-[var(--text-secondary)]">
                             <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0 mt-0.5">
                                 <span className="text-xs font-bold text-blue-400">1</span>
                             </div>
-                            {t('Ihre Angaben werden vom Praxisteam geprüft')}
+                            {translateStableText(t, 'ui.submitted.nextStepReview', 'Ihre Angaben werden vom Praxisteam geprüft')}
                         </li>
                         <li className="flex items-start gap-3 text-sm text-[var(--text-secondary)]">
                             <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0 mt-0.5">
                                 <span className="text-xs font-bold text-blue-400">2</span>
                             </div>
-                            {t('Bei Rückfragen werden wir Sie kontaktieren')}
+                            {translateStableText(t, 'ui.submitted.nextStepContact', 'Bei Rückfragen werden wir Sie kontaktieren')}
                         </li>
                         <li className="flex items-start gap-3 text-sm text-[var(--text-secondary)]">
                             <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0 mt-0.5">
                                 <span className="text-xs font-bold text-blue-400">3</span>
                             </div>
-                            {t('Sie können diese Seite nun schließen')}
+                            {translateStableText(t, 'ui.submitted.nextStepClose', 'Sie können diese Seite nun schließen')}
                         </li>
                     </ul>
                 </div>
@@ -111,14 +112,14 @@ export const SubmittedPage: React.FC<SubmittedPageProps> = ({
                         className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium transition-all shadow-lg shadow-emerald-600/20"
                     >
                         <ShieldCheck className="w-4 h-4" />
-                        {t('Verschlüsselte Datei herunterladen')}
+                        {translateStableText(t, 'ui.submitted.downloadEncrypted', 'Verschlüsselte Datei herunterladen')}
                     </button>
                     <button
                         onClick={onPDF}
                         className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-card)] hover:bg-[var(--bg-card-hover)] text-[var(--text-primary)] text-sm font-medium transition-all"
                     >
                         <Download className="w-4 h-4" />
-                        {t('PDF-Bericht herunterladen')}
+                        {translateStableText(t, 'ui.submitted.downloadPdf', 'PDF-Bericht herunterladen')}
                     </button>
                     {canSendPackageLink && onSendPackageLink && (
                         <button
@@ -126,7 +127,7 @@ export const SubmittedPage: React.FC<SubmittedPageProps> = ({
                             className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-card)] hover:bg-[var(--bg-card-hover)] text-[var(--text-primary)] text-sm font-medium transition-all"
                         >
                             <Mail className="w-4 h-4" />
-                            {t('Download-Link per E-Mail')}
+                            {translateStableText(t, 'ui.submitted.emailLink', 'Download-Link per E-Mail')}
                         </button>
                     )}
                     <button
@@ -134,14 +135,14 @@ export const SubmittedPage: React.FC<SubmittedPageProps> = ({
                         className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium transition-all shadow-lg shadow-blue-600/20"
                     >
                         <Home className="w-4 h-4" />
-                        {t('Zurück zum Start')}
+                        {translateStableText(t, 'ui.submitted.backToStart', 'Zurück zum Start')}
                     </button>
                 </div>
 
                 {/* Security Footer */}
                 <div className="mt-12 flex items-center justify-center gap-3 text-xs text-[var(--text-muted)]">
                     <ShieldCheck className="w-4 h-4" />
-                    <span>{t('Alle Daten sind Ende-zu-Ende verschlüsselt gespeichert')}</span>
+                    <span>{translateStableText(t, 'ui.submitted.encryptionNotice', 'Alle Daten sind Ende-zu-Ende verschlüsselt gespeichert')}</span>
                 </div>
             </div>
         </div>

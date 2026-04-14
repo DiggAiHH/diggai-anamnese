@@ -1,5 +1,10 @@
 import type { Question, Answer, ConditionalRouting } from '../types/question';
 import i18n from '../i18n';
+import {
+    getQuestionTriageMessageKey,
+    getQuestionValidationKey,
+    translateStableText,
+} from '../lib/patientFlow';
 
 /** Context passed through the question logic for conditional evaluation */
 interface QuestionContext {
@@ -64,7 +69,9 @@ export function validateAnswer(
         if (question.validation?.pattern) {
             const regex = new RegExp(question.validation.pattern);
             if (typeof value === 'string' && !regex.test(value)) {
-                return question.validation.customMessage || i18n.t('validation.invalidFormat', 'Ungültiges Format.');
+                return question.validation.customMessage
+                    ? translateStableText(i18n.t.bind(i18n), getQuestionValidationKey(question.id, 'customMessage'), question.validation.customMessage)
+                    : i18n.t('validation.invalidFormat', 'Ungültiges Format.');
             }
         }
     }
@@ -72,7 +79,9 @@ export function validateAnswer(
     if (question.type === 'date' && value instanceof Date) {
         if (question.validation?.ageOver) {
             if (calculateAge(value) < question.validation.ageOver) {
-                return question.validation.customMessage || i18n.t('validation.ageOver', { age: question.validation.ageOver, defaultValue: 'Sie müssen mindestens {{age}} Jahre alt sein.' });
+                return question.validation.customMessage
+                    ? translateStableText(i18n.t.bind(i18n), getQuestionValidationKey(question.id, 'customMessage'), question.validation.customMessage)
+                    : i18n.t('validation.ageOver', { age: question.validation.ageOver, defaultValue: 'Sie müssen mindestens {{age}} Jahre alt sein.' });
             }
         }
     }
@@ -85,7 +94,7 @@ export function validateAnswer(
             return answer !== undefined && answer !== null && answer !== '';
         });
         if (!anyFilled) {
-            return i18n.t('validation.crossFieldRequired', message);
+            return translateStableText(i18n.t.bind(i18n), getQuestionValidationKey(question.id, 'crossFieldRequired'), message);
         }
     }
 
@@ -267,7 +276,13 @@ export function getTriageAlert(
         ? (Array.isArray(answerVal) ? when.some(w => answerVal.includes(w)) : typeof answerVal === 'string' && when.includes(answerVal))
         : (Array.isArray(answerVal) ? answerVal.includes(when) : answerVal === when);
 
-    if (isMatched) return { level, message };
+    if (isMatched) {
+        return {
+            level,
+            message: translateStableText(i18n.t.bind(i18n), getQuestionTriageMessageKey(question.id), message),
+        };
+    }
+
     return null;
 }
 

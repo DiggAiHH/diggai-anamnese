@@ -6,7 +6,7 @@
  * Uhr, Datum, Praxis-Branding
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -35,6 +35,8 @@ import { LanguageSelector } from './LanguageSelector';
 import { ThemeToggle } from './ThemeToggle';
 import { preloadPatientFlow, preloadPwaPortal, preloadTelemedizin } from '../lib/routePreloaders';
 import { TrustBadgeBar } from './ui/TrustBadgeBar';
+import { AssistantAvatar } from './avatar/AssistantAvatar';
+import { useTTS } from '../hooks/useTTS';
 
 interface HomeTile {
   id: string;
@@ -61,6 +63,23 @@ export function HomeScreen() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [lastInteraction, setLastInteraction] = useState(Date.now());
   const [showMore, setShowMore] = useState(false);
+
+  // ─── Avatar & TTS ─────────────────────────────────────
+  const { playVoice, isSpeaking, isLoading: ttsLoading } = useTTS();
+  const greetingPlayed = useRef(false);
+
+  useEffect(() => {
+    if (greetingPlayed.current) return;
+    greetingPlayed.current = true;
+    const timer = window.setTimeout(() => {
+      void playVoice(t(
+        'home.avatar_greeting',
+        'Willkommen in der Praxis. Wie kann ich Ihnen heute helfen?',
+      ));
+    }, 1800);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -278,6 +297,18 @@ export function HomeScreen() {
           </div>
           <LanguageSelector />
           <ThemeToggle />
+          <AssistantAvatar
+            isSpeaking={isSpeaking}
+            isLoading={ttsLoading}
+            size="sm"
+            name={t('home.doctor_name', 'Dr. Klaproth')}
+            subtitle={t('home.avatar_subtitle', 'KI-Assistent')}
+            onClick={() =>
+              void playVoice(
+                t('home.avatar_greeting', 'Willkommen in der Praxis. Wie kann ich Ihnen heute helfen?'),
+              )
+            }
+          />
         </div>
       </header>
 

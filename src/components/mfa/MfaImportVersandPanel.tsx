@@ -3,6 +3,7 @@ import { FileDown, FileJson, Mail, Upload } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { api } from '../../api/client';
 import { useMfaSessions } from '../../hooks/useStaffApi';
+import { Select } from '../ui/Select';
 
 interface SessionItem {
   id: string;
@@ -126,18 +127,17 @@ export function MfaImportVersandPanel() {
           <span className="block text-xs font-bold uppercase tracking-widest text-white/40 mb-2">
             {t('mfa.selectSession', 'Sitzung auswählen')}
           </span>
-          <select
+          <Select
             value={selectedSessionId}
-            onChange={(event) => setSelectedSessionId(event.target.value)}
-            className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40"
-          >
-            <option value="">{t('mfa.selectSessionPlaceholder', 'Bitte Sitzung wählen')}</option>
-            {sessions.map((session) => (
-              <option key={session.id} value={session.id}>
-                {session.selectedService} · {session.id.slice(0, 10)}
-              </option>
-            ))}
-          </select>
+            onChange={setSelectedSessionId}
+            options={sessions.map((session) => ({
+              value: session.id,
+              label: `${session.selectedService} · ${session.id.slice(0, 10)}`,
+            }))}
+            placeholder={t('mfa.selectSessionPlaceholder', 'Bitte Sitzung wählen')}
+            aria-label={t('mfa.selectSession', 'Sitzung auswählen')}
+            className="[&_*]:text-white [&_[role='combobox']]:bg-black/20 [&_[role='combobox']]:border-white/10 [&_[role='combobox']]:text-white [&_[role='listbox']]:bg-slate-950 [&_[role='listbox']]:border-white/10"
+          />
         </label>
 
         <div className="flex flex-wrap gap-3">

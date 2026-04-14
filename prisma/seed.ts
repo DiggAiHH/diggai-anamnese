@@ -520,8 +520,25 @@ async function main() {
     // 3. Standard-Arzt-Account erstellen
     const tenant = await prisma.tenant.upsert({
         where: { subdomain: 'default' },
-        update: {},
-        create: { subdomain: 'default', name: 'Zentrum für Allgemeinmedizin' },
+        update: {
+            bsnr: '999999999',
+            name: 'Praxis Dr. Klaproth',
+            settings: {
+                features: {
+                    showWaitingRoom: false,
+                },
+            },
+        },
+        create: {
+            subdomain: 'default',
+            name: 'Praxis Dr. Klaproth',
+            bsnr: '999999999',
+            settings: {
+                features: {
+                    showWaitingRoom: false,
+                },
+            },
+        },
     });
     
     const arztPasswordHash = await bcrypt.hash(process.env.ARZT_PASSWORD || 'praxis2026', 10);

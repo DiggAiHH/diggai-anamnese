@@ -7,6 +7,7 @@ import {
     RTL_APP_LANGUAGE_CODES,
     normalizeAppLanguageCode,
 } from './lib/i18n/languages';
+import { registerPatientFlowResources } from './lib/patientFlow';
 
 // RTL languages that require layout mirroring
 const rtlLanguageSet = new Set<string>(RTL_APP_LANGUAGE_CODES);
@@ -49,6 +50,8 @@ i18n
         // Persian (fa) uses 2 forms: one, other
         pluralSeparator: '_',
     });
+
+registerPatientFlowResources(i18n);
 
 /**
  * Set document direction based on language

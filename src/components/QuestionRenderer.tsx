@@ -8,6 +8,12 @@ import { DateInput } from './inputs/DateInput';
 import { TextAreaInput } from './inputs/TextAreaInput';
 import { FileInput } from './inputs/FileInput';
 import { BgAccidentForm } from './inputs/BgAccidentForm';
+import {
+    translateQuestionDescription,
+    translateQuestionLabel,
+    translateQuestionOption,
+    translateQuestionPlaceholder,
+} from '../lib/patientFlow';
 
 /**
  * QuestionRenderer - Phase 3: Layout & Whitespace
@@ -47,15 +53,17 @@ export function QuestionRenderer({ question, value, onAnswer, error, simpleMode 
     const [showWhy, setShowWhy] = useState(false);
     const toggleHelp = useCallback(() => setShowHelp(prev => !prev), []);
     const toggleWhy = useCallback(() => setShowWhy(prev => !prev), []);
+    const questionLabel = translateQuestionLabel(t, question);
+    const questionDescription = translateQuestionDescription(t, question);
+    const placeholder = translateQuestionPlaceholder(t, question);
 
     const translatedOptions = question.options?.map(opt => ({
         ...opt,
-        label: t(opt.label)
+        label: translateQuestionOption(t, question.id, opt)
     })) || [];
 
     const renderInput = () => {
         const errorClass = error ? 'input-error' : '';
-        const placeholder = question.placeholder ? t(question.placeholder) : undefined;
 
         // Simple Mode: Pass simpleMode prop to inputs for enhanced spacing
         const inputProps = simpleMode ? { simpleMode: true } : {};
@@ -171,8 +179,8 @@ export function QuestionRenderer({ question, value, onAnswer, error, simpleMode 
                             <span className="text-4xl font-bold text-blue-400 tracking-tight">
                                 {formatValue(value)}
                             </span>
-                            {question.placeholder && (
-                                <span className="text-sm text-gray-400 ml-2">{t(question.placeholder)}</span>
+                            {placeholder && (
+                                <span className="text-sm text-gray-400 ml-2">{placeholder}</span>
                             )}
                         </div>
                     ) : (
@@ -208,13 +216,13 @@ export function QuestionRenderer({ question, value, onAnswer, error, simpleMode 
                     {question.sensitive && (
                         <Lock className="w-4 h-4 inline-block mr-1.5 text-[#4A90E2] shrink-0" aria-hidden="true" />
                     )}
-                    {t(question.question)}
+                    {questionLabel}
                     {question.validation?.required && (
                         <span className="text-red-400 ml-1">*</span>
                     )}
                 </h2>
-                {question.description && (
-                    <p className="question-description">{t(question.description)}</p>
+                {questionDescription && (
+                    <p className="question-description">{questionDescription}</p>
                 )}
             </div>
 
@@ -224,8 +232,8 @@ export function QuestionRenderer({ question, value, onAnswer, error, simpleMode 
                         <span className="text-3xl font-bold text-blue-400 tracking-tight">
                             {formatValue(value)}
                         </span>
-                        {question.placeholder && (
-                            <span className="text-sm text-gray-400 ml-2">{t(question.placeholder)}</span>
+                        {placeholder && (
+                            <span className="text-sm text-gray-400 ml-2">{placeholder}</span>
                         )}
                     </div>
                 ) : (

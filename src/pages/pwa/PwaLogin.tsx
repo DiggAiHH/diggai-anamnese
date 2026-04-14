@@ -204,7 +204,7 @@ export default function PwaLogin() {
             <p className="text-center text-xs text-gray-400">
               <button
                 type="button"
-                onClick={() => {/* TODO: PIN login flow */}}
+                onClick={() => { window.location.href = '/pwa/settings?tab=pin'; }}
                 className="underline hover:text-sky-600 transition-colors"
               >
                 {t('PIN festlegen')}

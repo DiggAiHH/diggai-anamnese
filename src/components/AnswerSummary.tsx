@@ -2,6 +2,7 @@ import React from 'react';
 import { Edit3, User, Activity, ShieldAlert, Pill, FileText, Printer } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { Question, Answer } from '../types/question';
+import { formatQuestionValue, translateQuestionLabel } from '../lib/patientFlow';
 
 interface AnswerSummaryProps {
     questions: Question[];
@@ -62,13 +63,6 @@ export const AnswerSummary: React.FC<AnswerSummaryProps> = ({
         }
     ];
 
-    const formatValue = (value: unknown): string => {
-        if (value === undefined || value === null || value === '') return '-';
-        if (Array.isArray(value)) return value.join(', ');
-        if (value instanceof Date) return value.toLocaleDateString('de-DE');
-        return String(value);
-    };
-
     const handlePrint = () => {
         window.print();
     };
@@ -121,10 +115,10 @@ export const AnswerSummary: React.FC<AnswerSummaryProps> = ({
                                         >
                                             <div className="flex-1 min-w-0">
                                                 <p className="text-xs font-medium text-gray-500 mb-0.5 print:text-gray-700">
-                                                    {question.question}
+                                                    {translateQuestionLabel(t, question)}
                                                 </p>
                                                 <p className="text-sm text-[var(--text-primary)] font-medium print:text-black">
-                                                    {formatValue(answer.value)}
+                                                    {formatQuestionValue(question, answer.value, t, i18n.language)}
                                                 </p>
                                             </div>
                                             <button

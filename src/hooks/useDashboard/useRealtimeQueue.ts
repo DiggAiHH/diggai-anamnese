@@ -12,6 +12,7 @@ import {
   getMockDashboardEngine,
   destroyMockDashboardEngine,
 } from '../../data/mockDashboards';
+import { getSocket, connectSocket, disconnectSocket } from '../../lib/socketClient';
 import type { QueueStatus, PatientQueueItem, QueueUpdateEvent } from '../../types/dashboard';
 
 // Feature-Flag für Mock-Daten
@@ -102,12 +103,38 @@ export function useRealtimeQueue(options: UseRealtimeQueueOptions = {}): UseReal
       storeSetQueueItems(engine.getQueueItems());
       
     } else {
-      // Produktion: Socket.IO Setup
-      // TODO: Socket.IO-Integration implementieren
-      // socket.on('queue:update', handleQueueUpdate);
-      // socket.on('queue:patient:moved', handlePatientMoved);
-      
-      storeSetConnected(true);
+      // Produktion: Socket.IO Queue-Updates
+      const socket = getSocket();
+      connectSocket();
+
+      const handleQueueUpdate = (data: PatientQueueItem[]) => {
+        storeSetQueueItems(data);
+        queryClient.setQueryData(QUEUE_QUERY_KEY, data);
+      };
+
+      const handlePatientMoved = (event: QueueUpdateEvent) => {
+        if (event.type === 'STATUS_CHANGED' && event.data?.status) {
+          const current = useDashboardStore.getState().queueItems;
+          const updated = current.map((item) =>
+            item.id === event.patientId ? { ...item, status: event.data!.status! } : item,
+          );
+          storeSetQueueItems(updated);
+          queryClient.setQueryData(QUEUE_QUERY_KEY, updated);
+        }
+      };
+
+      socket.on('queue:update', handleQueueUpdate);
+      socket.on('queue:patient:moved', handlePatientMoved);
+      storeSetConnected(socket.connected);
+
+      socket.on('connect', () => storeSetConnected(true));
+      socket.on('disconnect', () => storeSetConnected(false));
+
+      unsubscribeRef.current = () => {
+        socket.off('queue:update', handleQueueUpdate);
+        socket.off('queue:patient:moved', handlePatientMoved);
+        disconnectSocket();
+      };
     }
 
     // Cleanup
