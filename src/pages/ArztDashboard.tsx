@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { Shield, LogOut, AlertTriangle, User, ChevronRight, CheckCircle, Activity, Sparkles, Send, MessageSquare, Download, FileText, Bell, ClipboardList, HelpCircle, Info, LayoutGrid } from 'lucide-react';
+import { Shield, LogOut, AlertTriangle, User, ChevronRight, CheckCircle, Activity, Sparkles, Send, MessageSquare, Download, FileText, Bell, ClipboardList, HelpCircle, Info, LayoutGrid, Layers } from 'lucide-react';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { io } from 'socket.io-client';
 import { useTranslation } from 'react-i18next';
@@ -17,6 +17,7 @@ import { StaffTodoList } from '../components/StaffTodoList';
 import { ClinicalAlertList } from '../components/therapy/ClinicalAlertBanner';
 import { AdminAnalyticsTab } from '../components/admin/AdminAnalyticsTab';
 import { WunschboxTab } from '../components/admin/WunschboxTab';
+import { EpisodePanel } from '../components/episodes';
 
 // ═══════════════════════════════════════════════════════════
 // NEU: Phase 3 - Arzt Dashboard Components
@@ -63,6 +64,7 @@ interface SocketLock {
 
 interface ArztSession {
     id: string;
+    patientId?: string;
     status: 'ACTIVE' | 'COMPLETED';
     patientName?: string;
     selectedService?: string;
@@ -347,6 +349,7 @@ const TABS_CONFIG = [
     { key: 'patients' as const, labelKey: 'arzt.patients', labelDefault: 'Patienten', icon: User, hasBadge: false },
     { key: 'queue' as const, labelKey: 'arzt.liveQueue', labelDefault: 'Live Queue', icon: LayoutGrid, hasBadge: false },
     { key: 'therapy' as const, labelKey: 'arzt.therapyPlans', labelDefault: 'Therapiepläne', icon: ClipboardList, hasBadge: false },
+    { key: 'episodes' as const, labelKey: 'episodes.title', labelDefault: 'Episoden', icon: Layers, hasBadge: false },
     { key: 'alerts' as const, labelKey: 'arzt.alerts', labelDefault: 'Alerts', icon: Bell, hasBadge: true },
     { key: 'chat' as const, labelKey: 'arzt.teamChat', labelDefault: 'Team-Chat', icon: MessageSquare, hasBadge: false },
     { key: 'todo' as const, labelKey: 'arzt.todoList', labelDefault: 'Aufgaben', icon: CheckCircle, hasBadge: false },
@@ -369,6 +372,7 @@ export const ArztDashboard: React.FC = React.memo(function ArztDashboard() {
     const [clinicalAlertCount, setClinicalAlertCount] = useState(0);
     const { data: staffUser, isLoading: sessionLoading } = useStaffSession();
     const queryClient = useQueryClient();
+    const selectedPatientForEpisodes = useDashboardStore(selectSelectedPatient);
     
     // ═══════════════════════════════════════════════════════
     // NEU: Initialize Realtime Queue (Phase 3)
@@ -491,10 +495,19 @@ export const ArztDashboard: React.FC = React.memo(function ArztDashboard() {
                 return <AdminAnalyticsTab />;
             case 'wunschbox':
                 return <WunschboxTab />;
+            case 'episodes':
+                return selectedPatientForEpisodes
+                    ? <EpisodePanel patientId={selectedPatientForEpisodes.id} />
+                    : (
+                        <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-md text-center">
+                            <Layers className="w-10 h-10 mx-auto mb-3 text-[var(--text-muted)] opacity-40" />
+                            <p className="text-[var(--text-muted)]">{t('episodes.selectPatient', 'Bitte wählen Sie einen Patienten aus der Warteschlange.')}</p>
+                        </div>
+                    );
             default:
                 return null;
         }
-    }, [activeTab, activeLocks, handleSelectSession, staffUser, token]);
+    }, [activeTab, activeLocks, handleSelectSession, selectedPatientForEpisodes, staffUser, token]);
 
     if (sessionLoading || !staffUser || !token) {
         return null;

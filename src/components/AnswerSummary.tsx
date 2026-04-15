@@ -21,7 +21,7 @@ interface SummaryGroup {
     questionIds: string[];
 }
 
-export const AnswerSummary: React.FC<AnswerSummaryProps> = ({
+export const AnswerSummary: React.FC<AnswerSummaryProps> = React.memo(({
     questions,
     answers,
     activePathIds,
@@ -147,4 +147,4 @@ export const AnswerSummary: React.FC<AnswerSummaryProps> = ({
             </div>
         </div>
     );
-};
+});

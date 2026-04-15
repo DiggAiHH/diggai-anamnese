@@ -87,7 +87,19 @@ httpServer.setTimeout(30000);
 // ─── Security Middleware ────────────────────────────────────
 
 // Response compression — reduces bandwidth for large JSON payloads (atoms, content)
-app.use(compression());
+// Level 6 is the sweet spot between CPU cost and compression ratio
+app.use(compression({
+    level: 6,
+    threshold: 1024, // Only compress responses > 1KB
+    filter: (req, res) => {
+        // Skip already-compressed binary formats
+        const type = res.getHeader('Content-Type');
+        if (typeof type === 'string' && /image|video|audio|font/.test(type)) {
+            return false;
+        }
+        return compression.filter(req, res);
+    },
+}));
 
 // Security Headers with custom CSP — K-07 FIX: unsafe-inline entfernt für scripts
 // Stripe Integration: CSP erweitert für Stripe.js und Stripe Elements

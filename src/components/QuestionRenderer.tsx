@@ -8,12 +8,6 @@ import { DateInput } from './inputs/DateInput';
 import { TextAreaInput } from './inputs/TextAreaInput';
 import { FileInput } from './inputs/FileInput';
 import { BgAccidentForm } from './inputs/BgAccidentForm';
-import {
-    translateQuestionDescription,
-    translateQuestionLabel,
-    translateQuestionOption,
-    translateQuestionPlaceholder,
-} from '../lib/patientFlow';
 
 /**
  * QuestionRenderer - Phase 3: Layout & Whitespace
@@ -45,25 +39,23 @@ const formatValue = (value: unknown): string => {
 import { AlertCircle, Lock, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 
-export function QuestionRenderer({ question, value, onAnswer, error, simpleMode = false }: QuestionRendererProps) {
+export const QuestionRenderer = React.memo(function QuestionRenderer({ question, value, onAnswer, error, simpleMode = false }: QuestionRendererProps) {
     const { t } = useTranslation();
     const [showHelp, setShowHelp] = useState(false);
     const [showWhy, setShowWhy] = useState(false);
     const toggleHelp = useCallback(() => setShowHelp(prev => !prev), []);
     const toggleWhy = useCallback(() => setShowWhy(prev => !prev), []);
-    const questionLabel = translateQuestionLabel(t, question);
-    const questionDescription = translateQuestionDescription(t, question);
-    const placeholder = translateQuestionPlaceholder(t, question);
 
-    const translatedOptions = question.options?.map(opt => ({
+    const translatedOptions = useMemo(() => question.options?.map(opt => ({
         ...opt,
-        label: translateQuestionOption(t, question.id, opt)
-    })) || [];
+        label: t(opt.label)
+    })) || [], [question.options, t]);
 
     const renderInput = () => {
         const errorClass = error ? 'input-error' : '';
+        const placeholder = question.placeholder ? t(question.placeholder) : undefined;
 
         // Simple Mode: Pass simpleMode prop to inputs for enhanced spacing
         const inputProps = simpleMode ? { simpleMode: true } : {};
@@ -179,8 +171,8 @@ export function QuestionRenderer({ question, value, onAnswer, error, simpleMode 
                             <span className="text-4xl font-bold text-blue-400 tracking-tight">
                                 {formatValue(value)}
                             </span>
-                            {placeholder && (
-                                <span className="text-sm text-gray-400 ml-2">{placeholder}</span>
+                            {question.placeholder && (
+                                <span className="text-sm text-gray-400 ml-2">{t(question.placeholder)}</span>
                             )}
                         </div>
                     ) : (
@@ -216,13 +208,13 @@ export function QuestionRenderer({ question, value, onAnswer, error, simpleMode 
                     {question.sensitive && (
                         <Lock className="w-4 h-4 inline-block mr-1.5 text-[#4A90E2] shrink-0" aria-hidden="true" />
                     )}
-                    {questionLabel}
+                    {t(question.question)}
                     {question.validation?.required && (
                         <span className="text-red-400 ml-1">*</span>
                     )}
                 </h2>
-                {questionDescription && (
-                    <p className="question-description">{questionDescription}</p>
+                {question.description && (
+                    <p className="question-description">{t(question.description)}</p>
                 )}
             </div>
 
@@ -232,8 +224,8 @@ export function QuestionRenderer({ question, value, onAnswer, error, simpleMode 
                         <span className="text-3xl font-bold text-blue-400 tracking-tight">
                             {formatValue(value)}
                         </span>
-                        {placeholder && (
-                            <span className="text-sm text-gray-400 ml-2">{placeholder}</span>
+                        {question.placeholder && (
+                            <span className="text-sm text-gray-400 ml-2">{t(question.placeholder)}</span>
                         )}
                     </div>
                 ) : (
@@ -259,7 +251,7 @@ export function QuestionRenderer({ question, value, onAnswer, error, simpleMode 
             )}
         </div>
     );
-}
+});
 
 /**
  * TrustSignals — Inline transparency elements for medical questions

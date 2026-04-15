@@ -1,5 +1,6 @@
 import { prisma } from '../../db';
 import { encrypt, hashEmail, isPIIAtom } from '../encryption';
+import { ensureSessionStoredInEpisode } from '../episode.service';
 import type { EncryptedPackagePayload, MfaImportResult } from './package.service';
 
 function inferAnswerType(value: unknown): string {
@@ -105,6 +106,14 @@ export async function importEncryptedPackagePayload(params: {
       createdAt: new Date(params.payload.createdAt),
       completedAt: params.payload.completedAt ? new Date(params.payload.completedAt) : null,
     },
+  });
+
+  await ensureSessionStoredInEpisode({
+    tenantId: params.tenantId,
+    sessionId: session.id,
+    selectedService: params.payload.service,
+    createdAt: new Date(params.payload.createdAt),
+    completedAt: params.payload.completedAt ? new Date(params.payload.completedAt) : null,
   });
 
   if (params.payload.answers.length > 0) {

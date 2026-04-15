@@ -55,28 +55,45 @@ router.get('/sessions', requireAuth, requireRole('mfa', 'admin'), async (_req: R
             return;
         }
 
-        const sessions = await prisma.patientSession.findMany({
-            where: {
-                tenantId: resolvedTenant.tenantId,
-            },
-            include: {
-                assignedArzt: {
-                    select: {
-                        id: true,
-                        displayName: true,
+        // Server-side pagination + filtering
+        const page = Math.max(1, Number(req.query.page) || 1);
+        const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 50));
+        const skip = (page - 1) * limit;
+        const statusFilter = typeof req.query.status === 'string' ? req.query.status : undefined;
+        const triageFilter = typeof req.query.triage === 'string' ? req.query.triage : undefined;
+
+        const where = {
+            tenantId: resolvedTenant.tenantId,
+            ...(statusFilter && { status: statusFilter }),
+            ...(triageFilter === 'critical' && {
+                triageEvents: { some: { level: 'CRITICAL', acknowledgedBy: null } },
+            }),
+        };
+
+        const [sessions, total] = await Promise.all([
+            prisma.patientSession.findMany({
+                where,
+                include: {
+                    assignedArzt: {
+                        select: {
+                            id: true,
+                            displayName: true,
+                        }
+                    },
+                    _count: {
+                        select: { answers: true }
+                    },
+                    triageEvents: {
+                        where: { level: 'CRITICAL', acknowledgedBy: null },
+                        select: { id: true }
                     }
                 },
-                _count: {
-                    select: { answers: true }
-                },
-                triageEvents: {
-                    where: { level: 'CRITICAL', acknowledgedBy: null },
-                    select: { id: true }
-                }
-            },
-            orderBy: { createdAt: 'desc' },
-            take: 100,
-        });
+                orderBy: { createdAt: 'desc' },
+                skip,
+                take: limit,
+            }),
+            prisma.patientSession.count({ where }),
+        ]);
 
         const result = sessions.map(s => ({
             id: s.id,
@@ -88,7 +105,10 @@ router.get('/sessions', requireAuth, requireRole('mfa', 'admin'), async (_req: R
             assignedArzt: s.assignedArzt,
         }));
 
-        res.json({ sessions: result });
+        res.json({
+            sessions: result,
+            pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+        });
     } catch (err: unknown) {
         console.error('[MFA] Sessions-Fehler:', err);
         res.status(500).json({ error: 'Interner Serverfehler' });

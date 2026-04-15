@@ -2077,6 +2077,59 @@ export const api = {
         return response.data;
     },
 
+    // ─── Episoden (Behandlungsepisoden) ─────────────────────────
+
+    episodeCreate: async (data: { patientId: string; type: string; title: string; description?: string; icdCodes?: string[]; primaryDiagnosis?: string; patientGoals?: string; patientWishes?: string; communicationPref?: string; languagePref?: string; preferredArztId?: string }) => {
+        if (isDemoMode()) return { id: demoId('ep'), ...data, status: 'OPEN', icdCodes: data.icdCodes || [], sessions: [], preferences: [], notes: [], openedAt: new Date().toISOString(), lastActivityAt: new Date().toISOString(), createdAt: new Date().toISOString() };
+        const response = await apiClient.post('/episodes', data);
+        return response.data;
+    },
+    episodeGetById: async (id: string) => {
+        if (isDemoMode()) return { id, title: 'Demo-Episode', type: 'AKUT', status: 'OPEN', sessions: [], preferences: [], notes: [], icdCodes: [], openedAt: new Date().toISOString(), lastActivityAt: new Date().toISOString() };
+        const response = await apiClient.get(`/episodes/${id}`);
+        return response.data;
+    },
+    episodeUpdate: async (id: string, data: Record<string, unknown>) => {
+        if (isDemoMode()) return { id, ...data };
+        const response = await apiClient.put(`/episodes/${id}`, data);
+        return response.data;
+    },
+    episodeGetByPatient: async (patientId: string, params?: { status?: string }) => {
+        if (isDemoMode()) return [];
+        const response = await apiClient.get(`/episodes/patient/${patientId}`, { params });
+        return response.data;
+    },
+    episodeGetActiveForPersonalization: async (patientId: string) => {
+        if (isDemoMode()) return [];
+        const response = await apiClient.get(`/episodes/patient/${patientId}/active`);
+        return response.data;
+    },
+    episodeLinkSession: async (episodeId: string, sessionId: string) => {
+        if (isDemoMode()) return { id: sessionId, episodeId };
+        const response = await apiClient.post(`/episodes/${episodeId}/sessions/${sessionId}`);
+        return response.data;
+    },
+    episodeUnlinkSession: async (episodeId: string, sessionId: string) => {
+        if (isDemoMode()) return { id: sessionId, episodeId: null };
+        const response = await apiClient.delete(`/episodes/${episodeId}/sessions/${sessionId}`);
+        return response.data;
+    },
+    episodeSetPreference: async (episodeId: string, data: { category: string; key: string; value: string; isEncrypted?: boolean; setBy: string; setByUserId?: string; validUntil?: string }) => {
+        if (isDemoMode()) return { id: demoId('pref'), episodeId, ...data, isActive: true };
+        const response = await apiClient.post(`/episodes/${episodeId}/preferences`, data);
+        return response.data;
+    },
+    episodeDeactivatePreference: async (episodeId: string, preferenceId: string) => {
+        if (isDemoMode()) return { id: preferenceId, isActive: false };
+        const response = await apiClient.delete(`/episodes/${episodeId}/preferences/${preferenceId}`);
+        return response.data;
+    },
+    episodeAddNote: async (episodeId: string, data: { type: string; content: string; authorId?: string; authorName?: string; visibleToPatient?: boolean }) => {
+        if (isDemoMode()) return { id: demoId('note'), episodeId, ...data, createdAt: new Date().toISOString() };
+        const response = await apiClient.post(`/episodes/${episodeId}/notes`, data);
+        return response.data;
+    },
+
     // ─── Patient Portal (PWA) ───────────────────────────────────
 
     pwaRegister: async (data: { patientNumber: string; birthDate: string; password: string; email?: string; phone?: string; pin?: string }) => {

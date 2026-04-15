@@ -37,11 +37,12 @@ export function useArztSessions() {
             }
         },
         refetchInterval: REFETCH_INTERVAL.FAST,
+        staleTime: STALE_TIME.FAST,
     });
 }
 
 /**
- * Hook zum Laden einer spezifischen Session-Details
+ * Hook zum Laden einer einzelnen Session-Detail für das Arzt-Dashboard
  * 
  * @param sessionId - Die Session-ID
  */
@@ -61,11 +62,12 @@ export function useArztSessionDetail(sessionId: string) {
             }
         },
         enabled: !!sessionId,
+        staleTime: STALE_TIME.NORMAL,
     });
 }
 
 /**
- * Hook zum Bestätigen/Acknowledgen eines Triage-Alerts
+ * Hook zum Bestätigen (Acknowledge) einer Triage-Meldung
  */
 export function useAckTriage() {
     const queryClient = useQueryClient();
@@ -126,6 +128,7 @@ export function useMfaSessions() {
             }
         },
         refetchInterval: REFETCH_INTERVAL.FAST,
+        staleTime: STALE_TIME.FAST,
     });
 }
 
@@ -335,6 +338,7 @@ export function useQueue() {
             }
         },
         refetchInterval: REFETCH_INTERVAL.FAST,
+        staleTime: STALE_TIME.FAST,
     });
 }
 

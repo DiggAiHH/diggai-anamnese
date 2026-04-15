@@ -9,6 +9,10 @@ const middlewareMocks = vi.hoisted(() => ({
   requireSessionOwner: vi.fn((_req, _res, next) => next()),
 }));
 
+const episodeServiceMocks = vi.hoisted(() => ({
+  ensureSessionStoredInEpisode: vi.fn(),
+}));
+
 vi.mock('../middleware/auth', () => ({
   createToken: middlewareMocks.createToken,
   requireAuth: middlewareMocks.requireAuth,
@@ -23,8 +27,12 @@ vi.mock('../db', () => ({
       findFirst: vi.fn(),
       create: vi.fn(),
     },
+    tenant: {
+      findUnique: vi.fn(),
+    },
     patientSession: {
       create: vi.fn(),
+      update: vi.fn(),
     },
     answer: {},
     triageEvent: {},
@@ -37,6 +45,10 @@ vi.mock('../db', () => ({
 vi.mock('../services/encryption', () => ({
   hashEmail: vi.fn(() => 'hash'),
   encrypt: vi.fn((v: string) => v),
+}));
+
+vi.mock('../services/episode.service', () => ({
+  ensureSessionStoredInEpisode: episodeServiceMocks.ensureSessionStoredInEpisode,
 }));
 
 vi.mock('../i18n', () => ({
@@ -138,9 +150,13 @@ describe('sessions route authorization hardening', () => {
   it('does not expose JWT in POST / response body (cookie-only contract)', async () => {
     middlewareMocks.createToken.mockClear();
     middlewareMocks.setTokenCookie.mockClear();
+    episodeServiceMocks.ensureSessionStoredInEpisode.mockClear();
     vi.mocked(prisma.patient.findFirst).mockResolvedValue(null);
     vi.mocked(prisma.patient.create).mockResolvedValue({ id: 'p1' } as never);
-    vi.mocked(prisma.patientSession.create).mockResolvedValue({ id: 's1' } as never);
+    vi.mocked(prisma.patientSession.create).mockResolvedValue({
+      id: 's1',
+      createdAt: new Date('2026-04-15T20:58:00.000Z'),
+    } as never);
 
     const handlers = getRouteHandlers('/', 'post');
     const createSessionHandler = handlers[handlers.length - 1] as (req: unknown, res: unknown) => Promise<void>;
@@ -164,6 +180,47 @@ describe('sessions route authorization hardening', () => {
     const body = res.body as JsonPayload;
     expect(body.sessionId).toBe('s1');
     expect(body).not.toHaveProperty('token');
+    expect(episodeServiceMocks.ensureSessionStoredInEpisode).toHaveBeenCalledWith({
+      tenantId: 'tenant-public',
+      sessionId: 's1',
+      selectedService: 'Termin / Anamnese',
+      createdAt: new Date('2026-04-15T20:58:00.000Z'),
+    });
+  });
+
+  it('stores Digital Front Door sessions in episodes automatically', async () => {
+    middlewareMocks.createToken.mockClear();
+    middlewareMocks.setTokenCookie.mockClear();
+    episodeServiceMocks.ensureSessionStoredInEpisode.mockClear();
+    process.env.JWT_SECRET = 'test-secret';
+
+    vi.mocked(prisma.patient.create).mockResolvedValue({ id: 'p-dfd' } as never);
+    vi.mocked(prisma.patientSession.create).mockResolvedValue({
+      id: 's-dfd',
+      createdAt: new Date('2026-04-15T20:58:00.000Z'),
+    } as never);
+
+    const handlers = getRouteHandlers('/start', 'post');
+    const startHandler = handlers[handlers.length - 1] as (req: unknown, res: unknown) => Promise<void>;
+
+    const req = {
+      query: { specialty: 'general', lang: 'de' },
+      tenantId: 'default',
+      protocol: 'http',
+      get: (name: string) => (name === 'host' ? 'localhost:5173' : undefined),
+      headers: {},
+    };
+    const res = createMockResponse();
+
+    await startHandler(req, res);
+
+    expect(res.statusCode).toBe(201);
+    expect(episodeServiceMocks.ensureSessionStoredInEpisode).toHaveBeenCalledWith({
+      tenantId: 'default',
+      sessionId: 's-dfd',
+      selectedService: 'General',
+      createdAt: new Date('2026-04-15T20:58:00.000Z'),
+    });
   });
 
   it('rejects POST / without tenant context', async () => {

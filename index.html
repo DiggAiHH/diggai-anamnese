@@ -28,9 +28,12 @@
   <link rel="apple-touch-icon" href="/icons/icon-192.svg" />
   <!-- Typography: Phase 2 Optimization for Elderly/Anxious Users -->
   <!-- Primary Font: Inter with RTL support via Noto Sans Arabic -->
+  <!-- DNS prefetch + preconnect for API backend (reduces TCP handshake latency) -->
+  <link rel="dns-prefetch" href="https://api-takios.diggai.de" />
+  <link rel="preconnect" href="https://api-takios.diggai.de" crossorigin />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@400;500;600;700&display=swap" />
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@400;500;600;700&display=swap" fetchpriority="high" />
   <link
     href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@400;500;600;700&display=swap"
     rel="stylesheet" />

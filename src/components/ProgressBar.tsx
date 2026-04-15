@@ -1,3 +1,4 @@
+import React from 'react';
 import { motion } from 'framer-motion';
 
 interface ProgressBarProps {
@@ -11,7 +12,7 @@ interface ProgressBarProps {
   totalSteps?: number;
 }
 
-export function ProgressBar({ 
+export const ProgressBar = React.memo(function ProgressBar({ 
   progress, 
   className = '', 
   showPercentage = false,
@@ -85,6 +86,6 @@ export function ProgressBar({
       )}
     </div>
   );
-}
+}, (prev, next) => prev.progress === next.progress && prev.variant === next.variant && prev.size === next.size && prev.className === next.className);
 
 export default ProgressBar;

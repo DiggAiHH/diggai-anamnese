@@ -2,6 +2,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { prisma } from '../db';
 import { createToken, requireAuth, requireRole, requireSessionOwner, setTokenCookie } from '../middleware/auth';
+import { ensureSessionStoredInEpisode } from '../services/episode.service';
 import { hashEmail, encrypt } from '../services/encryption';
 import { t, parseLang, LocalizedError } from '../i18n';
 
@@ -150,6 +151,13 @@ router.post('/', async (req: Request, res: Response) => {
             },
         });
 
+        await ensureSessionStoredInEpisode({
+            tenantId,
+            sessionId: session.id,
+            selectedService,
+            createdAt: session.createdAt,
+        });
+
         const token = createToken({
             sessionId: session.id,
             tenantId,
@@ -253,6 +261,15 @@ router.post('/:id/submit', requireAuth, requireSessionOwner, async (req: Request
                 status: 'COMPLETED',
                 completedAt: new Date(),
             },
+        });
+
+        await ensureSessionStoredInEpisode({
+            tenantId: session.tenantId,
+            sessionId: session.id,
+            selectedService: session.selectedService,
+            assignedArztId: session.assignedArztId,
+            createdAt: session.createdAt,
+            completedAt: session.completedAt,
         });
 
         const { emitSessionComplete } = await import('../socket');
@@ -714,6 +731,13 @@ router.post('/start', async (req: Request, res: Response) => {
                 isNewPatient: true,
                 selectedService: serviceLabel,
             },
+        });
+
+        await ensureSessionStoredInEpisode({
+            tenantId,
+            sessionId: session.id,
+            selectedService: serviceLabel,
+            createdAt: session.createdAt,
         });
 
         const token = createToken({ sessionId: session.id, tenantId, role: 'patient' });

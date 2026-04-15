@@ -332,22 +332,35 @@ router.get('/sessions', requireAuth, requireRole('arzt', 'admin'), async (_req: 
             return;
         }
 
-        const sessions = await prisma.patientSession.findMany({
-            where: {
-                tenantId: resolvedTenant.tenantId,
-            },
-            orderBy: { createdAt: 'desc' },
-            take: 100,
-            include: {
-                _count: {
-                    select: { answers: true, triageEvents: true }
-                },
-                triageEvents: {
-                    where: { level: 'CRITICAL', acknowledgedBy: null },
-                    select: { id: true }
+        // Server-side pagination + filtering
+        const page = Math.max(1, Number(req.query.page) || 1);
+        const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 50));
+        const skip = (page - 1) * limit;
+        const statusFilter = typeof req.query.status === 'string' ? req.query.status : undefined;
+
+        const where = {
+            tenantId: resolvedTenant.tenantId,
+            ...(statusFilter && { status: statusFilter }),
+        };
+
+        const [sessions, total] = await Promise.all([
+            prisma.patientSession.findMany({
+                where,
+                orderBy: { createdAt: 'desc' },
+                skip,
+                take: limit,
+                include: {
+                    _count: {
+                        select: { answers: true, triageEvents: true }
+                    },
+                    triageEvents: {
+                        where: { level: 'CRITICAL', acknowledgedBy: null },
+                        select: { id: true }
+                    }
                 }
-            }
-        });
+            }),
+            prisma.patientSession.count({ where }),
+        ]);
 
         const result = [];
         for (const s of sessions) {
@@ -358,6 +371,7 @@ router.get('/sessions', requireAuth, requireRole('arzt', 'admin'), async (_req: 
 
             result.push({
                 id: s.id,
+                patientId: s.patientId,
                 patientName,
                 isNewPatient: s.isNewPatient,
                 gender: s.gender,
@@ -371,7 +385,10 @@ router.get('/sessions', requireAuth, requireRole('arzt', 'admin'), async (_req: 
             });
         }
 
-        res.json({ sessions: result });
+        res.json({
+            sessions: result,
+            pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+        });
     } catch (err: unknown) {
         console.error('[Arzt] Sessions-Fehler:', err);
         res.status(500).json({ error: 'Interner Serverfehler' });

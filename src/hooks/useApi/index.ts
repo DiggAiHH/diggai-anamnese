@@ -212,6 +212,21 @@ export {
     useAiIcdSuggest,
 } from './useTherapyApi';
 
+// ─── Episode API ────────────────────────────────────────────
+export {
+    episodeKeys,
+    usePatientEpisodes,
+    useActiveEpisodesForPersonalization,
+    useEpisodeDetail,
+    useCreateEpisode,
+    useUpdateEpisode,
+    useLinkSessionToEpisode,
+    useUnlinkSessionFromEpisode,
+    useSetEpisodePreference,
+    useDeactivateEpisodePreference,
+    useAddEpisodeNote,
+} from './useEpisodeApi';
+
 // ─── PWA API ────────────────────────────────────────────────
 export {
     // Dashboard
