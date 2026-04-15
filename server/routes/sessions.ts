@@ -345,6 +345,40 @@ router.post('/:id/submit', requireAuth, requireSessionOwner, async (req: Request
             }
         });
 
+        // ── Klaproth Pipeline: TutaMail → Tomedo (non-blocking) ──
+        setImmediate(async () => {
+            try {
+                const { formatSessionForTomedo, buildTomedoSubject } = await import('../services/emailFormatter');
+                const { sendAnamneseEmail } = await import('../services/tutamail');
+
+                // Reload session with answers for email body
+                const fullSession = await prisma.session.findUnique({
+                    where: { id: session.id },
+                    include: { answers: true, patient: true },
+                });
+                if (!fullSession) return;
+
+                // Resolve BSNR from tenant subdomain
+                let bsnr = 'UNKNOWN';
+                if (fullSession.tenantId) {
+                    const tenant = await prisma.tenant.findUnique({ where: { id: fullSession.tenantId } });
+                    if (tenant?.subdomain) bsnr = tenant.subdomain;
+                }
+
+                const bodyText = formatSessionForTomedo(fullSession as any);
+                const subject = buildTomedoSubject(fullSession as any);
+
+                await sendAnamneseEmail({
+                    bsnr,
+                    subject,
+                    bodyText,
+                    sessionId: fullSession.id,
+                });
+            } catch (mailErr) {
+                console.warn('[Sessions] TutaMail dispatch fehlgeschlagen (non-critical):', mailErr);
+            }
+        });
+
         res.json({
             success: true,
             sessionId: session.id,

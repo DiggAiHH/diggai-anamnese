@@ -248,4 +248,56 @@ router.post('/imports', requireAuth, requireRole('mfa', 'admin'), upload.single(
     }
 });
 
+// ── Klaproth Pipeline: Bearbeitet-Status (PENDING ↔ PROCESSED) ──
+
+const processedSchema = z.object({
+    processedStatus: z.enum(['PENDING', 'PROCESSED']),
+});
+
+router.patch('/sessions/:id/processed', requireAuth, requireRole('mfa', 'arzt', 'admin'), async (req: Request, res: Response) => {
+    try {
+        const tenantResult = resolveEffectiveTenant(req);
+        if (!tenantResult.ok) {
+            res.status(tenantResult.status).json(tenantResult.body);
+            return;
+        }
+
+        const parsed = processedSchema.safeParse(req.body);
+        if (!parsed.success) {
+            res.status(400).json({ error: 'Ungültiger Status', details: parsed.error.issues });
+            return;
+        }
+
+        const sessionId = req.params.id as string;
+        const userId = typeof req.auth?.userId === 'string' ? req.auth.userId : undefined;
+
+        const session = await prisma.session.findFirst({
+            where: { id: sessionId, tenantId: tenantResult.tenantId },
+        });
+
+        if (!session) {
+            res.status(404).json({ error: 'Session nicht gefunden' });
+            return;
+        }
+
+        const updated = await prisma.session.update({
+            where: { id: sessionId },
+            data: {
+                processedStatus: parsed.data.processedStatus,
+                processedAt: parsed.data.processedStatus === 'PROCESSED' ? new Date() : null,
+                processedBy: parsed.data.processedStatus === 'PROCESSED' ? userId : null,
+            },
+        });
+
+        res.json({
+            success: true,
+            processedStatus: updated.processedStatus,
+            processedAt: updated.processedAt,
+        });
+    } catch (err) {
+        console.error('[MFA] Processed-Status-Fehler:', err);
+        res.status(500).json({ error: 'Interner Serverfehler' });
+    }
+});
+
 export default router;

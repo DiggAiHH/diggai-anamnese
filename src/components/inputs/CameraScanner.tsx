@@ -17,8 +17,19 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onScan, onClose })
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [stream, setStream] = useState<MediaStream | null>(null);
     const [isScanning, setIsScanning] = useState(false);
-    const [status, setStatus] = useState<'idle' | 'starting' | 'scanning' | 'success' | 'error'>('idle');
+    const [status, setStatus] = useState<'idle' | 'starting' | 'scanning' | 'success' | 'error' | 'manual'>('idle');
     const [errorMsg, setErrorMsg] = useState('');
+    const [retryCount, setRetryCount] = useState(0);
+    const MAX_RETRIES = 2;
+
+    // Manual input state
+    const [manualData, setManualData] = useState({
+        firstname: '',
+        lastname: '',
+        dob: '',
+        insurance: '',
+        num: '',
+    });
 
     const startCamera = async () => {
         try {
@@ -33,8 +44,8 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onScan, onClose })
             setStatus('idle');
         } catch (err) {
             console.error("Camera access denied or failed:", err);
-            setStatus('error');
-            setErrorMsg(t('camera.error'));
+            setStatus('manual');
+            setErrorMsg(t('camera.noCameraFallback', 'Kamera nicht verfügbar. Bitte geben Sie die Daten manuell ein.'));
         }
     };
 
@@ -111,22 +122,148 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onScan, onClose })
 
             if (Object.keys(parsedData).length > 0) {
                 setStatus('success');
+                setRetryCount(0);
                 setTimeout(() => {
                     onScan(parsedData);
                     onClose();
                 }, 1500);
             } else {
-                setStatus('error');
-                setErrorMsg('Karte nicht erkannt. Bitte fokussieren und erneut versuchen.');
+                const newRetryCount = retryCount + 1;
+                setRetryCount(newRetryCount);
+                if (newRetryCount >= MAX_RETRIES) {
+                    setStatus('manual');
+                    setErrorMsg(t('camera.manualFallback', 'Die Karte konnte nicht automatisch erkannt werden. Bitte geben Sie die Daten manuell ein.'));
+                } else {
+                    setStatus('error');
+                    setErrorMsg(t('camera.retryHint', 'Karte nicht erkannt. Bitte fokussieren und erneut versuchen. (Versuch {{count}}/{{max}})', { count: newRetryCount, max: MAX_RETRIES }));
+                }
             }
         } catch (err) {
             console.error("OCR failed:", err);
-            setStatus('error');
-            setErrorMsg('Fehler bei der Texterkennung.');
+            const newRetryCount = retryCount + 1;
+            setRetryCount(newRetryCount);
+            if (newRetryCount >= MAX_RETRIES) {
+                setStatus('manual');
+                setErrorMsg(t('camera.manualFallback', 'Die Texterkennung ist fehlgeschlagen. Bitte geben Sie die Daten manuell ein.'));
+            } else {
+                setStatus('error');
+                setErrorMsg(t('camera.ocrError', 'Fehler bei der Texterkennung. Bitte erneut versuchen.'));
+            }
         } finally {
             setIsScanning(false);
         }
     };
+
+    const handleManualSubmit = () => {
+        const data: { firstname?: string; lastname?: string; dob?: string; insurance?: string; num?: string } = {};
+        if (manualData.firstname.trim()) data.firstname = manualData.firstname.trim();
+        if (manualData.lastname.trim()) data.lastname = manualData.lastname.trim();
+        if (manualData.dob.trim()) data.dob = manualData.dob.trim();
+        if (manualData.insurance.trim()) data.insurance = manualData.insurance.trim();
+        if (manualData.num.trim()) data.num = manualData.num.trim();
+
+        if (Object.keys(data).length > 0) {
+            onScan(data);
+            onClose();
+        }
+    };
+
+    // ─── Manual Input Mode ─────────────────────────────────────
+    if (status === 'manual') {
+        return (
+            <div className="fixed inset-0 z-50 bg-black/95 flex flex-col items-center justify-center p-6 animate-fade-in">
+                <div className="w-full max-w-md bg-gray-900 rounded-2xl p-6 border border-gray-700">
+                    <div className="flex items-center justify-between mb-6">
+                        <h3 className="text-white font-bold flex items-center gap-2">
+                            <AlertCircle className="w-5 h-5 text-amber-400" />
+                            {t('camera.manualTitle', 'Daten manuell eingeben')}
+                        </h3>
+                        <button onClick={onClose} className="p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors">
+                            <X className="w-5 h-5" />
+                        </button>
+                    </div>
+
+                    {errorMsg && (
+                        <div className="mb-4 p-3 bg-amber-500/20 text-amber-200 border border-amber-500/30 rounded-lg text-sm">
+                            {errorMsg}
+                        </div>
+                    )}
+
+                    <div className="space-y-4">
+                        <div>
+                            <label className="block text-sm text-gray-400 mb-1">{t('camera.field.lastname', 'Nachname')}</label>
+                            <input
+                                type="text"
+                                value={manualData.lastname}
+                                onChange={e => setManualData(d => ({ ...d, lastname: e.target.value }))}
+                                className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none"
+                                placeholder="Mustermann"
+                                autoFocus
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm text-gray-400 mb-1">{t('camera.field.firstname', 'Vorname')}</label>
+                            <input
+                                type="text"
+                                value={manualData.firstname}
+                                onChange={e => setManualData(d => ({ ...d, firstname: e.target.value }))}
+                                className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none"
+                                placeholder="Max"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm text-gray-400 mb-1">{t('camera.field.dob', 'Geburtsdatum')}</label>
+                            <input
+                                type="text"
+                                value={manualData.dob}
+                                onChange={e => setManualData(d => ({ ...d, dob: e.target.value }))}
+                                className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none"
+                                placeholder="TT.MM.JJJJ"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm text-gray-400 mb-1">{t('camera.field.insurance', 'Krankenkasse')}</label>
+                            <input
+                                type="text"
+                                value={manualData.insurance}
+                                onChange={e => setManualData(d => ({ ...d, insurance: e.target.value }))}
+                                className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none"
+                                placeholder="AOK, TK, Barmer..."
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm text-gray-400 mb-1">{t('camera.field.kvNumber', 'Versichertennummer')}</label>
+                            <input
+                                type="text"
+                                value={manualData.num}
+                                onChange={e => setManualData(d => ({ ...d, num: e.target.value }))}
+                                className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none"
+                                placeholder="A123456789"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="flex gap-3 mt-6">
+                        <button
+                            onClick={() => { setStatus('idle'); setRetryCount(0); setErrorMsg(''); }}
+                            className="flex-1 px-4 py-2.5 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                        >
+                            <Camera className="w-4 h-4" />
+                            {t('camera.tryAgain', 'Erneut scannen')}
+                        </button>
+                        <button
+                            onClick={handleManualSubmit}
+                            disabled={!manualData.lastname.trim() && !manualData.firstname.trim()}
+                            className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                        >
+                            <CheckCircle2 className="w-4 h-4" />
+                            {t('camera.submitManual', 'Übernehmen')}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center animate-fade-in">
@@ -208,6 +345,14 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onScan, onClose })
                     )}
                 </button>
                 <p className="text-white/50 text-xs mt-4">{t('camera.positionCard')}</p>
+
+                {/* Manual entry fallback button */}
+                <button
+                    onClick={() => setStatus('manual')}
+                    className="mt-4 px-4 py-2 text-white/70 hover:text-white text-sm underline underline-offset-4 transition-colors"
+                >
+                    {t('camera.switchToManual', 'Daten manuell eingeben')}
+                </button>
             </div>
 
             {/* Scan animation keyframes */}

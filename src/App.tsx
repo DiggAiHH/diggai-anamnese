@@ -331,22 +331,23 @@ function App() {
           {/* Impressum — §5 DDG (lazy-loaded) */}
           <Route path="/impressum" element={<Suspense fallback={<DashboardLoading />}><ImpressumPage /></Suspense>} />
 
-          {/* Pricing Page */}
-          <Route path="/pricing" element={<RouteErrorBoundary routeType="default"><Suspense fallback={<DashboardLoading />}><Pricing /></Suspense></RouteErrorBoundary>} />
+          {/* Pricing Page — hidden for live (PAYMENT_ENABLED=false) */}
+          {/* <Route path="/pricing" element={<RouteErrorBoundary routeType="default"><Suspense fallback={<DashboardLoading />}><Pricing /></Suspense></RouteErrorBoundary>} /> */}
 
           {/* Modul 7: NFC & Flow Routes */}
           <Route path="/nfc" element={<RouteErrorBoundary routeType="default"><Suspense fallback={<DashboardLoading />}><NfcLanding /></Suspense></RouteErrorBoundary>} />
           <Route path="/flows/live" element={<RouteErrorBoundary routeType="staff"><Suspense fallback={<DashboardLoading />}><PatientFlowLiveBoard /></Suspense></RouteErrorBoundary>} />
-          <Route path="/checkout/:sessionId" element={<RouteErrorBoundary routeType="patient"><Suspense fallback={<DashboardLoading />}><CheckoutWizardRoute /></Suspense></RouteErrorBoundary>} />
+          {/* Checkout/Payment routes — hidden for live (PAYMENT_ENABLED=false) */}
+          {/* <Route path="/checkout/:sessionId" element={<RouteErrorBoundary routeType="patient"><Suspense fallback={<DashboardLoading />}><CheckoutWizardRoute /></Suspense></RouteErrorBoundary>} /> */}
           <Route path="/feedback" element={<RouteErrorBoundary routeType="default"><Suspense fallback={<DashboardLoading />}><AnonymousFeedbackForm praxisId="default" /></Suspense></RouteErrorBoundary>} />
 
           {/* Modul 7/8: Kiosk + Payment + Flow Builder (role-protected) */}
           <Route path="/kiosk" element={<ProtectedRoute allowedRoles={['mfa', 'arzt', 'admin']}><RouteErrorBoundary routeType="staff"><Suspense fallback={<DashboardLoading />}><KioskDashboard /></Suspense></RouteErrorBoundary></ProtectedRoute>} />
           <Route path="/flows/builder" element={<ProtectedRoute allowedRoles={['arzt', 'admin']}><RouteErrorBoundary routeType="staff"><Suspense fallback={<DashboardLoading />}><TreatmentFlowBuilder /></Suspense></RouteErrorBoundary></ProtectedRoute>} />
           <Route path="/flows/builder/:flowId" element={<ProtectedRoute allowedRoles={['arzt', 'admin']}><RouteErrorBoundary routeType="staff"><Suspense fallback={<DashboardLoading />}><TreatmentFlowBuilder /></Suspense></RouteErrorBoundary></ProtectedRoute>} />
-          <Route path="/checkout/:sessionId/delete" element={<RouteErrorBoundary routeType="patient"><Suspense fallback={<DashboardLoading />}><DataDeletionConfirmRoute /></Suspense></RouteErrorBoundary>} />
-          <Route path="/checkout/success" element={<RouteErrorBoundary routeType="patient"><Suspense fallback={<DashboardLoading />}><CheckoutSuccess /></Suspense></RouteErrorBoundary>} />
-          <Route path="/verwaltung/billing" element={<RouteErrorBoundary routeType="staff"><Suspense fallback={<DashboardLoading />}><BillingDashboard /></Suspense></RouteErrorBoundary>} />
+          {/* <Route path="/checkout/:sessionId/delete" element={<RouteErrorBoundary routeType="patient"><Suspense fallback={<DashboardLoading />}><DataDeletionConfirmRoute /></Suspense></RouteErrorBoundary>} /> */}
+          {/* <Route path="/checkout/success" element={<RouteErrorBoundary routeType="patient"><Suspense fallback={<DashboardLoading />}><CheckoutSuccess /></Suspense></RouteErrorBoundary>} /> */}
+          {/* <Route path="/verwaltung/billing" element={<RouteErrorBoundary routeType="staff"><Suspense fallback={<DashboardLoading />}><BillingDashboard /></Suspense></RouteErrorBoundary>} /> */}
 
           {/* Modul 9: Telemedizin */}
           <Route path="/telemedizin" element={<RouteErrorBoundary routeType="default"><Suspense fallback={<DashboardLoading />}><TelemedizinScheduler /></Suspense></RouteErrorBoundary>} />

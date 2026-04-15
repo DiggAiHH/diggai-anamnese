@@ -192,4 +192,16 @@ export const config = {
     // Monitoring
     sentryDsn: process.env.SENTRY_DSN,
     appVersion: process.env.APP_VERSION || '3.0.0',
+
+    // SMTP / TutaMail (DiggAI Email Pipeline)
+    smtp: {
+        host: process.env.SMTP_HOST || '',
+        port: parseInt(process.env.SMTP_PORT || '587', 10),
+        secure: process.env.SMTP_SECURE === 'true',
+        user: process.env.SMTP_USER || '',
+        pass: process.env.SMTP_PASS || '',
+        from: process.env.SMTP_FROM || 'noreply@diggai.de',
+    },
+    /** Email domain for BSNR-based routing (e.g. <BSNR>@diggai.de) */
+    emailDomain: process.env.DIGGAI_EMAIL_DOMAIN || 'diggai.de',
 };

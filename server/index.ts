@@ -64,6 +64,7 @@ import tomedoBridgeRoutes from './routes/tomedo-bridge.routes';
 import tomedoBatchRoutes from './routes/tomedo-batch.routes';
 import fhirWebhookRoutes from './routes/fhir-webhook.routes';
 import fhirSubscriptionRoutes from './routes/fhir-subscription.routes';
+import episodeRoutes from './routes/episodes';
 import { requireAuth, requireAdmin } from './middleware/auth';
 import tenantsRoutes from './routes/tenants';
 import { messageBroker } from './services/messagebroker.service';
@@ -337,6 +338,7 @@ mountRoute('company', '/api/roi', roiRoutes);
 mountRoute('practice', '/api/wunschbox', wunschboxRoutes);
 mountRoute('authority', '/api/pvs', authLimiter, pvsRoutes);
 mountRoute('practice', '/api/therapy', authLimiter, therapyRoutes);
+mountRoute('practice', '/api/episodes', authLimiter, episodeRoutes);
 mountRoute('practice', '/api/pwa', pwaLimiter, pwaRoutes);
 mountRoute('company', '/api/system', authLimiter, systemRoutes);
 mountRoute('authority', '/api/ti', authLimiter, tiRoutes);
@@ -563,6 +565,7 @@ import { startComplianceReporter, stopComplianceReporter } from './jobs/complian
 import { startQueueAutoDispatch, stopQueueAutoDispatch } from './jobs/queueAutoDispatch';
 import { startBillingReconciler, stopBillingReconciler } from './jobs/billingReconciler';
 import { startTokenCleanupJob, stopTokenCleanupJob } from './jobs/token-cleanup.job';
+import { startRetentionCleanupJob } from './jobs/retentionCleanup';
 try { startDatabaseCleanupJob(); } catch (err) { console.error('[Server] Failed to start cleanup job:', err); }
 try { startROISnapshotJob(); } catch (err) { console.error('[Server] Failed to start ROI snapshot job:', err); }
 try { startReminderWorker(); } catch (err) { console.error('[Server] Failed to start reminder worker:', err); }
@@ -576,6 +579,7 @@ try { startComplianceReporter(); } catch (err) { console.error('[Server] Failed 
 try { startQueueAutoDispatch(); } catch (err) { console.error('[Server] Failed to start queue auto-dispatch:', err); }
 try { startBillingReconciler(); } catch (err) { console.error('[Server] Failed to start billing reconciler:', err); }
 try { startTokenCleanupJob(); } catch (err) { console.error('[Server] Failed to start token cleanup job:', err); }
+try { startRetentionCleanupJob(); } catch (err) { console.error('[Server] Failed to start retention cleanup job:', err); }
 
 // RabbitMQ — verbindet sich mit Agent-Core (non-blocking, graceful degradation)
 messageBroker.connect().catch(err =>

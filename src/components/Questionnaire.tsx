@@ -2,7 +2,6 @@ import { useEffect, useCallback, useState, useMemo, useRef } from 'react';
 import { useSessionStore } from '../store/sessionStore';
 import type { Answer } from '../types/question';
 import { useSubmitAnswer, useSubmitSession, useSubmitAccidentDetails, useSubmitMedications, useSubmitSurgeries, useQueuePosition, useQueueFlowConfig, useWaitingContent } from '../hooks/usePatientApi';
-import { useAutoScroll } from '../hooks/useAutoScroll';
 import { questions as allQuestions } from '../data/questions';
 import { QuestionRenderer } from './QuestionRenderer';
 import { ProgressBar } from './ProgressBar';
@@ -24,7 +23,6 @@ import { SchwangerschaftCheck } from './SchwangerschaftCheck';
 import { PDFExport } from './PDFExport';
 import { SubmittedPage } from './SubmittedPage';
 import { WaitingRoomModal } from './WaitingRoomModal';
-import { useTenantStore } from '../store/tenantStore';
 import { EmailFallbackModal } from './EmailFallbackModal';
 import { PatientIdentify } from './inputs/PatientIdentify';
 import { CameraScanner } from './inputs/CameraScanner';
@@ -95,11 +93,6 @@ const ESTIMATED_TIME_NUMBERS: Record<string, string> = {
 
 import { useTranslation } from 'react-i18next';
 import { ConsentFlow } from './ui/ConsentFlow';
-import {
-    translateQuestionDescription,
-    translateQuestionLabel,
-    translateStableText,
-} from '../lib/patientFlow';
 
 /**
  * Questionnaire Component - Phase 3: Layout & Whitespace
@@ -115,7 +108,6 @@ import {
 export function Questionnaire() {
     const { t } = useTranslation();
     const store = useSessionStore();
-    const tenantFeatures = useTenantStore((s) => s.features);
     const { mutate: submitAnswer } = useSubmitAnswer();
     const { mutateAsync: submitSession } = useSubmitSession();
     const { mutateAsync: submitMedicationsAsync } = useSubmitMedications();
@@ -172,15 +164,6 @@ export function Questionnaire() {
     // Guard: Skip SyncEffect during active user input to prevent race conditions
     const isUserInteractingRef = useRef(false);
     const interactionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-    // Auto-scroll: smoothly bring the new question card into view when the
-    // active question changes so that the header / nav buttons never block input.
-    // Disabled while full-screen overlays are visible to avoid jarring motion.
-    const questionCardRef = useAutoScroll<HTMLDivElement>(state.currentQuestionId, {
-        topOffset: 90,   // clears sticky header (≈72 px) + 18 px breathing room
-        delayMs: 100,    // one paint cycle after React re-render
-        disabled: false, // refined below after overlay state is declared
-    });
 
     // Patient-Daten aus Antworten ableiten
     const patientGender = state.answers['0002']?.value as string || '';
@@ -334,7 +317,7 @@ export function Questionnaire() {
         // Schwangerschafts-Check: Nach Beantwortung weiter zu Medikamente
         if (currentAtomId === '8800') {
             if (!state.answers['8800']) {
-                setLocalError(translateStableText(t, 'ui.questionnaire.answerRequired', 'Bitte beantworten Sie die Frage'));
+                setLocalError(t('Bitte beantworten Sie die Frage'));
                 return;
             }
             dispatch({ type: 'SET_CURRENT_QUESTION', payload: '8900' });
@@ -503,8 +486,6 @@ export function Questionnaire() {
     });
 
     const currentQuestion = allQuestions.find(q => q.id === state.currentQuestionId) || allQuestions[0];
-    const currentQuestionLabel = translateQuestionLabel(t, currentQuestion);
-    const currentQuestionDescription = translateQuestionDescription(t, currentQuestion);
     const context = { selectedReason: state.selectedReason, gender: patientGender, age: patientAge };
     const activePathIds = getActivePath(allQuestions, state.answers, context);
     const estimatedPath = estimateFullPath(allQuestions, state.answers, context);
@@ -551,8 +532,8 @@ export function Questionnaire() {
                     onSendPackageLink={handleSendPackageLink}
                     canSendPackageLink={Boolean(patientEmail)}
                 />
-                {/* Waiting Room Modal — Dismissable, theme-aware, opaque background */}
-                {store.sessionId && store.token && tenantFeatures.showWaitingRoom && (
+                {/* Wartenummer / WaitingRoom-Modal — deaktiviert für Live-Betrieb */}
+                {/* {store.sessionId && store.token && (
                     <WaitingRoomModal
                         open={isSubmitted}
                         onClose={handleReset}
@@ -561,7 +542,7 @@ export function Questionnaire() {
                         service={state.selectedReason || ''}
                         token={store.token}
                     />
-                )}
+                )} */}
                 {showPDF && (
                     <PDFExport
                         questions={allQuestions}
@@ -601,7 +582,7 @@ export function Questionnaire() {
                     <div className="flex items-center gap-4">
                         <button
                             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                            aria-label={translateStableText(t, 'ui.questionnaire.history', 'Verlauf anzeigen')}
+                            aria-label={t('Verlauf anzeigen', 'Verlauf anzeigen')}
                             className="
                                 p-3 min-h-[48px] min-w-[48px]  /* 48px touch target */
                                 hover:bg-[var(--bg-card)] rounded-[20px]  /* 20px radius */
@@ -618,7 +599,7 @@ export function Questionnaire() {
                             <div className="hidden sm:block">
                                 <h1 className="text-lg font-bold tracking-tight">{t(state.selectedReason || 'Anamnese')}</h1>
                                 <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">
-                                    {patientName ? `${patientName} – ` : ''}{translateStableText(t, 'ui.questionnaire.questionLabel', 'Frage')} {totalAnswered + 1}/{totalEstimated}
+                                    {patientName ? `${patientName} – ` : ''}{t('Frage')} {totalAnswered + 1}/{totalEstimated}
                                 </p>
                             </div>
                         </div>
@@ -630,12 +611,12 @@ export function Questionnaire() {
                         <div className="hidden md:flex items-center gap-4 px-4 py-2 bg-[var(--bg-card)] rounded-full border border-[var(--border-primary)]">
                             <div className="flex items-center gap-2">
                                 <Clock className="w-3.5 h-3.5 text-gray-500" />
-                                <span className="text-xs font-medium text-[var(--text-secondary)]">{translateStableText(t, 'ui.questionnaire.duration', 'Dauer')}: <span className="text-[var(--text-primary)]">{t(estTime)}</span></span>
+                                <span className="text-xs font-medium text-[var(--text-secondary)]">{t('Dauer')}: <span className="text-[var(--text-primary)]">{t(estTime)}</span></span>
                             </div>
                             <div className="w-px h-3 bg-[var(--border-primary)]" />
                             <div className="flex items-center gap-2">
                                 <ShieldCheck className="w-3.5 h-3.5 text-green-500/70" />
-                                <span className="text-xs font-medium text-green-500/70 uppercase tracking-wider">{translateStableText(t, 'ui.questionnaire.secure', 'Sicher')}</span>
+                                <span className="text-xs font-medium text-green-500/70 uppercase tracking-wider">{t('Sicher')}</span>
                             </div>
                         </div>
 
@@ -660,7 +641,7 @@ export function Questionnaire() {
                                 hover:bg-[var(--bg-card)] rounded-[20px]  /* 20px radius */
                                 transition-all border border-transparent hover:border-[var(--border-primary)]
                             "
-                            title={translateStableText(t, 'ui.questionnaire.cancelHome', 'Abbrechen & Home')}
+                            title={t('Abbrechen & Home')}
                         >
                             <Home className="w-5 h-5" />
                         </button>
@@ -729,7 +710,6 @@ export function Questionnaire() {
 
                         {/* Question Content - Single Focus in Simple Mode */}
                         <div 
-                            ref={questionCardRef}
                             className={`
                                 min-h-[400px] 
                                 ${store.simpleMode ? 'flex flex-col items-center justify-center' : ''}
@@ -756,7 +736,7 @@ export function Questionnaire() {
                                 `}>
                                     <div className="bg-[var(--bg-card)] rounded-[20px] p-8 border border-[var(--border-primary)]">
                                         <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-2">
-                                            {currentQuestionLabel}
+                                            {currentQuestion.question}
                                         </h2>
                                         <p className="text-sm text-[var(--text-muted)]">
                                             {t('medInputHint', 'Bitte geben Sie alle aktuellen Medikamente strukturiert ein, oder nutzen Sie das Freitextfeld unten.')}
@@ -871,11 +851,11 @@ export function Questionnaire() {
                                                     {t('question.label', 'Frage')} {totalAnswered + 1} {t('question.of', 'von')} {totalEstimated}
                                                 </span>
                                                 <h2 className="text-xl lg:text-2xl font-bold text-[var(--text-primary)] leading-relaxed">
-                                                    {currentQuestionLabel}
+                                                    {currentQuestion.question}
                                                 </h2>
-                                                {currentQuestionDescription && (
+                                                {currentQuestion.description && (
                                                     <p className="mt-3 text-sm text-[var(--text-muted)]">
-                                                        {currentQuestionDescription}
+                                                        {currentQuestion.description}
                                                     </p>
                                                 )}
                                             </div>

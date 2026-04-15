@@ -175,6 +175,9 @@ model Patient {
   kassennummer    String? // IK-Nummer (9-stellig)
   kassenname      String?
 
+  // Behandlungsepisoden (longitudinale Verknüpfung aller Sitzungen)
+  episodes Episode[]
+
   // Modul 4: Therapieplan & Alerts
   therapyPlans   TherapyPlan[]
   clinicalAlerts ClinicalAlert[]
@@ -209,6 +212,10 @@ model PatientSession {
 
   patientId String?
   patient   Patient? @relation(fields: [patientId, tenantId], references: [id, tenantId], onDelete: Cascade)
+
+  // Episode-Zuordnung (optional — wird bei Erstellung oder nachträglich gesetzt)
+  episodeId String?
+  episode   Episode? @relation(fields: [episodeId], references: [id], onDelete: SetNull)
 
   isNewPatient  Boolean?
   gender        String? // M / W / D
@@ -251,11 +258,17 @@ model PatientSession {
   secureExportLinks SecureExportLink[]
   packageImports    PackageImportLog[]
 
+  // Klaproth Pipeline: Dashboard-Bearbeitungsstatus
+  processedStatus String    @default("PENDING")
+  processedAt     DateTime?
+  processedBy     String?
+
   @@index([tenantId])
   @@index([tenantId, status])
   @@index([tenantId, patientId, createdAt])
   @@index([tenantId, status, createdAt]) // For dashboard queries
   @@index([status, createdAt]) // For status-based filtering
+  @@index([processedStatus, processedAt]) // For retention cleanup job
 }
 
 // ─── Accident Details (BG-Daten) ────────────────────────────
@@ -378,6 +391,9 @@ model ArztUser {
 
   // Modul 4: Therapieplan-Erstellung
   createdTherapyPlans TherapyPlan[] @relation("TherapyPlanCreator")
+
+  // Episoden: Bevorzugter Arzt
+  preferredEpisodes Episode[] @relation("EpisodePreferredArzt")
 
   // Modul 8: Avatar & Voice
   avatar StaffAvatar?
@@ -2479,4 +2495,142 @@ model PasskeyCredential {
   @@index([userId])
   @@index([credentialID])
   @@map("passkey_credentials")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Behandlungsepisoden (Longitudinale Patientenversorgung)
+// ═══════════════════════════════════════════════════════════════
+
+enum EpisodeStatus {
+  OPEN
+  ACTIVE
+  FOLLOW_UP
+  PAUSED
+  CLOSED
+  CANCELLED
+}
+
+enum EpisodeType {
+  AKUT
+  CHRONISCH
+  VORSORGE
+  NACHSORGE
+  REZEPT
+  AU
+  UEBERWEISUNG
+  BERATUNG
+}
+
+enum PreferenceCategory {
+  BEHANDLUNG
+  KOMMUNIKATION
+  TERMINPLANUNG
+  MEDIKATION
+  LEBENSSTIL
+  SONSTIGES
+}
+
+enum EpisodeNoteType {
+  ARZT_NOTIZ
+  MFA_NOTIZ
+  PATIENT_FEEDBACK
+  SYSTEM
+  AI_SUMMARY
+}
+
+// ─── Episode (Behandlungsepisode) ───────────────────────────
+
+model Episode {
+  id        String @id @default(uuid())
+  tenantId  String
+  patientId String
+  patient   Patient @relation(fields: [patientId, tenantId], references: [id, tenantId], onDelete: Cascade)
+
+  type   EpisodeType
+  status EpisodeStatus @default(OPEN)
+  title  String
+  description String?
+
+  icdCodes         String[]
+  primaryDiagnosis String?
+
+  patientGoals      String?
+  patientWishes     String?
+  communicationPref String?
+  languagePref      String?
+
+  customNotes     String?
+  preferredArztId String?
+  preferredArzt   ArztUser? @relation("EpisodePreferredArzt", fields: [preferredArztId, tenantId], references: [id, tenantId])
+
+  openedAt       DateTime @default(now())
+  lastActivityAt DateTime @default(now())
+  closedAt       DateTime?
+  nextAppointment DateTime?
+
+  summaryAI   String?
+  summaryArzt String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sessions    PatientSession[]
+  preferences EpisodePreference[]
+  notes       EpisodeNote[]
+
+  @@index([tenantId, patientId])
+  @@index([tenantId, status])
+  @@index([patientId, status])
+  @@index([tenantId, patientId, status])
+  @@index([lastActivityAt])
+  @@map("episodes")
+}
+
+// ─── Episode Preference (Patientenpräferenzen pro Episode) ──
+
+model EpisodePreference {
+  id        String  @id @default(uuid())
+  episodeId String
+  episode   Episode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+
+  category    PreferenceCategory
+  key         String
+  value       String
+  isEncrypted Boolean @default(false)
+
+  setBy       String
+  setByUserId String?
+
+  isActive   Boolean   @default(true)
+  validFrom  DateTime  @default(now())
+  validUntil DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([episodeId, category, key])
+  @@index([episodeId])
+  @@index([episodeId, category])
+  @@map("episode_preferences")
+}
+
+// ─── Episode Note (Verlaufsnotizen) ─────────────────────────
+
+model EpisodeNote {
+  id        String  @id @default(uuid())
+  episodeId String
+  episode   Episode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+
+  type       EpisodeNoteType
+  content    String
+  authorId   String?
+  authorName String?
+
+  visibleToPatient Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([episodeId, createdAt])
+  @@index([episodeId, type])
+  @@map("episode_notes")
 }
