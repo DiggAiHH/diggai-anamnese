@@ -5,6 +5,8 @@
 
 import { Router } from 'express';
 import { z } from 'zod';
+import { readFile } from 'fs/promises';
+import { extname, normalize, resolve, sep } from 'path';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { getPrismaClientForDomain } from '../db.js';
 import { pvsRouter } from '../services/pvs/pvs-router.service.js';
@@ -13,10 +15,25 @@ import { pvsDetectionService } from '../services/pvs/auto-config/index.js';
 import { smartSyncService } from '../services/pvs/sync/index.js';
 import { tomedoLauscher } from '../services/pvs/tomedo-lauscher.service.js';
 import { processVersand } from '../services/export/versand.service.js';
+import { createTomedoApiClient } from '../services/pvs/tomedo-api.client.js';
 import type { PvsConnectionData, PatientSessionFull } from '../services/pvs/types.js';
 
 const router = Router();
 const prisma: any = getPrismaClientForDomain('authority');
+const UPLOAD_DIR = resolve(process.cwd(), 'uploads');
+
+function isUploadPathSecure(filepath: string): boolean {
+  const normalized = normalize(filepath);
+  return normalized.startsWith(UPLOAD_DIR + sep);
+}
+
+function detectMimeType(filename: string): 'application/pdf' | 'image/jpeg' | 'image/png' | null {
+  const ext = extname(filename).toLowerCase();
+  if (ext === '.pdf') return 'application/pdf';
+  if (ext === '.jpg' || ext === '.jpeg') return 'image/jpeg';
+  if (ext === '.png') return 'image/png';
+  return null;
+}
 
 function getEffectiveTenantId(req: any, res: any): string | null {
   const authTenantId = req.auth?.tenantId as string | undefined;
@@ -747,7 +764,109 @@ router.post('/export/batch', requireAuth, requireRole('admin'), async (req, res)
   }
 });
 
-// 9. POST /import/patient â€” Patient aus PVS importieren
+const attachDocumentSchema = z.object({
+  filename: z.string().min(1),
+  patientId: z.string().min(1),
+  encounterId: z.string().optional(),
+  sessionId: z.string().optional(),
+  title: z.string().optional(),
+});
+
+// 9. POST /documents/attach - Upload-Dokument in Tomedo-Akte verknuepfen
+router.post('/documents/attach', requireAuth, requireRole('arzt', 'mfa', 'admin'), async (req, res) => {
+  try {
+    const tenantId = getEffectiveTenantId(req, res);
+    if (!tenantId) return;
+
+    const payload = attachDocumentSchema.parse(req.body);
+
+    const connection = await findActiveConnectionForTenant(tenantId);
+    if (!connection) {
+      return res.status(400).json({ error: 'Keine aktive PVS-Verbindung' });
+    }
+
+    if (connection.pvsType !== 'TOMEDO' || connection.protocol !== 'FHIR') {
+      return res.status(400).json({
+        error: 'Dokument-Upload wird aktuell nur fuer TOMEDO/FHIR unterstuetzt',
+        code: 'TOMEDO_FHIR_REQUIRED',
+      });
+    }
+
+    if (payload.sessionId) {
+      const session = await prisma.patientSession.findUnique({
+        where: { id: payload.sessionId },
+        select: { id: true, tenantId: true },
+      });
+      if (!session || session.tenantId !== tenantId) {
+        return res.status(403).json({
+          error: 'Session gehoert nicht zum aktuellen Tenant',
+          code: 'PVS_SCOPE_VIOLATION',
+        });
+      }
+    }
+
+    const filepath = resolve(UPLOAD_DIR, payload.filename);
+    if (!isUploadPathSecure(filepath)) {
+      return res.status(403).json({ error: 'Zugriff verweigert' });
+    }
+
+    const fileBuffer = await readFile(filepath);
+    const contentType = detectMimeType(payload.filename);
+    if (!contentType) {
+      return res.status(400).json({
+        error: 'Ungueltiger Dateityp. Nur PDF, JPG und PNG werden unterstuetzt.',
+        code: 'INVALID_MIME_TYPE',
+      });
+    }
+
+    const displayName = payload.title?.trim() || payload.filename;
+    const connData = connection as unknown as PvsConnectionData;
+    const client = createTomedoApiClient(connData);
+
+    const result = await client.uploadDocument(
+      payload.patientId,
+      fileBuffer,
+      displayName,
+      contentType,
+      payload.encounterId,
+    );
+
+    await prisma.auditLog.create({
+      data: {
+        tenantId,
+        userId: req.auth?.userId || null,
+        action: 'PVS_DOCUMENT_ATTACH',
+        resource: `pvs/tomedo/${payload.patientId}`,
+        metadata: JSON.stringify({
+          connectionId: connection.id,
+          patientId: payload.patientId,
+          encounterId: payload.encounterId || null,
+          sessionId: payload.sessionId || null,
+          filename: payload.filename,
+          displayName,
+          contentType,
+          size: result.size,
+          binaryId: result.binaryId || null,
+          documentReferenceId: result.documentReferenceId || null,
+          reference: result.reference || null,
+          warning: result.warning || null,
+        }),
+      },
+    });
+
+    return res.json({
+      success: true,
+      data: result,
+    });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validierungsfehler', details: err.issues });
+    }
+    return res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// 10. POST /import/patient â€” Patient aus PVS importieren
 router.post('/import/patient', requireAuth, requireRole('arzt', 'mfa', 'admin'), async (req, res) => {
   try {
     const tenantId = getEffectiveTenantId(req, res);

@@ -13,7 +13,12 @@ import { createLogger } from '../../logger.js';
 import { circuitBreakerRegistry } from './resilience/circuit-breaker.js';
 import { tomedoCache } from './tomedo-cache.service.js';
 import { tomedoMetrics } from './tomedo-metrics.service.js';
-import type { PvsConnectionData, PatientSearchResult, PatientSessionFull } from './types.js';
+import type {
+  DocumentUploadResult,
+  PvsConnectionData,
+  PatientSearchResult,
+  PatientSessionFull,
+} from './types.js';
 
 const logger = createLogger('TomedoApiClient');
 
@@ -192,7 +197,7 @@ export class TomedoApiClient {
             grant_type: 'client_credentials',
             client_id: this.credentials.clientId!,
             client_secret: this.credentials.clientSecret!,
-            scope: 'fhir/Patient.read fhir/Patient.write fhir/Encounter.read fhir/Encounter.write fhir/QuestionnaireResponse.write fhir/Composition.write fhir/Condition.write',
+            scope: 'fhir/Patient.read fhir/Patient.write fhir/Encounter.read fhir/Encounter.write fhir/QuestionnaireResponse.write fhir/Composition.write fhir/Condition.write fhir/Binary.write fhir/DocumentReference.write',
           }),
         })
       );
@@ -690,6 +695,158 @@ export class TomedoApiClient {
     }).catch(error => {
       tomedoMetrics.recordFallakteOperation('karteieintrag', 'error');
       tomedoMetrics.recordApiCall('Composition', 'POST', 'error', Date.now() - startTime);
+      throw error;
+    });
+  }
+
+  /**
+   * Upload a document to Tomedo as Binary + DocumentReference.
+   * This links the uploaded file to a patient and optionally to an encounter/fallakte.
+   */
+  async uploadDocument(
+    patientId: string,
+    file: Buffer,
+    filename: string,
+    contentType: 'application/pdf' | 'image/jpeg' | 'image/png',
+    encounterId?: string,
+  ): Promise<DocumentUploadResult> {
+    const startTime = Date.now();
+
+    return this.circuitBreaker.execute(async () => {
+      const token = await this.ensureAuth();
+
+      const binaryPayload = {
+        resourceType: 'Binary',
+        contentType,
+        ...(encounterId ? { securityContext: { reference: `Encounter/${encounterId}` } } : {}),
+        data: file.toString('base64'),
+      };
+
+      const binaryResponse = await this.rateLimiter.execute(() =>
+        fetch(`${this.baseUrl}/Binary`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/fhir+json',
+            Accept: 'application/fhir+json',
+          },
+          body: JSON.stringify(binaryPayload),
+        }),
+      );
+
+      if (!binaryResponse.ok) {
+        const errorBody = await binaryResponse.text();
+        throw new Error(`Create Binary failed: ${binaryResponse.status} ${binaryResponse.statusText} - ${errorBody}`);
+      }
+
+      const binaryBody = await binaryResponse.json().catch(() => ({})) as { id?: string };
+      const binaryLocation = binaryResponse.headers.get('location') || binaryResponse.headers.get('content-location');
+      const binaryId = binaryBody.id || (binaryLocation ? binaryLocation.split('/').pop() : undefined);
+
+      if (!binaryId) {
+        throw new Error('Create Binary succeeded but no Binary id was returned');
+      }
+
+      const nowIso = new Date().toISOString();
+      const documentReferencePayload = {
+        resourceType: 'DocumentReference',
+        status: 'current',
+        docStatus: 'final',
+        type: {
+          coding: [{
+            system: 'http://loinc.org',
+            code: '34108-1',
+            display: 'Outpatient Note',
+          }],
+        },
+        subject: {
+          reference: `Patient/${patientId}`,
+        },
+        ...(encounterId ? {
+          context: {
+            encounter: [{ reference: `Encounter/${encounterId}` }],
+          },
+        } : {}),
+        date: nowIso,
+        author: [{
+          display: 'DiggAI Anamnese System',
+        }],
+        description: `DiggAI upload: ${filename}`,
+        content: [{
+          attachment: {
+            contentType,
+            title: filename,
+            creation: nowIso,
+            url: `Binary/${binaryId}`,
+          },
+        }],
+      };
+
+      const docRefResponse = await this.rateLimiter.execute(() =>
+        fetch(`${this.baseUrl}/DocumentReference`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/fhir+json',
+            Accept: 'application/fhir+json',
+          },
+          body: JSON.stringify(documentReferencePayload),
+        }),
+      );
+
+      let documentReferenceId: string | undefined;
+      let warning: string | undefined;
+
+      if (docRefResponse.ok) {
+        const docRefBody = await docRefResponse.json().catch(() => ({})) as { id?: string };
+        const docRefLocation = docRefResponse.headers.get('location') || docRefResponse.headers.get('content-location');
+        documentReferenceId = docRefBody.id || (docRefLocation ? docRefLocation.split('/').pop() : undefined);
+      } else {
+        const errorBody = await docRefResponse.text();
+        warning = `DocumentReference failed: ${docRefResponse.status} ${docRefResponse.statusText}`;
+        logger.warn('[TomedoApiClient] DocumentReference creation failed after Binary upload', {
+          connectionId: this.connectionId,
+          patientId,
+          encounterId,
+          binaryId,
+          error: errorBody,
+        });
+      }
+
+      logger.info('[TomedoApiClient] Document uploaded', {
+        connectionId: this.connectionId,
+        patientId,
+        encounterId: encounterId || null,
+        binaryId,
+        documentReferenceId: documentReferenceId || null,
+        filename,
+        contentType,
+        size: file.length,
+      });
+
+      tomedoMetrics.recordApiCall('Binary', 'POST', 'success', Date.now() - startTime);
+      tomedoMetrics.recordApiCall(
+        'DocumentReference',
+        'POST',
+        docRefResponse.ok ? 'success' : 'error',
+        Date.now() - startTime,
+      );
+
+      return {
+        success: true,
+        binaryId,
+        documentReferenceId,
+        filename,
+        contentType,
+        size: file.length,
+        patientId,
+        encounterId,
+        uploadedAt: nowIso,
+        reference: `Binary/${binaryId}`,
+        warning,
+      };
+    }).catch((error) => {
+      tomedoMetrics.recordApiCall('Binary', 'POST', 'error', Date.now() - startTime);
       throw error;
     });
   }

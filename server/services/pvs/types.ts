@@ -183,6 +183,28 @@ export interface FhirComposition extends FhirResource {
   }>;
 }
 
+export interface FhirBinary extends FhirResource {
+  resourceType: 'Binary';
+  contentType: string;
+  securityContext?: { reference?: string };
+  data?: string;
+}
+
+export interface DocumentUploadResult {
+  success: boolean;
+  binaryId?: string;
+  documentReferenceId?: string;
+  filename: string;
+  contentType: string;
+  size: number;
+  patientId: string;
+  encounterId?: string;
+  uploadedAt: string;
+  reference?: string;
+  warning?: string;
+  error?: string;
+}
+
 export interface FhirCondition extends FhirResource {
   resourceType: 'Condition';
   clinicalStatus?: { coding?: Array<{ system?: string; code?: string }> };
