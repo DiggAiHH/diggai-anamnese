@@ -37,6 +37,7 @@ import { preloadPatientFlow, preloadPwaPortal, preloadTelemedizin } from '../lib
 import { TrustBadgeBar } from './ui/TrustBadgeBar';
 import { AssistantAvatar } from './avatar/AssistantAvatar';
 import { useTTS } from '../hooks/useTTS';
+import { practiceConfig } from '../lib/practiceConfig';
 
 interface HomeTile {
   id: string;
@@ -140,7 +141,7 @@ export function HomeScreen() {
       id: 'patient',
       route: '/patient',
       icon: <Stethoscope className="w-16 h-16 md:w-20 md:h-20" />,
-      gradient: 'from-blue-500 to-indigo-600',
+      gradient: practiceConfig.tileGradients[0],
       labelKey: 'home.tile.patient',
       descKey: 'home.tile.patient_desc',
       preload: preloadPatientFlow,
@@ -149,7 +150,7 @@ export function HomeScreen() {
       id: 'pwa',
       route: '/pwa/login',
       icon: <Smartphone className="w-16 h-16 md:w-20 md:h-20" />,
-      gradient: 'from-emerald-500 to-teal-600',
+      gradient: practiceConfig.tileGradients[1],
       labelKey: 'home.tile.pwa',
       descKey: 'home.tile.pwa_desc',
       preload: preloadPwaPortal,
@@ -158,7 +159,7 @@ export function HomeScreen() {
       id: 'telemedizin',
       route: '/telemedizin',
       icon: <Video className="w-16 h-16 md:w-20 md:h-20" />,
-      gradient: 'from-purple-500 to-violet-600',
+      gradient: practiceConfig.tileGradients[2],
       labelKey: 'home.tile.telemedizin',
       descKey: 'home.tile.telemedizin_desc',
       preload: preloadTelemedizin,
@@ -273,15 +274,19 @@ export function HomeScreen() {
       {/* Header */}
       <header className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-primary)]">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
-            <Stethoscope className="w-6 h-6 text-white" />
-          </div>
+          {practiceConfig.logoUrl ? (
+            <img src={practiceConfig.logoUrl} alt={practiceConfig.name} className="w-10 h-10 rounded-xl object-contain" />
+          ) : (
+            <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${practiceConfig.logoGradient} flex items-center justify-center`}>
+              <Stethoscope className="w-6 h-6 text-white" />
+            </div>
+          )}
           <div>
             <h1 className="text-lg font-bold text-[var(--text-primary)]">
-              {t('home.clinic_name', 'Praxis Dr. Klaproth')}
+              {t('home.clinic_name', practiceConfig.name)}
             </h1>
             <p className="text-xs text-[var(--text-secondary)]">
-              {t('home.subtitle', 'Digitale Anamnese & Praxis-Services')}
+              {t('home.subtitle', practiceConfig.specialty)}
             </p>
           </div>
         </div>
@@ -301,7 +306,7 @@ export function HomeScreen() {
             isSpeaking={isSpeaking}
             isLoading={ttsLoading}
             size="sm"
-            name={t('home.doctor_name', 'Dr. Klaproth')}
+            name={t('home.doctor_name', practiceConfig.doctor)}
             subtitle={t('home.avatar_subtitle', 'KI-Assistent')}
             onClick={() =>
               void playVoice(

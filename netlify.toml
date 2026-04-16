@@ -39,7 +39,7 @@
     # Kamera + Mikrofon für Videosprechstunde (self), rest gesperrt
     Permissions-Policy = "camera=(self), microphone=(self), geolocation=(), payment=()"
     # CSP — unsafe-eval required for lottie-web animation expressions
-    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://*.netlify.app wss://*.netlify.app https://api.diggai.de wss://api.diggai.de https://api-takios.diggai.de wss://api-takios.diggai.de https://*.up.railway.app wss://*.up.railway.app https://*.onrender.com wss://*.onrender.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self';"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://*.netlify.app wss://*.netlify.app https://*.diggai.de wss://*.diggai.de https://api.diggai.de wss://api.diggai.de https://api-takios.diggai.de wss://api-takios.diggai.de https://*.up.railway.app wss://*.up.railway.app https://*.onrender.com wss://*.onrender.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self';"
     # XSS-Protection off — CSP handles this; old header can trigger bugs
     X-XSS-Protection = "0"
     Cross-Origin-Embedder-Policy = "credentialless"
