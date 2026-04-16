@@ -1,0 +1,43 @@
+{
+  "timestamp": "2026-04-16T10:20:33.946Z",
+  "totalScore": 585,
+  "totalMax": 1000,
+  "pctTotal": 59,
+  "categories": [
+    {
+      "label": "TypeScript Quality",
+      "score": 200,
+      "max": 200
+    },
+    {
+      "label": "Unit Tests",
+      "score": 0,
+      "max": 250
+    },
+    {
+      "label": "E2E Flow Coverage",
+      "score": 240,
+      "max": 250
+    },
+    {
+      "label": "Security & DSGVO",
+      "score": 50,
+      "max": 200
+    },
+    {
+      "label": "i18n & Code Quality",
+      "score": 95,
+      "max": 100
+    }
+  ],
+  "seed": {
+    "exists": true,
+    "patientCount": 30,
+    "flowsCovered": 11,
+    "flowsTotal": 14,
+    "allFlowsCovered": false
+  },
+  "flags": {
+    "fast": true
+  }
+}
