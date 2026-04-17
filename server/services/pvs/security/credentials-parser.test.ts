@@ -4,6 +4,7 @@ import {
   decryptStoredCredentials,
   isEncryptedCredentialPayload,
   parseStoredFhirCredentials,
+  serializeStoredFhirCredentials,
   type EncryptedCredentialPayload,
 } from './credentials-parser';
 
@@ -29,14 +30,21 @@ function createEncryptedPayload(
 
 describe('credentials-parser', () => {
   const originalKey = process.env.PVS_ENCRYPTION_KEY;
+  const originalGeneralKey = process.env.ENCRYPTION_KEY;
 
   afterEach(() => {
     if (originalKey === undefined) {
       delete process.env.PVS_ENCRYPTION_KEY;
+    } else {
+      process.env.PVS_ENCRYPTION_KEY = originalKey;
+    }
+
+    if (originalGeneralKey === undefined) {
+      delete process.env.ENCRYPTION_KEY;
       return;
     }
 
-    process.env.PVS_ENCRYPTION_KEY = originalKey;
+    process.env.ENCRYPTION_KEY = originalGeneralKey;
   });
 
   it('parses plain JSON credentials', () => {
@@ -74,10 +82,26 @@ describe('credentials-parser', () => {
     }, key);
 
     delete process.env.PVS_ENCRYPTION_KEY;
+    delete process.env.ENCRYPTION_KEY;
 
     expect(() => decryptStoredCredentials(encryptedPayload)).toThrow(
-      'PVS_ENCRYPTION_KEY must be set and at least 32 characters to decrypt credentials',
+      'PVS_ENCRYPTION_KEY or ENCRYPTION_KEY must be set and at least 32 characters to handle encrypted credentials',
     );
+  });
+
+  it('uses ENCRYPTION_KEY fallback for serialize and parse operations', () => {
+    const key = 'fallback-fhir-encryption-key-123456';
+    delete process.env.PVS_ENCRYPTION_KEY;
+    process.env.ENCRYPTION_KEY = key;
+
+    const raw = serializeStoredFhirCredentials({
+      clientId: 'fallback-client',
+      clientSecret: 'fallback-secret',
+    });
+
+    const parsed = parseStoredFhirCredentials(raw);
+    expect(parsed.clientId).toBe('fallback-client');
+    expect(parsed.clientSecret).toBe('fallback-secret');
   });
 
   it('detects encrypted payload shape correctly', () => {

@@ -11,6 +11,10 @@
  */
 
 import { getPrismaClientForDomain } from '../../db.js';
+import {
+  parseStoredFhirCredentials,
+  serializeStoredFhirCredentials,
+} from './security/credentials-parser.js';
 
 const prisma = getPrismaClientForDomain('authority');
 
@@ -259,12 +263,14 @@ export class PVSIntegrationService {
       throw new Error('PVS system not found');
     }
 
+    const parsedCredentials = this.parseConnectionCredentials(connection.fhirCredentials);
+
     // Formatiere Daten für PVS
     const formattedData = this.formatForPVS(system, anamneseData);
 
     // Sende an PVS
     try {
-      const result = await this.sendToPVS(system, connection.fhirCredentials as any, formattedData);
+      const result = await this.sendToPVS(system, parsedCredentials, formattedData);
       
       // Logge Export
       await prisma.auditLog.create({
@@ -309,14 +315,16 @@ export class PVSIntegrationService {
       throw new Error('Patient export not supported by this PVS');
     }
 
+    const parsedCredentials = this.parseConnectionCredentials(connection.fhirCredentials);
+
     // Implementierung je nach PVS-Typ
     switch (system.type) {
       case 'tobit':
-        return this.importFromTobit(system, connection.fhirCredentials as any, filters);
+        return this.importFromTobit(system, parsedCredentials, filters);
       case 'medatixx':
-        return this.importFromMedatixx(system, connection.fhirCredentials as any, filters);
+        return this.importFromMedatixx(system, parsedCredentials, filters);
       case 'cgm':
-        return this.importFromCGM(system, connection.fhirCredentials as any, filters);
+        return this.importFromCGM(system, parsedCredentials, filters);
       default:
         throw new Error('PVS type not implemented');
     }
@@ -324,7 +332,7 @@ export class PVSIntegrationService {
 
   // Private Helper Methods
 
-  private async testConnection(system: PVSConfig, credentials: any): Promise<boolean> {
+  private async testConnection(system: PVSConfig, credentials: PVSConnection['credentials']): Promise<boolean> {
     // Implementierung je nach Auth-Typ
     try {
       switch (system.authType) {
@@ -342,19 +350,33 @@ export class PVSIntegrationService {
     }
   }
 
-  private async encryptCredentials(credentials: any): Promise<string> {
-    // TODO: Implementiere echte Verschlüsselung
-    return JSON.stringify(credentials);
+  private async encryptCredentials(credentials: PVSConnection['credentials']): Promise<string> {
+    return serializeStoredFhirCredentials(credentials);
+  }
+
+  private parseConnectionCredentials(rawCredentials: string | null | undefined): PVSConnection['credentials'] {
+    if (!rawCredentials) {
+      throw new Error('PVS credentials are missing for this connection');
+    }
+
+    return parseStoredFhirCredentials(rawCredentials);
   }
 
   private mapConnection(dbConnection: any): PVSConnection {
+    const tenantId = dbConnection.tenantId ?? dbConnection.praxisId;
+    const pvsSystemId = dbConnection.pvsSystemId ?? dbConnection.pvsType;
+    const settings = dbConnection.settings ?? dbConnection.customMappings ?? {
+      autoExport: false,
+      exportFormat: 'json',
+    };
+
     return {
       id: dbConnection.id,
-      tenantId: dbConnection.tenantId,
-      pvsSystemId: dbConnection.pvsSystemId,
+      tenantId,
+      pvsSystemId,
       isActive: dbConnection.isActive,
-      credentials: dbConnection.credentials as any,
-      settings: dbConnection.settings as any,
+      credentials: this.parseConnectionCredentials(dbConnection.fhirCredentials),
+      settings,
       lastSyncAt: dbConnection.lastSyncAt,
       createdAt: dbConnection.createdAt
     };
@@ -383,23 +405,23 @@ export class PVSIntegrationService {
     }
   }
 
-  private async sendToPVS(system: PVSConfig, credentials: any, data: any): Promise<any> {
+  private async sendToPVS(system: PVSConfig, credentials: PVSConnection['credentials'], data: any): Promise<any> {
     // HTTP Request an PVS API
     console.log(`Sending to ${system.name}:`, data);
     return { success: true };
   }
 
-  private async importFromTobit(system: PVSConfig, credentials: any, filters?: any): Promise<any[]> {
+  private async importFromTobit(system: PVSConfig, credentials: PVSConnection['credentials'], filters?: any): Promise<any[]> {
     // Tobit API Integration
     return [];
   }
 
-  private async importFromMedatixx(system: PVSConfig, credentials: any, filters?: any): Promise<any[]> {
+  private async importFromMedatixx(system: PVSConfig, credentials: PVSConnection['credentials'], filters?: any): Promise<any[]> {
     // Medatixx API Integration
     return [];
   }
 
-  private async importFromCGM(system: PVSConfig, credentials: any, filters?: any): Promise<any[]> {
+  private async importFromCGM(system: PVSConfig, credentials: PVSConnection['credentials'], filters?: any): Promise<any[]> {
     // CGM API Integration
     return [];
   }

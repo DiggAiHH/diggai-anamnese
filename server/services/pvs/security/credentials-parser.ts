@@ -1,4 +1,4 @@
-import { createDecipheriv, scryptSync } from 'crypto';
+import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'crypto';
 import type { FhirClientConfig } from '../types.js';
 
 export interface EncryptedCredentialPayload {
@@ -7,6 +7,22 @@ export interface EncryptedCredentialPayload {
   authTag: string;
   salt?: string;
   version: number;
+}
+
+function resolveCredentialEncryptionKey(): string {
+  const pvsEncryptionKey = process.env.PVS_ENCRYPTION_KEY;
+  if (pvsEncryptionKey && pvsEncryptionKey.length >= 32) {
+    return pvsEncryptionKey;
+  }
+
+  const generalEncryptionKey = process.env.ENCRYPTION_KEY;
+  if (generalEncryptionKey && generalEncryptionKey.length >= 32) {
+    return generalEncryptionKey;
+  }
+
+  throw new Error(
+    'PVS_ENCRYPTION_KEY or ENCRYPTION_KEY must be set and at least 32 characters to handle encrypted credentials',
+  );
 }
 
 export function isEncryptedCredentialPayload(value: unknown): value is EncryptedCredentialPayload {
@@ -26,10 +42,7 @@ export function isEncryptedCredentialPayload(value: unknown): value is Encrypted
 export function decryptStoredCredentials(
   payload: EncryptedCredentialPayload,
 ): FhirClientConfig['credentials'] {
-  const encryptionKey = process.env.PVS_ENCRYPTION_KEY;
-  if (!encryptionKey || encryptionKey.length < 32) {
-    throw new Error('PVS_ENCRYPTION_KEY must be set and at least 32 characters to decrypt credentials');
-  }
+  const encryptionKey = resolveCredentialEncryptionKey();
 
   const key = scryptSync(encryptionKey, 'pvs-salt', 32);
   const iv = Buffer.from(payload.iv, 'base64');
@@ -46,6 +59,28 @@ export function decryptStoredCredentials(
   }
 
   return parsed as FhirClientConfig['credentials'];
+}
+
+export function serializeStoredFhirCredentials(
+  credentials: FhirClientConfig['credentials'],
+): string {
+  const encryptionKey = resolveCredentialEncryptionKey();
+  const key = scryptSync(encryptionKey, 'pvs-salt', 32);
+  const iv = randomBytes(16);
+  const cipher = createCipheriv('aes-256-gcm', key, iv);
+
+  let encrypted = cipher.update(JSON.stringify(credentials), 'utf8', 'base64');
+  encrypted += cipher.final('base64');
+
+  const payload: EncryptedCredentialPayload = {
+    encrypted,
+    iv: iv.toString('base64'),
+    authTag: cipher.getAuthTag().toString('base64'),
+    salt: randomBytes(32).toString('base64'),
+    version: 1,
+  };
+
+  return JSON.stringify(payload);
 }
 
 export function parseStoredFhirCredentials(rawCredentials: string): FhirClientConfig['credentials'] {

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-04-17T11:32:18.000Z",
+  "updatedAt": "2026-04-17T11:58:00.000Z",
   "tasks": {
     "episode-opsedien-persistence": {
       "status": "in_progress",
@@ -49,11 +49,11 @@
       "status": "completed",
       "agent": "copilot",
       "sessionId": "2026-04-17-fhir-webhook-hardening",
-      "currentBatch": 4,
-      "updatedAt": "2026-04-17T11:32:18.000Z",
-      "summary": "Webhook signature hardening, persistent PVS audit storage, encrypted credential decryption, and shared parser rollout across FHIR adapters are implemented and validated by an 80-test focused gate.",
+      "currentBatch": 5,
+      "updatedAt": "2026-04-17T11:58:00.000Z",
+      "summary": "The remaining legacy plaintext credential path in PVS integration orchestration is now hardened with encrypted-at-rest storage and runtime shared-parser decryption, validated by a focused 8-test gate.",
       "next": [
-        "Apply shared credential parsing to remaining legacy integration paths that still parse plaintext credentials directly."
+        "Keep routing all future PVS credential reads/writes through shared parser utilities and reject new direct plaintext serialization paths in review."
       ],
       "artifacts": [
         "server/routes/fhir-webhook.routes.ts",
@@ -68,7 +68,9 @@
         "server/services/pvs/adapters/t2med.adapter.ts",
         "server/services/pvs/adapters/fhir-generic.adapter.ts",
         "server/services/pvs/adapters/__tests__/tomedo.adapter.test.ts",
-        "server/services/pvs/adapters/__tests__/t2med.adapter.test.ts"
+        "server/services/pvs/adapters/__tests__/t2med.adapter.test.ts",
+        "server/services/pvs/pvs-integration.service.ts",
+        "server/services/pvs/pvs-integration.service.test.ts"
       ],
       "checkpointFile": "shared/knowledge/checkpoints/fhir-webhook-signature-hardening.md"
     }

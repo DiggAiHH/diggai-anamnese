@@ -17,4 +17,6 @@ This file stores durable checkpoints, completions, and handoff notes for crash-s
 - Local browser validation still depends on the backend serving on port 3001.
 - `server/services/pvs/security/audit-logger.ts` now persists buffered PVS audit events into Prisma `AuditLog` with fallback and requeue behavior.
 - Shared encrypted credential parser is now used by `server/services/pvs/tomedo-api.client.ts`, `server/services/pvs/adapters/tomedo.adapter.ts`, `server/services/pvs/adapters/t2med.adapter.ts`, and `server/services/pvs/adapters/fhir-generic.adapter.ts`.
-- Focused validation gate completed with 80/80 tests across webhook, audit logger, parser, Tomedo API client, and adapter suites.
+- `server/services/pvs/pvs-integration.service.ts` now encrypts credentials at write-time and decrypts/parses credentials at runtime via shared parser utilities.
+- Shared parser key resolution now supports `PVS_ENCRYPTION_KEY` first and `ENCRYPTION_KEY` fallback for encrypted payload handling.
+- Latest focused validation gate completed with 8/8 tests for `credentials-parser` and `pvs-integration.service` suites.

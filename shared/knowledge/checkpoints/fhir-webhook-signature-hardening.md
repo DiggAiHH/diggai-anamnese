@@ -77,3 +77,28 @@
 - server/services/pvs/adapters/__tests__/tomedo.adapter.test.ts
 - server/services/pvs/adapters/__tests__/t2med.adapter.test.ts
 
+## 2026-04-17 11:58:00 | completed
+
+- Agent: copilot
+- Session: 2026-04-17-fhir-webhook-hardening
+- Batch: 5
+- Summary: Hardened the remaining legacy plaintext credential path in the integration orchestration layer by encrypting credentials at rest and parsing/decrypting at runtime.
+
+### Done
+- Replaced placeholder plaintext `encryptCredentials` behavior in `PVSIntegrationService` with shared encrypted credential serialization.
+- Added runtime credential parsing/decryption in `exportAnamnese` and `importPatients` before forwarding credentials downstream.
+- Updated integration mapping to read credentials from `fhirCredentials` and normalize legacy DB field names.
+- Extended shared parser key resolution to support `PVS_ENCRYPTION_KEY` with fallback to `ENCRYPTION_KEY` for consistent encrypted payload handling.
+- Added focused tests for integration-service encrypted storage/decryption flow and parser key fallback behavior.
+- Verified no remaining runtime matches for plaintext credential TODOs or direct `fhirCredentials as any` credential passing in `server/services/pvs`.
+- Validated with isolated focused gate: 2 files, 8 tests, all green.
+
+### Next
+- Continue scanning runtime PVS surfaces for any new direct credential deserialization bypassing shared parser utilities as future code lands.
+
+### Artifacts
+- server/services/pvs/pvs-integration.service.ts
+- server/services/pvs/pvs-integration.service.test.ts
+- server/services/pvs/security/credentials-parser.ts
+- server/services/pvs/security/credentials-parser.test.ts
+
