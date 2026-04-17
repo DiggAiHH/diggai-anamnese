@@ -1,0 +1,18 @@
+{
+  "title": "Passkey'ler",
+  "add": "Ekle",
+  "delete": "Sil",
+  "deleteConfirm": "Bu passkey'i gercekten silmek istiyor musunuz?",
+  "deviceName": "Cihaz adi (ornegin, iPhone 15)",
+  "lastUsed": "Son kullanilan",
+  "never": "Hic",
+  "noKeys": "Kayitli passkey yok",
+  "register": "Passkey Kaydet",
+  "registering": "Kaydediliyor...",
+  "authenticate": "Passkey ile giris yap",
+  "authenticating": "Giris yapiliyor...",
+  "login": "Passkey ile giris yap",
+  "checking": "Destek kontrol ediliyor...",
+  "notSupported": "Passkey'ler desteklenmiyor",
+  "authFailed": "Kimlik dogrulama basarisiz"
+}

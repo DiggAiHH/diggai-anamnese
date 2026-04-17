@@ -1,0 +1,1 @@
+function n(n=10){try{"vibrate"in navigator&&navigator.vibrate(n)}catch{}}function t(){n(10)}function a(){n(20)}function i(){n([15,50,30])}function o(){n([30,30,30])}export{o as i,i as n,t as r,a as t};

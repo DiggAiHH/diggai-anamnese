@@ -1,0 +1,77 @@
+{
+  "title": "Güvenlik",
+  "subtitle": "Güvenlik ayarlarınızı ve aktif oturumlarınızı yönetin",
+  "active": "Aktif",
+  "inactive": "Pasif",
+  "cancel": "İptal",
+  "verifying": "Doğrulanıyor...",
+  "disabling": "Devre dışı bırakılıyor...",
+  "score": {
+    "title": "Güvenlik Durumu",
+    "good": "Hesabınız iyi korunuyor",
+    "improve": "İyileştirme yapılabilir"
+  },
+  "password": {
+    "title": "Şifre",
+    "lastChanged": "Son değiştirilme: 3 ay önce",
+    "current": "Mevcut Şifre",
+    "new": "Yeni Şifre",
+    "reqLength": "En az 12 karakter",
+    "change": "Şifreyi Değiştir"
+  },
+  "2fa": {
+    "title": "İki Faktörlü Kimlik Doğrulama",
+    "enabled": "Kimlik Doğrulama Uygulaması ile etkin",
+    "disabled": "Etkin değil - güvenliği artırır",
+    "setup": "2FA kur",
+    "disable": "2FA devre dışı bırak",
+    "backupCodes": "Yedek Kodları Görüntüle",
+    "active": {
+      "title": "2FA etkin",
+      "description": "Hesabınız ek olarak korunuyor."
+    },
+    "inactive": {
+      "title": "2FA etkin değil",
+      "description": "Ek koruma için 2FA'yı etkinleştirin."
+    },
+    "setup": {
+      "title": "2FA Kurulumu",
+      "loading": "QR kodu oluşturuluyor...",
+      "scanQr": "QR kodunu Kimlik Doğrulama uygulamanızla tarayın:",
+      "manualEntry": "Manuel giriş:",
+      "enterCode": "Doğrulama kodunu girin",
+      "verify": "Etkinleştir",
+      "downloadCodes": "Kodları indir",
+      "backupCodesTitle": "Yedek Kodları Kaydet",
+      "backupCodesDesc": "Bu kodları güvenli bir yerde saklayın. Cihazınızı kaybederseniz erişim sağlarlar."
+    },
+    "disableConfirm": {
+      "title": "2FA devre dışı bırak",
+      "warning": "Güvenlik Uyarısı",
+      "description": "2FA'yı devre dışı bırakmak hesap güvenliğinizi azaltır. Devam etmek için geçerli bir 2FA kodu girmelisiniz.",
+      "enterCode": "Onay için 2FA kodu",
+      "confirm": "Devre Dışı Bırak"
+    },
+    "errors": {
+      "setupFailed": "Kurulum başarısız. Lütfen tekrar deneyin.",
+      "verifyFailed": "Doğrulama başarısız. Lütfen kodu kontrol edin.",
+      "disableFailed": "Devre dışı bırakma başarısız. Lütfen kodu kontrol edin.",
+      "invalidCode": "Lütfen geçerli bir 6 haneli kod girin."
+    }
+  },
+  "sessions": {
+    "title": "Aktif Oturumlar",
+    "loading": "Yükleniyor...",
+    "count": "{{count}} aktif oturum",
+    "current": "Mevcut",
+    "trusted": "Güvenilir",
+    "terminate": "Sonlandır",
+    "terminateAll": "Diğer tüm oturumları sonlandır",
+    "terminating": "Sonlandırılıyor..."
+  },
+  "devices": {
+    "title": "Güvenilir Cihazlar",
+    "count": "{{count}} güvenilir cihaz",
+    "manage": "Yönet"
+  }
+}

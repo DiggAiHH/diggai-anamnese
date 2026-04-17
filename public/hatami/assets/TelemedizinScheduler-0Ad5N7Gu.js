@@ -1,0 +1,1 @@
+import{n as e}from"./feature-telemed-PiBSAfUC.js";export{e as TelemedizinScheduler,e as default};

@@ -1,0 +1,1 @@
+import{t as e}from"./feature-telemed-PiBSAfUC.js";export{e as VideoRoom,e as default};

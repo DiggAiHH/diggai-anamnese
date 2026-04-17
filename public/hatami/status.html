@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DiggAI System Status</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f5f5;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem;
+    }
+    .container {
+      max-width: 800px;
+      width: 100%;
+    }
+    header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+    h1 {
+      font-size: 2rem;
+      color: #1a1a1a;
+      margin-bottom: 0.5rem;
+    }
+    .status-card {
+      background: white;
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 1rem;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .status-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      border-radius: 20px;
+      font-weight: 600;
+    }
+    .status-ok { background: #dcfce7; color: #166534; }
+    .status-degraded { background: #fef3c7; color: #92400e; }
+    .status-error { background: #fee2e2; color: #991b1b; }
+    .component-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    .component {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 1rem;
+      background: #f9fafb;
+      border-radius: 8px;
+    }
+    .component-icon {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+    .icon-ok { background: #22c55e; }
+    .icon-error { background: #ef4444; }
+    .icon-unknown { background: #9ca3af; }
+    footer {
+      margin-top: auto;
+      padding-top: 2rem;
+      text-align: center;
+      color: #6b7280;
+      font-size: 0.875rem;
+    }
+    .timestamp {
+      font-family: monospace;
+      color: #9ca3af;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🏥 DiggAI System Status</h1>
+      <p>Real-time status der Anamnese-Plattform</p>
+    </header>
+
+    <div class="status-card">
+      <div id="overall-status">Laden...</div>
+    </div>
+
+    <div class="status-card">
+      <h2>Komponenten</h2>
+      <div class="component-grid" id="components">
+        <p>Wird geladen...</p>
+      </div>
+    </div>
+
+    <div class="status-card">
+      <h2>Metriken</h2>
+      <div id="metrics">
+        <p>Wird geladen...</p>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <p>Letzte Aktualisierung: <span class="timestamp" id="timestamp">-</span></p>
+    <p>© 2026 DiggAI - <a href="./">Zurück zur Anwendung</a></p>
+  </footer>
+
+  <script>
+    async function fetchStatus() {
+      try {
+        const response = await fetch('/api/health');
+        const data = await response.json();
+        
+        // Overall status
+        const statusEl = document.getElementById('overall-status');
+        const statusClass = data.status === 'ok' ? 'status-ok' : 
+                           data.status === 'degraded' ? 'status-degraded' : 'status-error';
+        const statusText = data.status === 'ok' ? '🟢 Alle Systeme funktional' : 
+                          data.status === 'degraded' ? '🟡 Eingeschränkte Funktionalität' : '🔴 Probleme erkannt';
+        statusEl.innerHTML = `<span class="status-indicator ${statusClass}">${statusText}</span>`;
+        
+        // Components
+        const componentsEl = document.getElementById('components');
+        componentsEl.innerHTML = `
+          <div class="component">
+            <span class="component-icon icon-${data.db === 'connected' ? 'ok' : 'error'}"></span>
+            <div>
+              <div>Datenbank</div>
+              <small>${data.db === 'connected' ? 'Online' : 'Offline'}</small>
+            </div>
+          </div>
+          <div class="component">
+            <span class="component-icon icon-${data.redis === 'connected' ? 'ok' : 'error'}"></span>
+            <div>
+              <div>Redis Cache</div>
+              <small>${data.redis === 'connected' ? 'Online' : 'Offline'}</small>
+            </div>
+          </div>
+          <div class="component">
+            <span class="component-icon icon-ok"></span>
+            <div>
+              <div>API Server</div>
+              <small>Online (v${data.version})</small>
+            </div>
+          </div>
+        `;
+        
+        // Metrics
+        const metricsEl = document.getElementById('metrics');
+        const uptime = Math.floor(data.uptime / 60);
+        metricsEl.innerHTML = `
+          <p><strong>Uptime:</strong> ${uptime} Minuten</p>
+          <p><strong>Umgebung:</strong> ${data.environment}</p>
+          <p><strong>Agenten:</strong> ${data.agents?.length || 0} aktiv</p>
+        `;
+        
+        document.getElementById('timestamp').textContent = new Date().toLocaleString('de-DE');
+      } catch (error) {
+        document.getElementById('overall-status').innerHTML = 
+          '<span class="status-indicator status-error">🔴 Status konnte nicht abgerufen werden</span>';
+      }
+    }
+    
+    fetchStatus();
+    setInterval(fetchStatus, 30000); // Refresh every 30s
+  </script>
+</body>
+</html>

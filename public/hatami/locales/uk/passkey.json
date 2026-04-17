@@ -1,0 +1,18 @@
+{
+  "title": "Passkeys",
+  "add": "Dodaty",
+  "delete": "Vydalyty",
+  "deleteConfirm": "Chy sprodi vy chochete vydalyty tsei passkey?",
+  "deviceName": "Nazva prystroiu (napryklad, iPhone 15)",
+  "lastUsed": "Ostannye vykorystannia",
+  "never": "Nikoly",
+  "noKeys": "Nemaye zareiestrovanykh passkeys",
+  "register": "Zareiestruvaty Passkey",
+  "registering": "Reiestratsiia...",
+  "authenticate": "Uviyty za dopomohoiu Passkey",
+  "authenticating": "Vkhid...",
+  "login": "Uviyty za dopomohoiu Passkey",
+  "checking": "Perevirka pidtrymky...",
+  "notSupported": "Passkeys ne pidtrymuiutsia",
+  "authFailed": "Nevdala avtentyfikatsiia"
+}

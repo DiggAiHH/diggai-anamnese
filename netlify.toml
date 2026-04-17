@@ -52,6 +52,12 @@
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
+# Hatami subsite assets — static SPA under /hatami
+[[headers]]
+  for = "/hatami/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
 # Service Worker — never cache (must always be fresh for updates)
 [[headers]]
   for = "/sw.js"
@@ -59,9 +65,20 @@
     Cache-Control = "no-cache, no-store, must-revalidate"
     Service-Worker-Allowed = "/"
 
+[[headers]]
+  for = "/hatami/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+    Service-Worker-Allowed = "/hatami/"
+
 # SPA entry point — no cache (gets latest index.html on every load)
 [[headers]]
   for = "/index.html"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
+[[headers]]
+  for = "/hatami/index.html"
   [headers.values]
     Cache-Control = "no-cache, no-store, must-revalidate"
 
@@ -70,6 +87,22 @@
   for = "/locales/*"
   [headers.values]
     Cache-Control = "public, max-age=600, stale-while-revalidate=86400"
+
+[[headers]]
+  for = "/hatami/locales/*"
+  [headers.values]
+    Cache-Control = "public, max-age=600, stale-while-revalidate=86400"
+
+# Hatami subsite SPA fallback — keep diggai.de root app untouched
+[[redirects]]
+  from = "/hatami"
+  to = "/hatami/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/hatami/*"
+  to = "/hatami/index.html"
+  status = 200
 
 # SPA fallback — all unmatched paths serve index.html
 # This covers BSNR-prefixed routes such as:

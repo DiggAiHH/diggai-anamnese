@@ -1,0 +1,77 @@
+{
+  "title": "Sécurité",
+  "subtitle": "Gérez vos paramètres de sécurité et vos sessions actives",
+  "active": "Actif",
+  "inactive": "Inactif",
+  "cancel": "Annuler",
+  "verifying": "Vérification...",
+  "disabling": "Désactivation...",
+  "score": {
+    "title": "État de Sécurité",
+    "good": "Votre compte est bien protégé",
+    "improve": "Il y a place à l'amélioration"
+  },
+  "password": {
+    "title": "Mot de passe",
+    "lastChanged": "Dernière modification il y a 3 mois",
+    "current": "Mot de passe actuel",
+    "new": "Nouveau mot de passe",
+    "reqLength": "Au moins 12 caractères",
+    "change": "Changer le mot de passe"
+  },
+  "2fa": {
+    "title": "Authentification à Deux Facteurs",
+    "enabled": "Activé via l'application d'authentification",
+    "disabled": "Non activé - augmente la sécurité",
+    "setup": "Configurer 2FA",
+    "disable": "Désactiver 2FA",
+    "backupCodes": "Voir les codes de secours",
+    "active": {
+      "title": "2FA est activé",
+      "description": "Votre compte est protégé supplémentairement."
+    },
+    "inactive": {
+      "title": "2FA n'est pas activé",
+      "description": "Activez 2FA pour une protection supplémentaire."
+    },
+    "setup": {
+      "title": "Configuration 2FA",
+      "loading": "Génération du code QR...",
+      "scanQr": "Scannez le code QR avec votre application d'authentification:",
+      "manualEntry": "Saisie manuelle:",
+      "enterCode": "Entrez le code de vérification",
+      "verify": "Activer",
+      "downloadCodes": "Télécharger les codes",
+      "backupCodesTitle": "Sauvegarder les codes de secours",
+      "backupCodesDesc": "Conservez ces codes en lieu sûr. Ils permettent l'accès si vous perdez votre appareil."
+    },
+    "disableConfirm": {
+      "title": "Désactiver 2FA",
+      "warning": "Avertissement de sécurité",
+      "description": "La désactivation de 2FA réduit la sécurité de votre compte. Vous devez entrer un code 2FA valide pour continuer.",
+      "enterCode": "Code 2FA pour confirmation",
+      "confirm": "Désactiver"
+    },
+    "errors": {
+      "setupFailed": "Échec de la configuration. Veuillez réessayer.",
+      "verifyFailed": "Échec de la vérification. Veuillez vérifier le code.",
+      "disableFailed": "Échec de la désactivation. Veuillez vérifier le code.",
+      "invalidCode": "Veuillez entrer un code valide à 6 chiffres."
+    }
+  },
+  "sessions": {
+    "title": "Sessions Actives",
+    "loading": "Chargement...",
+    "count": "{{count}} sessions actives",
+    "current": "Actuelle",
+    "trusted": "Approuvé",
+    "terminate": "Terminer",
+    "terminateAll": "Terminer toutes les autres sessions",
+    "terminating": "Terminaison..."
+  },
+  "devices": {
+    "title": "Appareils Approuvés",
+    "count": "{{count}} appareils approuvés",
+    "manage": "Gérer"
+  }
+}

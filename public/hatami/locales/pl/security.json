@@ -1,0 +1,77 @@
+{
+  "title": "Bezpieczeństwo",
+  "subtitle": "Zarządzaj ustawieniami bezpieczeństwa i aktywnymi sesjami",
+  "active": "Aktywny",
+  "inactive": "Nieaktywny",
+  "cancel": "Anuluj",
+  "verifying": "Weryfikowanie...",
+  "disabling": "Wyłączanie...",
+  "score": {
+    "title": "Status Bezpieczeństwa",
+    "good": "Twoje konto jest dobrze chronione",
+    "improve": "Istnieje pole do poprawy"
+  },
+  "password": {
+    "title": "Hasło",
+    "lastChanged": "Ostatnia zmiana 3 miesiące temu",
+    "current": "Aktualne Hasło",
+    "new": "Nowe Hasło",
+    "reqLength": "Co najmniej 12 znaków",
+    "change": "Zmień Hasło"
+  },
+  "2fa": {
+    "title": "Uwierzytelnianie Dwuskładnikowe",
+    "enabled": "Włączone przez Aplikację Autentykacyjną",
+    "disabled": "Nie włączone - zwiększa bezpieczeństwo",
+    "setup": "Skonfiguruj 2FA",
+    "disable": "Wyłącz 2FA",
+    "backupCodes": "Zobacz Kody Zapasowe",
+    "active": {
+      "title": "2FA jest włączone",
+      "description": "Twoje konto jest dodatkowo chronione."
+    },
+    "inactive": {
+      "title": "2FA nie jest włączone",
+      "description": "Włącz 2FA dla dodatkowej ochrony."
+    },
+    "setup": {
+      "title": "Konfiguracja 2FA",
+      "loading": "Generowanie kodu QR...",
+      "scanQr": "Zeskanuj kod QR za pomocą aplikacji uwierzytelniającej:",
+      "manualEntry": "Wprowadzenie ręczne:",
+      "enterCode": "Wprowadź kod weryfikacyjny",
+      "verify": "Aktywuj",
+      "downloadCodes": "Pobierz kody",
+      "backupCodesTitle": "Zapisz Kody Zapasowe",
+      "backupCodesDesc": "Przechowuj te kody w bezpiecznym miejscu. Umożliwiają dostęp, gdy stracisz urządzenie."
+    },
+    "disableConfirm": {
+      "title": "Wyłącz 2FA",
+      "warning": "Ostrzeżenie Bezpieczeństwa",
+      "description": "Wyłączenie 2FA zmniejsza bezpieczeństwo Twojego konta. Musisz wprowadzić ważny kod 2FA, aby kontynuować.",
+      "enterCode": "Kod 2FA do potwierdzenia",
+      "confirm": "Wyłącz"
+    },
+    "errors": {
+      "setupFailed": "Konfiguracja nie powiodła się. Spróbuj ponownie.",
+      "verifyFailed": "Weryfikacja nie powiodła się. Sprawdź kod.",
+      "disableFailed": "Wyłączenie nie powiodło się. Sprawdź kod.",
+      "invalidCode": "Wprowadź ważny 6-cyfrowy kod."
+    }
+  },
+  "sessions": {
+    "title": "Aktywne Sesje",
+    "loading": "Ładowanie...",
+    "count": "{{count}} aktywnych sesji",
+    "current": "Aktualna",
+    "trusted": "Zaufana",
+    "terminate": "Zakończ",
+    "terminateAll": "Zakończ wszystkie inne sesje",
+    "terminating": "Zakańczanie..."
+  },
+  "devices": {
+    "title": "Zaufane Urządzenia",
+    "count": "{{count}} zaufanych urządzeń",
+    "manage": "Zarządzaj"
+  }
+}
