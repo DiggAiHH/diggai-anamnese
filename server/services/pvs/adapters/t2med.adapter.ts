@@ -18,6 +18,7 @@ import type {
 } from '../types.js';
 import { FhirClient } from '../fhir/fhir-client.js';
 import { buildAnamneseBundle, patientToFhir } from '../fhir/fhir-mapper.js';
+import { parseStoredFhirCredentials } from '../security/credentials-parser.js';
 
 /**
  * Adapter for T2Med PVS systems.
@@ -53,10 +54,10 @@ export class T2MedAdapter implements PvsAdapter {
 
     let credentials: FhirClientConfig['credentials'] = {};
 
-    // Parse encrypted credentials
+    // Parse plaintext or encrypted credential payload.
     if (connection.fhirCredentials) {
       try {
-        credentials = JSON.parse(connection.fhirCredentials);
+        credentials = parseStoredFhirCredentials(connection.fhirCredentials);
         this.apiKey = credentials.apiKey || null;
       } catch {
         credentials = {};

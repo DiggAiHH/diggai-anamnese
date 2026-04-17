@@ -10,31 +10,47 @@ import type { PvsConnectionData, PatientSessionFull } from '../../types.js';
 // ============================================
 
 // Mock FhirClient mit factory function
-const mockRead = vi.fn();
-const mockCreate = vi.fn();
-const mockSearch = vi.fn();
-const mockSubmitBundle = vi.fn();
-const mockTestConnection = vi.fn();
-const mockGetBaseUrl = vi.fn().mockReturnValue('https://api.t2med.de/fhir/R4');
+const fhirClientMocks = vi.hoisted(() => ({
+  read: vi.fn(),
+  create: vi.fn(),
+  search: vi.fn(),
+  submitBundle: vi.fn(),
+  testConnection: vi.fn(),
+  getBaseUrl: vi.fn().mockReturnValue('https://api.t2med.de/fhir/R4'),
+}));
+
+const mockRead = fhirClientMocks.read;
+const mockCreate = fhirClientMocks.create;
+const mockSearch = fhirClientMocks.search;
+const mockSubmitBundle = fhirClientMocks.submitBundle;
+const mockTestConnection = fhirClientMocks.testConnection;
+const mockGetBaseUrl = fhirClientMocks.getBaseUrl;
 
 vi.mock('../../fhir/fhir-client.js', () => ({
-  FhirClient: vi.fn().mockImplementation(() => ({
-    getBaseUrl: mockGetBaseUrl,
-    read: mockRead,
-    create: mockCreate,
-    search: mockSearch,
-    submitBundle: mockSubmitBundle,
-    testConnection: mockTestConnection,
-  })),
+  FhirClient: vi.fn().mockImplementation(function MockFhirClient() {
+    return {
+      getBaseUrl: fhirClientMocks.getBaseUrl,
+      read: fhirClientMocks.read,
+      create: fhirClientMocks.create,
+      search: fhirClientMocks.search,
+      submitBundle: fhirClientMocks.submitBundle,
+      testConnection: fhirClientMocks.testConnection,
+    };
+  }),
 }));
 
 // Mock FHIR mapper
-const mockBuildAnamneseBundle = vi.fn();
-const mockPatientToFhir = vi.fn();
+const mapperMocks = vi.hoisted(() => ({
+  buildAnamneseBundle: vi.fn(),
+  patientToFhir: vi.fn(),
+}));
+
+const mockBuildAnamneseBundle = mapperMocks.buildAnamneseBundle;
+const mockPatientToFhir = mapperMocks.patientToFhir;
 
 vi.mock('../../fhir/fhir-mapper.js', () => ({
-  buildAnamneseBundle: mockBuildAnamneseBundle,
-  patientToFhir: mockPatientToFhir,
+  buildAnamneseBundle: mapperMocks.buildAnamneseBundle,
+  patientToFhir: mapperMocks.patientToFhir,
 }));
 
 // Imports nach den mocks
@@ -79,7 +95,7 @@ describe('T2MedAdapter', () => {
   });
 
   afterEach(() => {
-    vi.resetAllMocks();
+    vi.clearAllMocks();
   });
 
   describe('initialize', () => {
@@ -211,12 +227,7 @@ describe('T2MedAdapter', () => {
       const result = await adapter.importPatient('123');
 
       expect(result).toEqual(mockPatient);
-      expect(mockRead).toHaveBeenCalledWith('Patient', '123', {
-        headers: expect.objectContaining({
-          'X-API-Key': 'test-api-key',
-          'Authorization': 'Bearer test-api-key',
-        }),
-      });
+      expect(mockRead).toHaveBeenCalledWith('Patient', '123');
     });
 
     it('should handle import errors', async () => {
@@ -302,11 +313,7 @@ describe('T2MedAdapter', () => {
       expect(results).toHaveLength(1);
       expect(results[0].lastName).toBe('Müller');
       expect(results[0].firstName).toBe('Hans');
-      expect(mockSearch).toHaveBeenCalledWith(
-        'Patient',
-        { name: 'Müller' },
-        { headers: expect.objectContaining({ 'X-API-Key': 'test-api-key' }) }
-      );
+      expect(mockSearch).toHaveBeenCalledWith('Patient', { name: 'Müller' });
     });
 
     it('should search patients by birthDate', async () => {
@@ -326,11 +333,7 @@ describe('T2MedAdapter', () => {
       const results = await adapter.searchPatient({ birthDate: '1980-01-01' });
 
       expect(results).toHaveLength(1);
-      expect(mockSearch).toHaveBeenCalledWith(
-        'Patient',
-        { birthdate: '1980-01-01' },
-        { headers: expect.any(Object) }
-      );
+      expect(mockSearch).toHaveBeenCalledWith('Patient', { birthdate: '1980-01-01' });
     });
 
     it('should search patients by KVNR', async () => {

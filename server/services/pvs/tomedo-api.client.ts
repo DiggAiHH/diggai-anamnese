@@ -13,8 +13,10 @@ import { createLogger } from '../../logger.js';
 import { circuitBreakerRegistry } from './resilience/circuit-breaker.js';
 import { tomedoCache } from './tomedo-cache.service.js';
 import { tomedoMetrics } from './tomedo-metrics.service.js';
+import { parseStoredFhirCredentials } from './security/credentials-parser.js';
 import type {
   DocumentUploadResult,
+  FhirClientConfig,
   PvsConnectionData,
   PatientSearchResult,
   PatientSessionFull,
@@ -114,12 +116,7 @@ export interface TomedoSearchParams {
 
 export class TomedoApiClient {
   private baseUrl: string;
-  private credentials: {
-    clientId?: string;
-    clientSecret?: string;
-    tokenUrl?: string;
-    apiKey?: string;
-  } = {};
+  private credentials: FhirClientConfig['credentials'] = {};
   private accessToken: string | null = null;
   private tokenExpiry: Date | null = null;
   private rateLimiter: FhirRateLimiter;
@@ -129,11 +126,10 @@ export class TomedoApiClient {
     this.connectionId = connection.id;
     this.baseUrl = connection.fhirBaseUrl || '';
     
-    // Parse credentials from encrypted storage
+    // Parse credentials from plaintext JSON or encrypted payload.
     if (connection.fhirCredentials) {
       try {
-        // TODO: Decrypt AES-256-GCM here in production
-        this.credentials = JSON.parse(connection.fhirCredentials);
+        this.credentials = parseStoredFhirCredentials(connection.fhirCredentials);
       } catch (e) {
         logger.error('[TomedoApiClient] Failed to parse credentials', {
           connectionId: this.connectionId,

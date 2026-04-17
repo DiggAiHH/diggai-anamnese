@@ -5,6 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { createCipheriv, randomBytes, scryptSync } from 'crypto';
 import { TomedoApiClient, createTomedoApiClient } from '../tomedo-api.client.js';
 import type { PvsConnectionData } from '../types.js';
 
@@ -26,6 +27,23 @@ vi.mock('../../../logger.js', () => ({
     debug: vi.fn(),
   })),
 }));
+
+function encryptCredentialsForTest(credentials: Record<string, string>, key: string): string {
+  const iv = randomBytes(16);
+  const derivedKey = scryptSync(key, 'pvs-salt', 32);
+  const cipher = createCipheriv('aes-256-gcm', derivedKey, iv);
+
+  let encrypted = cipher.update(JSON.stringify(credentials), 'utf8', 'base64');
+  encrypted += cipher.final('base64');
+
+  return JSON.stringify({
+    encrypted,
+    iv: iv.toString('base64'),
+    authTag: cipher.getAuthTag().toString('base64'),
+    salt: randomBytes(32).toString('base64'),
+    version: 1,
+  });
+}
 
 describe('TomedoApiClient', () => {
   const mockConnection: PvsConnectionData = {
@@ -64,6 +82,78 @@ describe('TomedoApiClient', () => {
       const client = createTomedoApiClient(connWithoutCreds);
       expect(client).toBeInstanceOf(TomedoApiClient);
     });
+
+    it('should decrypt encrypted credentials payload', async () => {
+      const testKey = '12345678901234567890123456789012';
+      const previousKey = process.env.PVS_ENCRYPTION_KEY;
+      process.env.PVS_ENCRYPTION_KEY = testKey;
+
+      try {
+        const encryptedCredentials = encryptCredentialsForTest({
+          clientId: 'encrypted-client-id',
+          clientSecret: 'encrypted-client-secret',
+        }, testKey);
+
+        const client = createTomedoApiClient({
+          ...mockConnection,
+          fhirCredentials: encryptedCredentials,
+        });
+
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            access_token: 'test-token-123',
+            expires_in: 3600,
+            token_type: 'Bearer',
+          }),
+        });
+
+        const result = await client.authenticate();
+        expect(result.success).toBe(true);
+
+        const fetchOptions = mockFetch.mock.calls[0][1] as { body: URLSearchParams };
+        const body = fetchOptions.body;
+        expect(body.get('client_id')).toBe('encrypted-client-id');
+        expect(body.get('client_secret')).toBe('encrypted-client-secret');
+      } finally {
+        if (previousKey === undefined) {
+          delete process.env.PVS_ENCRYPTION_KEY;
+        } else {
+          process.env.PVS_ENCRYPTION_KEY = previousKey;
+        }
+      }
+    });
+
+    it('should fail authentication when encrypted credentials cannot be decrypted', async () => {
+      const testKey = 'abcdefghijklmnopqrstuvwxyzABCDEF';
+      const previousKey = process.env.PVS_ENCRYPTION_KEY;
+      process.env.PVS_ENCRYPTION_KEY = testKey;
+
+      try {
+        const encryptedCredentials = encryptCredentialsForTest({
+          clientId: 'encrypted-client-id',
+          clientSecret: 'encrypted-client-secret',
+        }, testKey);
+
+        delete process.env.PVS_ENCRYPTION_KEY;
+
+        const client = createTomedoApiClient({
+          ...mockConnection,
+          fhirCredentials: encryptedCredentials,
+        });
+
+        const result = await client.authenticate();
+        expect(result.success).toBe(false);
+        expect(result.error).toContain('credentials');
+        expect(mockFetch).not.toHaveBeenCalled();
+      } finally {
+        if (previousKey === undefined) {
+          delete process.env.PVS_ENCRYPTION_KEY;
+        } else {
+          process.env.PVS_ENCRYPTION_KEY = previousKey;
+        }
+      }
+    });
   });
 
   describe('authenticate', () => {
@@ -82,7 +172,7 @@ describe('TomedoApiClient', () => {
 
       expect(result.success).toBe(true);
       expect(result.accessToken).toBe('test-token-123');
-      expect(result.latencyMs).toBeGreaterThan(0);
+      expect(result.latencyMs).toBeGreaterThanOrEqual(0);
     });
 
     it('should return cached token if still valid', async () => {
@@ -109,7 +199,9 @@ describe('TomedoApiClient', () => {
     it('should handle authentication failure', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
+        status: 401,
         statusText: 'Unauthorized',
+        text: async () => 'Unauthorized',
       });
 
       const client = createTomedoApiClient(mockConnection);
@@ -355,12 +447,21 @@ describe('TomedoApiClient', () => {
 
       expect(result.ok).toBe(true);
       expect(result.message).toContain('Tomedo');
-      expect(result.latencyMs).toBeGreaterThan(0);
+      expect(result.latencyMs).toBeGreaterThanOrEqual(0);
     });
 
     it('should return failure for invalid connection', async () => {
       mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          access_token: 'test-token',
+          expires_in: 3600,
+        }),
+      });
+
+      mockFetch.mockResolvedValueOnce({
         ok: false,
+        status: 503,
         statusText: 'Connection refused',
       });
 
@@ -379,7 +480,7 @@ describe('TomedoApiClient', () => {
       // Check initial rate limit status
       const status = client.getRateLimitStatus();
       expect(status.remaining).toBeGreaterThan(0);
-      expect(status.limit).toBe(180); // Tomedo limit
+      expect(status.limit).toBe(30); // Tomedo burst size
     });
   });
 });

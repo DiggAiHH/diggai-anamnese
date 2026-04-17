@@ -1,0 +1,76 @@
+{
+  "version": 1,
+  "updatedAt": "2026-04-17T11:32:18.000Z",
+  "tasks": {
+    "episode-opsedien-persistence": {
+      "status": "in_progress",
+      "agent": "copilot",
+      "sessionId": "2026-04-15-episode-opsedien",
+      "currentBatch": 1,
+      "updatedAt": "2026-04-15T20:58:00",
+      "summary": "Episodes exist and session auto-linking is implemented; backend startup and live browser validation still remain.",
+      "next": [
+        "Refresh Prisma client and confirm episode types are generated.",
+        "Start backend on port 3001 and clear the local 502 proxy errors.",
+        "Rerun the browser flow and verify that created sessions land in episodes."
+      ],
+      "artifacts": [
+        "server/services/episode.service.ts",
+        "server/routes/sessions.ts",
+        "server/services/export/package-import.service.ts",
+        "server/routes/sessions.test.ts",
+        "server/routes/episodes.ts",
+        "src/pages/ArztDashboard.tsx"
+      ],
+      "checkpointFile": "shared/knowledge/checkpoints/episode-opsedien-persistence.md"
+    },
+    "welcome-back-protocol": {
+      "status": "completed",
+      "agent": "copilot",
+      "sessionId": "2026-04-16-welcome-back",
+      "currentBatch": 2,
+      "updatedAt": "2026-04-16T05:59:52.258Z",
+      "summary": "Cleaned the corrupted wrapper, added a Windows CMD wrapper, moved artifact-exists checks into the node entrypoint, and validated the usable resume flows.",
+      "next": [
+        "Use node scripts/once-guard.mjs or scripts\\\\once-guard.cmd before the next work pack"
+      ],
+      "artifacts": [
+        "scripts/once-guard.mjs",
+        "scripts/once-guard.cmd",
+        "scripts/once-guard.ps1",
+        "shared/knowledge/knowledge-share.md",
+        "shared/knowledge/checkpoints/README.md",
+        "CLAUDE.md",
+        ".github/copilot-instructions.md"
+      ],
+      "checkpointFile": "shared/knowledge/checkpoints/welcome-back-protocol.md"
+    },
+    "fhir-webhook-signature-hardening": {
+      "status": "completed",
+      "agent": "copilot",
+      "sessionId": "2026-04-17-fhir-webhook-hardening",
+      "currentBatch": 4,
+      "updatedAt": "2026-04-17T11:32:18.000Z",
+      "summary": "Webhook signature hardening, persistent PVS audit storage, encrypted credential decryption, and shared parser rollout across FHIR adapters are implemented and validated by an 80-test focused gate.",
+      "next": [
+        "Apply shared credential parsing to remaining legacy integration paths that still parse plaintext credentials directly."
+      ],
+      "artifacts": [
+        "server/routes/fhir-webhook.routes.ts",
+        "server/routes/fhir-webhook.routes.test.ts",
+        "server/services/pvs/security/audit-logger.ts",
+        "server/services/pvs/security/audit-logger.test.ts",
+        "server/services/pvs/security/credentials-parser.ts",
+        "server/services/pvs/security/credentials-parser.test.ts",
+        "server/services/pvs/tomedo-api.client.ts",
+        "server/services/pvs/__tests__/tomedo-api.client.test.ts",
+        "server/services/pvs/adapters/tomedo.adapter.ts",
+        "server/services/pvs/adapters/t2med.adapter.ts",
+        "server/services/pvs/adapters/fhir-generic.adapter.ts",
+        "server/services/pvs/adapters/__tests__/tomedo.adapter.test.ts",
+        "server/services/pvs/adapters/__tests__/t2med.adapter.test.ts"
+      ],
+      "checkpointFile": "shared/knowledge/checkpoints/fhir-webhook-signature-hardening.md"
+    }
+  }
+}

@@ -16,6 +16,7 @@ import type {
 } from '../types.js';
 import { FhirClient } from '../fhir/fhir-client.js';
 import { buildAnamneseBundle, patientToFhir } from '../fhir/fhir-mapper.js';
+import { parseStoredFhirCredentials } from '../security/credentials-parser.js';
 
 /**
  * Generic FHIR R4 adapter for any FHIR-capable PVS.
@@ -35,10 +36,10 @@ export class FhirGenericAdapter implements PvsAdapter {
 
     let credentials: FhirClientConfig['credentials'] = {};
 
-    // Parse encrypted credentials (in real impl: decrypt AES-256-GCM)
+    // Parse plaintext or encrypted credential payload.
     if (connection.fhirCredentials) {
       try {
-        credentials = JSON.parse(connection.fhirCredentials);
+        credentials = parseStoredFhirCredentials(connection.fhirCredentials);
       } catch {
         credentials = {};
       }

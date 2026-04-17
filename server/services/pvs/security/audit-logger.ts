@@ -6,6 +6,30 @@
 import { createHash } from 'crypto';
 import { EventEmitter } from 'events';
 
+type PrismaAuditClient = typeof import('../../../db.js').prisma;
+
+let prismaAuditClient: PrismaAuditClient | null = null;
+
+async function getPrismaAuditClient(): Promise<PrismaAuditClient> {
+  if (!prismaAuditClient) {
+    const { prisma } = await import('../../../db.js');
+    prismaAuditClient = prisma;
+  }
+
+  return prismaAuditClient;
+}
+
+interface PersistedAuditLogData {
+  tenantId: string;
+  userId: string | null;
+  action: string;
+  resource: string;
+  ipAddress: string | null;
+  userAgent: string | null;
+  metadata: string | null;
+  createdAt: Date;
+}
+
 export type AuditOperation = 
   | 'PATIENT_IMPORT'
   | 'PATIENT_EXPORT'
@@ -50,8 +74,10 @@ export interface AuditEntry {
 export class PvsAuditLogger extends EventEmitter {
   private logBuffer: AuditEntry[] = [];
   private flushInterval: NodeJS.Timeout | null = null;
+  private flushInFlight: Promise<void> | null = null;
   private readonly FLUSH_SIZE = 100;
   private readonly FLUSH_INTERVAL_MS = 30000;
+  private readonly MAX_BUFFER_SIZE = 5000;
 
   constructor() {
     super();
@@ -69,6 +95,7 @@ export class PvsAuditLogger extends EventEmitter {
     };
 
     this.logBuffer.push(fullEntry);
+    this.trimBuffer();
     this.emit('audit', fullEntry);
 
     // Flush if buffer is full
@@ -197,6 +224,87 @@ export class PvsAuditLogger extends EventEmitter {
   }
 
   /**
+   * Avoid unbounded memory growth during prolonged persistence failures.
+   */
+  private trimBuffer(): void {
+    if (this.logBuffer.length <= this.MAX_BUFFER_SIZE) {
+      return;
+    }
+
+    const droppedCount = this.logBuffer.length - this.MAX_BUFFER_SIZE;
+    this.logBuffer = this.logBuffer.slice(droppedCount);
+
+    console.error('[PvsAuditLogger] Dropped audit entries due to buffer overflow', {
+      droppedCount,
+      retainedCount: this.logBuffer.length,
+    });
+  }
+
+  private sanitizeText(value: string, maxLength: number): string {
+    return value.replace(/[\r\n\t]/g, ' ').slice(0, maxLength);
+  }
+
+  private buildResource(entry: AuditEntry): string {
+    const pvsType = (entry.pvsType || 'unknown').toLowerCase();
+    const connectionId = entry.connectionId || 'unbound';
+    return `pvs/${pvsType}/${connectionId}`;
+  }
+
+  private toPersistedAuditLog(entry: AuditEntry): PersistedAuditLogData {
+    const metadata = {
+      auditId: entry.id,
+      level: entry.level,
+      operation: entry.operation,
+      success: entry.success,
+      connectionId: entry.connectionId,
+      pvsType: entry.pvsType,
+      patientHash: entry.patientHash,
+      sessionHash: entry.sessionHash,
+      fileHash: entry.fileHash,
+      durationMs: entry.durationMs,
+      errorCode: entry.errorCode,
+      errorMessage: entry.errorMessage ? this.sanitizeText(entry.errorMessage, 500) : undefined,
+    };
+
+    return {
+      tenantId: entry.tenantId,
+      userId: entry.userId || null,
+      action: `PVS_AUDIT:${entry.operation}`,
+      resource: this.buildResource(entry),
+      ipAddress: entry.sourceIp ? this.hashId(`ip:${entry.sourceIp}`) : null,
+      userAgent: entry.userAgent ? this.sanitizeText(entry.userAgent, 200) : null,
+      metadata: JSON.stringify(metadata),
+      createdAt: entry.timestamp,
+    };
+  }
+
+  private async persistEntries(entries: AuditEntry[]): Promise<void> {
+    const prisma = await getPrismaAuditClient();
+    const records = entries.map((entry) => this.toPersistedAuditLog(entry));
+    const auditLogModel = prisma.auditLog as {
+      createMany?: (args: { data: PersistedAuditLogData[] }) => Promise<unknown>;
+      create?: (args: { data: PersistedAuditLogData }) => Promise<unknown>;
+    };
+
+    if (typeof auditLogModel.createMany === 'function') {
+      try {
+        await auditLogModel.createMany({ data: records });
+        return;
+      } catch (error) {
+        if (typeof auditLogModel.create !== 'function') {
+          throw error;
+        }
+      }
+    }
+
+    if (typeof auditLogModel.create !== 'function') {
+      throw new Error('Prisma auditLog persistence is not available');
+    }
+
+    await Promise.all(records.map((record) => auditLogModel.create!({ data: record })));
+  }
+
+  /**
    * Generate unique ID
    */
   private generateId(): string {
@@ -206,23 +314,47 @@ export class PvsAuditLogger extends EventEmitter {
   /**
    * Flush buffer to persistent storage
    */
-  private async flush(): Promise<void> {
+  private async flushInternal(): Promise<void> {
     if (this.logBuffer.length === 0) return;
 
     const entries = [...this.logBuffer];
     this.logBuffer = [];
 
-    // TODO: Implement persistent storage (database, file, or external service)
-    // For now, console output in structured format
-    for (const entry of entries) {
-      console.log(JSON.stringify({
-        type: 'PVS_AUDIT',
-        ...entry,
-        timestamp: entry.timestamp.toISOString(),
-      }));
+    try {
+      await this.persistEntries(entries);
+      this.emit('flush', entries);
+    } catch (error) {
+      this.logBuffer = [...entries, ...this.logBuffer];
+      this.trimBuffer();
+
+      console.error('[PvsAuditLogger] Failed to persist audit logs', {
+        count: entries.length,
+        error: error instanceof Error ? error.message : String(error),
+      });
+
+      this.emit('flush-error', {
+        entries,
+        error,
+      });
+    }
+  }
+
+  /**
+   * Serializes flush execution to avoid concurrent drain/persist races.
+   */
+  private async flush(): Promise<void> {
+    if (this.flushInFlight) {
+      await this.flushInFlight;
+      return;
     }
 
-    this.emit('flush', entries);
+    this.flushInFlight = this.flushInternal();
+
+    try {
+      await this.flushInFlight;
+    } finally {
+      this.flushInFlight = null;
+    }
   }
 
   /**

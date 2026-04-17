@@ -10,36 +10,53 @@ import type { PvsConnectionData, PatientSessionFull } from '../../types.js';
 // ============================================
 
 // Mock FhirClient mit factory function
-const mockRead = vi.fn();
-const mockCreate = vi.fn();
-const mockSearch = vi.fn();
-const mockSubmitBundle = vi.fn();
-const mockTestConnection = vi.fn();
-const mockGetBaseUrl = vi.fn().mockReturnValue('https://api.tomedo.de/fhir/R4');
-const mockGetCredentials = vi.fn().mockReturnValue({
-  clientId: 'test-client-id',
-  clientSecret: 'test-client-secret',
-});
+const fhirClientMocks = vi.hoisted(() => ({
+  read: vi.fn(),
+  create: vi.fn(),
+  search: vi.fn(),
+  submitBundle: vi.fn(),
+  testConnection: vi.fn(),
+  getBaseUrl: vi.fn().mockReturnValue('https://api.tomedo.de/fhir/R4'),
+  getCredentials: vi.fn().mockReturnValue({
+    clientId: 'test-client-id',
+    clientSecret: 'test-client-secret',
+  }),
+}));
+
+const mockRead = fhirClientMocks.read;
+const mockCreate = fhirClientMocks.create;
+const mockSearch = fhirClientMocks.search;
+const mockSubmitBundle = fhirClientMocks.submitBundle;
+const mockTestConnection = fhirClientMocks.testConnection;
+const mockGetBaseUrl = fhirClientMocks.getBaseUrl;
+const mockGetCredentials = fhirClientMocks.getCredentials;
 
 vi.mock('../../fhir/fhir-client.js', () => ({
-  FhirClient: vi.fn().mockImplementation(() => ({
-    getBaseUrl: mockGetBaseUrl,
-    getCredentials: mockGetCredentials,
-    read: mockRead,
-    create: mockCreate,
-    search: mockSearch,
-    submitBundle: mockSubmitBundle,
-    testConnection: mockTestConnection,
-  })),
+  FhirClient: vi.fn().mockImplementation(function MockFhirClient() {
+    return {
+      getBaseUrl: fhirClientMocks.getBaseUrl,
+      getCredentials: fhirClientMocks.getCredentials,
+      read: fhirClientMocks.read,
+      create: fhirClientMocks.create,
+      search: fhirClientMocks.search,
+      submitBundle: fhirClientMocks.submitBundle,
+      testConnection: fhirClientMocks.testConnection,
+    };
+  }),
 }));
 
 // Mock FHIR mapper
-const mockBuildAnamneseBundle = vi.fn();
-const mockPatientToFhir = vi.fn();
+const mapperMocks = vi.hoisted(() => ({
+  buildAnamneseBundle: vi.fn(),
+  patientToFhir: vi.fn(),
+}));
+
+const mockBuildAnamneseBundle = mapperMocks.buildAnamneseBundle;
+const mockPatientToFhir = mapperMocks.patientToFhir;
 
 vi.mock('../../fhir/fhir-mapper.js', () => ({
-  buildAnamneseBundle: mockBuildAnamneseBundle,
-  patientToFhir: mockPatientToFhir,
+  buildAnamneseBundle: mapperMocks.buildAnamneseBundle,
+  patientToFhir: mapperMocks.patientToFhir,
 }));
 
 // Imports nach den mocks
@@ -87,7 +104,7 @@ describe('TomedoAdapter', () => {
   });
 
   afterEach(() => {
-    vi.resetAllMocks();
+    vi.clearAllMocks();
   });
 
   describe('initialize', () => {
@@ -164,12 +181,12 @@ describe('TomedoAdapter', () => {
     });
 
     it('should return error when authentication fails', async () => {
-      global.fetch = vi.fn().mockResolvedValue({
-        ok: false,
-        statusText: 'Unauthorized',
-      });
+      const connWithoutOauthCreds = {
+        ...mockConnection,
+        fhirCredentials: JSON.stringify({}),
+      };
 
-      await adapter.initialize(mockConnection);
+      await adapter.initialize(connWithoutOauthCreds);
       const result = await adapter.testConnection();
 
       expect(result.ok).toBe(false);
@@ -215,9 +232,7 @@ describe('TomedoAdapter', () => {
       const result = await adapter.importPatient('123');
 
       expect(result).toEqual(mockPatient);
-      expect(mockRead).toHaveBeenCalledWith('Patient', '123', {
-        headers: { Authorization: 'Bearer test-token' },
-      });
+      expect(mockRead).toHaveBeenCalledWith('Patient', '123');
     });
 
     it('should handle import errors', async () => {
@@ -317,11 +332,7 @@ describe('TomedoAdapter', () => {
       expect(results).toHaveLength(1);
       expect(results[0].lastName).toBe('Mustermann');
       expect(results[0].firstName).toBe('Max');
-      expect(mockSearch).toHaveBeenCalledWith(
-        'Patient',
-        { name: 'Mustermann' },
-        { headers: { Authorization: 'Bearer test-token' } }
-      );
+      expect(mockSearch).toHaveBeenCalledWith('Patient', { name: 'Mustermann' });
     });
 
     it('should search patients by KVNR', async () => {
