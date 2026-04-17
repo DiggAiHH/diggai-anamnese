@@ -365,11 +365,11 @@ router.post('/:id/submit', requireAuth, requireSessionOwner, async (req: Request
         // ── Klaproth Pipeline: TutaMail → Tomedo (non-blocking) ──
         setImmediate(async () => {
             try {
-                const { formatSessionForTomedo, buildTomedoSubject } = await import('../services/emailFormatter');
+                const { formatSessionForTomedo } = await import('../services/emailFormatter');
                 const { sendAnamneseEmail } = await import('../services/tutamail');
 
                 // Reload session with answers for email body
-                const fullSession = await prisma.session.findUnique({
+                const fullSession = await prisma.patientSession.findUnique({
                     where: { id: session.id },
                     include: { answers: true, patient: true },
                 });
@@ -382,13 +382,20 @@ router.post('/:id/submit', requireAuth, requireSessionOwner, async (req: Request
                     if (tenant?.subdomain) bsnr = tenant.subdomain;
                 }
 
-                const bodyText = formatSessionForTomedo(fullSession as any);
-                const subject = buildTomedoSubject(fullSession as any);
+                const formattedSession = formatSessionForTomedo(
+                    fullSession.answers.map(answer => ({
+                        atomId: answer.atomId,
+                        value: answer.value,
+                        encryptedValue: answer.encryptedValue,
+                    })),
+                    null,
+                    fullSession.selectedService,
+                );
 
                 await sendAnamneseEmail({
                     bsnr,
-                    subject,
-                    bodyText,
+                    subject: formattedSession.subject,
+                    bodyText: formattedSession.bodyText,
                     sessionId: fullSession.id,
                 });
             } catch (mailErr) {
