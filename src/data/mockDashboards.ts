@@ -207,6 +207,7 @@ export class MockDashboardEngine {
       service: faker.helpers.arrayElement(SERVICES),
       waitTimeMinutes: calculateWaitTime(checkInTime),
       checkInTime,
+      visitType: faker.helpers.arrayElement(['IN_PERSON', 'ONLINE', 'PHONE'] as const),
       criticalFlags: generateCriticalFlags(triageLevel),
       quickInfo: generateQuickInfo(triageLevel),
       assignedDoctorId: status === 'IN_TREATMENT' ? `doctor-${faker.number.int({ min: 1, max: 3 })}` : undefined,

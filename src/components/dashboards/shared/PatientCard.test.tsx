@@ -19,6 +19,7 @@ const mockPatient: PatientQueueItem = {
   service: 'Termin / Anamnese',
   waitTimeMinutes: 15,
   checkInTime: new Date(),
+  visitType: 'IN_PERSON',
   criticalFlags: [],
   quickInfo: {
     allergies: [],
