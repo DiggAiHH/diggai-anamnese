@@ -1,0 +1,6 @@
+{
+  "mode": "HYBRID",
+  "hybrid": true,
+  "protocols": ["FHIR", "GDT"],
+  "channels": ["PVS", "FHIR", "GDT"]
+}

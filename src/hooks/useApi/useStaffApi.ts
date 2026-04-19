@@ -251,7 +251,7 @@ export function useMfaReceptionRespond() {
             ...data
         }: {
             sessionId: string;
-            templateKey: 'received' | 'in_review' | 'completed' | 'callback';
+            templateKey: string;
             customNote?: string | null;
             mode?: 'auto' | 'smtp' | 'manual';
         }) => api.mfaReceptionRespond(sessionId, data),
@@ -270,6 +270,30 @@ export function useMfaReceptionConfirm() {
             api.mfaReceptionConfirm(sessionId, kind),
         onSuccess: (_data, variables) => {
             queryClient.invalidateQueries({ queryKey: ['mfa', 'reception'] });
+            queryClient.invalidateQueries({ queryKey: ['mfa', 'reception', 'detail', variables.sessionId] });
+        },
+    });
+}
+
+export function useMfaReceptionSms() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ sessionId, to, body }: { sessionId: string; to: string; body: string }) =>
+            api.mfaReceptionSms(sessionId, { to, body }),
+        onSuccess: (_data, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['mfa', 'reception', 'detail', variables.sessionId] });
+        },
+    });
+}
+
+export function useMfaReceptionStarface() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ sessionId, callee, caller }: { sessionId: string; callee: string; caller?: string }) =>
+            api.mfaReceptionStarface(sessionId, { callee, caller }),
+        onSuccess: (_data, variables) => {
             queryClient.invalidateQueries({ queryKey: ['mfa', 'reception', 'detail', variables.sessionId] });
         },
     });

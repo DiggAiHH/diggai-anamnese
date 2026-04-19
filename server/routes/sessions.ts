@@ -362,6 +362,20 @@ router.post('/:id/submit', requireAuth, requireSessionOwner, async (req: Request
             }
         });
 
+        // ── MFA Reception Inbox: Auto-copy on submit (non-blocking) ──
+        setImmediate(async () => {
+            try {
+                const { sendPracticeInboxCopy } = await import('../services/mfa/receptionInbox.service');
+                await sendPracticeInboxCopy({
+                    tenantId: session.tenantId,
+                    sessionId: session.id,
+                    userId: null,
+                });
+            } catch (inboxErr) {
+                console.warn('[Sessions] Reception inbox copy fehlgeschlagen (non-critical):', inboxErr);
+            }
+        });
+
         // ── Klaproth Pipeline: TutaMail → Tomedo (non-blocking) ──
         setImmediate(async () => {
             try {

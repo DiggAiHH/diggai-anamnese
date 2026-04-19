@@ -78,6 +78,8 @@ export {
     useMfaReceptionPracticeCopy,
     useMfaReceptionRespond,
     useMfaReceptionConfirm,
+    useMfaReceptionSms,
+    useMfaReceptionStarface,
     // Chat
     useChatMessages,
     useSendChatMessage,

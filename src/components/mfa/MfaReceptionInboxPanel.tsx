@@ -7,6 +7,7 @@ import {
   Copy,
   Inbox,
   Mail,
+  Phone,
   Printer,
   RefreshCw,
   Send,
@@ -23,6 +24,8 @@ import {
   useMfaReceptionMarkRead,
   useMfaReceptionPracticeCopy,
   useMfaReceptionRespond,
+  useMfaReceptionSms,
+  useMfaReceptionStarface,
   useMfaReceptionStats,
 } from '../../hooks/useStaffApi';
 
@@ -66,7 +69,20 @@ type ReceptionInboxStats = {
 };
 
 type ReceptionTemplatePreview = {
-  key: 'received' | 'in_review' | 'completed' | 'callback';
+  key:
+    | 'received'
+    | 'in_review'
+    | 'completed'
+    | 'callback'
+    | 'termin_confirmed'
+    | 'rezept_ready_pickup'
+    | 'rezept_ready_post'
+    | 'au_issued'
+    | 'ueberweisung_ready'
+    | 'bg_unfall_registered'
+    | 'befund_available'
+    | 'befund_appointment_needed'
+    | 'rückruf_scheduled';
   label: string;
   subject: string;
   body: string;
@@ -118,10 +134,27 @@ type ReceptionInboxDetail = {
 };
 
 const TEMPLATE_ORDER: Array<ReceptionTemplatePreview['key']> = [
+  // Status templates
   'received',
   'in_review',
   'completed',
   'callback',
+  // Termin
+  'termin_confirmed',
+  // Rezept
+  'rezept_ready_pickup',
+  'rezept_ready_post',
+  // AU
+  'au_issued',
+  // Überweisung
+  'ueberweisung_ready',
+  // BG-Unfall
+  'bg_unfall_registered',
+  // Befund
+  'befund_available',
+  'befund_appointment_needed',
+  // Rückruf
+  'rückruf_scheduled',
 ];
 
 function formatDate(value: string | null): string {
@@ -231,6 +264,10 @@ export function MfaReceptionInboxPanel() {
   const [customNote, setCustomNote] = useState('');
   const [practiceDispatch, setPracticeDispatch] = useState<DispatchResult | null>(null);
   const [responseDispatch, setResponseDispatch] = useState<DispatchResult | null>(null);
+  const [smsPhone, setSmsPhone] = useState('');
+  const [smsResult, setSmsResult] = useState<{ sent: boolean; error?: string } | null>(null);
+  const [starfacePhone, setStarfacePhone] = useState('');
+  const [starfaceResult, setStarfaceResult] = useState<{ initiated: boolean; error?: string } | null>(null);
   const readSessionsRef = useRef<Set<string>>(new Set());
 
   const items = useMemo<ReceptionInboxItem[]>(() => {
@@ -247,6 +284,8 @@ export function MfaReceptionInboxPanel() {
   const practiceCopyMutation = useMfaReceptionPracticeCopy();
   const responseMutation = useMfaReceptionRespond();
   const confirmMutation = useMfaReceptionConfirm();
+  const smsMutation = useMfaReceptionSms();
+  const starfaceMutation = useMfaReceptionStarface();
 
   useEffect(() => {
     if (!selectedSessionId && items.length > 0) {
@@ -338,6 +377,19 @@ export function MfaReceptionInboxPanel() {
     setResponseDispatch(null);
   }
 
+  async function handleSendSms() {
+    if (!selectedSessionId || !smsPhone.trim()) return;
+    const body = selectedTemplate?.body || t('mfa.smsFallbackBody', 'Ihre Anfrage wurde in der Praxis bearbeitet. Bei Rückfragen melden Sie sich bitte.');
+    const result = await smsMutation.mutateAsync({ sessionId: selectedSessionId, to: smsPhone.trim(), body: body.slice(0, 160) });
+    setSmsResult(result as { sent: boolean; error?: string });
+  }
+
+  async function handleStarfaceCallback() {
+    if (!selectedSessionId || !starfacePhone.trim()) return;
+    const result = await starfaceMutation.mutateAsync({ sessionId: selectedSessionId, callee: starfacePhone.trim() });
+    setStarfaceResult(result as { initiated: boolean; error?: string });
+  }
+
   if (isLoading) {
     return (
       <div className="rounded-3xl border border-white/10 bg-white/5 p-10 text-center text-white/60">
@@ -400,6 +452,8 @@ export function MfaReceptionInboxPanel() {
                     setSelectedSessionId(item.sessionId);
                     setPracticeDispatch(null);
                     setResponseDispatch(null);
+                    setSmsResult(null);
+                    setStarfaceResult(null);
                     setCustomNote('');
                   }}
                   className={`w-full text-left px-5 py-4 transition-colors ${active ? 'bg-purple-500/10' : 'hover:bg-white/[0.03]'}`}
@@ -658,6 +712,69 @@ export function MfaReceptionInboxPanel() {
                     )}
                   </>
                 )}
+              </div>
+
+              {/* SMS & Starface Kanal */}
+              <div className="rounded-2xl border border-white/10 bg-black/20 p-4 space-y-4">
+                <div className="flex items-center gap-2">
+                  <Phone className="w-4 h-4 text-white/60" />
+                  <div className="text-sm font-bold text-white">{t('mfa.receptionPhoneChannels', 'Weitere Kanäle')}</div>
+                </div>
+                <p className="text-xs text-white/45">{t('mfa.receptionPhoneDesc', 'SMS oder Starface Click2Dial als Ergänzung zur E-Mail.')}</p>
+
+                {/* SMS */}
+                <div className="space-y-2">
+                  <div className="text-xs uppercase tracking-[0.18em] text-white/35">{t('mfa.receptionSmsTitle', 'SMS senden')}</div>
+                  <div className="flex gap-2">
+                    <input
+                      type="tel"
+                      value={smsPhone}
+                      onChange={(e) => setSmsPhone(e.target.value)}
+                      placeholder="+49 151 …"
+                      className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:ring-2 ring-purple-500/40"
+                    />
+                    <button
+                      onClick={() => void handleSendSms()}
+                      disabled={smsMutation.isPending || !smsPhone.trim()}
+                      className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-500 transition-colors disabled:opacity-50"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      {t('mfa.receptionSmsSend', 'Senden')}
+                    </button>
+                  </div>
+                  {smsResult && (
+                    <p className={`text-xs ${smsResult.sent ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      {smsResult.sent ? t('mfa.smsSentOk', 'SMS erfolgreich gesendet.') : smsResult.error || t('mfa.smsFailed', 'SMS konnte nicht gesendet werden.')}
+                    </p>
+                  )}
+                </div>
+
+                {/* Starface Click2Dial */}
+                <div className="space-y-2">
+                  <div className="text-xs uppercase tracking-[0.18em] text-white/35">{t('mfa.receptionStarfaceTitle', 'Starface Rückruf')}</div>
+                  <div className="flex gap-2">
+                    <input
+                      type="tel"
+                      value={starfacePhone}
+                      onChange={(e) => setStarfacePhone(e.target.value)}
+                      placeholder="+49 151 …"
+                      className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:ring-2 ring-purple-500/40"
+                    />
+                    <button
+                      onClick={() => void handleStarfaceCallback()}
+                      disabled={starfaceMutation.isPending || !starfacePhone.trim()}
+                      className="inline-flex items-center gap-2 rounded-2xl bg-amber-600 px-4 py-2 text-sm font-bold text-white hover:bg-amber-500 transition-colors disabled:opacity-50"
+                    >
+                      <Phone className="w-3.5 h-3.5" />
+                      {t('mfa.receptionStarfaceDial', 'Click2Dial')}
+                    </button>
+                  </div>
+                  {starfaceResult && (
+                    <p className={`text-xs ${starfaceResult.initiated ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      {starfaceResult.initiated ? t('mfa.starfaceOk', 'Rückruf eingeleitet.') : starfaceResult.error || t('mfa.starfaceFailed', 'Rückruf konnte nicht initiiert werden.')}
+                    </p>
+                  )}
+                </div>
               </div>
 
               <div className="rounded-2xl border border-white/10 bg-black/20 p-4 space-y-4">

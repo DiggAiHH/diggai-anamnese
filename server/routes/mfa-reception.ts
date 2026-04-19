@@ -48,7 +48,21 @@ function resolveEffectiveTenant(req: Request):
 }
 
 const responsePayloadSchema = z.object({
-  templateKey: z.enum(['received', 'in_review', 'completed', 'callback']),
+  templateKey: z.enum([
+    'received',
+    'in_review',
+    'completed',
+    'callback',
+    'termin_confirmed',
+    'rezept_ready_pickup',
+    'rezept_ready_post',
+    'au_issued',
+    'ueberweisung_ready',
+    'bg_unfall_registered',
+    'befund_available',
+    'befund_appointment_needed',
+    'rückruf_scheduled',
+  ]),
   customNote: z.string().trim().max(2000).optional().nullable(),
   mode: z.enum(['auto', 'smtp', 'manual']).default('auto'),
 });
@@ -236,6 +250,74 @@ router.post('/inbox/:sessionId/confirm', async (req: Request, res: Response) => 
 
     console.error('[MFA Reception] Confirm-Fehler:', error);
     res.status(500).json({ error: 'Bestätigung konnte nicht gespeichert werden' });
+  }
+});
+
+const smsPayloadSchema = z.object({
+  to: z.string().regex(/^\+[1-9]\d{6,14}$/, 'E.164-Format erforderlich (+49...)'),
+  body: z.string().trim().min(1).max(160),
+});
+
+router.post('/inbox/:sessionId/sms', async (req: Request, res: Response) => {
+  try {
+    const resolvedTenant = resolveEffectiveTenant(req);
+    if (!resolvedTenant.ok) {
+      res.status(resolvedTenant.status).json(resolvedTenant.body);
+      return;
+    }
+
+    const payload = smsPayloadSchema.parse(req.body || {});
+    const { sendSms, isSmsAvailable } = await import('../services/sms.service');
+
+    if (!isSmsAvailable()) {
+      res.status(503).json({ error: 'SMS nicht konfiguriert (TWILIO_* Umgebungsvariablen fehlen)' });
+      return;
+    }
+
+    const result = await sendSms({ to: payload.to, body: payload.body });
+    res.json(result);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ error: 'Ungültige SMS-Daten', details: error.issues });
+      return;
+    }
+
+    console.error('[MFA Reception] SMS-Fehler:', error);
+    res.status(500).json({ error: 'SMS konnte nicht gesendet werden' });
+  }
+});
+
+const starfacePayloadSchema = z.object({
+  callee: z.string().trim().min(5).max(30),
+  caller: z.string().trim().optional(),
+});
+
+router.post('/inbox/:sessionId/starface-callback', async (req: Request, res: Response) => {
+  try {
+    const resolvedTenant = resolveEffectiveTenant(req);
+    if (!resolvedTenant.ok) {
+      res.status(resolvedTenant.status).json(resolvedTenant.body);
+      return;
+    }
+
+    const payload = starfacePayloadSchema.parse(req.body || {});
+    const { initiateClick2Dial, isStarfaceAvailable } = await import('../services/starface.service');
+
+    if (!isStarfaceAvailable()) {
+      res.status(503).json({ error: 'Starface nicht konfiguriert (STARFACE_* Umgebungsvariablen fehlen)' });
+      return;
+    }
+
+    const result = await initiateClick2Dial({ callee: payload.callee, caller: payload.caller });
+    res.json(result);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ error: 'Ungültige Rückrufdaten', details: error.issues });
+      return;
+    }
+
+    console.error('[MFA Reception] Starface-Fehler:', error);
+    res.status(500).json({ error: 'Rückruf konnte nicht initiiert werden' });
   }
 });
 

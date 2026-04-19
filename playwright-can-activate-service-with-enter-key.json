@@ -1,0 +1,229 @@
+{
+  "config": {
+    "configFile": "d:\\Klaproth Projekte\\DiggAi\\Ananmese\\diggai-anamnese-master\\playwright.frontend.config.ts",
+    "rootDir": "d:/Klaproth Projekte/DiggAi/Ananmese/diggai-anamnese-master/e2e",
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "d:/Klaproth Projekte/DiggAi/Ananmese/diggai-anamnese-master/test-results",
+        "repeatEach": 1,
+        "retries": 1,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "d:/Klaproth Projekte/DiggAi/Ananmese/diggai-anamnese-master/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      },
+      {
+        "outputDir": "d:/Klaproth Projekte/DiggAi/Ananmese/diggai-anamnese-master/test-results",
+        "repeatEach": 1,
+        "retries": 1,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "mobile-chrome",
+        "name": "mobile-chrome",
+        "testDir": "d:/Klaproth Projekte/DiggAi/Ananmese/diggai-anamnese-master/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "runAgents": "none",
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.58.2",
+    "workers": 1,
+    "webServer": {
+      "command": "npm run dev",
+      "url": "http://localhost:5173",
+      "reuseExistingServer": true,
+      "timeout": 30000
+    }
+  },
+  "suites": [
+    {
+      "title": "patient-journey\\accessibility.spec.ts",
+      "file": "patient-journey/accessibility.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "A11y - Keyboard Navigation",
+          "file": "patient-journey/accessibility.spec.ts",
+          "line": 34,
+          "column": 6,
+          "specs": [
+            {
+              "title": "can activate service with Enter key",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 17346,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText('Datenschutz-Einwilligung')\nExpected: visible\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for getByText('Datenschutz-Einwilligung')\u001b[22m\n",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText('Datenschutz-Einwilligung')\nExpected: visible\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for getByText('Datenschutz-Einwilligung')\u001b[22m\n\n    at d:\\Klaproth Projekte\\DiggAi\\Ananmese\\diggai-anamnese-master\\e2e\\patient-journey\\accessibility.spec.ts:67:66",
+                        "location": {
+                          "file": "d:\\Klaproth Projekte\\DiggAi\\Ananmese\\diggai-anamnese-master\\e2e\\patient-journey\\accessibility.spec.ts",
+                          "column": 66,
+                          "line": 67
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 65 |\u001b[39m\n \u001b[90m 66 |\u001b[39m         \u001b[90m// Should show DSGVO modal\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 67 |\u001b[39m         \u001b[36mawait\u001b[39m expect(page\u001b[33m.\u001b[39mgetByText(\u001b[32m'Datenschutz-Einwilligung'\u001b[39m))\u001b[33m.\u001b[39mtoBeVisible({ timeout\u001b[33m:\u001b[39m \u001b[35m10000\u001b[39m })\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                                                                  \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 68 |\u001b[39m     })\u001b[33m;\u001b[39m\n \u001b[90m 69 |\u001b[39m\n \u001b[90m 70 |\u001b[39m     test(\u001b[32m'can navigate questionnaire with keyboard'\u001b[39m\u001b[33m,\u001b[39m \u001b[36masync\u001b[39m ({ page }) \u001b[33m=>\u001b[39m {\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "d:\\Klaproth Projekte\\DiggAi\\Ananmese\\diggai-anamnese-master\\e2e\\patient-journey\\accessibility.spec.ts",
+                            "column": 66,
+                            "line": 67
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText('Datenschutz-Einwilligung')\nExpected: visible\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for getByText('Datenschutz-Einwilligung')\u001b[22m\n\n\n  65 |\n  66 |         // Should show DSGVO modal\n> 67 |         await expect(page.getByText('Datenschutz-Einwilligung')).toBeVisible({ timeout: 10000 });\n     |                                                                  ^\n  68 |     });\n  69 |\n  70 |     test('can navigate questionnaire with keyboard', async ({ page }) => {\n    at d:\\Klaproth Projekte\\DiggAi\\Ananmese\\diggai-anamnese-master\\e2e\\patient-journey\\accessibility.spec.ts:67:66"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-04-19T06:44:21.499Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "d:\\Klaproth Projekte\\DiggAi\\Ananmese\\diggai-anamnese-master\\test-results\\patient-journey-accessibil-6ec9c-vate-service-with-Enter-key-chromium\\test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "d:\\Klaproth Projekte\\DiggAi\\Ananmese\\diggai-anamnese-master\\test-results\\patient-journey-accessibil-6ec9c-vate-service-with-Enter-key-chromium\\error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "d:\\Klaproth Projekte\\DiggAi\\Ananmese\\diggai-anamnese-master\\e2e\\patient-journey\\accessibility.spec.ts",
+                        "column": 66,
+                        "line": 67
+                      }
+                    },
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 16360,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText('Datenschutz-Einwilligung')\nExpected: visible\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for getByText('Datenschutz-Einwilligung')\u001b[22m\n",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText('Datenschutz-Einwilligung')\nExpected: visible\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for getByText('Datenschutz-Einwilligung')\u001b[22m\n\n    at d:\\Klaproth Projekte\\DiggAi\\Ananmese\\diggai-anamnese-master\\e2e\\patient-journey\\accessibility.spec.ts:67:66",
+                        "location": {
+                          "file": "d:\\Klaproth Projekte\\DiggAi\\Ananmese\\diggai-anamnese-master\\e2e\\patient-journey\\accessibility.spec.ts",
+                          "column": 66,
+                          "line": 67
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 65 |\u001b[39m\n \u001b[90m 66 |\u001b[39m         \u001b[90m// Should show DSGVO modal\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 67 |\u001b[39m         \u001b[36mawait\u001b[39m expect(page\u001b[33m.\u001b[39mgetByText(\u001b[32m'Datenschutz-Einwilligung'\u001b[39m))\u001b[33m.\u001b[39mtoBeVisible({ timeout\u001b[33m:\u001b[39m \u001b[35m10000\u001b[39m })\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                                                                  \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 68 |\u001b[39m     })\u001b[33m;\u001b[39m\n \u001b[90m 69 |\u001b[39m\n \u001b[90m 70 |\u001b[39m     test(\u001b[32m'can navigate questionnaire with keyboard'\u001b[39m\u001b[33m,\u001b[39m \u001b[36masync\u001b[39m ({ page }) \u001b[33m=>\u001b[39m {\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "d:\\Klaproth Projekte\\DiggAi\\Ananmese\\diggai-anamnese-master\\e2e\\patient-journey\\accessibility.spec.ts",
+                            "column": 66,
+                            "line": 67
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText('Datenschutz-Einwilligung')\nExpected: visible\nTimeout: 10000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for getByText('Datenschutz-Einwilligung')\u001b[22m\n\n\n  65 |\n  66 |         // Should show DSGVO modal\n> 67 |         await expect(page.getByText('Datenschutz-Einwilligung')).toBeVisible({ timeout: 10000 });\n     |                                                                  ^\n  68 |     });\n  69 |\n  70 |     test('can navigate questionnaire with keyboard', async ({ page }) => {\n    at d:\\Klaproth Projekte\\DiggAi\\Ananmese\\diggai-anamnese-master\\e2e\\patient-journey\\accessibility.spec.ts:67:66"
+                        },
+                        {
+                          "message": "Error: apiRequestContext._wrapApiCall: ENOENT: no such file or directory, open 'd:\\Klaproth Projekte\\DiggAi\\Ananmese\\diggai-anamnese-master\\test-results\\.playwright-artifacts-1\\traces\\e77a45a8b784c7a1ae4e-503929734b8098d53e99-retry1.trace'"
+                        },
+                        {
+                          "message": "Error: ENOENT: no such file or directory, open 'd:\\Klaproth Projekte\\DiggAi\\Ananmese\\diggai-anamnese-master\\test-results\\.playwright-artifacts-1\\ae536960d42aab5e7ad81a8c4c324e0a.zip'"
+                        },
+                        {
+                          "message": "\u001b[31mTest timeout of 60000ms exceeded.\u001b[39m"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 1,
+                      "startTime": "2026-04-19T06:44:56.099Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "d:\\Klaproth Projekte\\DiggAi\\Ananmese\\diggai-anamnese-master\\test-results\\patient-journey-accessibil-6ec9c-vate-service-with-Enter-key-chromium-retry1\\test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "d:\\Klaproth Projekte\\DiggAi\\Ananmese\\diggai-anamnese-master\\test-results\\patient-journey-accessibil-6ec9c-vate-service-with-Enter-key-chromium-retry1\\error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "d:\\Klaproth Projekte\\DiggAi\\Ananmese\\diggai-anamnese-master\\e2e\\patient-journey\\accessibility.spec.ts",
+                        "column": 66,
+                        "line": 67
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "e77a45a8b784c7a1ae4e-503929734b8098d53e99",
+              "file": "patient-journey/accessibility.spec.ts",
+              "line": 55,
+              "column": 5
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-04-19T06:44:13.549Z",
+    "duration": 119676.09999999999,
+    "expected": 0,
+    "skipped": 0,
+    "unexpected": 1,
+    "flaky": 0
+  }
+}

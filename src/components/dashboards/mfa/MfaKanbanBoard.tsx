@@ -23,7 +23,7 @@ import { useDashboardStore, selectQueueItemsByStatus } from '../../../store/dash
 import { useRealtimeQueue } from '../../../hooks/useDashboard/useRealtimeQueue';
 import { StatusColumn } from '../shared/StatusColumn';
 import { PatientCard } from '../shared/PatientCard';
-import type { QueueStatus, PatientQueueItem } from '../../../types/dashboard';
+import type { QueueStatus, PatientQueueItem, VisitType } from '../../../types/dashboard';
 import { cn } from '../../../lib/utils';
 
 // Spalten-Konfiguration
@@ -48,6 +48,9 @@ export const MfaKanbanBoard: React.FC<MfaKanbanBoardProps> = ({ className }) => 
   // State fuer Drag & Drop
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activePatient, setActivePatient] = useState<PatientQueueItem | null>(null);
+
+  // State fuer VisitType-Filter
+  const [visitTypeFilter, setVisitTypeFilter] = useState<VisitType | 'ALL'>('ALL');
 
   // Sensoren fuer Drag & Drop
   const sensors = useSensors(
@@ -108,6 +111,25 @@ export const MfaKanbanBoard: React.FC<MfaKanbanBoardProps> = ({ className }) => 
     selectPatient(patient.id);
   }, [selectPatient]);
 
+  // Gefilterte Items pro Status
+  const filteredItemsByStatus = React.useMemo(() => {
+    if (visitTypeFilter === 'ALL') return itemsByStatus;
+    const result: Record<QueueStatus, PatientQueueItem[]> = {} as Record<QueueStatus, PatientQueueItem[]>;
+    for (const status of Object.keys(itemsByStatus) as QueueStatus[]) {
+      result[status] = itemsByStatus[status].filter(
+        (p) => (p.visitType ?? 'IN_PERSON') === visitTypeFilter
+      );
+    }
+    return result;
+  }, [itemsByStatus, visitTypeFilter]);
+
+  const VISIT_FILTER_OPTIONS: { value: VisitType | 'ALL'; label: string }[] = [
+    { value: 'ALL', label: 'Alle' },
+    { value: 'IN_PERSON', label: 'Vor Ort' },
+    { value: 'ONLINE', label: 'Online' },
+    { value: 'PHONE', label: 'Telefon' },
+  ];
+
   // Loading State
   if (isLoading) {
     return (
@@ -121,6 +143,25 @@ export const MfaKanbanBoard: React.FC<MfaKanbanBoardProps> = ({ className }) => 
   }
 
   return (
+    <>
+      {/* VisitType Filter Leiste */}
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
+        {VISIT_FILTER_OPTIONS.map((opt) => (
+          <button
+            key={opt.value}
+            onClick={() => setVisitTypeFilter(opt.value)}
+            className={cn(
+              'px-3 py-1 rounded-full text-xs font-medium transition-colors',
+              visitTypeFilter === opt.value
+                ? 'bg-purple-500 text-white'
+                : 'bg-white/5 text-white/50 hover:bg-white/10 hover:text-white/80'
+            )}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+
     <DndContext
       sensors={sensors}
       collisionDetection={closestCorners}
@@ -139,7 +180,7 @@ export const MfaKanbanBoard: React.FC<MfaKanbanBoardProps> = ({ className }) => 
             key={column.status}
             status={column.status}
             title={column.title}
-            patients={itemsByStatus[column.status]}
+            patients={filteredItemsByStatus[column.status]}
             color={column.color}
             renderPatient={(patient) => (
               <PatientCard
@@ -167,5 +208,6 @@ export const MfaKanbanBoard: React.FC<MfaKanbanBoardProps> = ({ className }) => 
         ) : null}
       </DragOverlay>
     </DndContext>
+    </>
   );
 };

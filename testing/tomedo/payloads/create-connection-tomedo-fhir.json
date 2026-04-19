@@ -1,0 +1,8 @@
+{
+  "pvsType": "TOMEDO",
+  "protocol": "FHIR",
+  "fhirBaseUrl": "https://api.tomedo.de/fhir/R4",
+  "fhirAuthType": "oauth2",
+  "syncIntervalSec": 30,
+  "autoMapFields": true
+}

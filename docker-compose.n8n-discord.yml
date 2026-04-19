@@ -1,0 +1,30 @@
+version: "3.8"
+services:
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: diggai_n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      N8N_BASIC_AUTH_ACTIVE: "true"
+      N8N_BASIC_AUTH_USER: ${N8N_USER:-admin}
+      N8N_BASIC_AUTH_PASSWORD: ${N8N_PASSWORD:-admin}
+      WEBHOOK_URL: http://localhost:5678/
+      N8N_HOST: 0.0.0.0
+      N8N_PORT: 5678
+    volumes:
+      - ./n8n-data:/home/node/.n8n
+
+  discord-bot:
+    build:
+      context: ./apps/discord-bot
+      dockerfile: Dockerfile
+    container_name: diggai_discord_bot
+    restart: unless-stopped
+    ports:
+      - "3002:3002"
+    env_file:
+      - .env.n8n_discord
+    depends_on:
+      - n8n

@@ -7,11 +7,11 @@
 
 import React, { useState } from 'react';
 import { useDraggable } from '@dnd-kit/core';
-import { GripVertical, Clock, User, AlertCircle } from 'lucide-react';
+import { GripVertical, Clock, User, AlertCircle, Monitor, MapPin, Phone } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { formatDistanceToNow } from '../../../lib/dateUtils';
 import { TriageBadge, TriageDot } from './TriageBadge';
-import type { PatientQueueItem, QueueStatus } from '../../../types/dashboard';
+import type { PatientQueueItem, QueueStatus, VisitType } from '../../../types/dashboard';
 
 interface PatientCardProps {
   patient: PatientQueueItem;
@@ -20,6 +20,32 @@ interface PatientCardProps {
   showDragHandle?: boolean;
   isDragging?: boolean;
   className?: string;
+}
+
+// Hilfsfunktion für VisitType Badge
+function VisitTypeBadge({ visitType }: { visitType?: VisitType }) {
+  if (!visitType || visitType === 'IN_PERSON') {
+    return (
+      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-500/10 text-blue-300 border border-blue-500/20">
+        <MapPin className="w-2.5 h-2.5" />
+        Vor Ort
+      </span>
+    );
+  }
+  if (visitType === 'ONLINE') {
+    return (
+      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+        <Monitor className="w-2.5 h-2.5" />
+        Online
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500/10 text-amber-300 border border-amber-500/20">
+      <Phone className="w-2.5 h-2.5" />
+      Telefon
+    </span>
+  );
 }
 
 // Hilfsfunktion für Wartezeit-Farbe
@@ -163,6 +189,7 @@ export const PatientCard: React.FC<PatientCardProps> = ({
                 {patient.waitTimeMinutes} Min
               </span>
             </span>
+            <VisitTypeBadge visitType={patient.visitType} />
           </div>
 
           {/* Critical Flags (nur in full Mode) */}

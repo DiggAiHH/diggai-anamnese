@@ -1,5 +1,5 @@
 import React, { lazy, Suspense, useEffect, useMemo, useState } from 'react';
-import { Activity, ShieldCheck, Clock, MessageSquare, Phone, AlertCircle, Calendar, HardHat, FileText, FilePlus, ClipboardList, Stethoscope, ChevronRight, BookOpen, Eye, Users, Settings } from 'lucide-react';
+import { Activity, Clock, MessageSquare, Phone, AlertCircle, Calendar, HardHat, FileText, FilePlus, ClipboardList, Stethoscope, ChevronRight } from 'lucide-react';
 import { useCreateSession } from '../hooks/usePatientApi';
 import { useSessionStore } from '../store/sessionStore';
 import { useTranslation } from 'react-i18next';
@@ -8,7 +8,7 @@ import { ThemeToggle } from './ThemeToggle';
 import { ModeToggle } from './ModeToggle';
 import { KioskToggle } from './KioskToggle';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { preloadConsentExperience, preloadLandingEnhancements } from '../lib/routePreloaders';
+import { preloadConsentExperience } from '../lib/routePreloaders';
 import { api } from '../api/client';
 import {
     getPatientAppBasePath,
@@ -21,8 +21,6 @@ import {
 
 const DatenschutzGame = lazy(() => import('./DatenschutzGame').then(m => ({ default: m.DatenschutzGame })));
 const SignaturePad = lazy(() => import('./SignaturePad').then(m => ({ default: m.SignaturePad })));
-const QRCodeDisplay = lazy(() => import('./QRCodeDisplay').then(m => ({ default: m.QRCodeDisplay })));
-const ChatBubble = lazy(() => import('./ChatBubble').then(m => ({ default: m.ChatBubble })));
 
 interface ServiceCard {
     id: string;
@@ -57,20 +55,9 @@ export function LandingPage({ forceClassic = false }: LandingPageProps) {
     const [showDSGVO, setShowDSGVO] = useState(false);
     const [showSignature, setShowSignature] = useState(false);
     const [selectedService, setSelectedService] = useState<ServiceCard | null>(null);
-    const [showDeferredUi, setShowDeferredUi] = useState(false);
     const classicLayoutFromQuery = searchParams.get('layout');
     const showClassicLayout =
         forceClassic || classicLayoutFromQuery === 'classic' || classicLayoutFromQuery === 'classic4';
-
-    useEffect(() => {
-        const enableDeferredUi = () => {
-            setShowDeferredUi(true);
-            void preloadLandingEnhancements();
-        };
-
-        const timer = globalThis.setTimeout(enableDeferredUi, 800);
-        return () => globalThis.clearTimeout(timer);
-    }, []);
 
     useEffect(() => {
         if (createStatus !== 'success' || !sessionId || !selectedService) {
@@ -393,67 +380,7 @@ export function LandingPage({ forceClassic = false }: LandingPageProps) {
                     })}
                 </div>
 
-                {/* Footer */}
-                <div className="mt-24 pt-12 border-t border-[var(--border-primary)] flex flex-col lg:flex-row items-center justify-between gap-8 py-8">
-                    <div className="flex items-center gap-8">
-                        <div className="flex items-center gap-3">
-                            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.5)]" />
-                            <span className="text-sm font-bold text-gray-500 uppercase tracking-widest">{translateStableText(t, 'ui.landing.systemOnline', 'System Online')}</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <ShieldCheck className="w-5 h-5 text-gray-600" />
-                            <span className="text-sm font-bold text-gray-500 uppercase tracking-widest">{translateStableText(t, 'ui.landing.dsgvo', 'DSGVO Konform')}</span>
-                        </div>
-                    </div>
 
-                    <div className="flex items-center gap-4 flex-wrap justify-center">
-                        <Link to={bsnr ? `/${bsnr}/datenschutz` : '/datenschutz'} className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-primary)] backdrop-blur-md text-sm font-bold text-[var(--text-secondary)] hover:text-blue-400 hover:border-blue-500/30 transition-all duration-300">
-                            <ShieldCheck className="w-4 h-4" />
-                            {t('landing.datenschutz', 'Datenschutz')}
-                        </Link>
-                        <Link to={bsnr ? `/${bsnr}/impressum` : '/impressum'} className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-primary)] backdrop-blur-md text-sm font-bold text-[var(--text-secondary)] hover:text-blue-400 hover:border-blue-500/30 transition-all duration-300">
-                            <FileText className="w-4 h-4" />
-                            {t('landing.impressum', 'Impressum')}
-                        </Link>
-                        <span className="hidden lg:block w-px h-6 bg-[var(--border-primary)]" />
-                        <Link to="/verwaltung/docs" className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-primary)] backdrop-blur-md text-sm font-bold text-[var(--text-secondary)] hover:text-blue-400 hover:border-blue-500/30 transition-all duration-300">
-                            <BookOpen className="w-4 h-4" />
-                            {t('landing.docs', 'Dokumentation')}
-                        </Link>
-                        <Link to="/verwaltung/handbuch" className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-primary)] backdrop-blur-md text-sm font-bold text-[var(--text-secondary)] hover:text-blue-400 hover:border-blue-500/30 transition-all duration-300">
-                            <Eye className="w-4 h-4" />
-                            {t('landing.handbuch', 'Handbuch')}
-                        </Link>
-                        <span className="hidden lg:block w-px h-6 bg-[var(--border-primary)]" />
-                        <Link to="/verwaltung/arzt" className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-primary)] backdrop-blur-md text-sm font-bold text-[var(--text-secondary)] hover:text-emerald-400 hover:border-emerald-500/30 transition-all duration-300">
-                            <Stethoscope className="w-4 h-4" />
-                            {t('landing.arzt', 'Arzt')}
-                        </Link>
-                        <Link to="/verwaltung/mfa" className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-primary)] backdrop-blur-md text-sm font-bold text-[var(--text-secondary)] hover:text-amber-400 hover:border-amber-500/30 transition-all duration-300">
-                            <Users className="w-4 h-4" />
-                            {t('landing.mfa', 'MFA')}
-                        </Link>
-                        <Link to="/verwaltung/admin" className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-primary)] backdrop-blur-md text-sm font-bold text-[var(--text-secondary)] hover:text-rose-400 hover:border-rose-500/30 transition-all duration-300">
-                            <Settings className="w-4 h-4" />
-                            {t('landing.admin', 'Admin')}
-                        </Link>
-                    </div>
-
-                    <div className="flex items-center gap-6 px-6 py-4 bg-[var(--bg-card)] rounded-3xl border border-[var(--border-primary)] backdrop-blur-md">
-                        <p className="text-sm text-[var(--text-secondary)] font-medium">
-                            {t('aesFooter', 'Ihre Daten werden AES-256 verschlüsselt übertragen und gespeichert.')}
-                        </p>
-                    </div>
-                </div>
-
-                {/* QR Code for tablet/kiosk self-service */}
-                {showDeferredUi && (
-                    <Suspense fallback={<div className="mt-12 h-[304px]" />}>
-                        <div className="mt-12 flex justify-center">
-                            <QRCodeDisplay />
-                        </div>
-                    </Suspense>
-                )}
             </div>
 
             {/* Gamified DSGVO Consent */}
@@ -493,12 +420,7 @@ export function LandingPage({ forceClassic = false }: LandingPageProps) {
                 </div>
             )}
 
-            {/* Chat Bot (bot-only on landing, no sessionId) */}
-            {showDeferredUi && (
-                <Suspense fallback={null}>
-                    <ChatBubble />
-                </Suspense>
-            )}
+
         </main>
     );
 }

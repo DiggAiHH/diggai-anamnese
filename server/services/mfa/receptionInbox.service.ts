@@ -42,7 +42,20 @@ type InboxAuditAction =
   | 'RECEPTION_INBOX_PROCESSED'
   | 'RECEPTION_INBOX_COMPLETED';
 
-type ResponseTemplateKey = 'received' | 'in_review' | 'completed' | 'callback';
+type ResponseTemplateKey =
+  | 'received'
+  | 'in_review'
+  | 'completed'
+  | 'callback'
+  | 'termin_confirmed'
+  | 'rezept_ready_pickup'
+  | 'rezept_ready_post'
+  | 'au_issued'
+  | 'ueberweisung_ready'
+  | 'bg_unfall_registered'
+  | 'befund_available'
+  | 'befund_appointment_needed'
+  | 'rückruf_scheduled';
 
 type AuditEntry = {
   action: InboxAuditAction;
@@ -422,21 +435,174 @@ function buildResponseTemplatePreview(
           signoff,
         ].join('\n'),
       };
+    case 'termin_confirmed':
+      return {
+        key: templateKey,
+        label: 'Termin bestätigt',
+        subject: `[${referenceId}] Ihr Termin wurde bestätigt`,
+        body: [
+          greeting,
+          '',
+          'Ihr Termin wurde erfolgreich eingetragen.',
+          'Bitte beachten Sie die Ihnen mitgeteilte Uhrzeit und erscheinen Sie bitte 5 Minuten vorher.',
+          '',
+          `Referenz: ${referenceId}`,
+          signoff,
+        ].join('\n'),
+      };
+    case 'rezept_ready_pickup':
+      return {
+        key: templateKey,
+        label: 'Rezept: Abholung',
+        subject: `[${referenceId}] Ihr Rezept liegt bereit`,
+        body: [
+          greeting,
+          '',
+          'Ihr Rezept liegt zu den Öffnungszeiten in der Praxis zur Abholung bereit.',
+          'Bitte halten Sie beim Abholen Ihre Versichertenkarte bereit.',
+          '',
+          `Referenz: ${referenceId}`,
+          signoff,
+        ].join('\n'),
+      };
+    case 'rezept_ready_post':
+      return {
+        key: templateKey,
+        label: 'Rezept: Postversand',
+        subject: `[${referenceId}] Ihr Rezept wird versendet`,
+        body: [
+          greeting,
+          '',
+          'Ihr Rezept wurde ausgestellt und wird in den nächsten Tagen per Post an Ihre hinterlegte Adresse versandt.',
+          '',
+          `Referenz: ${referenceId}`,
+          signoff,
+        ].join('\n'),
+      };
+    case 'au_issued':
+      return {
+        key: templateKey,
+        label: 'AU ausgestellt',
+        subject: `[${referenceId}] Ihre Arbeitsunfähigkeitsbescheinigung`,
+        body: [
+          greeting,
+          '',
+          'Ihre Arbeitsunfähigkeitsbescheinigung (AU) wurde ausgestellt.',
+          'Sie können diese zu den Öffnungszeiten in der Praxis abholen.',
+          '',
+          `Referenz: ${referenceId}`,
+          signoff,
+        ].join('\n'),
+      };
+    case 'ueberweisung_ready':
+      return {
+        key: templateKey,
+        label: 'Überweisung bereit',
+        subject: `[${referenceId}] Ihre Überweisung liegt bereit`,
+        body: [
+          greeting,
+          '',
+          'Ihre Überweisung wurde ausgestellt und liegt zur Abholung in der Praxis bereit.',
+          '',
+          `Referenz: ${referenceId}`,
+          signoff,
+        ].join('\n'),
+      };
+    case 'bg_unfall_registered':
+      return {
+        key: templateKey,
+        label: 'BG-Unfall aufgenommen',
+        subject: `[${referenceId}] Ihr BG-Fall wurde aufgenommen`,
+        body: [
+          greeting,
+          '',
+          'Ihr Berufsgenossenschaftsfall (BG-Unfall) wurde in der Praxis aufgenommen und weitergeleitet.',
+          'Für Rückfragen zur BG-Meldung wenden Sie sich bitte direkt an die Praxis.',
+          '',
+          `Referenz: ${referenceId}`,
+          signoff,
+        ].join('\n'),
+      };
+    case 'befund_available':
+      return {
+        key: templateKey,
+        label: 'Befund liegt vor',
+        subject: `[${referenceId}] Ihre Befunde liegen vor`,
+        body: [
+          greeting,
+          '',
+          'Ihre Untersuchungsergebnisse liegen in der Praxis vor.',
+          'Sie können Ihre Befunde zu den Öffnungszeiten in der Praxis einsehen.',
+          '',
+          `Referenz: ${referenceId}`,
+          signoff,
+        ].join('\n'),
+      };
+    case 'befund_appointment_needed':
+      return {
+        key: templateKey,
+        label: 'Befund: Besprechungstermin',
+        subject: `[${referenceId}] Besprechungstermin für Ihre Befunde`,
+        body: [
+          greeting,
+          '',
+          'Ihre Untersuchungsergebnisse liegen vor und sollten mit dem Arzt besprochen werden.',
+          'Bitte vereinbaren Sie zeitnah einen Besprechungstermin in der Praxis.',
+          '',
+          `Referenz: ${referenceId}`,
+          signoff,
+        ].join('\n'),
+      };
+    case 'rückruf_scheduled':
+      return {
+        key: templateKey,
+        label: 'Rückruf angekündigt',
+        subject: `[${referenceId}] Rückruf von der Praxis`,
+        body: [
+          greeting,
+          '',
+          'Wir werden Sie unter Ihrer hinterlegten Telefonnummer zurückrufen.',
+          'Bitte stellen Sie sicher, dass Sie erreichbar sind.',
+          '',
+          `Referenz: ${referenceId}`,
+          signoff,
+        ].join('\n'),
+      };
   }
 }
 
 function getRecommendedTemplates(service: string): ResponseTemplateKey[] {
   const normalized = service.trim().toLowerCase();
 
-  if (normalized.includes('telefon')) {
-    return ['received', 'callback'];
+  if (normalized.includes('termin') || normalized.includes('anamnese')) {
+    return ['received', 'termin_confirmed'];
   }
 
-  if (normalized.includes('rezept') || normalized.includes('befund')) {
-    return ['received', 'completed'];
+  if (normalized.includes('rezept') || normalized.includes('medikament')) {
+    return ['rezept_ready_pickup', 'rezept_ready_post', 'received'];
   }
 
-  return ['received', 'in_review'];
+  if (normalized.includes('au') || normalized.includes('krank') || normalized.includes('arbeitsunfähig')) {
+    return ['au_issued', 'received'];
+  }
+
+  if (normalized.includes('überweisung') || normalized.includes('ueberweisung')) {
+    return ['ueberweisung_ready', 'received'];
+  }
+
+  if (normalized.includes('bg') || normalized.includes('unfall') || normalized.includes('berufsgenossens')) {
+    return ['bg_unfall_registered', 'received'];
+  }
+
+  if (normalized.includes('befund')) {
+    return ['befund_available', 'befund_appointment_needed', 'received'];
+  }
+
+  if (normalized.includes('telefon') || normalized.includes('rückruf') || normalized.includes('callback')) {
+    return ['rückruf_scheduled', 'callback'];
+  }
+
+  return ['received', 'in_review', 'completed'];
 }
 
 function getActionState(

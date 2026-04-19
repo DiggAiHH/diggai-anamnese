@@ -32,6 +32,8 @@ export interface QuickInfo {
   hasRedFlags: boolean;
 }
 
+export type VisitType = 'IN_PERSON' | 'ONLINE' | 'PHONE';
+
 export interface PatientQueueItem {
   id: string;
   sessionId: string;
@@ -40,6 +42,7 @@ export interface PatientQueueItem {
   status: QueueStatus;
   triageLevel: TriageLevel;
   service: string;
+  visitType: VisitType;
   waitTimeMinutes: number;
   checkInTime: Date;
   assignedDoctorId?: string;

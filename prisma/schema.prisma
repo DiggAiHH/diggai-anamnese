@@ -87,6 +87,7 @@ model Tenant {
   practiceEncryptionKeys PracticeEncryptionKey[]
   secureExportLinks      SecureExportLink[]
   packageImportLogs      PackageImportLog[]
+  signatures             Signature[]
 
   @@index([subdomain])
   @@index([status])
@@ -423,6 +424,8 @@ enum FormType {
 
 model Signature {
   id        String          @id @default(uuid())
+  tenantId  String?
+  tenant    Tenant?         @relation(fields: [tenantId], references: [id], onDelete: SetNull)
   patientId String?
   patient   Patient?        @relation(fields: [patientId], references: [id], onDelete: SetNull)
   sessionId String?
@@ -442,6 +445,8 @@ model Signature {
   createdAt DateTime @default(now())
 
   @@unique([patientId, formType, documentHash])
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
   @@index([patientId, createdAt])
   @@index([sessionId])
   @@index([formType, createdAt])
@@ -677,6 +682,7 @@ model QueueEntry {
   service            String
   priority           String    @default("NORMAL") // NORMAL, URGENT, EMERGENCY
   status             String    @default("WAITING") // WAITING, CALLED, IN_TREATMENT, DONE
+  visitType          String    @default("IN_PERSON") // IN_PERSON, ONLINE, PHONE
   position           Int       @default(0)
   joinedAt           DateTime  @default(now())
   calledAt           DateTime?
@@ -691,6 +697,7 @@ model QueueEntry {
   session PatientSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@index([status, priority])
+  @@index([visitType, status])
   @@index([joinedAt])
 }
 

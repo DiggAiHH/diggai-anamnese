@@ -17,6 +17,8 @@ export {
     useMfaReceptionPracticeCopy,
     useMfaReceptionRespond,
     useMfaReceptionConfirm,
+    useMfaReceptionSms,
+    useMfaReceptionStarface,
     useChatMessages,
     useQueue,
     useQueueCall,

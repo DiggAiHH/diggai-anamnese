@@ -1261,7 +1261,7 @@ export const api = {
         return response.data;
     },
 
-    mfaReceptionRespond: async (sessionId: string, data: { templateKey: 'received' | 'in_review' | 'completed' | 'callback'; customNote?: string | null; mode?: 'auto' | 'smtp' | 'manual' }) => {
+    mfaReceptionRespond: async (sessionId: string, data: { templateKey: string; customNote?: string | null; mode?: 'auto' | 'smtp' | 'manual' }) => {
         if (isDemoMode()) {
             return {
                 sent: false,
@@ -1283,6 +1283,18 @@ export const api = {
     mfaReceptionConfirm: async (sessionId: string, kind: 'practice-copy' | 'response') => {
         if (isDemoMode()) return { success: true };
         const response = await apiClient.post(`/mfa/reception/inbox/${sessionId}/confirm`, { kind });
+        return response.data;
+    },
+
+    mfaReceptionSms: async (sessionId: string, data: { to: string; body: string }) => {
+        if (isDemoMode()) return { sent: true, mode: 'twilio', messageSid: 'SM_DEMO' };
+        const response = await apiClient.post(`/mfa/reception/inbox/${sessionId}/sms`, data);
+        return response.data;
+    },
+
+    mfaReceptionStarface: async (sessionId: string, data: { callee: string; caller?: string }) => {
+        if (isDemoMode()) return { initiated: true, mode: 'click2dial', callId: 'CALL_DEMO' };
+        const response = await apiClient.post(`/mfa/reception/inbox/${sessionId}/starface-callback`, data);
         return response.data;
     },
 
