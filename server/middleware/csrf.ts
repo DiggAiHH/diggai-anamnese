@@ -59,10 +59,11 @@ export function setCsrfCookie(req: Request, res: Response, next: NextFunction): 
     
     if (!existingToken) {
         const token = generateToken();
+        const isProduction = process.env.NODE_ENV === 'production';
         res.cookie(CSRF_COOKIE_NAME, token, {
             httpOnly: false, // Must be accessible by JavaScript
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
+            secure: isProduction,
+            sameSite: isProduction ? 'none' : 'lax',
             path: '/',
             maxAge: 24 * 60 * 60 * 1000, // 24 hours
         });

@@ -2,7 +2,7 @@
   "mcpServers": {
     "playwright": {
       "command": "npx",
-      "args": ["@playwright/mcp@latest"],
+      "args": ["-y", "@playwright/mcp@latest"],
       "description": "Browser automation for E2E testing — 22 Playwright specs in e2e/"
     },
     "filesystem": {
@@ -10,9 +10,9 @@
       "args": [
         "-y",
         "@modelcontextprotocol/server-filesystem",
-        "C:\\Users\\tubbeTEC\\Downloads\\Anamnese-kimi\\anamnese-app"
+        "D:\\Klaproth Projekte\\DiggAi\\Ananmese\\diggai-anamnese-master"
       ],
-      "description": "File system access — SCOPED to anamnese-app/ only. Do NOT expand scope to sibling projects."
+      "description": "File system access — scoped to the active DiggAI workspace only."
     },
     "postgres": {
       "command": "npx",

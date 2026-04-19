@@ -114,8 +114,10 @@ docker-compose -f docker-compose.local.yml up -d
 # 4. Datenbank-Migrationen ausfÃ¼hren
 npx prisma migrate dev --name init
 
-# 5. Datenbank befÃ¼llen (270+ Fragen + Admin-Nutzer)
+# 5. Datenbank befüllen (270+ Fragen + Admin-Nutzer + Default-Tenant)
 npx prisma db seed
+# HINWEIS: Das Seed erstellt einen 'default'-Tenant für localhost-Entwicklung.
+# Ohne diesen Tenant schlagen alle API-Calls fehl (404 Tenant-Resolution).
 
 # 6. Entwicklungsserver starten
 npm run dev

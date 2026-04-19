@@ -16,13 +16,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | **Compliance** | DSGVO, HIPAA audit logging, BSI TR-03161, gematik TI/ePA, eIDAS |
 | **Architecture** | DiggAI Service 4 of 4 (Python Agent Core / Tauri Desktop / Monorepo / **this**) |
 
-**SCOPE: Work EXCLUSIVELY in `anamnese-app/`. Do NOT touch sibling folders.**
+**SCOPE: Work EXCLUSIVELY in this repository root. Do NOT touch sibling folders.**
 
 ---
 
 ## Build & Dev Commands
 
-All commands run from `anamnese-app/`:
+All commands run from this repository root:
 
 ```bash
 # Development
@@ -50,6 +50,14 @@ npm run test:changed              # only files changed since last commit
 npm run test:e2e                             # Full suite
 npx playwright test e2e/anamnese.spec.ts     # Single spec
 npx playwright test --ui                     # Interactive runner
+
+# Python E2E Tests (pytest + Playwright — D: drive only)
+# Requires: D:\Python312\python.exe, PLAYWRIGHT_BROWSERS_PATH=D:\playwright-browsers
+# Requires: Vite dev server running on localhost:5173 (npm run dev)
+tests_py\run_tests.bat               # Run all Python E2E tests (headed)
+tests_py\run_tests.bat -k test_01    # Run only UI tests
+tests_py\run_tests.bat -m encryption # Run only encryption marker
+tests_py\run_tests.bat --html=report.html  # Generate HTML report
 
 # Load Tests (k6 — requires k6 installed)
 npm run test:load         # all k6 load tests
@@ -356,11 +364,38 @@ npm run deploy:preview  # Preview deploy
 
 ## No-Redundancy Protocol
 
-This workspace uses a multi-agent Once-Guard system. See root `../CLAUDE.md` for the full protocol. Before creating any file, feature, or service:
+This workspace uses a multi-agent Once-Guard system. See the workspace-root `CLAUDE.md` for the full protocol. Before creating any file, feature, or service:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File ../scripts/once-guard.ps1 precheck -Task "<task-key>"
-# Exit 0 = free | Exit 2 = in_progress (STOP) | Exit 3 = completed (read artifacts) | Exit 4 = file exists (read first)
+node scripts/once-guard.mjs precheck --task "<task-key>"
+# Exit 0 = free | Exit 2 = in_progress (STOP) | Exit 3 = completed (read artifacts)
+
+# Windows wrapper (same workflow, same storage)
+scripts\once-guard.cmd precheck --task "<task-key>"
 ```
 
-Registry: `../shared/knowledge/task-registry.json` | Knowledge: `../shared/knowledge/knowledge-share.md`
+Registry: `shared/knowledge/task-registry.json` | Knowledge: `shared/knowledge/knowledge-share.md` | Checkpoints: `shared/knowledge/checkpoints/`
+
+## Welcome-Back Protocol
+
+Long tasks must be split into small packs and checkpointed so work survives editor crashes or context resets.
+
+Rules:
+
+- One pack = one user-visible outcome.
+- Target <= 3 edited files or <= 30 minutes before writing a checkpoint.
+- Always checkpoint after validation, before risky refactors, and before leaving an unfinished task.
+
+Checkpoint command:
+
+```powershell
+node scripts/once-guard.mjs checkpoint --task "<task-key>" --agent "copilot" --session "<YYYY-MM-DD-topic>" --batch <n> --summary "What is true right now" --done "finished item" --next "next item" --artifacts "relative/path.ts"
+```
+
+Resume command:
+
+```powershell
+node scripts/once-guard.mjs status --task "<task-key>"
+```
+
+Checkpoints are stored in `shared/knowledge/checkpoints/<task-key>.md`.

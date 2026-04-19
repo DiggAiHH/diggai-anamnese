@@ -7,9 +7,11 @@ import { LanguageSelector } from './LanguageSelector';
 import { ThemeToggle } from './ThemeToggle';
 import { ModeToggle } from './ModeToggle';
 import { KioskToggle } from './KioskToggle';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { preloadConsentExperience, preloadLandingEnhancements } from '../lib/routePreloaders';
+import { api } from '../api/client';
 import {
+    getPatientAppBasePath,
     getPatientQuestionnairePath,
     getPatientServiceById,
     getPatientServiceEntryPath,
@@ -33,17 +35,32 @@ interface ServiceCard {
     badge?: string;
 }
 
-export function LandingPage() {
+interface LandingPageProps {
+    forceClassic?: boolean;
+}
+
+const CLASSIC_SERVICE_IDS: ReadonlySet<PatientServiceId> = new Set([
+    'anamnese',
+    'prescription',
+    'au',
+    'unfall',
+]);
+
+export function LandingPage({ forceClassic = false }: LandingPageProps) {
     const { t } = useTranslation();
     const { mutate: createSession, status: createStatus } = useCreateSession();
     const navigate = useNavigate();
     const { bsnr } = useParams<{ bsnr?: string }>();
+    const [searchParams] = useSearchParams();
     const sessionId = useSessionStore(state => state.sessionId);
     const setPatientData = useSessionStore(state => state.setPatientData);
     const [showDSGVO, setShowDSGVO] = useState(false);
     const [showSignature, setShowSignature] = useState(false);
     const [selectedService, setSelectedService] = useState<ServiceCard | null>(null);
     const [showDeferredUi, setShowDeferredUi] = useState(false);
+    const classicLayoutFromQuery = searchParams.get('layout');
+    const showClassicLayout =
+        forceClassic || classicLayoutFromQuery === 'classic' || classicLayoutFromQuery === 'classic4';
 
     useEffect(() => {
         const enableDeferredUi = () => {
@@ -157,6 +174,20 @@ export function LandingPage() {
         }
     ], [t]);
 
+    const displayedServices = useMemo(() => {
+        if (!showClassicLayout) {
+            return services;
+        }
+
+        return services.filter((service) => CLASSIC_SERVICE_IDS.has(service.id as PatientServiceId));
+    }, [services, showClassicLayout]);
+
+    const servicesGridClassName = showClassicLayout
+        ? 'grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl'
+        : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6';
+
+    const patientBasePath = getPatientAppBasePath(bsnr);
+
     const handleSelect = (service: ServiceCard) => {
         // Erst DSGVO-Consent prüfen
         const consentGiven = localStorage.getItem('dsgvo_consent');
@@ -191,9 +222,21 @@ export function LandingPage() {
     };
 
     const handleSignatureComplete = (signatureData: string, documentHash: string) => {
+        // Store locally for offline fallback
         localStorage.setItem('dsgvo_consent', new Date().toISOString());
         localStorage.setItem('dsgvo_signature_hash', documentHash);
         localStorage.setItem('dsgvo_signature_data', signatureData);
+
+        // Persist DSGVO signature to backend (fire-and-forget with error logging)
+        api.submitDsgvoSignature({
+            signatureData,
+            documentHash,
+            formType: 'DSGVO',
+            documentVersion: '1.0',
+        }).catch((err: unknown) => {
+            console.warn('[DSGVO] Signature backend persist failed (stored locally):', err);
+        });
+
         setShowSignature(false);
         if (selectedService) {
             startFlow(selectedService);
@@ -231,19 +274,46 @@ export function LandingPage() {
                 <div className="max-w-3xl mb-16 lg:mb-24">
                     <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-sm font-bold tracking-wide uppercase mb-8 shadow-lg shadow-blue-500/5">
                         <Activity className="w-4 h-4" />
-                        {t('landing.serviceHub', 'Patienten-Service Hub')}
+                        {showClassicLayout
+                            ? translateStableText(t, 'landing.classicHub', 'Patienten-Service Klassik')
+                            : t('landing.serviceHub', 'Patienten-Service Hub')}
                     </div>
                     <h1 className="text-5xl lg:text-7xl font-black tracking-tight text-[var(--text-primary)] mb-8 leading-[1.1]">
-                        {translateStableText(t, 'ui.landing.title', 'Anliegen wählen')}
+                        {showClassicLayout
+                            ? translateStableText(t, 'ui.landing.classicTitle', 'Schnellauswahl in 4 Feldern')
+                            : translateStableText(t, 'ui.landing.title', 'Anliegen wählen')}
                     </h1>
                     <p className="text-xl text-[var(--text-secondary)] leading-relaxed font-medium">
-                        {t('landingDescription', 'Wählen Sie Ihr Anliegen aus. Unser intelligenter Assistent leitet Sie Schritt für Schritt durch den Prozess – schnell, sicher und diskret.')}
+                        {showClassicLayout
+                            ? translateStableText(
+                                t,
+                                'ui.landing.classicDescription',
+                                'Die klassische 4-Felder-Ansicht für den schnellsten Einstieg in die häufigsten Anliegen.',
+                            )
+                            : t('landingDescription', 'Wählen Sie Ihr Anliegen aus. Unser intelligenter Assistent leitet Sie Schritt für Schritt durch den Prozess – schnell, sicher und diskret.')}
                     </p>
+                    <div className="mt-6">
+                        {showClassicLayout ? (
+                            <Link
+                                to={patientBasePath}
+                                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--bg-card)] border border-[var(--border-primary)] text-sm font-semibold text-[var(--text-secondary)] hover:text-blue-400 hover:border-blue-500/30 transition-all"
+                            >
+                                {translateStableText(t, 'ui.landing.switchFull', 'Vollständige Service-Ansicht öffnen')}
+                            </Link>
+                        ) : (
+                            <Link
+                                to={`${patientBasePath}?layout=classic`}
+                                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--bg-card)] border border-[var(--border-primary)] text-sm font-semibold text-[var(--text-secondary)] hover:text-blue-400 hover:border-blue-500/30 transition-all"
+                            >
+                                {translateStableText(t, 'ui.landing.switchClassic', '4-Felder-Ansicht öffnen')}
+                            </Link>
+                        )}
+                    </div>
                 </div>
 
                 {/* Services Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    {services.map((service) => {
+                <div className={servicesGridClassName}>
+                    {displayedServices.map((service) => {
                         const serviceDefinition = getPatientServiceById(service.id);
                         const route = serviceDefinition?.routeSegment
                             ? getPatientServiceEntryPath(service.id as PatientServiceId, bsnr)
@@ -337,33 +407,33 @@ export function LandingPage() {
                     </div>
 
                     <div className="flex items-center gap-4 flex-wrap justify-center">
-                        <Link to="/datenschutz" className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-primary)] backdrop-blur-md text-sm font-bold text-[var(--text-secondary)] hover:text-blue-400 hover:border-blue-500/30 transition-all duration-300">
+                        <Link to={bsnr ? `/${bsnr}/datenschutz` : '/datenschutz'} className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-primary)] backdrop-blur-md text-sm font-bold text-[var(--text-secondary)] hover:text-blue-400 hover:border-blue-500/30 transition-all duration-300">
                             <ShieldCheck className="w-4 h-4" />
                             {t('landing.datenschutz', 'Datenschutz')}
                         </Link>
-                        <Link to="/impressum" className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-primary)] backdrop-blur-md text-sm font-bold text-[var(--text-secondary)] hover:text-blue-400 hover:border-blue-500/30 transition-all duration-300">
+                        <Link to={bsnr ? `/${bsnr}/impressum` : '/impressum'} className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-primary)] backdrop-blur-md text-sm font-bold text-[var(--text-secondary)] hover:text-blue-400 hover:border-blue-500/30 transition-all duration-300">
                             <FileText className="w-4 h-4" />
                             {t('landing.impressum', 'Impressum')}
                         </Link>
                         <span className="hidden lg:block w-px h-6 bg-[var(--border-primary)]" />
-                        <Link to="/docs" className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-primary)] backdrop-blur-md text-sm font-bold text-[var(--text-secondary)] hover:text-blue-400 hover:border-blue-500/30 transition-all duration-300">
+                        <Link to="/verwaltung/docs" className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-primary)] backdrop-blur-md text-sm font-bold text-[var(--text-secondary)] hover:text-blue-400 hover:border-blue-500/30 transition-all duration-300">
                             <BookOpen className="w-4 h-4" />
                             {t('landing.docs', 'Dokumentation')}
                         </Link>
-                        <Link to="/handbuch" className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-primary)] backdrop-blur-md text-sm font-bold text-[var(--text-secondary)] hover:text-blue-400 hover:border-blue-500/30 transition-all duration-300">
+                        <Link to="/verwaltung/handbuch" className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-primary)] backdrop-blur-md text-sm font-bold text-[var(--text-secondary)] hover:text-blue-400 hover:border-blue-500/30 transition-all duration-300">
                             <Eye className="w-4 h-4" />
                             {t('landing.handbuch', 'Handbuch')}
                         </Link>
                         <span className="hidden lg:block w-px h-6 bg-[var(--border-primary)]" />
-                        <Link to="/arzt" className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-primary)] backdrop-blur-md text-sm font-bold text-[var(--text-secondary)] hover:text-emerald-400 hover:border-emerald-500/30 transition-all duration-300">
+                        <Link to="/verwaltung/arzt" className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-primary)] backdrop-blur-md text-sm font-bold text-[var(--text-secondary)] hover:text-emerald-400 hover:border-emerald-500/30 transition-all duration-300">
                             <Stethoscope className="w-4 h-4" />
                             {t('landing.arzt', 'Arzt')}
                         </Link>
-                        <Link to="/mfa" className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-primary)] backdrop-blur-md text-sm font-bold text-[var(--text-secondary)] hover:text-amber-400 hover:border-amber-500/30 transition-all duration-300">
+                        <Link to="/verwaltung/mfa" className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-primary)] backdrop-blur-md text-sm font-bold text-[var(--text-secondary)] hover:text-amber-400 hover:border-amber-500/30 transition-all duration-300">
                             <Users className="w-4 h-4" />
                             {t('landing.mfa', 'MFA')}
                         </Link>
-                        <Link to="/admin" className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-primary)] backdrop-blur-md text-sm font-bold text-[var(--text-secondary)] hover:text-rose-400 hover:border-rose-500/30 transition-all duration-300">
+                        <Link to="/verwaltung/admin" className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-primary)] backdrop-blur-md text-sm font-bold text-[var(--text-secondary)] hover:text-rose-400 hover:border-rose-500/30 transition-all duration-300">
                             <Settings className="w-4 h-4" />
                             {t('landing.admin', 'Admin')}
                         </Link>

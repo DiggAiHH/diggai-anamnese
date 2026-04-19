@@ -291,7 +291,7 @@ router.patch('/sessions/:id/processed', requireAuth, requireRole('mfa', 'arzt', 
         const sessionId = req.params.id as string;
         const userId = typeof req.auth?.userId === 'string' ? req.auth.userId : undefined;
 
-        const session = await prisma.session.findFirst({
+        const session = await prisma.patientSession.findFirst({
             where: { id: sessionId, tenantId: tenantResult.tenantId },
         });
 
@@ -300,7 +300,7 @@ router.patch('/sessions/:id/processed', requireAuth, requireRole('mfa', 'arzt', 
             return;
         }
 
-        const updated = await prisma.session.update({
+        const updated = await prisma.patientSession.update({
             where: { id: sessionId },
             data: {
                 processedStatus: parsed.data.processedStatus,

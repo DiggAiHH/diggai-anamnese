@@ -132,3 +132,79 @@ Im Verzeichnis `docs/` befinden sich sämtliche DSGVO- und Datenschutz-Dokumente
 | `INCIDENT_RESPONSE_PLAN.md` | Incident-Response-Plan für Datenpannen |
 | `TOM_DOKUMENTATION.md` | Technisch-organisatorische Maßnahmen (Art. 32 DSGVO) |
 | `VERFAHRENSVERZEICHNIS.md` | Verfahrensverzeichnis (Art. 30 DSGVO) |
+
+---
+
+## 🔐 End-to-End Verschlüsselung (Zero-Knowledge Architektur)
+
+### Datenfluss: Patient → Backend → Arzt-Dashboard
+
+```
+Patient Browser                         Server                      PostgreSQL
+─────────────────────────────────────────────────────────────────────────────
+1. Patient gibt PII ein
+   (z.B. E-Mail, Adresse, Telefon)
+        ↓
+2. PBKDF2(passphrase + sessionId)
+   → AES-256-GCM CryptoKey (non-extractable)
+        ↓
+3. encryptPayload({value}, key)
+   → { iv, ciphertext, alg: 'AES-256-GCM' }
+        ↓
+4. POST /api/sessions/:id/answers
+   { atomId: '3003', value: '[E2EE]',
+     encrypted: { iv, ciphertext } }
+                                        ↓
+                                   5. Server speichert NUR Ciphertext
+                                      (entschlüsselt NICHT)
+                                        ↓
+                                                                6. JSON-Blob in DB
+                                                                   (nur Ciphertext)
+
+--- Später: Arzt-Ansicht ---
+
+7. GET /api/sessions/:id
+   → Server liefert verschlüsselte Blobs
+        ↓
+8. MfaDecryptView im Browser:
+   deriveSessionKey(masterKey, sessionId)
+   decryptPayload(encrypted, key)
+        ↓
+9. Klartext NUR im Browser-DOM
+   (wird nie zurück an Server gesendet)
+   ✅ Zero-Knowledge bestätigt
+```
+
+### Verschlüsselte Felder (Client-Side E2EE)
+
+| AtomId | Feld | Verschlüsselung |
+|--------|------|-----------------|
+| 3000 | PLZ | AES-256-GCM (Client) |
+| 3001 | Ort | AES-256-GCM (Client) |
+| 3002 | Adresse | AES-256-GCM (Client) |
+| 3004 | Telefon | AES-256-GCM (Client) |
+| 9011 | Kontakt-Telefon | AES-256-GCM (Client) |
+
+### Server-Side Verschlüsselung (Legacy PII)
+
+| AtomId | Feld | Verschlüsselung |
+|--------|------|-----------------|
+| 0001 | Nachname | AES-256-GCM (Server, ENCRYPTION_KEY) |
+| 0011 | Vorname | AES-256-GCM (Server, ENCRYPTION_KEY) |
+| 9010 | E-Mail | SHA-256 gehashter Lookup + AES-256-GCM |
+
+### DSGVO-Signatur-Persistierung
+
+1. Patient unterschreibt DSGVO-Formular im Browser (SignaturePad)
+2. `handleSignatureComplete()` → localStorage (Offline-Fallback) + `POST /api/signatures`
+3. Server verschlüsselt Signatur-Daten via `signatureService.encryptSignature()` (AES-256-GCM)
+4. Gespeichert: `encryptedSignatureData`, `documentHash` (SHA-256), `ipHash`, `userAgent`
+5. Abruf nur durch Arzt/Admin mit `?decrypt=true` Parameter
+
+### Multi-Tenant-Architektur
+
+- **Row-Level Isolation**: Jede DB-Zeile hat `tenantId`
+- **Tenant-Resolution**: Subdomain → BSNR-Header → Custom-Domain → Default-Fallback
+- **5-Minuten-Cache**: Tenant-Konfiguration wird gecacht für Performance
+- **Skalierung**: Unbegrenzte Praxen im selben System (Shared Database)
+- **White-Label**: Farben, Logo, Willkommensnachricht pro Tenant konfigurierbar

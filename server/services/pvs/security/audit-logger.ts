@@ -281,7 +281,7 @@ export class PvsAuditLogger extends EventEmitter {
   private async persistEntries(entries: AuditEntry[]): Promise<void> {
     const prisma = await getPrismaAuditClient();
     const records = entries.map((entry) => this.toPersistedAuditLog(entry));
-    const auditLogModel = prisma.auditLog as {
+    const auditLogModel = prisma.auditLog as unknown as {
       createMany?: (args: { data: PersistedAuditLogData[] }) => Promise<unknown>;
       create?: (args: { data: PersistedAuditLogData }) => Promise<unknown>;
     };

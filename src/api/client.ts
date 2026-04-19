@@ -2489,6 +2489,28 @@ export const api = {
         return response.data;
     },
 
+    // ─── DSGVO Signature Persistence ───────────────────────────
+
+    submitDsgvoSignature: async (data: {
+        signatureData: string;
+        documentHash: string;
+        sessionId?: string;
+        patientId?: string;
+        formType?: string;
+        documentVersion?: string;
+    }) => {
+        if (isDemoMode()) return { id: 'demo-sig-1', createdAt: new Date().toISOString() };
+        const response = await apiClient.post('/signatures', {
+            signatureData: data.signatureData,
+            documentHash: data.documentHash,
+            sessionId: data.sessionId || null,
+            patientId: data.patientId || null,
+            formType: data.formType || 'DSGVO',
+            documentVersion: data.documentVersion || '1.0',
+        });
+        return response.data;
+    },
+
     // ─── Modul 7: NFC Checkpoints ──────────────────────────────
 
     nfcScan: async (data: { locationId: string; praxisId: string; timestamp: number; signature: string; sessionHint?: string; deviceInfo?: string }) => {

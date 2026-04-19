@@ -139,11 +139,30 @@ async function main() {
   // ── Clean up demo tenants ─────────────────────────────────────
   console.log('🧹 Bereinige vorhandene Demo-Daten...');
   await prisma.tenant.deleteMany({
-    where: { subdomain: { in: ['demo-hausarzt', 'demo-kardio', 'demo-mvz'] } },
+    where: { subdomain: { in: ['default', 'demo-hausarzt', 'demo-kardio', 'demo-mvz'] } },
   });
 
   // ── Tenants ───────────────────────────────────────────────────
   console.log('📋 Erstelle Demo-Praxen...');
+
+  // Default tenant for localhost development (resolveTenant fallback)
+  const tDefault = await prisma.tenant.upsert({
+    where: { subdomain: 'default' },
+    update: {},
+    create: {
+      subdomain: 'default',
+      name: 'DiggAI Demo-Praxis (Localhost)',
+      legalName: 'DiggAI Demo GmbH',
+      plan: 'PROFESSIONAL',
+      status: 'ACTIVE',
+      primaryColor: '#2563eb',
+      welcomeMessage: 'Willkommen in der DiggAI Demo-Praxis! Dies ist die lokale Entwicklungsumgebung.',
+      maxUsers: 50, maxPatientsPerMonth: 5000, storageLimitMB: 10240,
+      dsgvoAgreementSigned: true, dsgvoAgreementSignedAt: new Date(), dataRegion: 'de',
+    },
+  });
+  console.log(`  ✅ ${tDefault.name} [DEFAULT/LOCALHOST]`);
+
   const t1 = await prisma.tenant.create({ data: TENANT_HAUSARZT });
   const t2 = await prisma.tenant.create({ data: TENANT_KARDIO });
   const t3 = await prisma.tenant.create({ data: TENANT_MVZ });
@@ -171,6 +190,13 @@ async function main() {
 
   // ── Staff Accounts ────────────────────────────────────────────
   console.log('\n👨‍⚕️ Erstelle Arzt-Accounts...');
+
+  // Default tenant accounts (for localhost development)
+  const [aD_admin, aD_arzt, aD_mfa] = await Promise.all([
+    prisma.arztUser.create({ data: { tenantId: tDefault.id, username: 'admin',   passwordHash: pwHash, pinHash, displayName: 'System Administrator', role: 'ADMIN', loginCount: 42, lastLoginAt: new Date() } }),
+    prisma.arztUser.create({ data: { tenantId: tDefault.id, username: 'arzt',    passwordHash: pwHash, displayName: 'Dr. Demo (Localhost)',        role: 'ARZT',  loginCount: 15 } }),
+    prisma.arztUser.create({ data: { tenantId: tDefault.id, username: 'mfa',     passwordHash: pwHash, displayName: 'MFA Demo (Localhost)',         role: 'MFA',   loginCount: 30 } }),
+  ]);
 
   const [a1_admin, a1_arzt, a1_mfa] = await Promise.all([
     prisma.arztUser.create({ data: { tenantId: t1.id, username: 'admin',       passwordHash: pwHash, pinHash, displayName: 'Dr. Klaus Musterarzt',      role: 'ADMIN', loginCount: 142, lastLoginAt: new Date() } }),
@@ -702,6 +728,45 @@ async function main() {
   });
 
   // ═══════════════════════════════════════════════════════════════
+  // DSGVO SIGNATURES (Consent persistence)
+  // ═══════════════════════════════════════════════════════════════
+  console.log('\n✍️ Erstelle DSGVO-Signaturen...');
+
+  await prisma.signature.createMany({
+    data: [
+      { patientId: pts3[0].id,  sessionId: s3_1.id,  signerRole: 'PATIENT', formType: 'DSGVO', documentHash: 'sha256:demo-hash-s3-1',  encryptedSignatureData: 'demo-encrypted-sig-data', ipHash: 'sha256:demo-ip-1',  userAgent: 'DiggAI PWA/3.0' },
+      { patientId: pts3[1].id,  sessionId: s3_2.id,  signerRole: 'PATIENT', formType: 'DSGVO', documentHash: 'sha256:demo-hash-s3-2',  encryptedSignatureData: 'demo-encrypted-sig-data', ipHash: 'sha256:demo-ip-2',  userAgent: 'DiggAI PWA/3.0' },
+      { patientId: pts3[2].id,  sessionId: s3_3.id,  signerRole: 'PATIENT', formType: 'DSGVO', documentHash: 'sha256:demo-hash-s3-3',  encryptedSignatureData: 'demo-encrypted-sig-data', ipHash: 'sha256:demo-ip-3',  userAgent: 'DiggAI Kiosk/3.0' },
+      { patientId: pts1[0].id,  sessionId: s1_1.id,  signerRole: 'PATIENT', formType: 'DSGVO', documentHash: 'sha256:demo-hash-s1-1',  encryptedSignatureData: 'demo-encrypted-sig-data', ipHash: 'sha256:demo-ip-4',  userAgent: 'DiggAI PWA/3.0' },
+      { patientId: pts2[0].id,  sessionId: s2_1.id,  signerRole: 'PATIENT', formType: 'DSGVO', documentHash: 'sha256:demo-hash-s2-1',  encryptedSignatureData: 'demo-encrypted-sig-data', ipHash: 'sha256:demo-ip-5',  userAgent: 'DiggAI PWA/3.0' },
+      { patientId: pts1[1].id,  sessionId: s1_2.id,  signerRole: 'PATIENT', formType: 'DSGVO', documentHash: 'sha256:demo-hash-s1-2',  encryptedSignatureData: 'demo-encrypted-sig-data', ipHash: 'sha256:demo-ip-6',  userAgent: 'DiggAI PWA/3.0' },
+    ],
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // PATIENT CONSENTS (PWA accounts)
+  // ═══════════════════════════════════════════════════════════════
+  console.log('\n📋 Erstelle Patienten-Einwilligungen...');
+
+  // Fetch the PWA accounts to reference them
+  const pwaAccounts = await prisma.patientAccount.findMany({
+    where: { patientId: { in: [pts3[0].id, pts3[1].id, pts3[2].id, pts3[11].id, pts3[13].id] } },
+  });
+
+  if (pwaAccounts.length > 0) {
+    const consentData: Array<{ accountId: string; type: 'DATA_PROCESSING' | 'EMERGENCY_CONTACT' | 'MEDICATION_REMINDER' | 'PUSH_NOTIFICATIONS' | 'DATA_SHARING'; granted: boolean; grantedAt: Date; ipAddress: string }> = [];
+    for (const acc of pwaAccounts) {
+      consentData.push(
+        { accountId: acc.id, type: 'DATA_PROCESSING',      granted: true,  grantedAt: new Date(Date.now() - 30 * 86400_000), ipAddress: '10.0.0.50' },
+        { accountId: acc.id, type: 'EMERGENCY_CONTACT',     granted: true,  grantedAt: new Date(Date.now() - 30 * 86400_000), ipAddress: '10.0.0.50' },
+        { accountId: acc.id, type: 'MEDICATION_REMINDER',   granted: true,  grantedAt: new Date(Date.now() - 14 * 86400_000), ipAddress: '10.0.0.50' },
+        { accountId: acc.id, type: 'PUSH_NOTIFICATIONS',    granted: false, grantedAt: new Date(Date.now() - 30 * 86400_000), ipAddress: '10.0.0.50' },
+      );
+    }
+    await prisma.patientConsent.createMany({ data: consentData });
+  }
+
+  // ═══════════════════════════════════════════════════════════════
   // SUMMARY
   // ═══════════════════════════════════════════════════════════════
   const totalPts = pts1.length + pts2.length + pts3.length;
@@ -711,8 +776,8 @@ async function main() {
   console.log('═'.repeat(68));
   console.log(`
 📊 ERSTELLT:
-  • 3 Demo-Praxen (STARTER / PROFESSIONAL / ENTERPRISE)
-  • 13 Arzt-/MFA-Accounts (3 Tenants)
+  • 4 Demo-Praxen (DEFAULT + STARTER / PROFESSIONAL / ENTERPRISE)
+  • 16 Arzt-/MFA-Accounts (Default + 3 Tenants)
   • ${totalPts} Patienten (T1: ${pts1.length} | T2: ${pts2.length} | T3: ${pts3.length})
   • 30 Patientensessionen — alle Interaktionsflows abgedeckt
   • 4 Triage-Events (2× KRITISCH KARDIO, 1× KRITISCH PSYCH, 1× WARNING)
@@ -720,6 +785,8 @@ async function main() {
   • 4 Therapiepläne (KI-generiert)
   • 12 Termine (inkl. 2× Notfall heute, 2× Telemedizin)
   • 5 PWA-Patienten-Accounts (DE/AR/RU/TR)
+  • 6 DSGVO-Signaturen (verschlüsselt)
+  • ${pwaAccounts.length * 4} Patienten-Einwilligungen (DSGVO-Consent)
   • 3 Tagebuch-Einträge (PWA-Showcase)
   • 9 Wartezimmer-Inhalte (DE/AR/RU/TR/PL)
   • ROI-Analytics für alle 3 Praxen
@@ -751,6 +818,9 @@ async function main() {
 
 🔑 DEMO-ZUGANGSDATEN (alle Praxen):
   Passwort: ${DEMO_PW}   PIN: 1234
+
+  Localhost (Default):    default
+    admin / ${DEMO_PW}   |   arzt / ${DEMO_PW}   |   mfa / ${DEMO_PW}
 
   Praxis 1 (Hausarzt):    demo-hausarzt
     admin / ${DEMO_PW}   |   arzt / ${DEMO_PW}   |   mfa / ${DEMO_PW}

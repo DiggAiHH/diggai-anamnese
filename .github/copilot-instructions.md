@@ -426,13 +426,13 @@ Goldene Regel: Alles darf nur einmal gemacht werden.
 Before creating any file, feature, route, service, or component:
 
 ```powershell
-# From repo root (Anamnese-kimi/):
+# From repository root:
 # 1. Precheck
-powershell -ExecutionPolicy Bypass -File scripts/once-guard.ps1 precheck -Task "<task-key>"
+node scripts/once-guard.mjs precheck --task "<task-key>"
 # Exit 0 = free  |  Exit 2 = IN PROGRESS by another agent  |  Exit 3 = ALREADY DONE
 
 # 2. Claim
-powershell -ExecutionPolicy Bypass -File scripts/once-guard.ps1 claim -Task "<task-key>" -Agent "copilot" -SessionId "<YYYY-MM-DD-topic>"
+node scripts/once-guard.mjs claim --task "<task-key>" --agent "copilot" --session "<YYYY-MM-DD-topic>"
 
 # 3. Read shared knowledge
 # shared/knowledge/knowledge-share.md   (decisions + lessons learned)
@@ -440,13 +440,22 @@ powershell -ExecutionPolicy Bypass -File scripts/once-guard.ps1 claim -Task "<ta
 
 # 4. Do the work.
 
+# 4.5. Save the current stand after every small pack or validation step
+node scripts/once-guard.mjs checkpoint --task "<task-key>" --agent "copilot" --session "<YYYY-MM-DD-topic>" --batch <n> --summary "What is true right now" --done "finished item" --next "next item" --artifacts "relative/path/artifact.ts"
+
 # 5. Complete
-powershell -ExecutionPolicy Bypass -File scripts/once-guard.ps1 complete -Task "<task-key>" -Agent "copilot" -Artifacts @("relative/path/artifact.ts")
+node scripts/once-guard.mjs complete --task "<task-key>" --agent "copilot" --summary "Completed state" --artifacts "relative/path/artifact.ts"
 ```
 
 Exit 2 = STOP — another agent owns it. Exit 3 = STOP — already done, extend don't rebuild.
 
+Pack size rule: one outcome per pack, usually <= 3 edited files or <= 30 minutes before a checkpoint.
+
+Resume rule: before continuing any interrupted task, run `node scripts/once-guard.mjs status --task "<task-key>"` and continue from the saved `Next` items instead of re-exploring from zero.
+
 Policy: `SESSIONS_ONCE_POLICY.md` | Brainstorm flow: `AGENT_BRAINSTORM_FLOW.md`
+
+Checkpoint store: `shared/knowledge/task-registry.json` and `shared/knowledge/checkpoints/<task-key>.md`
 
 ---
 

@@ -311,3 +311,15 @@ Recovery-Plan:
 2. `git reset --hard origin/master`
 3. Fixes + Scripts re-applyen
 4. Clean commit + push
+
+### Operationalized Repo Standard (2026-04-15)
+
+Der Welcome-Back- und Checkpoint-Mechanismus ist jetzt im Repo selbst verankert:
+
+- `scripts/once-guard.mjs` bleibt die Source of Truth fuer Claim, Checkpoint, Complete und Status
+- `scripts/once-guard.ps1` bietet dafuer einen Windows-PowerShell-Wrapper
+- `shared/knowledge/task-registry.json` speichert den aktuellen Task-Stand maschinenlesbar
+- `shared/knowledge/checkpoints/` speichert pro Task den letzten verifizierten Batch-Stand
+- `SESSIONS_ONCE_POLICY.md` definiert kleine Arbeitspakete und den Resume-Ablauf
+
+Pflicht-Regel: Nach jedem kleinen Arbeitspaket und vor riskanten Operationen muss ein Checkpoint geschrieben werden.

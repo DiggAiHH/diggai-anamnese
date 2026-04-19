@@ -229,11 +229,16 @@ function BsnrEntryGate() {
   );
 }
 
-function PatientApp() {
+type PatientLayoutVariant = 'default' | 'classic';
+
+function PatientApp({ defaultLayout = 'default' }: { defaultLayout?: PatientLayoutVariant }) {
   const flowStep = useSessionStore(state => state.flowStep);
   const selectedService = useSessionStore(state => state.selectedService);
   const setPatientData = useSessionStore(state => state.setPatientData);
   const [searchParams] = useSearchParams();
+  const layoutParam = searchParams.get('layout');
+  const isClassicLayout =
+    defaultLayout === 'classic' || layoutParam === 'classic' || layoutParam === 'classic4';
 
   useEffect(() => {
     const requestedServiceId = searchParams.get('service');
@@ -254,7 +259,7 @@ function PatientApp() {
     <Suspense fallback={<DashboardLoading />}>
       <div className="min-h-screen transition-colors duration-500">
         {flowStep === 'landing' ? (
-          <LandingPage />
+          <LandingPage forceClassic={isClassicLayout} />
         ) : (
           <Questionnaire />
         )}
@@ -298,6 +303,7 @@ function App() {
 
           {/* Patient-Flow */}
           <Route path="/patient" element={<RouteErrorBoundary routeType="patient"><PatientApp /></RouteErrorBoundary>} />
+          <Route path="/patient-classic" element={<RouteErrorBoundary routeType="patient"><PatientApp defaultLayout="classic" /></RouteErrorBoundary>} />
 
           {/* Dedicated Service Pages */}
           <Route path="/anamnese" element={<RouteErrorBoundary routeType="patient"><Suspense fallback={<DashboardLoading />}><AnamnesePage /></Suspense></RouteErrorBoundary>} />
@@ -401,6 +407,7 @@ function App() {
             <Route path="krankschreibung" element={<RouteErrorBoundary routeType="patient"><Suspense fallback={<DashboardLoading />}><KrankschreibungPage /></Suspense></RouteErrorBoundary>} />
             <Route path="unfallmeldung" element={<RouteErrorBoundary routeType="patient"><Suspense fallback={<DashboardLoading />}><UnfallmeldungPage /></Suspense></RouteErrorBoundary>} />
             <Route path="patient" element={<RouteErrorBoundary routeType="patient"><PatientApp /></RouteErrorBoundary>} />
+            <Route path="patient-classic" element={<RouteErrorBoundary routeType="patient"><PatientApp defaultLayout="classic" /></RouteErrorBoundary>} />
             <Route path="datenschutz" element={<Suspense fallback={<DashboardLoading />}><DatenschutzPage /></Suspense>} />
             <Route path="impressum" element={<Suspense fallback={<DashboardLoading />}><ImpressumPage /></Suspense>} />
             <Route path="admin" element={<RouteErrorBoundary routeType="staff"><Suspense fallback={<DashboardLoading />}><PraxisAdminPage /></Suspense></RouteErrorBoundary>} />

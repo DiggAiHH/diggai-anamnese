@@ -134,10 +134,13 @@ export function createToken(payload: AuthPayload): string {
 /** Set JWT as httpOnly cookie on the response */
 export function setTokenCookie(res: Response, token: string): void {
     // SECURITY FIX M1: maxAge jetzt synchron mit config.jwtExpiresIn (nicht hardcoded 24h)
+    // sameSite: In production with cross-origin (Netlify→Railway), use 'none' + secure.
+    // In dev (same-origin via Vite proxy), use 'lax' for compatibility.
+    const isProduction = process.env.NODE_ENV === 'production';
     res.cookie('access_token', token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        secure: isProduction,
+        sameSite: isProduction ? 'none' : 'lax',
         maxAge: config.jwtCookieMaxAgeMs,
         path: '/',
     });
@@ -145,10 +148,11 @@ export function setTokenCookie(res: Response, token: string): void {
 
 /** Clear the JWT cookie on logout */
 export function clearTokenCookie(res: Response): void {
+    const isProduction = process.env.NODE_ENV === 'production';
     res.clearCookie('access_token', {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        secure: isProduction,
+        sameSite: isProduction ? 'none' : 'lax',
         path: '/',
     });
 }

@@ -39,6 +39,12 @@ powershell -ExecutionPolicy Bypass -File scripts/once-guard.ps1 claim `
 
 # 4. Arbeit ausführen
 
+# 4.5. Nach jedem kleinen Paket checkpointen
+powershell -ExecutionPolicy Bypass -File scripts/once-guard.ps1 checkpoint `
+  -Task "<task-key>" -Agent "<agent-id>" -SessionId "<YYYY-MM-DD-topic>" `
+  -Summary "Was jetzt verifiziert ist" -NextStep "naechster verifizierter Schritt" `
+  -Files @("path/file1")
+
 # 5. Complete — immer abschließen
 powershell -ExecutionPolicy Bypass -File scripts/once-guard.ps1 complete `
   -Task "<task-key>" -Agent "<agent-id>" `
@@ -47,21 +53,7 @@ powershell -ExecutionPolicy Bypass -File scripts/once-guard.ps1 complete `
 
 ## Brainstorm Flow
 
-```powershell
-# Neues Brainstorm starten
-powershell -ExecutionPolicy Bypass -File scripts/agent-brainstorm.ps1 init -Topic "<thema>"
-
-# Status prüfen
-powershell -ExecutionPolicy Bypass -File scripts/agent-brainstorm.ps1 status
-
-# Antwort einreichen
-powershell -ExecutionPolicy Bypass -File scripts/agent-brainstorm.ps1 submit `
-  -Agent "<agent-id>" -InputFile "<response>.md"
-
-# Synthese + Plan
-powershell -ExecutionPolicy Bypass -File scripts/agent-brainstorm.ps1 synthesize
-powershell -ExecutionPolicy Bypass -File scripts/agent-brainstorm.ps1 plan
-```
+This repo uses the manual flow documented in `AGENT_BRAINSTORM_FLOW.md`.
 
 ## Shared Knowledge
 
