@@ -16,10 +16,9 @@
   command = "npm run build"
 
 [context.production.environment]
-  # ACTION REQUIRED: Set this in Netlify Dashboard > Environment variables
-  # to your Railway production URL (after Railway deploy).
-  # Format: https://YOUR_PROJECT.up.railway.app/api
-  VITE_API_URL = "https://REPLACE_WITH_RAILWAY_URL/api"
+  # Production backend endpoint (Hetzner VPS)
+  # Override in Netlify Dashboard for temporary staging tests if needed.
+  VITE_API_URL = "https://api.diggai.de/api"
 
 # ─── Branch deploy context (disabled in Dashboard — defined here for safety) ─
 # To disable branch deploys: Netlify Dashboard > Site configuration >

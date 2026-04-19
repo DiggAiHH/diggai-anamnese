@@ -108,3 +108,8 @@ test-final*.txt
 pw-phase*.txt
 pw-results*.txt
 pw-penetration-test.txt
+
+# Python venv
+tests_py/venv/
+tests_py/__pycache__/
+tests_py/*.pyc

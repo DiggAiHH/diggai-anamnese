@@ -11,8 +11,8 @@
 |---|------|-----|---------|--------|---------------|
 | 1 | **Klaproth (Hauptseite)** | [diggai-drklaproth.netlify.app](https://diggai-drklaproth.netlify.app) | Netlify | ✅ Live | `netlify.toml` (Hauptrepo) |
 | 2 | **Hatami (Kardiologie)** | `/hatami` Pfad auf Hauptdomain | Netlify (DiggAI-HZV-Rural) | ✅ Live | `DiggAI-HZV-Rural/netlify.toml` |
-| 3 | **API Backend (Produktion)** | `api.diggai.de` | Hetzner VPS Docker | 🟡 Konfiguriert (DNS ausstehend) | `.env.hetzner.template` |
-| 4 | **API Backend (Staging)** | `*.up.railway.app` | Railway | 🔄 Staging | `.env.pilot.example` |
+| 3 | **API Backend (Produktion)** | `api.diggai.de` | Hetzner VPS Docker | ✅ Live | `.env.hetzner.template` |
+| 4 | **API Backend (Staging/Fallback)** | `*.up.railway.app` | Railway | 🟡 Optional | `.env.pilot.example` |
 | 5 | **Pilot Klaproth** | `klaproth.diggai.de` | Hetzner VPS | 🟡 Geplant | `.env.pilot.example` |
 
 ---
@@ -36,7 +36,7 @@
 - **Netlify Site ID:** `aeb2a8e2-e8ac-47e0-a5bc-fef4df4aceaa`
 - **Branch:** `master` in `Ananmese/diggai-anamnese-master/`
 - **Konfiguration:** [`netlify.toml`](../netlify.toml)
-- **Backend:** `https://api.diggai.de/api` (Hetzner) oder aktuell Railway-Staging
+- **Backend:** `https://api.diggai.de/api` (Hetzner)
 - **Anmerkung:** Standard-Deployment für Dr. Klaproth (Hausarztpraxis)
 
 ### 2. Hatami — Kardiologie Subsite
@@ -55,13 +55,13 @@
 - **Konfiguration:** [`.env.hetzner.template`](../.env.hetzner.template)
 - **Docker:** `docker-compose.prod.yml`
 - **Datenbank:** PostgreSQL 16 (Supabase oder lokales Volume)
-- **Status:** DNS-Konfiguration ausstehend; aktuell läuft Staging auf Railway
+- **Status:** Produktiv aktiv
 
 ### 4. API Backend — Railway (Staging)
 
 - **URL:** `https://diggai-anamnese.up.railway.app/api`
 - **Konfiguration:** [`railway.toml`](../railway.toml), `.env.pilot.example`
-- **Zweck:** Temporäres Staging-Backend während Hetzner DNS konfiguriert wird
+- **Zweck:** Optionales Fallback- und Test-Backend
 
 ---
 

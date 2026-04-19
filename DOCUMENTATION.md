@@ -14,7 +14,7 @@ Diese Dokumentation beschreibt die Struktur, den technischen Aufbau und die klin
 - **Animationen**: CSS Transitions & Tailwind Animate
 - **Internationalisierung**: i18next (10 Sprachen: DE/EN/TR/AR/UK/ES/FA/IT/FR/PL)
 - **Sicherheit**: AES-256-GCM Verschlüsselung, JWT HS256 (gepinnt), JTI-Blacklist
-- **Datenbank**: SQLite (dateibasiert) via Prisma 6.19.2
+- **Datenbank**: PostgreSQL 16 via Prisma 6.x
 
 ---
 
@@ -206,5 +206,5 @@ Patient Browser                         Server                      PostgreSQL
 - **Row-Level Isolation**: Jede DB-Zeile hat `tenantId`
 - **Tenant-Resolution**: Subdomain → BSNR-Header → Custom-Domain → Default-Fallback
 - **5-Minuten-Cache**: Tenant-Konfiguration wird gecacht für Performance
-- **Skalierung**: Unbegrenzte Praxen im selben System (Shared Database)
+- **Skalierung**: Mandantenfaehig auf Shared Database, horizontal erweiterbar ueber Backend-Profile
 - **White-Label**: Farben, Logo, Willkommensnachricht pro Tenant konfigurierbar
