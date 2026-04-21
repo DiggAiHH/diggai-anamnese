@@ -308,6 +308,18 @@ router.post('/:id/submit', requireAuth, requireSessionOwner, async (req: Request
             }
         });
 
+        // Always-on deterministic session-markdown into EpisodeNote (non-blocking).
+        // Baseline so the patient portal never has an empty longitudinal view —
+        // the LLM-backed dokumentation agent above adds a richer note when available.
+        setImmediate(async () => {
+            try {
+                const { writeSessionSummary } = await import('../services/session-summary.service');
+                await writeSessionSummary({ sessionId: session.id });
+            } catch (summaryErr) {
+                console.warn('[Sessions] Session-summary write failed (non-critical):', summaryErr);
+            }
+        });
+
         // FHIR push to external command centers (M42 / Presight / JDHC) — non-blocking
         setImmediate(async () => {
             try {
