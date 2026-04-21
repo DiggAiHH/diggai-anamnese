@@ -131,13 +131,17 @@ export default defineConfig({
             return 'feature-staff';
           }
           
-          // Admin features (heavy dashboard)
-          if (id.includes('/src/pages/AdminDashboard') || id.includes('/src/components/admin/')) {
+          // Admin dashboard shell only — every sub-tab/panel/editor falls
+          // through so Rolldown emits per-chunk lazy files. Keeps first-paint
+          // admin chunk small; heavy editors only load when the tab opens.
+          if (id.includes('/src/pages/AdminDashboard')) {
             return 'feature-admin';
           }
-          
-          // MFA features
-          if (id.includes('/src/pages/MFADashboard') || id.includes('/src/components/chat/Mfa')) {
+
+          // MFA dashboard shell only. MfaChatInterface stays in feature-mfa
+          // because it loads on every MFA route, but other MFA-adjacent heavy
+          // components should fall through to their own chunks.
+          if (id.includes('/src/pages/MFADashboard') || id.includes('/src/components/chat/MfaChatInterface')) {
             return 'feature-mfa';
           }
           
