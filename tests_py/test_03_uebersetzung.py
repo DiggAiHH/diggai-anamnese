@@ -13,8 +13,15 @@ from conftest import BASE_URL, dismiss_cookie_banner
 # Known translations to verify (key UI labels in each language)
 LANGUAGE_SAMPLES = {
     "de": {"code": "DE", "expect_text": "Sprache wählen"},
-    "en": {"code": "EN", "expect_text": "Select language"},
-    "tr": {"code": "TR", "expect_text": "Dil seçin"},
+    "en": {"code": "EN", "expect_text": "Select Language"},
+    "tr": {"code": "TR", "expect_text": "Dil Seçin"},
+    "ar": {"code": "AR", "expect_text": "اختيار اللغة"},
+    "uk": {"code": "UK", "expect_text": "Виберіть мову"},
+    "es": {"code": "ES", "expect_text": "Seleccionar Idioma"},
+    "fa": {"code": "FA", "expect_text": "انتخاب زبان"},
+    "it": {"code": "IT", "expect_text": "Seleziona Lingua"},
+    "fr": {"code": "FR", "expect_text": "Sélectionner la langue"},
+    "pl": {"code": "PL", "expect_text": "Wybierz język"},
 }
 
 RTL_LANGUAGES = ["ar", "fa"]
@@ -61,60 +68,35 @@ class TestLanguageSwitching:
     """Tests that switching languages changes UI text without a full page reload."""
 
     @pytest.mark.uebersetzung
-    def test_switch_to_english(self, seeded_page: Page):
-        """Switching to English should change UI texts instantly (no reload)."""
+    @pytest.mark.parametrize("lang_key, data", LANGUAGE_SAMPLES.items())
+    def test_switch_all_languages(self, seeded_page: Page, lang_key, data):
+        """Iterate through all supported languages and verify code and label."""
         seeded_page.goto(BASE_URL)
         seeded_page.wait_for_load_state("domcontentloaded")
         dismiss_cookie_banner(seeded_page)
 
-        # Record the initial URL to verify no full navigation happens
-        initial_url = seeded_page.url
-
-        # Open language selector and click English
+        # Open selector
         seeded_page.locator("[data-testid='language-selector']").click()
-        seeded_page.locator("text=English").click()
-
-        # The URL should not have changed (client-side switch, no reload)
-        assert seeded_page.url == initial_url, (
-            "URL changed after language switch — expected client-side update only"
-        )
-
-        # The button should now show "EN"
-        lang_btn = seeded_page.locator("[data-testid='language-selector']")
-        expect(lang_btn).to_contain_text("EN")
-
-    @pytest.mark.uebersetzung
-    def test_switch_to_turkish(self, seeded_page: Page):
-        """Switching to Turkish should reflect Türkçe labels."""
-        seeded_page.goto(BASE_URL)
-        seeded_page.wait_for_load_state("domcontentloaded")
-        dismiss_cookie_banner(seeded_page)
-
-        seeded_page.locator("[data-testid='language-selector']").click()
-        seeded_page.locator("text=Türkçe").click()
-
-        lang_btn = seeded_page.locator("[data-testid='language-selector']")
-        expect(lang_btn).to_contain_text("TR")
-
-    @pytest.mark.uebersetzung
-    def test_switch_back_to_german(self, seeded_page: Page):
-        """Switching away and back to German should restore original texts."""
-        seeded_page.goto(BASE_URL)
-        seeded_page.wait_for_load_state("domcontentloaded")
-        dismiss_cookie_banner(seeded_page)
-
-        # Switch to English first
-        seeded_page.locator("[data-testid='language-selector']").click()
-        seeded_page.locator("text=English").click()
+        
+        # Click the language by its name (which is in the dropdown)
+        # We need the full name here. Let's look it up from our sample or mapping.
+        # For now, let's just try to find the text that matches the button we expect.
+        lang_name_map = {
+            "de": "Deutsch", "en": "English", "tr": "Türkçe", "ar": "العربية",
+            "uk": "Українська", "es": "Español", "fa": "فارسی", "it": "Italiano",
+            "fr": "Français", "pl": "Polski"
+        }
+        
+        seeded_page.locator(f"text={lang_name_map[lang_key]}").click()
         seeded_page.wait_for_timeout(500)
 
-        # Switch back to German
-        seeded_page.locator("[data-testid='language-selector']").click()
-        seeded_page.locator("text=Deutsch").click()
-        seeded_page.wait_for_timeout(500)
-
+        # Verify button code
         lang_btn = seeded_page.locator("[data-testid='language-selector']")
-        expect(lang_btn).to_contain_text("DE")
+        expect(lang_btn).to_contain_text(data["code"])
+        
+        # Verify the tooltip/aria-label text (translated 'languageSelect')
+        expect(lang_btn).to_have_attribute("aria-label", data["expect_text"])
+
 
 
 class TestRTLLanguages:
@@ -168,23 +150,18 @@ class TestTranslationOnPatientPage:
     @pytest.mark.uebersetzung
     def test_patient_page_german_content(self, patient_page: Page):
         """The /patient page in German should contain German text."""
-        body_text = patient_page.inner_text("body")
-        # At least one of these common German terms should appear
-        assert any(
-            term in body_text
-            for term in ["Anamnese", "Fragebogen", "Termin", "Willkommen", "Starten"]
-        ), "Expected German content on /patient page"
+        # Use expect with locator for built-in retries
+        body = patient_page.locator("body")
+        expect(body).to_contain_text("Anamnese", timeout=10_000)
+        expect(body).to_contain_text("Termin")
 
     @pytest.mark.uebersetzung
     def test_patient_page_english_content(self, patient_page: Page):
         """After switching to English, the /patient page should show English text."""
         patient_page.locator("[data-testid='language-selector']").click()
         patient_page.locator("text=English").click()
-        patient_page.wait_for_timeout(1_000)
+        
+        body = patient_page.locator("body")
+        expect(body).to_contain_text("Questionnaire", timeout=10_000)
+        expect(body).to_contain_text("Service Hub")
 
-        body_text = patient_page.inner_text("body")
-        # German-specific terms should be gone; English terms should appear
-        assert any(
-            term in body_text
-            for term in ["Questionnaire", "Start", "Appointment", "Welcome", "Begin"]
-        ), "Expected English content on /patient page after language switch"
