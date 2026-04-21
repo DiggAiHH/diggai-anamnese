@@ -439,7 +439,7 @@ export default function PwaSettings() {
               )}
               {setPin.isError && (
                 <p className="text-xs text-red-500 flex items-center gap-1">
-                  <AlertTriangle className="w-3 h-3" /> {t('Fehler beim Speichern der PIN.')}
+                  <AlertTriangle className="w-3 h-3" /> {t('Die PIN ließ sich gerade nicht speichern — versuchen Sie es kurz erneut.')}
                 </p>
               )}
             </div>

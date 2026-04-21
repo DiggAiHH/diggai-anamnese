@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 
 interface ProgressBarProps {
   progress: number;
@@ -12,14 +13,20 @@ interface ProgressBarProps {
   totalSteps?: number;
 }
 
-export const ProgressBar = React.memo(function ProgressBar({ 
-  progress, 
-  className = '', 
+export const ProgressBar = React.memo(function ProgressBar({
+  progress,
+  className = '',
   showPercentage = false,
   size = 'md',
   variant = 'default'
 }: ProgressBarProps) {
+  const { t } = useTranslation();
   const clampedProgress = Math.min(100, Math.max(0, progress));
+  const encouragement =
+    clampedProgress >= 100 ? t('progress.complete', 'Geschafft')
+    : clampedProgress >= 75 ? t('progress.almost', 'Fast geschafft')
+    : clampedProgress >= 40 ? t('progress.good', 'Läuft gut')
+    : t('progress.start', 'Fortschritt');
   
   // Psychology-based colors
   const getBarColor = () => {
@@ -70,7 +77,7 @@ export const ProgressBar = React.memo(function ProgressBar({
       {showPercentage && (
         <div className="flex justify-between mt-1.5">
           <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-            Fortschritt
+            {encouragement}
           </span>
           <motion.span 
             className="text-xs font-medium"

@@ -317,7 +317,7 @@ export function Questionnaire() {
         // Schwangerschafts-Check: Nach Beantwortung weiter zu Medikamente
         if (currentAtomId === '8800') {
             if (!state.answers['8800']) {
-                setLocalError(t('Bitte beantworten Sie die Frage'));
+                setLocalError(t('validation.please_answer', 'Diese Antwort fehlt uns noch — dann geht es weiter.'));
                 return;
             }
             dispatch({ type: 'SET_CURRENT_QUESTION', payload: '8900' });
