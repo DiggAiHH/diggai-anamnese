@@ -66,7 +66,7 @@ export function ServicePageLayout({
           className="inline-flex items-center gap-2 px-4 py-2 mb-10 rounded-xl bg-[var(--bg-card)] border border-[var(--border-primary)] text-[var(--text-secondary)] hover:text-blue-400 hover:border-blue-500/30 transition-all duration-300 text-sm font-bold"
         >
           <ArrowLeft className="w-4 h-4" />
-          {t('service.back', 'Zurück zur Übersicht')}
+          {t('service.back')}
         </Link>
 
         {/* Header */}
@@ -94,7 +94,7 @@ export function ServicePageLayout({
         {/* Steps */}
         <div className="mb-10">
           <h2 className="text-xl font-bold text-[var(--text-primary)] mb-6">
-            {t('service.steps_title', 'So funktioniert es')}
+            {t('service.steps_title')}
           </h2>
           <div className="grid gap-4">
             {steps.map((step, i) => (
@@ -112,11 +112,11 @@ export function ServicePageLayout({
         <div className="flex flex-wrap items-center gap-4 mb-10">
           <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--bg-card)] border border-[var(--border-primary)]">
             <ShieldCheck className="w-4 h-4 text-green-500" />
-            <span className="text-xs font-bold text-gray-400 uppercase tracking-wide">{t('service.dsgvo', 'DSGVO-konform')}</span>
+            <span className="text-xs font-bold text-gray-400 uppercase tracking-wide">{t('service.dsgvo')}</span>
           </div>
           <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--bg-card)] border border-[var(--border-primary)]">
             <CheckCircle className="w-4 h-4 text-blue-400" />
-            <span className="text-xs font-bold text-gray-400 uppercase tracking-wide">{t('service.encrypted', 'AES-256 verschlüsselt')}</span>
+            <span className="text-xs font-bold text-gray-400 uppercase tracking-wide">{t('service.encrypted')}</span>
           </div>
         </div>
 
@@ -130,8 +130,8 @@ export function ServicePageLayout({
           className={`w-full sm:w-auto px-10 py-4 rounded-2xl text-white font-bold text-lg shadow-2xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] bg-gradient-to-r ${color}`}
         >
           {flow.createStatus === 'pending'
-            ? t('service.loading', 'Sichere Verbindung wird aufgebaut…')
-            : t('service.start_cta', 'Jetzt starten')}
+            ? t('service.loading')
+            : t('service.start_cta')}
         </button>
       </div>
 
@@ -212,10 +212,10 @@ function ConsentSignatureModal({ flow }: { flow: ServiceFlowState }) {
             <ShieldCheck className="w-7 h-7 text-blue-400" />
           </div>
           <h2 className="text-xl font-bold text-[var(--text-primary)]">
-            {t('consent.title', 'Einwilligung & Unterschrift')}
+            {t('consent.title')}
           </h2>
           <p className="text-sm text-[var(--text-secondary)]">
-            {t('consent.subtitle', 'Bitte bestätigen Sie alle Punkte und unterschreiben Sie.')}
+            {t('consent.subtitle')}
           </p>
         </div>
 
@@ -239,7 +239,7 @@ function ConsentSignatureModal({ flow }: { flow: ServiceFlowState }) {
                 className="mt-0.5 w-5 h-5 rounded border-2 border-[var(--border-primary)] text-blue-600 focus:ring-blue-500 shrink-0 accent-blue-600"
               />
               <span className="text-sm text-[var(--text-secondary)] leading-relaxed">
-                {t(cb.labelKey, cb.fallback)}
+                {t(cb.labelKey)}
               </span>
             </label>
           ))}
@@ -248,15 +248,15 @@ function ConsentSignatureModal({ flow }: { flow: ServiceFlowState }) {
         {/* Signature */}
         <div className="space-y-2">
           <p className="text-sm font-medium text-[var(--text-primary)]">
-            {t('consent.signature_label', 'Ihre Unterschrift')}
+            {t('consent.signature_label')}
           </p>
           <div className={`rounded-xl border-2 transition-colors ${
             showError && !hasSigned ? 'border-red-500/50' : 'border-[var(--border-primary)]'
           }`}>
             <SignaturePad
-              documentText={t('consent.document_text', 'DSGVO-Einwilligung') + ' — DiggAI Praxis — ' + new Date().toISOString()}
+              documentText={t('consent.document_text') + ' — DiggAI Praxis — ' + new Date().toISOString()}
               onComplete={handleSignatureComplete}
-              label={t('consent.signature_hint', 'Hier unterschreiben')}
+              label={t('consent.signature_hint')}
             />
           </div>
         </div>
@@ -266,10 +266,10 @@ function ConsentSignatureModal({ flow }: { flow: ServiceFlowState }) {
           <div className="flex items-center gap-2 p-3 rounded-xl border border-red-500/30 bg-red-500/10 text-red-400 text-sm">
             <AlertCircle className="w-4 h-4 shrink-0" />
             {!allChecked && !hasSigned
-              ? t('consent.error_both', 'Bitte haken Sie alle Checkboxen ab und unterschreiben Sie.')
+              ? t('consent.error_both')
               : !allChecked
-              ? t('consent.error_checkboxes', 'Bitte haken Sie alle Checkboxen ab.')
-              : t('consent.error_signature', 'Bitte unterschreiben Sie im Feld oben.')}
+              ? t('consent.error_checkboxes')
+              : t('consent.error_signature')}
           </div>
         )}
 
@@ -284,13 +284,13 @@ function ConsentSignatureModal({ flow }: { flow: ServiceFlowState }) {
             }`}
           >
             <CheckCircle className="w-4 h-4" />
-            {t('consent.submit', 'Einwilligung bestätigen & fortfahren')}
+            {t('consent.submit')}
           </button>
           <button
             onClick={flow.handleConsentCancel}
             className="w-full py-2 text-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
           >
-            {t('consent.cancel', 'Abbrechen')}
+            {t('consent.cancel')}
           </button>
         </div>
       </div>

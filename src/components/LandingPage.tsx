@@ -70,94 +70,94 @@ export function LandingPage({ forceClassic = false }: LandingPageProps) {
     const services: ServiceCard[] = useMemo(() => [
         {
             id: 'anamnese',
-            title: t('Termin / Anamnese'),
-            description: t('Intelligente Vorbereitung für Ihren nächsten Behandlungstermin.'),
+            title: t('ui.services.anamnese.title'),
+            description: t('ui.services.anamnese.description'),
             icon: <Stethoscope className="w-8 h-8" />,
             color: 'from-blue-500 to-indigo-600',
             flow: 'questionnaire',
-            duration: `5-8 ${t('time.min', 'Min.')}`
+            duration: `5-8 ${t('time.min')}`
         },
         {
             id: 'prescription',
-            title: t('Medikamente / Rezepte'),
-            description: t('Folge-Rezepte für Ihre Dauermedikation einfach online anfragen.'),
+            title: t('ui.services.prescription.title'),
+            description: t('ui.services.prescription.description'),
             icon: <ClipboardList className="w-8 h-8" />,
             color: 'from-emerald-500 to-teal-600',
             flow: 'questionnaire',
-            duration: `2 ${t('time.min', 'Min.')}`
+            duration: `2 ${t('time.min')}`
         },
         {
             id: 'au',
-            title: t('AU (Krankschreibung)'),
-            description: t('Anfrage einer Arbeitsunfähigkeits-Bescheinigung bei Erkrankung.'),
+            title: t('ui.services.au.title'),
+            description: t('ui.services.au.description'),
             icon: <FileText className="w-8 h-8" />,
             color: 'from-rose-500 to-pink-600',
             flow: 'questionnaire',
-            duration: `3 ${t('time.min', 'Min.')}`
+            duration: `3 ${t('time.min')}`
         },
         {
             id: 'unfall',
-            title: t('Unfallmeldung (BG)'),
-            description: t('Arbeitsunfall, Wegeunfall oder Schulunfall dokumentieren.'),
+            title: t('ui.services.unfall.title'),
+            description: t('ui.services.unfall.description'),
             icon: <HardHat className="w-8 h-8" />,
             color: 'from-orange-500 to-amber-600',
             flow: 'questionnaire',
-            duration: `5 ${t('time.min', 'Min.')}`,
-            badge: t('badge.new', 'NEU')
+            duration: `5 ${t('time.min')}`,
+            badge: t('badge.new')
         },
         {
             id: 'referral',
-            title: t('Überweisung'),
-            description: t('Fachspezifische Überweisungen für weiterführende Behandlungen.'),
+            title: t('ui.services.referral.title'),
+            description: t('ui.services.referral.description'),
             icon: <Calendar className="w-8 h-8" />,
             color: 'from-indigo-500 to-blue-600',
             flow: 'questionnaire',
-            duration: `2 ${t('time.min', 'Min.')}`
+            duration: `2 ${t('time.min')}`
         },
         {
             id: 'appointment-cancel',
-            title: t('Terminabsage'),
-            description: t('Einfach und schnell einen bestehenden Termin absagen.'),
+            title: t('ui.services.appointmentCancel.title'),
+            description: t('ui.services.appointmentCancel.description'),
             icon: <AlertCircle className="w-8 h-8" />,
             color: 'from-orange-500 to-red-600',
             flow: 'questionnaire',
-            duration: `1 ${t('time.min', 'Min.')}`
+            duration: `1 ${t('time.min')}`
         },
         {
             id: 'docs-upload',
-            title: t('Dateien / Befunde'),
-            description: t('Externe Befunde, Laborwerte oder Dokumente übermitteln.'),
+            title: t('ui.services.docsUpload.title'),
+            description: t('ui.services.docsUpload.description'),
             icon: <FilePlus className="w-8 h-8" />,
             color: 'from-amber-500 to-yellow-600',
             flow: 'questionnaire',
-            duration: `2 ${t('time.min', 'Min.')}`
+            duration: `2 ${t('time.min')}`
         },
         {
             id: 'callback',
-            title: t('Telefonanfrage'),
-            description: t('Wir rufen Sie zurück. Hinterlassen Sie Ihre Nummer.'),
+            title: t('ui.services.callback.title'),
+            description: t('ui.services.callback.description'),
             icon: <Phone className="w-8 h-8" />,
             color: 'from-cyan-500 to-teal-600',
             flow: 'questionnaire',
-            duration: `2 ${t('time.min', 'Min.')}`
+            duration: `2 ${t('time.min')}`
         },
         {
             id: 'docs-request',
-            title: t('Dokumente anfordern'),
-            description: t('Kopien von Befunden oder Berichten anfordern.'),
+            title: t('ui.services.docsRequest.title'),
+            description: t('ui.services.docsRequest.description'),
             icon: <ClipboardList className="w-8 h-8" />,
             color: 'from-purple-500 to-violet-600',
             flow: 'questionnaire',
-            duration: `2 ${t('time.min', 'Min.')}`
+            duration: `2 ${t('time.min')}`
         },
         {
             id: 'message',
-            title: t('Nachricht schreiben'),
-            description: t('Allgemeine Mitteilung an das Praxis-Team.'),
+            title: t('ui.services.message.title'),
+            description: t('ui.services.message.description'),
             icon: <MessageSquare className="w-8 h-8" />,
             color: 'from-slate-600 to-slate-800',
             flow: 'questionnaire',
-            duration: `3 ${t('time.min', 'Min.')}`
+            duration: `3 ${t('time.min')}`
         }
     ], [t]);
 
@@ -263,7 +263,7 @@ export function LandingPage({ forceClassic = false }: LandingPageProps) {
                         <Activity className="w-4 h-4" />
                         {showClassicLayout
                             ? translateStableText(t, 'landing.classicHub', 'Patienten-Service Klassik')
-                            : t('landing.serviceHub', 'Patienten-Service Hub')}
+                            : t('landing.serviceHub')}
                     </div>
                     <h1 className="text-5xl lg:text-7xl font-black tracking-tight text-[var(--text-primary)] mb-8 leading-[1.1]">
                         {showClassicLayout
@@ -277,7 +277,7 @@ export function LandingPage({ forceClassic = false }: LandingPageProps) {
                                 'ui.landing.classicDescription',
                                 'Die klassische 4-Felder-Ansicht für den schnellsten Einstieg in die häufigsten Anliegen.',
                             )
-                            : t('landingDescription', 'Wählen Sie Ihr Anliegen aus. Unser intelligenter Assistent leitet Sie Schritt für Schritt durch den Prozess – schnell, sicher und diskret.')}
+                            : t('landingDescription')}
                     </p>
                     <div className="mt-6">
                         {showClassicLayout ? (
