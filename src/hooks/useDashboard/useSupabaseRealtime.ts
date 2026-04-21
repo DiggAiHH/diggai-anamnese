@@ -13,6 +13,7 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useDashboardStore } from '../../store/dashboardStore';
 import { getQueueService, destroyQueueService, isMockMode } from '../../services/queueService';
+import { getSocket } from '../../lib/socketClient';
 import type { QueueStatus, PatientQueueItem } from '../../types/dashboard';
 
 // Query-Key fuer Queue-Daten
@@ -305,33 +306,26 @@ export function useRealtimeAlerts() {
   useEffect(() => {
     if (isMockMode()) return;
 
-    // Socket.IO Alert Listener
-    import('../../lib/socketClient').then((mod) => {
-      const s = mod.getSocket();
-      
-      s.on('triage:alert', (data: {
-        patientId: string;
-        level: 'CRITICAL' | 'WARNING';
-        message: string;
-      }) => {
-        setAlerts((prev) => [
-          ...prev,
-          {
-            id: `${Date.now()}-${data.patientId}`,
-            patientId: data.patientId,
-            message: data.message,
-            level: data.level,
-            timestamp: new Date(),
-          },
-        ]);
-      });
+    const s = getSocket();
+    s.on('triage:alert', (data: {
+      patientId: string;
+      level: 'CRITICAL' | 'WARNING';
+      message: string;
+    }) => {
+      setAlerts((prev) => [
+        ...prev,
+        {
+          id: `${Date.now()}-${data.patientId}`,
+          patientId: data.patientId,
+          message: data.message,
+          level: data.level,
+          timestamp: new Date(),
+        },
+      ]);
     });
 
     return () => {
-      import('../../lib/socketClient').then((mod) => {
-        const s = mod.getSocket();
-        s.off('triage:alert');
-      });
+      s.off('triage:alert');
     };
   }, []);
 

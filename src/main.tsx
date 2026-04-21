@@ -5,6 +5,9 @@ import './i18n';
 import './styles/skeleton.css';
 import { trackWebVitals } from './lib/performance-monitor';
 import { initSentry } from './lib/sentry';
+import { bootstrapStaffAuth } from './lib/staffSession';
+
+bootstrapStaffAuth();
 
 import { Suspense } from 'react';
 

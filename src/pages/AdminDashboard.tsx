@@ -21,7 +21,7 @@ const UserManagementTab = React.lazy(() => import('../components/admin/UserManag
 const PermissionMatrix = React.lazy(() => import('../components/admin/PermissionMatrix').then(m => ({ default: m.PermissionMatrix })));
 const ROIDashboard = React.lazy(() => import('../components/admin/ROIDashboard').then(m => ({ default: m.ROIDashboard })));
 const FragebogenBuilder = React.lazy(() => import('../components/admin/FragebogenBuilder').then(m => ({ default: m.FragebogenBuilder })));
-const WunschboxTab = React.lazy(() => import('../components/admin/WunschboxTab').then(m => ({ default: m.WunschboxTab })));
+import { WunschboxTab } from '../components/admin/WunschboxTab';
 const WaitingContentTab = React.lazy(() => import('../components/admin/WaitingContentTab').then(m => ({ default: m.WaitingContentTab })));
 const AuditLogTab = React.lazy(() => import('../components/admin/AuditLogTab').then(m => ({ default: m.AuditLogTab })));
 const PvsAdminPanel = React.lazy(() => import('../components/admin/PvsAdminPanel').then(m => ({ default: m.PvsAdminPanel })));

@@ -11,6 +11,8 @@ import type {
   DashboardStats,
   QueueApiResponse,
 } from '../types/dashboard';
+import { getSocket, connectSocket } from '../lib/socketClient';
+import { getMockDashboardEngine, destroyMockDashboardEngine } from '../data/mockDashboards';
 
 // Feature-Flag fuer Mock-Daten
 const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DASHBOARD === 'true' || !import.meta.env.VITE_API_URL;
@@ -31,26 +33,14 @@ export interface QueueService {
 // ═══════════════════════════════════════════════════════════
 
 class MockQueueService implements QueueService {
-  private engine: ReturnType<typeof import('../data/mockDashboards').getMockDashboardEngine> | null = null;
+  private engine: ReturnType<typeof getMockDashboardEngine> | null = null;
   private listeners: Set<(items: PatientQueueItem[]) => void> = new Set();
-  private enginePromise: Promise<ReturnType<typeof import('../data/mockDashboards').getMockDashboardEngine>> | null = null;
-
-  private async getEngineAsync() {
-    if (!this.engine) {
-      if (!this.enginePromise) {
-        this.enginePromise = import('../data/mockDashboards').then(m => m.getMockDashboardEngine());
-      }
-      this.engine = await this.enginePromise;
-    }
-    return this.engine;
-  }
 
   private getEngine() {
     if (!this.engine) {
-      // Synchronous fallback — engine is loaded lazily; callers should prefer getEngineAsync
-      void import('../data/mockDashboards').then(m => { this.engine = m.getMockDashboardEngine(); });
+      this.engine = getMockDashboardEngine();
     }
-    return this.engine!;
+    return this.engine;
   }
 
   async getQueue(): Promise<PatientQueueItem[]> {
@@ -95,9 +85,8 @@ class MockQueueService implements QueueService {
   destroy(): void {
     this.stopRealtime();
     if (this.engine) {
-      void import('../data/mockDashboards').then(m => m.destroyMockDashboardEngine());
+      destroyMockDashboardEngine();
       this.engine = null;
-      this.enginePromise = null;
     }
   }
 }
@@ -110,13 +99,9 @@ class ApiQueueService implements QueueService {
   private listeners: Set<(items: PatientQueueItem[]) => void> = new Set();
   private currentItems: PatientQueueItem[] = [];
   private pollingInterval: ReturnType<typeof setInterval> | null = null;
-  private socketModule: typeof import('../lib/socketClient') | null = null;
 
   constructor() {
-    import('../lib/socketClient').then((mod) => {
-      this.socketModule = mod;
-      this.setupSocketListeners();
-    });
+    this.setupSocketListeners();
   }
 
   async getQueue(): Promise<PatientQueueItem[]> {
@@ -142,11 +127,9 @@ class ApiQueueService implements QueueService {
     });
     
     if (!response.ok) throw new Error('Failed to update status');
-    
-    if (this.socketModule) {
-      const s = this.socketModule.getSocket();
-      s.emit('queue:status:changed', { patientId, newStatus });
-    }
+
+    const s = getSocket();
+    s.emit('queue:status:changed', { patientId, newStatus });
   }
 
   async assignDoctor(patientId: string, doctorId: string): Promise<void> {
@@ -173,9 +156,8 @@ class ApiQueueService implements QueueService {
   }
 
   private setupSocketListeners(): void {
-    if (!this.socketModule) return;
-    const s = this.socketModule.getSocket();
-    
+    const s = getSocket();
+
     s.on('queue:updated', (data: { items: PatientQueueItem[] }) => {
       this.notifyListeners(data.items);
     });
@@ -198,11 +180,9 @@ class ApiQueueService implements QueueService {
   }
 
   startRealtime(): void {
-    if (this.socketModule) {
-      const s = this.socketModule.getSocket();
-      if (!s.connected) {
-        this.socketModule.connectSocket();
-      }
+    const s = getSocket();
+    if (!s.connected) {
+      connectSocket();
     }
     
     this.pollingInterval = setInterval(async () => {

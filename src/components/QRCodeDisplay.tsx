@@ -167,7 +167,7 @@ export function QRCodeDisplay({ url }: QRCodeDisplayProps) {
             <div className="flex items-center gap-2 text-[var(--text-secondary)]">
                 <QrCode className="w-5 h-5" />
                 <span className="text-sm font-bold uppercase tracking-wider">
-                    {t('qrTitle', 'QR-Code scannen')}
+                    {t('qrTitle')}
                 </span>
             </div>
             
@@ -182,7 +182,7 @@ export function QRCodeDisplay({ url }: QRCodeDisplayProps) {
             )}
             
             <p className="text-xs text-[var(--text-muted)] text-center max-w-[220px]">
-                {t('qrDescription', 'Scannen Sie diesen Code mit Ihrem Smartphone, um den Fragebogen auf Ihrem Gerät auszufüllen.')}
+                {t('qrDescription')}
             </p>
             
             <button

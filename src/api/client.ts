@@ -304,9 +304,7 @@ apiClient.interceptors.response.use(
             if (originalRequest.url?.includes('refresh-token')) {
                 setAuthToken(null);
                 localStorage.removeItem('anamnese_session_id');
-                import('../store/sessionStore').then(({ useSessionStore }) => {
-                    useSessionStore.getState().clearSession();
-                });
+                useSessionStore.getState().clearSession();
                 if (window.location.pathname !== '/' && window.location.pathname !== '/arzt' && window.location.pathname !== '/mfa') {
                     window.location.href = '/';
                 }
@@ -349,9 +347,7 @@ apiClient.interceptors.response.use(
                 processQueue(refreshError);
                 setAuthToken(null);
                 localStorage.removeItem('anamnese_session_id');
-                import('../store/sessionStore').then(({ useSessionStore }) => {
-                    useSessionStore.getState().clearSession();
-                });
+                useSessionStore.getState().clearSession();
                 if (window.location.pathname !== '/' && window.location.pathname !== '/arzt' && window.location.pathname !== '/mfa') {
                     window.location.href = '/';
                 }

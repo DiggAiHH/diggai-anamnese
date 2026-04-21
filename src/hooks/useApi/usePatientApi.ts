@@ -165,7 +165,7 @@ export function useSubmitAnswer() {
          */
         onError: (error: unknown) => {
             console.error('Antwort-Fehler (Rollback durchgeführt):', error);
-            setError(getErrorMessage(error, 'Fehler beim Speichern der Antwort. Ihre Eingabe wurde zurückgesetzt.'));
+            setError(getErrorMessage(error, 'Die Antwort ließ sich gerade nicht speichern — Ihre Eingabe ist zurückgesetzt. Versuchen Sie es bitte erneut.'));
         },
     });
 }

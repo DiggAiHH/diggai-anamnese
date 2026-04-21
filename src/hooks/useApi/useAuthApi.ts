@@ -7,7 +7,7 @@
  */
 
 import { useMutation } from '@tanstack/react-query';
-import { api } from '../../api/client';
+import { api, setAuthToken } from '../../api/client';
 import { setStoredStaffUser, setStoredStaffToken } from '../../lib/staffSession';
 
 /**
@@ -43,6 +43,7 @@ export function useArztLogin() {
         onSuccess: (response) => {
             setStoredStaffUser(response.user ?? null);
             if (response.token) {
+                setAuthToken(response.token);
                 setStoredStaffToken(response.token);
             }
         },

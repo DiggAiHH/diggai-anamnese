@@ -6,7 +6,28 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist', 'server', 'scripts', 'netlify', 'prisma', 'e2e']),
+  globalIgnores([
+    'dist',
+    'server',
+    'scripts',
+    'netlify',
+    'prisma',
+    'e2e',
+    'tests_py',
+    'tests',
+    'testing',
+    'coverage-vitest',
+    'playwright-report',
+    'test-results',
+    'monitoring',
+    'docker',
+    'k8s',
+    'node_modules',
+    'apps',
+    'docs',
+    'shared',
+    '**/*.d.ts',
+  ]),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [

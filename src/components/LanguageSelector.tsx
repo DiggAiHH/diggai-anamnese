@@ -46,7 +46,7 @@ export const LanguageSelector: React.FC = () => {
                 className="flex items-center gap-2 px-4 py-2 bg-[var(--bg-card)] hover:bg-[var(--bg-card-hover)] border border-[var(--border-primary)] rounded-xl transition-all text-[var(--text-primary)] text-sm font-medium backdrop-blur-md"
             >
                 <Globe className="w-4 h-4 text-blue-400" />
-                <span className="uppercase">{currentLanguage.code}</span>
+                <span>{currentLanguage.code.toUpperCase()}</span>
                 <ChevronDown className={`w-3.5 h-3.5 text-gray-500 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
             </button>
 

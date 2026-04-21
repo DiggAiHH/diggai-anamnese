@@ -2,16 +2,22 @@ import React, { useState, useRef } from 'react';
 import { Mic, StopCircle, FileText, CheckCircle2 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
-import axios from 'axios';
+import { apiClient } from '../../api/client';
+
+interface SoapNote {
+  s: string;
+  o: string;
+  a: string;
+  p: string;
+}
 
 export const AmbientScribePanel = ({ sessionId }: { sessionId: string }) => {
   const [isRecording, setIsRecording] = useState(false);
   const [transcript, setTranscript] = useState('');
-  const [soapNote, setSoapNote] = useState<any>(null);
+  const [soapNote, setSoapNote] = useState<SoapNote | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Simulation of speech recognition & transcription for Demo
-  const simulationRef = useRef<any>(null);
+  const simulationRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const toggleRecording = () => {
     if (!isRecording) {
@@ -28,7 +34,7 @@ export const AmbientScribePanel = ({ sessionId }: { sessionId: string }) => {
       }, 2000);
     } else {
       setIsRecording(false);
-      clearInterval(simulationRef.current);
+      if (simulationRef.current) clearInterval(simulationRef.current);
       generateSoap();
     }
   };
@@ -36,11 +42,9 @@ export const AmbientScribePanel = ({ sessionId }: { sessionId: string }) => {
   const generateSoap = async () => {
     setIsProcessing(true);
     try {
-      const { data } = await axios.post('/api/ai/ambient-scribe', {
+      const { data } = await apiClient.post<{ soapNote: SoapNote }>('/ai/ambient-scribe', {
         transcript,
         sessionId,
-      }, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('anamnese_auth_token') || ''}` }
       });
       setSoapNote(data.soapNote);
     } catch (e) {

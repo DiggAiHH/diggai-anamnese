@@ -57,10 +57,10 @@ export function validateAnswer(
         }
 
         if (effectiveMin !== undefined && num < effectiveMin) {
-            return i18n.t('validation.minValue', { min: effectiveMin, defaultValue: 'Der Wert muss mindestens {{min}} sein.' });
+            return i18n.t('validation.minValue', { min: effectiveMin, defaultValue: 'Hier passt ein Wert ab {{min}}.' });
         }
         if (question.validation?.max !== undefined && num > question.validation.max) {
-            return i18n.t('validation.maxValue', { max: question.validation.max, defaultValue: 'Der Wert darf maximal {{max}} sein.' });
+            return i18n.t('validation.maxValue', { max: question.validation.max, defaultValue: 'Hier passt ein Wert bis {{max}}.' });
         }
     }
 
@@ -71,7 +71,7 @@ export function validateAnswer(
             if (typeof value === 'string' && !regex.test(value)) {
                 return question.validation.customMessage
                     ? translateStableText(i18n.t.bind(i18n), getQuestionValidationKey(question.id, 'customMessage'), question.validation.customMessage)
-                    : i18n.t('validation.invalidFormat', 'Ungültiges Format.');
+                    : i18n.t('validation.invalidFormat', 'Das Format passt noch nicht ganz — schauen Sie bitte kurz drauf.');
             }
         }
     }
@@ -81,7 +81,7 @@ export function validateAnswer(
             if (calculateAge(value) < question.validation.ageOver) {
                 return question.validation.customMessage
                     ? translateStableText(i18n.t.bind(i18n), getQuestionValidationKey(question.id, 'customMessage'), question.validation.customMessage)
-                    : i18n.t('validation.ageOver', { age: question.validation.ageOver, defaultValue: 'Sie müssen mindestens {{age}} Jahre alt sein.' });
+                    : i18n.t('validation.ageOver', { age: question.validation.ageOver, defaultValue: 'Für diesen Bereich brauchen wir ein Alter ab {{age}} Jahren.' });
             }
         }
     }

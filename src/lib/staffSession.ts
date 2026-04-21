@@ -1,3 +1,5 @@
+import { setAuthToken } from '../api/client';
+
 export type StaffRole = 'arzt' | 'mfa' | 'admin';
 
 export interface StaffUser {
@@ -73,9 +75,18 @@ export function setStoredStaffToken(token: string | null): void {
   }
   if (!token) {
     localStorage.removeItem(STAFF_TOKEN_STORAGE_KEY);
+    setAuthToken(null);
     return;
   }
   localStorage.setItem(STAFF_TOKEN_STORAGE_KEY, token);
+  setAuthToken(token);
+}
+
+export function bootstrapStaffAuth(): void {
+  const token = getStoredStaffToken();
+  if (token) {
+    setAuthToken(token);
+  }
 }
 
 export function setStoredStaffUser(user: StaffUser | null): void {
