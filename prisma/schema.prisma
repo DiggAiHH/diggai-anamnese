@@ -1307,6 +1307,10 @@ model PatientAccount {
   medicationReminders MedicationReminder[]
   appointments        Appointment[]
 
+  // Modul 5b: Patient-to-Patient Consent-Based Connections
+  outgoingConnections PatientConnection[] @relation("Requester")
+  incomingConnections PatientConnection[] @relation("Target")
+
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
   webauthnCredentials WebAuthnCredential[]
@@ -1314,6 +1318,52 @@ model PatientAccount {
   @@index([email])
   @@index([phone])
   @@index([deletedAt])
+}
+
+// ─── Modul 5b: Patient-to-Patient Connections ─────────────────
+//
+// Consent-based links between two PatientAccount holders. Used for
+// caregiver / family / legal-guardian flows where one account wants
+// read-only or collaborative access to another account's diary,
+// appointments or ePA — strictly after explicit consent on both sides.
+//
+// Scope defines what the requester is allowed to see. revoke() sets
+// status=REVOKED and revokedAt; a revoked connection is kept for
+// audit but carries no access.
+
+enum ConnectionStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  REVOKED
+}
+
+enum ConnectionScope {
+  DIARY_READ
+  APPOINTMENTS_READ
+  EPA_READ
+  FULL_PORTAL_READ
+}
+
+model PatientConnection {
+  id          String @id @default(uuid())
+  requesterId String
+  requester   PatientAccount @relation("Requester", fields: [requesterId], references: [id], onDelete: Cascade)
+  targetId    String
+  target      PatientAccount @relation("Target", fields: [targetId], references: [id], onDelete: Cascade)
+
+  status      ConnectionStatus @default(PENDING)
+  scope       ConnectionScope  @default(DIARY_READ)
+  relationship String?         // "spouse", "parent", "legal_guardian", "caregiver", "other"
+  note        String?          // optional message from requester to target
+
+  requestedAt DateTime  @default(now())
+  respondedAt DateTime?
+  revokedAt   DateTime?
+
+  @@unique([requesterId, targetId])
+  @@index([requesterId, status])
+  @@index([targetId, status])
 }
 
 // ─── Modul 5: WebAuthn / FIDO2 Passkeys ────────────────────────
