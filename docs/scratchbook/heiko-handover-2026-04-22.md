@@ -1,132 +1,133 @@
-# Heiko — Live-Deploy Unblock Handover
+# Live-Deploy Unblock — Browser-Only Anleitung
 
-Date: 2026-04-22
-Goal: unblock auto-deploy of `diggai.de` (frontend via Netlify) and
-`api.diggai.de` (backend via Hetzner) so every push to `master` ships.
-Estimated effort: **~10 minutes**, two isolated steps, no coding.
+Stand: 2026-04-22
+Ziel: `diggai.de` (Frontend via Netlify) und `api.diggai.de` (Backend
+via Hetzner) so konfigurieren, dass jeder Push nach `master`
+automatisch live geht.
+Aufwand: **ca. 10 Minuten**, zwei Schritte, **komplett im Browser**,
+kein SSH-Client, kein Key, keine Kommandozeile.
 
-After you finish, write back "done" and the agent will verify live
-state and ship Run 1.
-
----
-
-## Step 1 — Fix VPS git permission (Hetzner, 3 minutes)
-
-**Why:** GitHub Actions "Deploy to VPS" fails with
-`error: cannot open '.git/FETCH_HEAD': Permission denied`.
-The `.git/` directory in `/opt/diggai/repo` is owned by a user the
-deploy SSH user cannot write as. This has been failing silently on
-every push since 2026-04-12.
-
-**Evidence:** https://github.com/DiggAiHH/diggai-anamnese/actions/runs/24766104924
-(job "deploy" → step "Deploy via SSH")
-
-**Do this:**
-
-```bash
-# 1. SSH to the production VPS
-#    Host/user/key matches the GitHub repo secrets VPS_HOST / VPS_USER / VPS_SSH_KEY.
-ssh diggai@api.diggai.de
-
-# 2. Check current ownership
-ls -la /opt/diggai/repo/.git/FETCH_HEAD  2>/dev/null || echo "no FETCH_HEAD yet — OK"
-stat /opt/diggai/repo/.git | grep -i 'access\|uid\|gid'
-
-# 3. Make diggai the owner of the whole repo
-sudo chown -R diggai:diggai /opt/diggai/repo
-
-# 4. Verify
-ls -la /opt/diggai/repo/ | head -3
-# → all entries should show `diggai diggai`
-
-# 5. Test that git pull now works as diggai
-cd /opt/diggai/repo
-git pull origin master
-# → should print "Updating ..." or "Already up to date."
-
-exit
-```
-
-**Definition of done for Step 1:**
-- `git pull origin master` inside `/opt/diggai/repo` succeeds **as the
-  `diggai` user** (no sudo, no permission error).
-- No more "Permission denied" in the next GitHub Actions deploy run.
+Wenn beides erledigt ist: einfach "go" in den Chat tippen. Der Agent
+verifiziert live und zieht Run 1 durch.
 
 ---
 
-## Step 2 — Wire Netlify auto-deploy (Dashboard, 5 minutes)
+## Schritt 1 — Netlify Auto-Deploy verdrahten (ca. 5 min)
 
-**Why:** The master push happened, but Netlify did not rebuild.
-Live `diggai.de` bundle is still `index-CEa7cYBO.js` (April 12 build);
-the freshly-built `index-BGIBQ2Sa.js` is not served anywhere. Netlify's
-GitHub integration is either disconnected or wired to a non-master
-branch.
+**Warum:** Die letzten Pushes nach `master` haben auf GitHub gelandet,
+aber Netlify hat nichts neu gebaut. Live `diggai.de` zeigt immer noch
+das Bundle vom 12. April. Die GitHub↔Netlify-Integration ist
+entweder getrennt oder auf einen anderen Branch gebunden.
 
-**Do this:**
+**Was zu tun ist:**
 
-1. Open https://app.netlify.com/ and log in as the DiggAi account.
-2. Pick the site that serves `https://diggai.de`.
-   - If two sites both claim diggai.de, the one with domain
-     "diggai.de" in *Domain management* is the live one.
-3. Go to **Site configuration → Build & deploy → Continuous
-   deployment**.
-4. Under *Build settings*, confirm:
+1. https://app.netlify.com/ öffnen, anmelden (Account: DiggAi).
+2. In der Liste **die Site auswählen, die `https://diggai.de` ausliefert**.
+   - Unter *Domain management* muss dort `diggai.de` als Custom-Domain
+     stehen.
+   - Falls es zwei Sites gibt, die das behaupten: die mit dem
+     aktuellsten Deploy (oder der Site-ID
+     `d4c9bba2-71cc-48a1-81a4-14cb9ac5cb90` bzw.
+     `aeb2a8e2-e8ac-47e0-a5bc-fef4df4aceaa`).
+3. Links im Menü: **Site configuration → Build & deploy →
+   Continuous deployment**.
+4. Block "Build settings" prüfen:
    - Repository: `DiggAiHH/diggai-anamnese`
    - Production branch: **`master`**
    - Build command: `npm run build`
    - Publish directory: `dist`
-5. If the repository link says "no repository linked" or points to the
-   wrong branch → click **Link repository** → choose GitHub →
-   `DiggAiHH/diggai-anamnese` → branch `master`.
-6. Scroll down to *Deploy contexts* and confirm:
-   - Production: `master`
-   - Branch deploys: *None* (per netlify.toml safety)
-7. Click **Trigger deploy → Deploy site** once, manually, to confirm
-   the wiring.
+5. Falls das Repository als "not linked" angezeigt wird oder einen
+   anderen Branch nutzt → Button **Link repository** → GitHub →
+   `DiggAiHH/diggai-anamnese` → Branch `master`.
+6. Weiter unten: *Deploy contexts* muss zeigen
+   - Production branch: `master`
+   - Branch deploys: *None*
+7. Oben rechts (oder im *Deploys*-Tab): **Trigger deploy → Deploy site**.
 
-**Definition of done for Step 2:**
-- Netlify Dashboard → *Deploys* shows a **new** deploy kicking off
-  within ~30 s of your manual trigger.
-- That deploy completes with state **Published**.
-- `curl -sI https://diggai.de | grep -i etag` returns an ETag
-  **different from** `f184a53f5b0aed4ec3f05b2f6bfd0daa-ssl`.
+**Fertig, wenn:**
+- Im *Deploys*-Tab taucht innerhalb von ~30 s ein neuer Deploy auf.
+- Der Deploy endet mit Status **Published** (grün).
+- Im Browser: `diggai.de` zeigt im Quelltext (Strg+U) eine neue
+  `index-...js`-Hash-Datei. Vorher war das `index-CEa7cYBO.js`.
 
 ---
 
-## Step 3 — Report back (30 seconds)
+## Schritt 2 — VPS-Git-Rechte via Hetzner Cloud Console (ca. 3 min)
 
-Reply with:
+**Warum:** Der GitHub-Actions-Deploy schlägt fehl mit
+`.git/FETCH_HEAD: Permission denied`. Der Deploy-User `diggai` auf
+dem Server darf in `/opt/diggai/repo/.git/` nicht schreiben, weil das
+Verzeichnis jemand anders (vermutlich `root`) gehört.
 
-> **done** — VPS chown applied, Netlify relinked + test-deploy
-> published. New Netlify ETag: `<etag from diggai.de>`.
+**Kein SSH-Key nötig — Hetzner bietet einen Browser-Terminal direkt
+im Cloud-Dashboard.**
 
-Or, if one of the steps was not possible:
+1. https://console.hetzner.cloud/ öffnen, anmelden (Hetzner-Account).
+2. Projekt mit dem DiggAi-Server öffnen.
+3. Den Server klicken, der `api.diggai.de` hostet.
+4. Oben im Server-Menü: Tab **"Console"** (Symbol: kleines
+   Terminal-Fenster).
+   - Das öffnet ein Browser-Terminal mit Root-Zugang.
+   - Login: `root` + Root-Passwort (liegt im Hetzner-Account-
+     Kontext, oder wurde beim Server-Setup vergeben).
+   - Falls das Passwort unklar ist: im Hetzner-Dashboard
+     **"Reset root password"** klicken — neues Passwort kommt per
+     E-Mail. Nimmt ~30 s.
+5. Im Terminal diese **zwei** Befehle tippen:
 
-> **blocked on step N** — `<what stopped you>`.
+   ```
+   chown -R diggai:diggai /opt/diggai/repo
+   sudo -u diggai git -C /opt/diggai/repo pull origin master
+   ```
+
+   Der zweite Befehl soll `Updating ...` oder `Already up to date.`
+   ausgeben — **nicht** "Permission denied".
+
+6. Terminal-Tab schließen.
+
+**Fertig, wenn:**
+- Der zweite Befehl hat ohne Permission-Error durchgelaufen.
 
 ---
 
-## What the agent will do the moment you reply "done"
+## Schritt 3 — Rückmeldung (30 s)
 
-1. Re-probe `diggai.de` ETag + bundle hash → confirm it matches the
-   freshly-built local hash.
-2. Trigger / watch the next `Deploy to VPS` run → confirm green.
-3. Re-probe `api.diggai.de` uptime → confirm restart (uptime resets
-   from ~840k s to < 60 s).
-4. Apply the one manual SQL migration
+Zurück in den Chat schreiben:
+
+> **go** — Netlify trigger-deployed, neue ETag gesehen; VPS-chown
+> gemacht, git pull hat geklappt.
+
+Falls einer der Schritte nicht geht:
+
+> **hängt bei Schritt N** — `<genaue Fehlermeldung>`.
+
+---
+
+## Was der Agent nach "go" automatisch erledigt
+
+1. `diggai.de` ETag + Bundle-Hash neu abfragen → bestätigen, dass
+   `index-BGIBQ2Sa.js` live liegt.
+2. Einen leeren Commit pushen (`git commit --allow-empty`), um den
+   `Deploy to VPS`-Workflow auf GitHub erneut zu triggern.
+3. Den neuen Workflow-Run streamen, bis grün.
+4. `api.diggai.de` Uptime checken (muss von ~840.000 s auf < 60 s
+   fallen — bedeutet, der Backend-Container wurde neu gestartet).
+5. Die eine offene manuelle SQL-Migration
    `prisma/migrations_manual/20260421_add_patient_connections.sql`
-   against Supabase (you'll need `SUPABASE_DB_PASS` set, or trigger the
-   `Migrate Production DB` workflow manually).
-5. Post the Run 1 → live scorecard delta.
+   gegen Supabase ausführen (über `gh workflow run
+   migrate-production-once.yml` — nutzt bereits die GitHub-
+   Secret-Credentials, keine lokalen DB-Passwörter nötig).
+6. Das Run-1 → live Scorecard-Delta posten.
 
 ---
 
-## What is **not** being touched in this handover
+## Was *nicht* nötig ist
 
-- No secrets, passwords, or Supabase credentials need to leave the
-  Netlify / Hetzner environments. Everything Heiko does is in UI
-  dashboards and one SSH chown.
-- The code changes are already on GitHub master (commits
-  `a51d54a`, `0ea0d78`, `9ea0966`, `08489b2`, `d07573e`).
-  Nothing to merge, rebase, or redo.
-- TriageEngine, encryption keys, JWT secrets — untouched.
+- Kein lokaler SSH-Key.
+- Kein CLI-Tool außer Browser.
+- Keine Passwörter im Chat.
+- Keine Änderungen an Code oder Secrets.
+
+Alles Code-seitig liegt schon auf GitHub (Commits
+`a51d54a`, `0ea0d78`, `9ea0966`, `08489b2`, `d07573e`, `d93388c`).
+Der nächste Push nach den beiden Schritten oben deployed automatisch.
