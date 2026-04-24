@@ -14,8 +14,25 @@ const metrics: PerformanceMetrics = {};
 const API_BASE_URL = resolveApiBaseUrl(import.meta.env.VITE_API_URL as string | undefined);
 const WEB_VITALS_ENDPOINT = `${API_BASE_URL}/system/metrics/web-vitals`;
 const API_TIMING_ENDPOINT = `${API_BASE_URL}/system/metrics/api-timing`;
-let webVitalsEndpointDisabled = false;
-let apiTimingEndpointDisabled = false;
+
+function isSameOriginApiBase(apiBaseUrl: string): boolean {
+  if (typeof window === 'undefined') {
+    return true;
+  }
+
+  try {
+    const resolvedUrl = new URL(apiBaseUrl, window.location.origin);
+    return resolvedUrl.origin === window.location.origin;
+  } catch {
+    return true;
+  }
+}
+
+const crossOriginMetricsEnabled = import.meta.env.VITE_ENABLE_CROSS_ORIGIN_METRICS === 'true';
+const disableCrossOriginMetricsByDefault = !crossOriginMetricsEnabled && !isSameOriginApiBase(API_BASE_URL);
+
+let webVitalsEndpointDisabled = disableCrossOriginMetricsByDefault;
+let apiTimingEndpointDisabled = disableCrossOriginMetricsByDefault;
 
 function shouldDisableEndpoint(status: number): boolean {
   return status === 404 || status >= 500;

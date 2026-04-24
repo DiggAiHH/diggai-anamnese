@@ -70,8 +70,8 @@ export function LandingPage({ forceClassic = false }: LandingPageProps) {
     const services: ServiceCard[] = useMemo(() => [
         {
             id: 'anamnese',
-            title: t('ui.services.anamnese.title'),
-            description: t('ui.services.anamnese.description'),
+            title: translateStableText(t, 'ui.services.anamnese.title', 'Termin / Anamnese'),
+            description: translateStableText(t, 'ui.services.anamnese.description', 'Intelligente Vorbereitung für Ihren nächsten Behandlungstermin.'),
             icon: <Stethoscope className="w-8 h-8" />,
             color: 'from-blue-500 to-indigo-600',
             flow: 'questionnaire',
@@ -79,8 +79,8 @@ export function LandingPage({ forceClassic = false }: LandingPageProps) {
         },
         {
             id: 'prescription',
-            title: t('ui.services.prescription.title'),
-            description: t('ui.services.prescription.description'),
+            title: translateStableText(t, 'ui.services.prescription.title', 'Medikamente / Rezepte'),
+            description: translateStableText(t, 'ui.services.prescription.description', 'Folge-Rezepte für Ihre Dauermedikation einfach online anfragen.'),
             icon: <ClipboardList className="w-8 h-8" />,
             color: 'from-emerald-500 to-teal-600',
             flow: 'questionnaire',
@@ -88,8 +88,8 @@ export function LandingPage({ forceClassic = false }: LandingPageProps) {
         },
         {
             id: 'au',
-            title: t('ui.services.au.title'),
-            description: t('ui.services.au.description'),
+            title: translateStableText(t, 'ui.services.au.title', 'AU (Krankschreibung)'),
+            description: translateStableText(t, 'ui.services.au.description', 'Anfrage einer Arbeitsunfahigkeits-Bescheinigung bei Erkrankung.'),
             icon: <FileText className="w-8 h-8" />,
             color: 'from-rose-500 to-pink-600',
             flow: 'questionnaire',
@@ -97,8 +97,8 @@ export function LandingPage({ forceClassic = false }: LandingPageProps) {
         },
         {
             id: 'unfall',
-            title: t('ui.services.unfall.title'),
-            description: t('ui.services.unfall.description'),
+            title: translateStableText(t, 'ui.services.unfall.title', 'Unfallmeldung (BG)'),
+            description: translateStableText(t, 'ui.services.unfall.description', 'Arbeitsunfall, Wegeunfall oder Schulunfall dokumentieren.'),
             icon: <HardHat className="w-8 h-8" />,
             color: 'from-orange-500 to-amber-600',
             flow: 'questionnaire',
@@ -107,8 +107,8 @@ export function LandingPage({ forceClassic = false }: LandingPageProps) {
         },
         {
             id: 'referral',
-            title: t('ui.services.referral.title'),
-            description: t('ui.services.referral.description'),
+            title: translateStableText(t, 'ui.services.referral.title', 'Uberweisung'),
+            description: translateStableText(t, 'ui.services.referral.description', 'Fachspezifische Uberweisungen fur weiterfuhrende Behandlungen.'),
             icon: <Calendar className="w-8 h-8" />,
             color: 'from-indigo-500 to-blue-600',
             flow: 'questionnaire',
@@ -116,8 +116,8 @@ export function LandingPage({ forceClassic = false }: LandingPageProps) {
         },
         {
             id: 'appointment-cancel',
-            title: t('ui.services.appointmentCancel.title'),
-            description: t('ui.services.appointmentCancel.description'),
+            title: translateStableText(t, 'ui.services.appointmentCancel.title', 'Terminabsage'),
+            description: translateStableText(t, 'ui.services.appointmentCancel.description', 'Einfach und schnell einen bestehenden Termin absagen.'),
             icon: <AlertCircle className="w-8 h-8" />,
             color: 'from-orange-500 to-red-600',
             flow: 'questionnaire',
@@ -125,8 +125,8 @@ export function LandingPage({ forceClassic = false }: LandingPageProps) {
         },
         {
             id: 'docs-upload',
-            title: t('ui.services.docsUpload.title'),
-            description: t('ui.services.docsUpload.description'),
+            title: translateStableText(t, 'ui.services.docsUpload.title', 'Dateien / Befunde'),
+            description: translateStableText(t, 'ui.services.docsUpload.description', 'Externe Befunde, Laborwerte oder Dokumente ubermitteln.'),
             icon: <FilePlus className="w-8 h-8" />,
             color: 'from-amber-500 to-yellow-600',
             flow: 'questionnaire',
@@ -134,8 +134,8 @@ export function LandingPage({ forceClassic = false }: LandingPageProps) {
         },
         {
             id: 'callback',
-            title: t('ui.services.callback.title'),
-            description: t('ui.services.callback.description'),
+            title: translateStableText(t, 'ui.services.callback.title', 'Telefonanfrage'),
+            description: translateStableText(t, 'ui.services.callback.description', 'Wir rufen Sie zuruck. Hinterlassen Sie Ihre Nummer.'),
             icon: <Phone className="w-8 h-8" />,
             color: 'from-cyan-500 to-teal-600',
             flow: 'questionnaire',
@@ -143,8 +143,8 @@ export function LandingPage({ forceClassic = false }: LandingPageProps) {
         },
         {
             id: 'docs-request',
-            title: t('ui.services.docsRequest.title'),
-            description: t('ui.services.docsRequest.description'),
+            title: translateStableText(t, 'ui.services.docsRequest.title', 'Dokumente anfordern'),
+            description: translateStableText(t, 'ui.services.docsRequest.description', 'Kopien von Befunden oder Berichten anfordern.'),
             icon: <ClipboardList className="w-8 h-8" />,
             color: 'from-purple-500 to-violet-600',
             flow: 'questionnaire',
@@ -152,8 +152,8 @@ export function LandingPage({ forceClassic = false }: LandingPageProps) {
         },
         {
             id: 'message',
-            title: t('ui.services.message.title'),
-            description: t('ui.services.message.description'),
+            title: translateStableText(t, 'ui.services.message.title', 'Nachricht schreiben'),
+            description: translateStableText(t, 'ui.services.message.description', 'Allgemeine Mitteilung an das Praxis-Team.'),
             icon: <MessageSquare className="w-8 h-8" />,
             color: 'from-slate-600 to-slate-800',
             flow: 'questionnaire',
@@ -263,7 +263,7 @@ export function LandingPage({ forceClassic = false }: LandingPageProps) {
                         <Activity className="w-4 h-4" />
                         {showClassicLayout
                             ? translateStableText(t, 'landing.classicHub', 'Patienten-Service Klassik')
-                            : t('landing.serviceHub')}
+                            : translateStableText(t, 'landing.serviceHub', 'Patienten-Service Hub')}
                     </div>
                     <h1 className="text-5xl lg:text-7xl font-black tracking-tight text-[var(--text-primary)] mb-8 leading-[1.1]">
                         {showClassicLayout
@@ -277,7 +277,11 @@ export function LandingPage({ forceClassic = false }: LandingPageProps) {
                                 'ui.landing.classicDescription',
                                 'Die klassische 4-Felder-Ansicht für den schnellsten Einstieg in die häufigsten Anliegen.',
                             )
-                            : t('landingDescription')}
+                            : translateStableText(
+                                t,
+                                'landingDescription',
+                                'Wahlen Sie den passenden Service und starten Sie in wenigen Minuten Ihren sicheren digitalen Check-in.',
+                            )}
                     </p>
                     <div className="mt-6">
                         {showClassicLayout ? (
