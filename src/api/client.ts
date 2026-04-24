@@ -16,6 +16,7 @@ import {
     resolveApiBaseUrl,
     resolveSocketBaseUrl,
 } from '../lib/runtimeEndpoints';
+import { practiceConfig } from '../lib/practiceConfig';
 
 // =============================================================================
 // REQUEST DEDUPLICATION
@@ -61,6 +62,7 @@ const configuredSocketUrl = import.meta.env.VITE_SOCKET_URL as string | undefine
 
 export const API_BASE_URL = resolveApiBaseUrl(configuredApiUrl);
 export const SOCKET_BASE_URL = resolveSocketBaseUrl(configuredSocketUrl, configuredApiUrl);
+const configuredTenantId = (import.meta.env.VITE_TENANT_ID as string | undefined)?.trim() || null;
 // Demo mode is now controlled by modeStore (runtime switchable).
 // Legacy env-var support: if VITE_DISABLE_DEMO_MODE=true, force live mode on load.
 if (import.meta.env.VITE_DISABLE_DEMO_MODE === 'true') {
@@ -74,6 +76,43 @@ if (isLikelyPlaceholderUrl(configuredApiUrl)) {
 
 if (isDemoMode()) {
     console.warn('Demo API mode is active. Data is stored locally in this browser.');
+}
+
+function slugifyTenantId(value: string): string {
+    return value
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+}
+
+function deriveTenantIdFromDoctorName(): string | null {
+    const rawDoctor = practiceConfig.doctor?.trim();
+    if (!rawDoctor) {
+        return null;
+    }
+
+    const withoutTitles = rawDoctor
+        .replace(/\bdr\.?\b/gi, '')
+        .replace(/\bmed\.?\b/gi, '')
+        .trim();
+    if (!withoutTitles) {
+        return null;
+    }
+
+    const parts = withoutTitles.split(/\s+/).filter(Boolean);
+    const surname = parts[parts.length - 1] || '';
+    const slug = slugifyTenantId(surname);
+    return slug || null;
+}
+
+function resolveTenantIdHint(): string | null {
+    if (configuredTenantId) {
+        return configuredTenantId;
+    }
+
+    return deriveTenantIdFromDoctorName();
 }
 
 /**
@@ -221,10 +260,15 @@ apiClient.interceptors.request.use(
             config.headers.Authorization = `Bearer ${token}`;
         }
 
-        // TENANT: Attach BSNR header so backend can resolve the correct practice
+        // TENANT: Prefer explicit BSNR, fall back to tenant-id hint for root (non-BSNR) deployments.
         const bsnr = useSessionStore.getState().bsnr;
         if (bsnr) {
             config.headers['x-tenant-bsnr'] = bsnr;
+        } else {
+            const tenantIdHint = resolveTenantIdHint();
+            if (tenantIdHint) {
+                config.headers['x-tenant-id'] = tenantIdHint;
+            }
         }
 
         // SECURITY: Add CSRF token for state-changing requests (HIGH-001 Fix)

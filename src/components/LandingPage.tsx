@@ -46,6 +46,7 @@ const CLASSIC_SERVICE_IDS: ReadonlySet<PatientServiceId> = new Set([
 
 export function LandingPage({ forceClassic = false }: LandingPageProps) {
     const { t } = useTranslation();
+    const minuteLabel = translateStableText(t, 'time.min', 'min');
     const { mutate: createSession, status: createStatus } = useCreateSession();
     const navigate = useNavigate();
     const { bsnr } = useParams<{ bsnr?: string }>();
@@ -75,7 +76,7 @@ export function LandingPage({ forceClassic = false }: LandingPageProps) {
             icon: <Stethoscope className="w-8 h-8" />,
             color: 'from-blue-500 to-indigo-600',
             flow: 'questionnaire',
-            duration: `5-8 ${t('time.min')}`
+            duration: `5-8 ${minuteLabel}`,
         },
         {
             id: 'prescription',
@@ -84,7 +85,7 @@ export function LandingPage({ forceClassic = false }: LandingPageProps) {
             icon: <ClipboardList className="w-8 h-8" />,
             color: 'from-emerald-500 to-teal-600',
             flow: 'questionnaire',
-            duration: `2 ${t('time.min')}`
+            duration: `2 ${minuteLabel}`,
         },
         {
             id: 'au',
@@ -93,7 +94,7 @@ export function LandingPage({ forceClassic = false }: LandingPageProps) {
             icon: <FileText className="w-8 h-8" />,
             color: 'from-rose-500 to-pink-600',
             flow: 'questionnaire',
-            duration: `3 ${t('time.min')}`
+            duration: `3 ${minuteLabel}`,
         },
         {
             id: 'unfall',
@@ -102,8 +103,8 @@ export function LandingPage({ forceClassic = false }: LandingPageProps) {
             icon: <HardHat className="w-8 h-8" />,
             color: 'from-orange-500 to-amber-600',
             flow: 'questionnaire',
-            duration: `5 ${t('time.min')}`,
-            badge: t('badge.new')
+            duration: `5 ${minuteLabel}`,
+            badge: translateStableText(t, 'badge.new', 'NEU'),
         },
         {
             id: 'referral',
@@ -112,7 +113,7 @@ export function LandingPage({ forceClassic = false }: LandingPageProps) {
             icon: <Calendar className="w-8 h-8" />,
             color: 'from-indigo-500 to-blue-600',
             flow: 'questionnaire',
-            duration: `2 ${t('time.min')}`
+            duration: `2 ${minuteLabel}`,
         },
         {
             id: 'appointment-cancel',
@@ -121,7 +122,7 @@ export function LandingPage({ forceClassic = false }: LandingPageProps) {
             icon: <AlertCircle className="w-8 h-8" />,
             color: 'from-orange-500 to-red-600',
             flow: 'questionnaire',
-            duration: `1 ${t('time.min')}`
+            duration: `1 ${minuteLabel}`,
         },
         {
             id: 'docs-upload',
@@ -130,7 +131,7 @@ export function LandingPage({ forceClassic = false }: LandingPageProps) {
             icon: <FilePlus className="w-8 h-8" />,
             color: 'from-amber-500 to-yellow-600',
             flow: 'questionnaire',
-            duration: `2 ${t('time.min')}`
+            duration: `2 ${minuteLabel}`,
         },
         {
             id: 'callback',
@@ -139,7 +140,7 @@ export function LandingPage({ forceClassic = false }: LandingPageProps) {
             icon: <Phone className="w-8 h-8" />,
             color: 'from-cyan-500 to-teal-600',
             flow: 'questionnaire',
-            duration: `2 ${t('time.min')}`
+            duration: `2 ${minuteLabel}`,
         },
         {
             id: 'docs-request',
@@ -148,7 +149,7 @@ export function LandingPage({ forceClassic = false }: LandingPageProps) {
             icon: <ClipboardList className="w-8 h-8" />,
             color: 'from-purple-500 to-violet-600',
             flow: 'questionnaire',
-            duration: `2 ${t('time.min')}`
+            duration: `2 ${minuteLabel}`,
         },
         {
             id: 'message',
@@ -157,9 +158,9 @@ export function LandingPage({ forceClassic = false }: LandingPageProps) {
             icon: <MessageSquare className="w-8 h-8" />,
             color: 'from-slate-600 to-slate-800',
             flow: 'questionnaire',
-            duration: `3 ${t('time.min')}`
-        }
-    ], [t]);
+            duration: `3 ${minuteLabel}`,
+        },
+    ], [minuteLabel, t]);
 
     const displayedServices = useMemo(() => {
         if (!showClassicLayout) {
@@ -316,7 +317,7 @@ export function LandingPage({ forceClassic = false }: LandingPageProps) {
                                 {/* Badge */}
                                 {service.badge && (
                                     <div className="absolute top-4 right-4 px-2.5 py-1 bg-orange-500 text-white text-[10px] font-black uppercase tracking-wider rounded-full shadow-lg shadow-orange-500/30 animate-pulse">
-                                        {t(service.badge)}
+                                        {service.badge}
                                     </div>
                                 )}
 
