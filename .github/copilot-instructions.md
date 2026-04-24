@@ -491,3 +491,15 @@ Checkpoint store: `shared/knowledge/task-registry.json` and `shared/knowledge/ch
 
 **Sicherheitsregel:** Netlify-Passwörter NIEMALS in Repository-Dateien speichern.
 Nur Umgebungsvariablen (`NETLIFY_AUTH_TOKEN`) oder lokalen CLI-Login-State nutzen.
+
+## graphify
+
+This project uses a graphify knowledge graph in graphify-out/.
+
+Rules:
+- At session start, if graphify-out/GRAPH_REPORT.md exists, read it before broad file search.
+- Query-first navigation for architecture questions: graphify query "<question>", graphify path "<A>" "<B>", graphify explain "<concept>".
+- For code-only changes run graphify update . to refresh the graph without API usage.
+- For non-code changes (docs/images/pdfs), run /graphify --update in Copilot Chat to refresh semantic nodes.
+- Keep graphify-out/graph.json current after substantial changes.
+- Privacy note: AST extraction is local; semantic extraction for non-code content can use the assistant model API.

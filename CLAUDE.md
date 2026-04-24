@@ -399,3 +399,15 @@ node scripts/once-guard.mjs status --task "<task-key>"
 ```
 
 Checkpoints are stored in `shared/knowledge/checkpoints/<task-key>.md`.
+
+## graphify
+
+This project uses a graphify knowledge graph in graphify-out/.
+
+Rules:
+- At session start, if graphify-out/GRAPH_REPORT.md exists, read it before broad file search.
+- Query-first navigation for architecture questions: graphify query "<question>", graphify path "<A>" "<B>", graphify explain "<concept>".
+- Do not trigger full re-extraction blindly. For code-only changes run graphify update . (AST-only, no API cost).
+- For non-code changes (docs/images/pdfs), run /graphify --update in the assistant to refresh semantic nodes.
+- After substantial changes, verify graphify-out/graph.json exists and is current.
+- Privacy note: AST extraction is local; semantic extraction for non-code content can use the assistant model API.

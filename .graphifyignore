@@ -1,0 +1,37 @@
+# Graphify exclusions for faster, cleaner repository graphs
+# Syntax matches .gitignore
+
+# Generated dependencies and build outputs
+node_modules/
+dist/
+dist-ssr/
+coverage/
+coverage-vitest/
+test-results/
+playwright-report/
+.netlify/
+
+# Graphify outputs (never parse your own graph artifacts)
+graphify-out/
+
+# Generated frontend bundles
+public/hatami/assets/
+
+# Agent/runtime config that should not become graph knowledge
+.claude/
+.codex/
+.opencode/
+.gemini/
+.agents/
+.kiro/
+
+# Instruction files (avoid self-referential prompt extraction)
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+.github/copilot-instructions.md
+
+# Generic noisy artifacts
+**/*.min.js
+**/*.map
+*.log

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-04-17T11:58:00.000Z",
+  "updatedAt": "2026-04-24T12:09:07.148Z",
   "tasks": {
     "episode-opsedien-persistence": {
       "status": "in_progress",
@@ -73,6 +73,25 @@
         "server/services/pvs/pvs-integration.service.test.ts"
       ],
       "checkpointFile": "shared/knowledge/checkpoints/fhir-webhook-signature-hardening.md"
+    },
+    "graphify-integration-prompt-architecture": {
+      "status": "completed",
+      "agent": "copilot",
+      "sessionId": "2026-04-24-graphify-integration",
+      "currentBatch": 2,
+      "updatedAt": "2026-04-24T12:09:07.148Z",
+      "summary": "Graphify integrated across AGENTS/CLAUDE/Copilot instructions with ignore policy and regenerated graph artifacts.",
+      "next": [],
+      "artifacts": [
+        ".graphifyignore",
+        ".gitignore",
+        "AGENTS.md",
+        "CLAUDE.md",
+        ".github/copilot-instructions.md",
+        "graphify-out/graph.json",
+        "graphify-out/GRAPH_REPORT.md"
+      ],
+      "checkpointFile": "shared/knowledge/checkpoints/graphify-integration-prompt-architecture.md"
     }
   }
 }
