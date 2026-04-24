@@ -93,6 +93,7 @@ const ESTIMATED_TIME_NUMBERS: Record<string, string> = {
 
 import { useTranslation } from 'react-i18next';
 import { ConsentFlow } from './ui/ConsentFlow';
+import { useTenantStore } from '../store/tenantStore';
 
 /**
  * Questionnaire Component - Phase 3: Layout & Whitespace
@@ -108,6 +109,7 @@ import { ConsentFlow } from './ui/ConsentFlow';
 export function Questionnaire() {
     const { t } = useTranslation();
     const store = useSessionStore();
+    const showWaitingRoom = useTenantStore((state) => state.features.showWaitingRoom);
     const { mutate: submitAnswer } = useSubmitAnswer();
     const { mutateAsync: submitSession } = useSubmitSession();
     const { mutateAsync: submitMedicationsAsync } = useSubmitMedications();
@@ -532,8 +534,7 @@ export function Questionnaire() {
                     onSendPackageLink={handleSendPackageLink}
                     canSendPackageLink={Boolean(patientEmail)}
                 />
-                {/* Wartenummer / WaitingRoom-Modal — deaktiviert für Live-Betrieb */}
-                {/* {store.sessionId && store.token && (
+                {showWaitingRoom && store.sessionId && store.token && (
                     <WaitingRoomModal
                         open={isSubmitted}
                         onClose={handleReset}
@@ -542,7 +543,7 @@ export function Questionnaire() {
                         service={state.selectedReason || ''}
                         token={store.token}
                     />
-                )} */}
+                )}
                 {showPDF && (
                     <PDFExport
                         questions={allQuestions}

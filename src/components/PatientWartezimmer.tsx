@@ -12,6 +12,7 @@ import { HealthTipCarousel } from './waiting/HealthTipCarousel';
 import { WaitingGames } from './waiting/WaitingGames';
 import { PraxisNewsFeed } from './waiting/PraxisNewsFeed';
 import { MoodCheck } from './waiting/MoodCheck';
+import { useWaitingRoomAvatarGuidance } from '../hooks/useWaitingRoomAvatarGuidance';
 
 interface PatientWartezimmerProps {
   sessionId: string;
@@ -65,12 +66,20 @@ export const PatientWartezimmer: React.FC<PatientWartezimmerProps> = ({
   const { mutate: likeContent } = useLikeContent();
   const { mutate: trackQuizAnswer } = useTrackQuizAnswer();
 
+  useWaitingRoomAvatarGuidance({
+    enabled: true,
+    status,
+    position,
+    estimatedWait,
+  });
+
   // Update from polling
   useEffect(() => {
     if (queueData) {
       if (queueData.position !== undefined) setPosition(queueData.position);
       if (queueData.status) setStatus(queueData.status);
-      if (queueData.estimatedWaitMinutes !== undefined) setEstimatedWait(queueData.estimatedWaitMinutes);
+      const waitMinutes = queueData.estimatedWaitMinutes ?? queueData.estimatedWaitMin;
+      if (waitMinutes !== undefined) setEstimatedWait(waitMinutes);
       if (queueData.queueLength !== undefined) setQueueLength(queueData.queueLength);
     }
   }, [queueData]);
@@ -99,10 +108,13 @@ export const PatientWartezimmer: React.FC<PatientWartezimmerProps> = ({
 
     socket.on('disconnect', () => setConnected(false));
 
-    socket.on('queue:position', (data: { position: number; status: WaitingStatus; estimatedWaitMinutes: number; queueLength?: number }) => {
+    socket.on('queue:position', (data: { position: number; status: WaitingStatus; estimatedWaitMinutes?: number; estimatedWaitMin?: number; queueLength?: number }) => {
       setPosition(data.position);
       setStatus(data.status);
-      setEstimatedWait(data.estimatedWaitMinutes);
+      const waitMinutes = data.estimatedWaitMinutes ?? data.estimatedWaitMin;
+      if (waitMinutes !== undefined) {
+        setEstimatedWait(waitMinutes);
+      }
       if (data.queueLength !== undefined) setQueueLength(data.queueLength);
     });
 

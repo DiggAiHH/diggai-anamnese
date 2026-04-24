@@ -16,10 +16,12 @@ async function broadcastQueue() {
 
     // Also broadcast individual positions to each patient
     for (const entry of state.queue) {
+        const estimatedWaitMinutes = entry.estimatedWaitMin;
         io.to(`session:${entry.sessionId}`).emit('queue:position', {
             position: entry.position,
             status: entry.status,
-            estimatedWaitMin: entry.estimatedWaitMin,
+            estimatedWaitMinutes,
+            estimatedWaitMin: estimatedWaitMinutes,
             queueLength: state.stats.waiting,
         });
     }

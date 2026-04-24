@@ -2,6 +2,7 @@
 // Modul 8: Staff Avatar + TTS + Voice Clone endpoints
 
 import { Router, Request, Response } from 'express';
+import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import {
   getAvatar,
@@ -17,6 +18,14 @@ import {
 } from '../services/avatar';
 
 const router = Router();
+
+const avatarSpeakLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Zu viele Avatar-Sprachanfragen. Bitte kurz warten.' },
+});
 
 // GET /api/avatar/languages — Supported TTS languages
 router.get('/languages', async (_req: Request, res: Response) => {
@@ -104,7 +113,7 @@ router.delete('/:staffId/consent', async (req: Request, res: Response) => {
 });
 
 // POST /api/avatar/speak — Text-to-Speech
-router.post('/speak', async (req: Request, res: Response) => {
+router.post('/speak', avatarSpeakLimiter, async (req: Request, res: Response) => {
   try {
     const schema = z.object({
       staffId: z.string().min(1),

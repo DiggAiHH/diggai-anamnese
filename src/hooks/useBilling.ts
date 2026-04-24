@@ -2,7 +2,7 @@
 // React Query hooks for Stripe Billing API
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../api/client';
+import { apiClient } from '../api/client';
 
 // ─── Types ─────────────────────────────────────────────────
 
@@ -88,8 +88,7 @@ export function useSubscription() {
   return useQuery<SubscriptionStatus>({
     queryKey: BILLING_KEYS.subscription(),
     queryFn: async () => {
-      // @ts-ignore - Billing API routes pending
-      const response = await api.get?.('/billing/subscription') || { data: {} };
+      const response = await apiClient.get<SubscriptionStatus>('/billing/subscription');
       return response.data;
     },
   });
@@ -102,8 +101,7 @@ export function usePaymentMethods() {
   return useQuery<PaymentMethod[]>({
     queryKey: BILLING_KEYS.paymentMethods(),
     queryFn: async () => {
-      // @ts-ignore - Billing API routes pending
-      const response = await api.get?.('/billing/payment-methods') || { data: [] };
+      const response = await apiClient.get<{ methods: PaymentMethod[] }>('/billing/payment-methods');
       return response.data.methods;
     },
   });
@@ -116,8 +114,7 @@ export function useInvoices() {
   return useQuery<InvoicesResponse>({
     queryKey: BILLING_KEYS.invoices(),
     queryFn: async () => {
-      // @ts-ignore - Billing API routes pending
-      const response = await api.get?.('/billing/invoices') || { data: [] };
+      const response = await apiClient.get<InvoicesResponse>('/billing/invoices');
       return response.data;
     },
   });
@@ -131,8 +128,7 @@ export function useInvoices() {
 export function useCreateSetupIntent() {
   return useMutation<SetupIntentResponse, Error, { customerId?: string; email?: string }>({
     mutationFn: async (data) => {
-      // @ts-ignore - Billing API routes pending
-      const response = await api.post?.('/billing/setup-intent', data) || { data: {} };
+      const response = await apiClient.post<SetupIntentResponse>('/billing/setup-intent', data);
       return response.data;
     },
   });
@@ -150,8 +146,7 @@ export function useCreateSubscription() {
     CreateSubscriptionInput
   >({
     mutationFn: async (data) => {
-      // @ts-ignore - Billing API routes pending
-      const response = await api.post?.('/billing/subscription', data) || { data: {} };
+      const response = await apiClient.post<{ subscriptionId: string; clientSecret: string | null; status: string }>('/billing/subscription', data);
       return response.data;
     },
     onSuccess: () => {
@@ -172,8 +167,7 @@ export function useCancelSubscription() {
     Error
   >({
     mutationFn: async () => {
-      // @ts-ignore - Billing API routes pending
-      const response = await api.delete?.('/billing/subscription') || { data: {} };
+      const response = await apiClient.delete<{ success: boolean; cancelAtPeriodEnd: boolean; currentPeriodEnd: number }>('/billing/subscription');
       return response.data;
     },
     onSuccess: () => {
