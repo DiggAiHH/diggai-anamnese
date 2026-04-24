@@ -1,5 +1,6 @@
 // Web Vitals Performance Monitoring
 import { onCLS, onFCP, onINP, onLCP, onTTFB, type Metric } from 'web-vitals';
+import { resolveApiBaseUrl } from './runtimeEndpoints';
 
 interface PerformanceMetrics {
   lcp?: number;  // Largest Contentful Paint
@@ -10,6 +11,49 @@ interface PerformanceMetrics {
 }
 
 const metrics: PerformanceMetrics = {};
+const API_BASE_URL = resolveApiBaseUrl(import.meta.env.VITE_API_URL as string | undefined);
+const WEB_VITALS_ENDPOINT = `${API_BASE_URL}/system/metrics/web-vitals`;
+const API_TIMING_ENDPOINT = `${API_BASE_URL}/system/metrics/api-timing`;
+let webVitalsEndpointDisabled = false;
+let apiTimingEndpointDisabled = false;
+
+function shouldDisableEndpoint(status: number): boolean {
+  return status === 404 || status >= 500;
+}
+
+function postKeepaliveJson(url: string, body: string, endpoint: 'webVitals' | 'apiTiming'): void {
+  if (endpoint === 'webVitals' && webVitalsEndpointDisabled) {
+    return;
+  }
+
+  if (endpoint === 'apiTiming' && apiTimingEndpointDisabled) {
+    return;
+  }
+
+  fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body,
+    keepalive: true,
+    credentials: 'include',
+  })
+    .then((response) => {
+      if (shouldDisableEndpoint(response.status)) {
+        if (endpoint === 'webVitals') {
+          webVitalsEndpointDisabled = true;
+        } else {
+          apiTimingEndpointDisabled = true;
+        }
+      }
+    })
+    .catch(() => {
+      if (endpoint === 'webVitals') {
+        webVitalsEndpointDisabled = true;
+      } else {
+        apiTimingEndpointDisabled = true;
+      }
+    });
+}
 
 function sendToAnalytics(metric: Metric) {
   // Store locally
@@ -30,16 +74,8 @@ function sendToAnalytics(metric: Metric) {
     navigationType: metric.navigationType,
   });
 
-  // Sende an Analytics (Beacon API für zuverlässiges Senden)
-  if (navigator.sendBeacon) {
-    navigator.sendBeacon('/api/system/metrics/web-vitals', body);
-  } else {
-    fetch('/api/system/metrics/web-vitals', {
-      method: 'POST',
-      body,
-      keepalive: true,
-    }).catch(() => {});
-  }
+  // Send analytics as keepalive request to the resolved backend API.
+  postKeepaliveJson(WEB_VITALS_ENDPOINT, body, 'webVitals');
 }
 
 export function trackWebVitals() {
@@ -51,12 +87,7 @@ export function trackWebVitals() {
 }
 
 export function trackApiPerformance(endpoint: string, duration: number) {
-  fetch('/api/system/metrics/api-timing', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ endpoint, duration }),
-    keepalive: true,
-  }).catch(() => {});
+  postKeepaliveJson(API_TIMING_ENDPOINT, JSON.stringify({ endpoint, duration }), 'apiTiming');
 }
 
 export function getMetrics(): PerformanceMetrics {

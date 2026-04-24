@@ -11,6 +11,11 @@ import {
     isSessionEncryptionActive,
     type EncryptedPayload,
 } from '../utils/clientEncryption';
+import {
+    isLikelyPlaceholderUrl,
+    resolveApiBaseUrl,
+    resolveSocketBaseUrl,
+} from '../lib/runtimeEndpoints';
 
 // =============================================================================
 // REQUEST DEDUPLICATION
@@ -51,8 +56,11 @@ function clearPendingRequest(config: AxiosRequestConfig | InternalAxiosRequestCo
 
 
 
-export const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
-export const SOCKET_BASE_URL = API_BASE_URL.replace(/\/api\/?$/, '');
+const configuredApiUrl = import.meta.env.VITE_API_URL as string | undefined;
+const configuredSocketUrl = import.meta.env.VITE_SOCKET_URL as string | undefined;
+
+export const API_BASE_URL = resolveApiBaseUrl(configuredApiUrl);
+export const SOCKET_BASE_URL = resolveSocketBaseUrl(configuredSocketUrl, configuredApiUrl);
 // Demo mode is now controlled by modeStore (runtime switchable).
 // Legacy env-var support: if VITE_DISABLE_DEMO_MODE=true, force live mode on load.
 if (import.meta.env.VITE_DISABLE_DEMO_MODE === 'true') {
@@ -60,8 +68,8 @@ if (import.meta.env.VITE_DISABLE_DEMO_MODE === 'true') {
     import('../store/modeStore').then(m => m.useModeStore.getState().setMode('live'));
 }
 
-if (!import.meta.env.VITE_API_URL) {
-    console.warn('VITE_API_URL is missing. Falling back to /api (same-origin).');
+if (isLikelyPlaceholderUrl(configuredApiUrl)) {
+    console.warn(`VITE_API_URL is missing or invalid. Falling back to '${API_BASE_URL}'.`);
 }
 
 if (isDemoMode()) {

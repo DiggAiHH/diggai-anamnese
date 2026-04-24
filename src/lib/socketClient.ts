@@ -2,8 +2,12 @@
 // Central Socket.IO connection for real-time NFC/Flow/Chat/Payment events
 
 import { io, Socket } from 'socket.io-client';
+import { resolveSocketBaseUrl } from './runtimeEndpoints';
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const SOCKET_URL = resolveSocketBaseUrl(
+  import.meta.env.VITE_SOCKET_URL as string | undefined,
+  import.meta.env.VITE_API_URL as string | undefined
+);
 
 let socket: Socket | null = null;
 let reconnectAttempt = 0;
