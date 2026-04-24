@@ -350,6 +350,14 @@ apiClient.interceptors.response.use(
         }
         
         const originalRequest = error.config;
+        const requestUrl: string = String(originalRequest?.url || '');
+        const isStaffLoginRequest = /\/arzt\/login(?:\?|$)/.test(requestUrl);
+
+        // A failed staff login is an expected credential error and must not trigger
+        // refresh-token logic or a forced redirect to '/'.
+        if (error.response?.status === 401 && isStaffLoginRequest) {
+            return Promise.reject(error);
+        }
 
         if (error.response?.status === 401 && !originalRequest._retry) {
             // If this is the refresh request itself failing, don't retry
