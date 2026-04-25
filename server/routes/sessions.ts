@@ -151,11 +151,14 @@ router.post('/', async (req: Request, res: Response) => {
             },
         });
 
-        await ensureSessionStoredInEpisode({
+        // Episode linking is non-critical — session creation succeeds even if episodes table is not yet migrated
+        ensureSessionStoredInEpisode({
             tenantId,
             sessionId: session.id,
             selectedService,
             createdAt: session.createdAt,
+        }).catch((episodeErr: unknown) => {
+            console.warn('[Sessions] Episode-Verknüpfung fehlgeschlagen (non-fatal):', episodeErr);
         });
 
         const token = createToken({
