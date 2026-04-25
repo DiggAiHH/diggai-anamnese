@@ -35,8 +35,12 @@ export default function StaffLogin() {
         navigate('/verwaltung/admin', { replace: true });
       }
     } catch (err: unknown) {
-      const e2 = err as { response?: { data?: { message?: string } }; message?: string };
-      setError(e2?.response?.data?.message ?? e2?.message ?? t('verwaltung.login.failed', 'Anmeldung fehlgeschlagen.'));
+      const e2 = err as {
+        response?: { data?: { message?: string; error?: string } };
+        message?: string;
+      };
+      const backendMessage = e2?.response?.data?.message ?? e2?.response?.data?.error;
+      setError(backendMessage ?? e2?.message ?? t('verwaltung.login.failed', 'Anmeldung fehlgeschlagen.'));
     }
   };
 
