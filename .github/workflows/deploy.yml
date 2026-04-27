@@ -56,15 +56,28 @@ jobs:
           script: |
             set -e
 
-            # Extract repo path from docker compose ls using grep -oE (avoids awk ANSI issues)
-            REPO_PATH=$(docker compose ls 2>/dev/null \
-              | grep -oE '(/[^[:space:],]+)+/docker-compose\.yml' \
-              | head -1 \
-              | xargs -r dirname 2>/dev/null || true)
+            # Find repo dir: locate directory containing BOTH docker-compose.yml
+            # and docker-compose.override.yml (avoids ANSI/parsing issues entirely)
+            REPO_PATH=""
+            for base in /root /home /opt /srv /var/www; do
+              [ -d "$base" ] || continue
+              while IFS= read -r f; do
+                d=$(dirname "$f")
+                if [ -f "$d/docker-compose.override.yml" ]; then
+                  REPO_PATH="$d"
+                  break 2
+                fi
+              done < <(find "$base" -maxdepth 6 -name "docker-compose.yml" -not -path "*/node_modules/*" 2>/dev/null)
+            done
 
-            if [ -z "$REPO_PATH" ]; then
-              echo "ERROR: Could not extract repo path from docker compose ls"
+            if [ -z "$REPO_PATH" ] || [ ! -d "$REPO_PATH" ]; then
+              echo "=== DIAGNOSTIC: Cannot locate repo ==="
+              echo "whoami: $(whoami)"
+              echo "ls /home: $(ls /home 2>/dev/null || echo none)"
+              echo "ls /opt:  $(ls /opt  2>/dev/null || echo none)"
+              echo "ls /root: $(ls /root 2>/dev/null || echo none)"
               docker compose ls 2>&1 || true
+              docker ps --format 'table {{.Names}}\t{{.Image}}' 2>&1 || true
               exit 1
             fi
 
