@@ -56,25 +56,14 @@ jobs:
           script: |
             set -e
 
-            # Get repo path from any running container's compose label (most reliable)
-            REPO_PATH=$(docker ps -q 2>/dev/null \
-              | xargs -r docker inspect --format '{{ index .Config.Labels "com.docker.compose.project.working_dir"}}' 2>/dev/null \
-              | grep -v '^$' | head -1 | tr -d '[:space:]')
+            # Extract repo path from docker compose ls using grep -oE (avoids awk ANSI issues)
+            REPO_PATH=$(docker compose ls 2>/dev/null \
+              | grep -oE '(/[^[:space:],]+)+/docker-compose\.yml' \
+              | head -1 \
+              | xargs -r dirname 2>/dev/null || true)
 
-            # Fallback: parse docker compose ls for the config file path
-            if [ -z "$REPO_PATH" ] || [ ! -d "$REPO_PATH" ]; then
-              REPO_PATH=$(docker compose ls 2>/dev/null \
-                | awk 'NR>1 {print $NF}' \
-                | tr ',' '\n' \
-                | grep '\.yml' \
-                | head -1 \
-                | xargs -r dirname 2>/dev/null || true)
-            fi
-
-            if [ -z "$REPO_PATH" ] || [ ! -d "$REPO_PATH" ]; then
-              echo "ERROR: Could not find repo. Running containers:"
-              docker ps 2>&1 || true
-              echo "Compose projects:"
+            if [ -z "$REPO_PATH" ]; then
+              echo "ERROR: Could not extract repo path from docker compose ls"
               docker compose ls 2>&1 || true
               exit 1
             fi
