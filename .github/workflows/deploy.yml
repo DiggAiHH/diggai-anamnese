@@ -56,33 +56,25 @@ jobs:
           script: |
             set -e
 
-            # Primary: use known repo path (confirmed via docker compose ls diagnostic)
-            REPO_PATH="/opt/${{ secrets.VPS_USER }}/repo"
+            # Get repo path from any running container's compose label (most reliable)
+            REPO_PATH=$(docker ps -q 2>/dev/null \
+              | xargs -r docker inspect --format '{{ index .Config.Labels "com.docker.compose.project.working_dir"}}' 2>/dev/null \
+              | grep -v '^$' | head -1 | tr -d '[:space:]')
 
-            # Fallback 1: docker compose ls table output - extract path from CONFIG FILES column
-            if [ ! -d "$REPO_PATH" ]; then
+            # Fallback: parse docker compose ls for the config file path
+            if [ -z "$REPO_PATH" ] || [ ! -d "$REPO_PATH" ]; then
               REPO_PATH=$(docker compose ls 2>/dev/null \
-                | tail -n +2 \
-                | awk '{print $NF}' \
+                | awk 'NR>1 {print $NF}' \
                 | tr ',' '\n' \
-                | grep -i "docker-compose.yml" \
+                | grep '\.yml' \
                 | head -1 \
-                | xargs -I{} dirname {} 2>/dev/null || true)
-            fi
-
-            # Fallback 2: docker inspect the app container
-            if [ -z "$REPO_PATH" ] || [ ! -d "$REPO_PATH" ]; then
-              for CNAME in $(docker ps --format '{{.Names}}' 2>/dev/null); do
-                TMP=$(docker inspect "$CNAME" 2>/dev/null \
-                  | grep -o '"com.docker.compose.project.working_dir":"[^"]*"' \
-                  | head -1 \
-                  | sed 's|.*":"||;s|"||g' || true)
-                if [ -n "$TMP" ] && [ -d "$TMP" ]; then REPO_PATH="$TMP"; break; fi
-              done
+                | xargs -r dirname 2>/dev/null || true)
             fi
 
             if [ -z "$REPO_PATH" ] || [ ! -d "$REPO_PATH" ]; then
-              echo "ERROR: Repo not found. docker compose ls output:"
+              echo "ERROR: Could not find repo. Running containers:"
+              docker ps 2>&1 || true
+              echo "Compose projects:"
               docker compose ls 2>&1 || true
               exit 1
             fi
