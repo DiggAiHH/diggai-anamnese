@@ -56,58 +56,58 @@ jobs:
           script: |
             set -e
 
-            # Method 1: docker compose ls (lists all running projects with config paths)
+            # Method 1: docker compose ls - parse ConfigFiles with awk
             REPO_PATH=$(docker compose ls --format json 2>/dev/null \
-              | python3 -c "
-import sys, json
-try:
-  data = json.load(sys.stdin)
-  for p in data:
-    cfg = p.get('ConfigFiles', '')
-    if 'anamnese' in cfg.lower() or 'diggai' in cfg.lower():
-      print(cfg.split(',')[0].rsplit('/', 1)[0])
-      break
-except Exception as e:
-  pass
-" 2>/dev/null || true)
+              | grep -oi '"ConfigFiles":"[^"]*"' \
+              | grep -i "anamnese\|diggai" \
+              | head -1 \
+              | sed 's|"ConfigFiles":"||;s|"||g' \
+              | sed 's|/[^/]*$||' \
+              || true)
 
-            # Method 2: docker inspect compose label
+            # Method 2: docker inspect - try several likely container names
             if [ -z "$REPO_PATH" ] || [ ! -d "$REPO_PATH" ]; then
-              REPO_PATH=$(docker inspect diggai-anamnese-master-app-1 \
-                --format '{{ index .Config.Labels "com.docker.compose.project.working_dir"}}' \
-                2>/dev/null | tr -d '[:space:]' || true)
+              for CNAME in diggai-anamnese-master-app-1 anamnese-master-app-1 anamnese-app-1; do
+                TMP=$(docker inspect "$CNAME" 2>/dev/null \
+                  | grep -o '"com.docker.compose.project.working_dir":"[^"]*"' \
+                  | head -1 \
+                  | sed 's|.*":"||;s|"||g' \
+                  || true)
+                if [ -n "$TMP" ] && [ -d "$TMP" ]; then REPO_PATH="$TMP"; break; fi
+              done
             fi
 
-            # Method 3: find .git dir matching remote URL
+            # Method 3: search for .git dirs whose remote points to our repo
             if [ -z "$REPO_PATH" ] || [ ! -d "$REPO_PATH" ]; then
-              REPO_PATH=$(find / -maxdepth 7 -name ".git" -type d \
+              while IFS= read -r gd; do
+                dir=$(dirname "$gd")
+                if git -C "$dir" remote -v 2>/dev/null | grep -q "diggai-anamnese"; then
+                  REPO_PATH="$dir"; break
+                fi
+              done < <(find / -maxdepth 7 -name ".git" -type d \
                 -not -path "*/proc/*" -not -path "*/sys/*" -not -path "*/dev/*" \
-                2>/dev/null \
-                | while read gd; do
-                    dir=$(dirname "$gd")
-                    if git -C "$dir" remote -v 2>/dev/null | grep -q "diggai-anamnese"; then
-                      echo "$dir"; break
-                    fi
-                  done | head -1 || true)
+                2>/dev/null)
             fi
 
-            # Method 4: wide find for docker-compose.yml
+            # Method 4: find docker-compose.yml mentioning anamnese
             if [ -z "$REPO_PATH" ] || [ ! -d "$REPO_PATH" ]; then
               REPO_PATH=$(find / -maxdepth 7 -name "docker-compose.yml" \
                 -not -path "*/proc/*" -not -path "*/sys/*" -not -path "*/dev/*" \
-                2>/dev/null | xargs grep -l "anamnese" 2>/dev/null | head -1 | xargs dirname 2>/dev/null || true)
+                2>/dev/null | xargs grep -l "anamnese" 2>/dev/null \
+                | head -1 | xargs -I{} dirname {} 2>/dev/null || true)
             fi
 
-            # Abort with diagnostics if still not found
+            # Abort with diagnostics so we can determine the real path
             if [ -z "$REPO_PATH" ] || [ ! -d "$REPO_PATH" ]; then
               echo "ERROR: Could not locate repo. Diagnostic info:"
-              docker ps --format "table {{.Names}}\t{{.Status}}" 2>/dev/null || true
+              docker ps 2>/dev/null || true
               docker compose ls 2>/dev/null || true
-              find / -maxdepth 5 -name "docker-compose.yml" -not -path "*/proc/*" -not -path "*/sys/*" 2>/dev/null || true
+              find / -maxdepth 5 -name "docker-compose.yml" \
+                -not -path "*/proc/*" -not -path "*/sys/*" 2>/dev/null || true
               exit 1
             fi
 
-            echo "→ Repo path: $REPO_PATH"
+            echo ">>> Repo path: $REPO_PATH"
 
             # Pull latest code
             echo "Pulling latest changes..."
