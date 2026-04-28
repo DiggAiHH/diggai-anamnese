@@ -200,8 +200,14 @@ jobs:
                 APP_OK=1
                 break
               fi
-              echo "  waiting... ($((i*5))s/90s)"
+              APP_STATE=$(docker inspect --format='{{.State.Status}}' diggai-app 2>/dev/null || echo missing)
+              echo "  waiting... ($((i*5))s/90s) app=$APP_STATE"
             done
-            [ "$APP_OK" = "1" ] || { echo "Health check failed after 90s!"; exit 1; }
+            if [ "$APP_OK" != "1" ]; then
+              echo "=== APP CONTAINER LOGS (last 60 lines) ==="
+              docker logs diggai-app --tail 60 2>&1 || true
+              echo "=== END APP LOGS ==="
+              echo "Health check failed after 90s!"; exit 1
+            fi
 
             echo "Deployment successful!"
