@@ -56,52 +56,31 @@ jobs:
           script: |
             set -e
 
-            # Method 1: NO_COLOR=1 suppresses ANSI escape codes from docker compose ls
-            # then awk gets last column, tr splits comma-separated config files, grep finds .yml
-            COMPOSE_FILE=$(NO_COLOR=1 docker compose ls 2>/dev/null \
-              | awk 'NR>1 && NF>0 {print $NF}' \
-              | tr ',' '\n' \
-              | grep '/docker-compose\.yml$' \
-              | head -1 || true)
+            # Get path from docker inspect label (no Go templates, no ANSI, no -d test)
+            CONTAINER_ID=$(docker ps -q | head -1)
+            REPO_PATH=$(docker inspect "$CONTAINER_ID" \
+              | grep '"com.docker.compose.project.working_dir"' \
+              | head -1 \
+              | sed 's/.*": "\([^"]*\)".*/\1/' \
+              | tr -d '[:space:]')
 
-            REPO_PATH=$(dirname "$COMPOSE_FILE" 2>/dev/null || true)
-
-            # Method 2: docker inspect via grep (avoids {{ }} Go-template interpretation)
-            if [ -z "$REPO_PATH" ] || [ ! -d "$REPO_PATH" ]; then
-              CONTAINER_ID=$(docker ps -q | head -1)
-              if [ -n "$CONTAINER_ID" ]; then
-                REPO_PATH=$(docker inspect "$CONTAINER_ID" \
-                  | grep '"com.docker.compose.project.working_dir"' \
-                  | head -1 \
-                  | sed 's/.*": "\([^"]*\)".*/\1/' \
-                  | tr -d '[:space:]' || true)
-              fi
-            fi
-
-            # Method 3: docker compose ls --format json (compose v2.21+)
-            if [ -z "$REPO_PATH" ] || [ ! -d "$REPO_PATH" ]; then
+            # Fallback: docker compose ls --format json
+            if [ -z "$REPO_PATH" ]; then
               COMPOSE_FILE=$(docker compose ls --format json 2>/dev/null \
-                | tr '{' '\n' | tr ',' '\n' \
+                | tr ',' '\n' \
                 | grep 'ConfigFiles' \
                 | sed 's/.*ConfigFiles":"\([^",]*\).*/\1/' \
                 | head -1 || true)
               REPO_PATH=$(dirname "$COMPOSE_FILE" 2>/dev/null || true)
             fi
 
-            if [ -z "$REPO_PATH" ] || [ ! -d "$REPO_PATH" ]; then
-              echo "=== DEBUG: all methods failed ==="
-              echo "NO_COLOR ls output:"
-              NO_COLOR=1 docker compose ls 2>&1 || true
-              echo "docker compose ls --format json:"
-              docker compose ls --format json 2>&1 || true
-              echo "docker inspect working_dir label:"
-              docker ps -q | head -1 | xargs -r docker inspect 2>/dev/null | grep working_dir || true
-              exit 1
+            if [ -z "$REPO_PATH" ]; then
+              echo "ERROR: Could not find repo path"; exit 1
             fi
 
             echo ">>> Repo path: $REPO_PATH"
 
-            # Pull latest code
+            # Pull latest code (git -C works even without cd permissions)
             echo "Pulling latest changes..."
             git -C "$REPO_PATH" pull origin master
 
