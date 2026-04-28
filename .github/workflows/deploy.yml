@@ -48,11 +48,14 @@ jobs:
     steps:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_SSH_PORT || 22 }}
+          envs: GITHUB_TOKEN
           script: |
             set -e
 
@@ -70,27 +73,52 @@ jobs:
 
             echo ">>> Repo: $REPO_PATH"
 
-            # Fix repo ownership via docker (daemon runs as root, can chown even
-            # when SSH user has no direct access to the path)
-            UID_GID="$(id -u):$(id -g)"
             PARENT=$(dirname "$REPO_PATH")
-            echo "Fixing repo ownership for UID:GID $UID_GID ..."
-            docker run --rm \
-              -v "${PARENT}:${PARENT}" \
-              alpine sh -c "chown -R ${UID_GID} ${REPO_PATH}"
+            UID_GID="$(id -u):$(id -g)"
+            # Build clone URL using GITHUB_TOKEN (passed via envs, available in this shell)
+            CLONE_URL="https://x-access-token:${GITHUB_TOKEN}@github.com/DiggAiHH/diggai-anamnese.git"
 
-            echo "Pulling latest changes..."
-            git -C "$REPO_PATH" pull origin master
+            # Check if repo exists (run inside docker container which runs as root)
+            REPO_EXISTS=$(docker run --rm \
+              -v "${PARENT}:${PARENT}" \
+              alpine sh -c "test -d '${REPO_PATH}/.git' && echo yes || echo no" 2>/dev/null || echo no)
+
+            if [ "$REPO_EXISTS" != "yes" ]; then
+              echo "Repo missing — cloning fresh..."
+              docker run --rm \
+                -v "${PARENT}:${PARENT}" \
+                -e "CLONE_URL=${CLONE_URL}" \
+                -e "REPO_PATH=${REPO_PATH}" \
+                -e "UID_GID=${UID_GID}" \
+                alpine sh -c '
+                  apk add --no-cache git > /dev/null 2>&1
+                  mkdir -p "$REPO_PATH"
+                  git clone --depth=50 "$CLONE_URL" "$REPO_PATH"
+                  chown -R $UID_GID "$REPO_PATH"
+                '
+            else
+              echo "Pulling latest changes..."
+              docker run --rm \
+                -v "${PARENT}:${PARENT}" \
+                -w "${REPO_PATH}" \
+                -e "CLONE_URL=${CLONE_URL}" \
+                alpine sh -c '
+                  apk add --no-cache git > /dev/null 2>&1
+                  git remote set-url origin "$CLONE_URL"
+                  git pull origin master
+                '
+            fi
 
             # SSL cert renewal (best-effort)
             certbot renew --quiet 2>/dev/null || true
 
-            # docker compose flags (include override.yml if present)
+            # Include override.yml if present
             OVERRIDE_FLAG=""
-            if [ -f "$REPO_PATH/docker-compose.override.yml" ]; then
-              OVERRIDE_FLAG="-f $REPO_PATH/docker-compose.override.yml"
+            if docker run --rm -v "${PARENT}:${PARENT}" alpine \
+                test -f "${REPO_PATH}/docker-compose.override.yml" 2>/dev/null; then
+              OVERRIDE_FLAG="-f ${REPO_PATH}/docker-compose.override.yml"
             fi
-            DC="docker compose -f $REPO_PATH/docker-compose.yml $OVERRIDE_FLAG --project-directory $REPO_PATH"
+            DC="docker compose -f ${REPO_PATH}/docker-compose.yml ${OVERRIDE_FLAG} --project-directory ${REPO_PATH}"
 
             echo "Building and starting containers..."
             $DC up -d --build --remove-orphans
