@@ -13,6 +13,7 @@ RUN npx prisma generate
 
 # Copy server source and build
 COPY server/ ./server/
+COPY src/theme/ ./src/theme/
 COPY tsconfig*.json ./
 
 # Build server TypeScript
@@ -37,6 +38,7 @@ COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
 # Copy server source (tsx runs .ts directly at runtime)
 COPY server/ ./server/
+COPY src/theme/ ./src/theme/
 
 # Create uploads directory
 RUN mkdir -p uploads && chown -R node:node uploads
