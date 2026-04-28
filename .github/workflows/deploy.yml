@@ -56,7 +56,7 @@ jobs:
           script: |
             set -e
 
-            # Get path from docker inspect label (no Go templates, no ANSI, no -d test)
+            # Get path from docker inspect label (no Go templates, no ANSI)
             CONTAINER_ID=$(docker ps -q | head -1)
             REPO_PATH=$(docker inspect "$CONTAINER_ID" \
               | grep '"com.docker.compose.project.working_dir"' \
@@ -64,43 +64,46 @@ jobs:
               | sed 's/.*": "\([^"]*\)".*/\1/' \
               | tr -d '[:space:]')
 
-            # Fallback: docker compose ls --format json
             if [ -z "$REPO_PATH" ]; then
-              COMPOSE_FILE=$(docker compose ls --format json 2>/dev/null \
-                | tr ',' '\n' \
-                | grep 'ConfigFiles' \
-                | sed 's/.*ConfigFiles":"\([^",]*\).*/\1/' \
-                | head -1 || true)
-              REPO_PATH=$(dirname "$COMPOSE_FILE" 2>/dev/null || true)
-            fi
-
-            if [ -z "$REPO_PATH" ]; then
-              echo "ERROR: Could not find repo path"; exit 1
+              echo "ERROR: Cannot find repo path"; exit 1
             fi
 
             echo ">>> Repo path: $REPO_PATH"
 
-            # Pull latest code (git -C works even without cd permissions)
+            # Use sudo: SSH user may lack execute permission on repo directory
+            # (sudo certbot already works, so passwordless sudo is configured)
             echo "Pulling latest changes..."
-            git -C "$REPO_PATH" pull origin master
-
-            cd "$REPO_PATH"
+            sudo git -C "$REPO_PATH" pull origin master
 
             # Refresh SSL certs if due
             echo "Renewing SSL certs if needed..."
             sudo certbot renew --quiet 2>/dev/null || true
-            if [ -f /etc/letsencrypt/live/api.diggai.de/fullchain.pem ]; then
-              cp /etc/letsencrypt/live/api.diggai.de/fullchain.pem docker/certs/
-              cp /etc/letsencrypt/live/api.diggai.de/privkey.pem   docker/certs/
+            if sudo test -f /etc/letsencrypt/live/api.diggai.de/fullchain.pem 2>/dev/null; then
+              sudo cp /etc/letsencrypt/live/api.diggai.de/fullchain.pem "$REPO_PATH/docker/certs/" 2>/dev/null || true
+              sudo cp /etc/letsencrypt/live/api.diggai.de/privkey.pem   "$REPO_PATH/docker/certs/" 2>/dev/null || true
             fi
 
+            # Build and restart — use explicit -f + --project-directory to avoid needing cd
             echo "Building and starting containers..."
-            docker compose up -d --build --remove-orphans
+            OVERRIDE=""
+            if sudo test -f "$REPO_PATH/docker-compose.override.yml" 2>/dev/null; then
+              OVERRIDE="-f $REPO_PATH/docker-compose.override.yml"
+            fi
+            docker compose \
+              -f "$REPO_PATH/docker-compose.yml" $OVERRIDE \
+              --project-directory "$REPO_PATH" \
+              up -d --build --remove-orphans
 
+            # Run migrations
             echo "Running database migrations..."
-            docker compose exec -T app npx prisma migrate deploy 2>/dev/null || \
-              echo "Migration step skipped (no migration folder — running schema push instead)" && \
-              docker compose exec -T app npx prisma db push --accept-data-loss 2>/dev/null || true
+            docker compose \
+              -f "$REPO_PATH/docker-compose.yml" $OVERRIDE \
+              --project-directory "$REPO_PATH" \
+              exec -T app npx prisma migrate deploy 2>/dev/null || \
+              docker compose \
+              -f "$REPO_PATH/docker-compose.yml" $OVERRIDE \
+              --project-directory "$REPO_PATH" \
+              exec -T app npx prisma db push --accept-data-loss 2>/dev/null || true
 
             echo "Health check..."
             sleep 10
