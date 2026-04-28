@@ -149,6 +149,19 @@ jobs:
             $DC build app
 
             echo "Ensuring infrastructure is running (redis/postgres not recreated if healthy)..."
+            # If redis/postgres are unhealthy (not just "not running"), stop them so compose
+            # can recreate with updated config (e.g., after docker-compose.yml changes)
+            REDIS_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' diggai-redis 2>/dev/null || echo missing)
+            POSTGRES_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' diggai-postgres 2>/dev/null || echo missing)
+            if [ "$REDIS_HEALTH" = "unhealthy" ]; then
+              echo "Redis unhealthy — stopping for config update..."
+              docker stop diggai-redis 2>/dev/null || true
+            fi
+            if [ "$POSTGRES_HEALTH" = "unhealthy" ]; then
+              echo "Postgres unhealthy — stopping for config update..."
+              docker stop diggai-postgres 2>/dev/null || true
+            fi
+
             REDIS_STATUS=$(docker inspect --format='{{.State.Status}}' diggai-redis 2>/dev/null || echo missing)
             POSTGRES_STATUS=$(docker inspect --format='{{.State.Status}}' diggai-postgres 2>/dev/null || echo missing)
             if [ "$REDIS_STATUS" != "running" ] || [ "$POSTGRES_STATUS" != "running" ]; then
