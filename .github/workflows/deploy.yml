@@ -56,7 +56,7 @@ jobs:
           script: |
             set -e
 
-            # Get path from docker inspect label (no Go templates, no ANSI)
+            # Get repo path from docker inspect labels
             CONTAINER_ID=$(docker ps -q | head -1)
             REPO_PATH=$(docker inspect "$CONTAINER_ID" \
               | grep '"com.docker.compose.project.working_dir"' \
@@ -68,42 +68,36 @@ jobs:
               echo "ERROR: Cannot find repo path"; exit 1
             fi
 
-            echo ">>> Repo path: $REPO_PATH"
+            echo ">>> Repo: $REPO_PATH"
 
-            # Use sudo: SSH user may lack execute permission on repo directory
-            # (sudo certbot already works, so passwordless sudo is configured)
+            # Fix repo ownership via docker (daemon runs as root, can chown even
+            # when SSH user has no direct access to the path)
+            UID_GID="$(id -u):$(id -g)"
+            PARENT=$(dirname "$REPO_PATH")
+            echo "Fixing repo ownership for UID:GID $UID_GID ..."
+            docker run --rm \
+              -v "${PARENT}:${PARENT}" \
+              alpine sh -c "chown -R ${UID_GID} ${REPO_PATH}"
+
             echo "Pulling latest changes..."
-            sudo git -C "$REPO_PATH" pull origin master
+            git -C "$REPO_PATH" pull origin master
 
-            # Refresh SSL certs if due
-            echo "Renewing SSL certs if needed..."
-            sudo certbot renew --quiet 2>/dev/null || true
-            if sudo test -f /etc/letsencrypt/live/api.diggai.de/fullchain.pem 2>/dev/null; then
-              sudo cp /etc/letsencrypt/live/api.diggai.de/fullchain.pem "$REPO_PATH/docker/certs/" 2>/dev/null || true
-              sudo cp /etc/letsencrypt/live/api.diggai.de/privkey.pem   "$REPO_PATH/docker/certs/" 2>/dev/null || true
+            # SSL cert renewal (best-effort)
+            certbot renew --quiet 2>/dev/null || true
+
+            # docker compose flags (include override.yml if present)
+            OVERRIDE_FLAG=""
+            if [ -f "$REPO_PATH/docker-compose.override.yml" ]; then
+              OVERRIDE_FLAG="-f $REPO_PATH/docker-compose.override.yml"
             fi
+            DC="docker compose -f $REPO_PATH/docker-compose.yml $OVERRIDE_FLAG --project-directory $REPO_PATH"
 
-            # Build and restart — use explicit -f + --project-directory to avoid needing cd
             echo "Building and starting containers..."
-            OVERRIDE=""
-            if sudo test -f "$REPO_PATH/docker-compose.override.yml" 2>/dev/null; then
-              OVERRIDE="-f $REPO_PATH/docker-compose.override.yml"
-            fi
-            docker compose \
-              -f "$REPO_PATH/docker-compose.yml" $OVERRIDE \
-              --project-directory "$REPO_PATH" \
-              up -d --build --remove-orphans
+            $DC up -d --build --remove-orphans
 
-            # Run migrations
             echo "Running database migrations..."
-            docker compose \
-              -f "$REPO_PATH/docker-compose.yml" $OVERRIDE \
-              --project-directory "$REPO_PATH" \
-              exec -T app npx prisma migrate deploy 2>/dev/null || \
-              docker compose \
-              -f "$REPO_PATH/docker-compose.yml" $OVERRIDE \
-              --project-directory "$REPO_PATH" \
-              exec -T app npx prisma db push --accept-data-loss 2>/dev/null || true
+            $DC exec -T app npx prisma migrate deploy 2>/dev/null || \
+              $DC exec -T app npx prisma db push --accept-data-loss 2>/dev/null || true
 
             echo "Health check..."
             sleep 10
