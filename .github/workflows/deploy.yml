@@ -56,28 +56,39 @@ jobs:
           script: |
             set -e
 
-            # Find repo dir: locate directory containing BOTH docker-compose.yml
-            # and docker-compose.override.yml (avoids ANSI/parsing issues entirely)
-            REPO_PATH=""
-            for base in /root /home /opt /srv /var/www; do
-              [ -d "$base" ] || continue
-              while IFS= read -r f; do
-                d=$(dirname "$f")
-                if [ -f "$d/docker-compose.override.yml" ]; then
-                  REPO_PATH="$d"
-                  break 2
-                fi
-              done < <(find "$base" -maxdepth 6 -name "docker-compose.yml" -not -path "*/node_modules/*" 2>/dev/null)
-            done
+            # Primary: derive from whoami (diagnostic confirmed path is /opt/USER/repo)
+            ME=$(whoami)
+            REPO_PATH="/opt/${ME}/repo"
+
+            # Fallback 1: /home/USER/repo
+            if [ ! -d "$REPO_PATH" ]; then
+              REPO_PATH="/home/${ME}/repo"
+            fi
+
+            # Fallback 2: POSIX-compatible find (pipe, not process substitution)
+            if [ ! -d "$REPO_PATH" ]; then
+              REPO_PATH=$(find /opt /home /root /srv 2>/dev/null \
+                -maxdepth 7 -name 'docker-compose.yml' \
+                -not -path '*/node_modules/*' \
+                | while read -r f; do
+                    d=$(dirname "$f")
+                    [ -f "$d/docker-compose.override.yml" ] && echo "$d" && break
+                  done | head -1)
+            fi
+
+            # Fallback 3: sed-strip ANSI then grep docker compose ls
+            if [ -z "$REPO_PATH" ] || [ ! -d "$REPO_PATH" ]; then
+              REPO_PATH=$(docker compose ls 2>/dev/null \
+                | sed 's/\x1b\[[0-9;]*[mGKHF]//g' \
+                | grep -oE '/[^[:space:],]+/docker-compose\.yml' \
+                | head -1 \
+                | xargs -r dirname 2>/dev/null || true)
+            fi
 
             if [ -z "$REPO_PATH" ] || [ ! -d "$REPO_PATH" ]; then
-              echo "=== DIAGNOSTIC: Cannot locate repo ==="
-              echo "whoami: $(whoami)"
-              echo "ls /home: $(ls /home 2>/dev/null || echo none)"
-              echo "ls /opt:  $(ls /opt  2>/dev/null || echo none)"
-              echo "ls /root: $(ls /root 2>/dev/null || echo none)"
+              echo "=== ERROR: Cannot locate repo ==="
+              echo "whoami=$ME  /opt/$ME/repo exists? $(test -d /opt/$ME/repo && echo yes || echo no)"
               docker compose ls 2>&1 || true
-              docker ps --format 'table {{.Names}}\t{{.Image}}' 2>&1 || true
               exit 1
             fi
 
