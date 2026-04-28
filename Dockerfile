@@ -5,7 +5,7 @@ WORKDIR /app
 
 # Install build dependencies
 COPY package*.json ./
-RUN npm ci
+RUN npm ci --legacy-peer-deps
 
 # Generate Prisma client
 COPY prisma/ ./prisma/
@@ -28,7 +28,7 @@ RUN apk add --no-cache tini wget
 
 # Copy production node_modules
 COPY package*.json ./
-RUN npm ci --omit=dev && npm install tsx bcryptjs
+RUN npm ci --omit=dev --legacy-peer-deps && npm install tsx bcryptjs --legacy-peer-deps
 
 # Copy Prisma schema + generated client
 COPY --from=builder /app/prisma ./prisma
