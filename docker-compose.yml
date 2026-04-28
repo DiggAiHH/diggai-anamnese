@@ -52,12 +52,12 @@ services:
       --appendonly yes
       --maxmemory 128mb
       --maxmemory-policy allkeys-lru
-      --requirepass ${REDIS_PASSWORD:-}
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s
     restart: unless-stopped
     networks:
       - diggai-network
