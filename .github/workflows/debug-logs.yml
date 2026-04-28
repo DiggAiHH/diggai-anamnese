@@ -21,8 +21,30 @@ jobs:
             echo "=== DB: list tenants ==="
             docker exec diggai-postgres psql -U diggai -d anamnese_prod -c 'SELECT id, subdomain, name, status FROM "Tenant" LIMIT 20;' 2>&1 || echo "psql failed"
             echo ""
-            echo "=== DB: list staff users (no passwords) ==="
-            docker exec diggai-postgres psql -U diggai -d anamnese_prod -c 'SELECT id, username, role, "tenantId" FROM "ArztUser" LIMIT 20;' 2>&1 || echo "psql failed"
+            echo "=== DB: list staff users with lockout status ==="
+            docker exec diggai-postgres psql -U diggai -d anamnese_prod -c 'SELECT id, username, role, "tenantId", "isActive", "failedLoginAttempts", "lockedUntil", LEFT("passwordHash",20) as hash_prefix FROM "ArztUser" LIMIT 20;' 2>&1 || echo "psql failed"
+            echo ""
+            echo "=== Reset account lockout for all ArztUsers ==="
+            docker exec diggai-postgres psql -U diggai -d anamnese_prod -c 'UPDATE "ArztUser" SET "failedLoginAttempts" = 0, "lockedUntil" = NULL WHERE "failedLoginAttempts" > 0 OR "lockedUntil" IS NOT NULL;' 2>&1 || echo "psql reset failed"
+            echo ""
+            echo "=== Reset passwords to known defaults via app container ==="
+            docker exec diggai-app node --import tsx --input-type=module -e "
+import bcrypt from 'bcryptjs';
+import { PrismaClient } from '@prisma/client';
+const prisma = new PrismaClient();
+try {
+  const arztHash = await bcrypt.hash('arzt1234', 10);
+  const mfaHash = await bcrypt.hash('mfa1234', 10);
+  const adminHash = await bcrypt.hash('praxis2026', 10);
+  await prisma.arztUser.updateMany({ where: { username: 'mfa' }, data: { passwordHash: mfaHash, failedLoginAttempts: 0, lockedUntil: null, isActive: true } });
+  await prisma.arztUser.updateMany({ where: { username: 'arzt' }, data: { passwordHash: arztHash, failedLoginAttempts: 0, lockedUntil: null, isActive: true } });
+  await prisma.arztUser.updateMany({ where: { username: 'admin' }, data: { passwordHash: adminHash, failedLoginAttempts: 0, lockedUntil: null, isActive: true } });
+  console.log('Passwords reset: mfa=mfa1234 arzt=arzt1234 admin=praxis2026');
+} finally { await prisma.\$disconnect(); }
+" 2>&1 || echo "Password reset via app container failed"
+            echo ""
+            echo "=== DB: verify users after reset ==="
+            docker exec diggai-postgres psql -U diggai -d anamnese_prod -c 'SELECT username, role, "isActive", "failedLoginAttempts", "lockedUntil" FROM "ArztUser" LIMIT 20;' 2>&1 || echo "psql failed"
             echo ""
             echo "=== diggai-app logs (last 50 lines) ==="
             docker logs diggai-app --tail 50 2>&1 || echo "No diggai-app container found"
