@@ -7,7 +7,7 @@ jobs:
   get-logs:
     runs-on: ubuntu-latest
     steps:
-      - name: Get app container logs
+      - name: Get app container logs and DB info
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -18,5 +18,11 @@ jobs:
             echo "=== docker ps ==="
             docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Image}}"
             echo ""
-            echo "=== diggai-app logs (last 150 lines) ==="
-            docker logs diggai-app --tail 150 2>&1 || echo "No diggai-app container found"
+            echo "=== DB: list tenants ==="
+            docker exec diggai-postgres psql -U diggai -d anamnese_prod -c 'SELECT id, subdomain, name, status FROM "Tenant" LIMIT 20;' 2>&1 || echo "psql failed"
+            echo ""
+            echo "=== DB: list staff users (no passwords) ==="
+            docker exec diggai-postgres psql -U diggai -d anamnese_prod -c 'SELECT id, username, role, "tenantId" FROM "ArztUser" LIMIT 20;' 2>&1 || echo "psql failed"
+            echo ""
+            echo "=== diggai-app logs (last 50 lines) ==="
+            docker logs diggai-app --tail 50 2>&1 || echo "No diggai-app container found"
