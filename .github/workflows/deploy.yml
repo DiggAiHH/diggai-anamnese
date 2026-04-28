@@ -134,6 +134,16 @@ jobs:
             # Always refresh the backup so future fresh-clones can restore it
             cp "${REPO_PATH}/.env.production" "$ENV_BACKUP" 2>/dev/null || true
 
+            # Verify critical env vars are present in .env.production
+            if ! grep -q "^DATABASE_URL=" "${REPO_PATH}/.env.production" 2>/dev/null; then
+              echo "ERROR: DATABASE_URL missing from .env.production!"
+              echo "  Hint: Add DATABASE_URL=postgresql://diggai:<password>@postgres:5432/anamnese_prod"
+              echo "  Current .env.production contents (redacted):"
+              grep -v "SECRET\|KEY\|PASSWORD\|TOKEN" "${REPO_PATH}/.env.production" 2>/dev/null || echo "  (empty)"
+              exit 1
+            fi
+            echo "DATABASE_URL found in .env.production ✓"
+
             # SSL cert renewal (best-effort)
             certbot renew --quiet 2>/dev/null || true
 
@@ -193,7 +203,7 @@ jobs:
 
             echo "Health check (waiting for app startup, max 90s)..."
             APP_OK=0
-            for i in $(seq 1 18); do
+            for i in $(seq 1 36); do
               sleep 5
               if curl -sf http://localhost:3001/api/health >/dev/null 2>&1; then
                 echo "App healthy after $((i*5))s"
@@ -201,13 +211,13 @@ jobs:
                 break
               fi
               APP_STATE=$(docker inspect --format='{{.State.Status}}' diggai-app 2>/dev/null || echo missing)
-              echo "  waiting... ($((i*5))s/90s) app=$APP_STATE"
+              echo "  waiting... ($((i*5))s/180s) app=$APP_STATE"
             done
             if [ "$APP_OK" != "1" ]; then
-              echo "=== APP CONTAINER LOGS (last 60 lines) ==="
-              docker logs diggai-app --tail 60 2>&1 || true
+              echo "=== APP CONTAINER LOGS (last 100 lines) ==="
+              docker logs diggai-app --tail 100 2>&1 || true
               echo "=== END APP LOGS ==="
-              echo "Health check failed after 90s!"; exit 1
+              echo "Health check failed after 180s!"; exit 1
             fi
 
             echo "Deployment successful!"

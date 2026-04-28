@@ -9,7 +9,6 @@ services:
       - "3001:3001"
     env_file: .env.production
     environment:
-      - DATABASE_URL=postgresql://diggai:${POSTGRES_PASSWORD}@postgres:5432/anamnese_prod
       - REDIS_URL=redis://redis:6379
     depends_on:
       postgres:

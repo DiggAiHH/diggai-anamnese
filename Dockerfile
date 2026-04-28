@@ -53,4 +53,4 @@ HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
   CMD wget -qO- http://localhost:3001/api/health || exit 1
 
 ENTRYPOINT ["/sbin/tini", "--"]
-CMD ["sh", "-c", "npx prisma db push --accept-data-loss && (npx prisma db seed || echo 'Seed skipped, continuing...') && node --import tsx server/index.ts"]
+CMD ["sh", "-c", "npx prisma db push --accept-data-loss && node --import tsx server/index.ts"]
