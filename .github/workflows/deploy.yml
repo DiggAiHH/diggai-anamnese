@@ -145,8 +145,38 @@ jobs:
             fi
             DC="docker compose -f ${REPO_PATH}/docker-compose.yml ${OVERRIDE_FLAG} --project-directory ${REPO_PATH}"
 
-            echo "Building and starting containers..."
-            $DC up -d --build --remove-orphans
+            echo "Building app image..."
+            $DC build app
+
+            echo "Ensuring infrastructure is running (redis/postgres not recreated if healthy)..."
+            REDIS_STATUS=$(docker inspect --format='{{.State.Status}}' diggai-redis 2>/dev/null || echo missing)
+            POSTGRES_STATUS=$(docker inspect --format='{{.State.Status}}' diggai-postgres 2>/dev/null || echo missing)
+            if [ "$REDIS_STATUS" != "running" ] || [ "$POSTGRES_STATUS" != "running" ]; then
+              echo "Starting infrastructure (redis=$REDIS_STATUS postgres=$POSTGRES_STATUS)..."
+              $DC up -d postgres redis
+            else
+              echo "Infrastructure already running — skipping recreate"
+            fi
+
+            echo "Waiting for redis/postgres to be healthy (max 120s)..."
+            ELAPSED=0
+            while [ $ELAPSED -lt 120 ]; do
+              R=$(docker inspect --format='{{.State.Health.Status}}' diggai-redis 2>/dev/null || echo missing)
+              P=$(docker inspect --format='{{.State.Health.Status}}' diggai-postgres 2>/dev/null || echo missing)
+              [ "$R" = "healthy" ] && [ "$P" = "healthy" ] && { echo "Infrastructure healthy"; break; }
+              echo "  redis=$R postgres=$P (${ELAPSED}s/120s)"
+              sleep 5; ELAPSED=$((ELAPSED + 5))
+            done
+            R=$(docker inspect --format='{{.State.Health.Status}}' diggai-redis 2>/dev/null || echo missing)
+            P=$(docker inspect --format='{{.State.Health.Status}}' diggai-postgres 2>/dev/null || echo missing)
+            [ "$R" != "healthy" ] && { echo "ERROR: Redis unhealthy: $R"; exit 1; }
+            [ "$P" != "healthy" ] && { echo "ERROR: Postgres unhealthy: $P"; exit 1; }
+
+            echo "Deploying app container..."
+            $DC up -d --force-recreate --no-deps app
+
+            echo "Ensuring nginx is running..."
+            $DC up -d --no-recreate nginx
 
             echo "Running database migrations..."
             $DC exec -T app npx prisma migrate deploy 2>/dev/null || \
