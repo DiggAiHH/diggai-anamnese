@@ -109,6 +109,30 @@ jobs:
                 '
             fi
 
+            # Restore .env.production if missing (e.g. after fresh clone)
+            # Strategy: backup file outside repo → running container env → empty fallback
+            ENV_BACKUP="${PARENT}/.env.production.bak"
+            if [ ! -f "${REPO_PATH}/.env.production" ]; then
+              if [ -f "$ENV_BACKUP" ]; then
+                echo "Restoring .env.production from backup..."
+                cp "$ENV_BACKUP" "${REPO_PATH}/.env.production"
+              else
+                echo "No backup found — extracting env from running app container..."
+                APP_CTR=$(docker ps --format '{{.Names}}' | grep -- '-app$' | head -1)
+                if [ -n "$APP_CTR" ]; then
+                  docker inspect "$APP_CTR" \
+                    --format '{{range .Config.Env}}{{println .}}{{end}}' \
+                    > "${REPO_PATH}/.env.production"
+                  echo "Restored $(wc -l < ${REPO_PATH}/.env.production) env vars from container"
+                else
+                  echo "WARNING: no app container found; creating empty .env.production"
+                  touch "${REPO_PATH}/.env.production"
+                fi
+              fi
+            fi
+            # Always refresh the backup so future fresh-clones can restore it
+            cp "${REPO_PATH}/.env.production" "$ENV_BACKUP" 2>/dev/null || true
+
             # SSL cert renewal (best-effort)
             certbot renew --quiet 2>/dev/null || true
 
