@@ -191,12 +191,17 @@ jobs:
             echo "Ensuring nginx is running..."
             $DC up -d --no-recreate nginx
 
-            echo "Running database migrations..."
-            $DC exec -T app npx prisma migrate deploy 2>/dev/null || \
-              $DC exec -T app npx prisma db push --accept-data-loss 2>/dev/null || true
-
-            echo "Health check..."
-            sleep 10
-            curl -sf http://localhost:3001/api/health || (echo "Health check failed!" && exit 1)
+            echo "Health check (waiting for app startup, max 90s)..."
+            APP_OK=0
+            for i in $(seq 1 18); do
+              sleep 5
+              if curl -sf http://localhost:3001/api/health >/dev/null 2>&1; then
+                echo "App healthy after $((i*5))s"
+                APP_OK=1
+                break
+              fi
+              echo "  waiting... ($((i*5))s/90s)"
+            done
+            [ "$APP_OK" = "1" ] || { echo "Health check failed after 90s!"; exit 1; }
 
             echo "Deployment successful!"
