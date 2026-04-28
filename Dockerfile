@@ -28,7 +28,7 @@ RUN apk add --no-cache tini wget
 
 # Copy production node_modules
 COPY package*.json ./
-RUN npm ci --omit=dev --legacy-peer-deps && npm install tsx bcryptjs --legacy-peer-deps
+RUN npm ci --omit=dev --legacy-peer-deps --ignore-scripts && npm install tsx bcryptjs --legacy-peer-deps
 
 # Copy Prisma schema + generated client
 COPY --from=builder /app/prisma ./prisma
