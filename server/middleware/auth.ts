@@ -27,7 +27,7 @@
  * ```
  */
 import { Request, Response, NextFunction } from 'express';
-import * as jwt from 'jsonwebtoken';
+import jwt from 'jsonwebtoken';
 const { sign, verify } = jwt;
 import type { Secret, SignOptions } from 'jsonwebtoken';
 import { config } from '../config';

@@ -15,7 +15,7 @@
  */
 
 import * as crypto from 'crypto';
-import * as jwt from 'jsonwebtoken';
+import jwt from 'jsonwebtoken';
 import type { Secret, SignOptions } from 'jsonwebtoken';
 import { prisma } from '../../db';
 import { config } from '../../config';

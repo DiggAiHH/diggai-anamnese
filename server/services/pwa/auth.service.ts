@@ -1,6 +1,6 @@
 // ─── Modul 5: Patient Portal PWA — Auth Service ─────────────
 import * as bcrypt from 'bcryptjs';
-import * as jwt from 'jsonwebtoken';
+import jwt from 'jsonwebtoken';
 import * as crypto from 'crypto';
 import * as nodemailer from 'nodemailer';
 import { t, LocalizedError } from '../../i18n';

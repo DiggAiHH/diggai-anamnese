@@ -6,7 +6,7 @@ import { ensureSessionStoredInEpisode } from '../services/episode.service';
 import { hashEmail, encrypt } from '../services/encryption';
 import { t, parseLang, LocalizedError } from '../i18n';
 
-import * as jwt from 'jsonwebtoken';
+import jwt from 'jsonwebtoken';
 const { sign } = jwt;
 
 const router = Router();

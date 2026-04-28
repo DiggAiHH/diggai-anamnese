@@ -1,6 +1,6 @@
 import { Server as HttpServer } from 'http';
 import { Server, Socket } from 'socket.io';
-import * as jwt from 'jsonwebtoken';
+import jwt from 'jsonwebtoken';
 import { config } from './config';
 import { prisma } from './db';
 import type { AuthPayload } from './middleware/auth';
