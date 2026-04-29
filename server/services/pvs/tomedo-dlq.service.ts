@@ -102,7 +102,15 @@ export class TomedoDLQService {
         try {
             if (redis) {
                 const items = await redis.lrange(DLQ_KEY, 0, -1);
-                return items.map(item => JSON.parse(item) as DLQItem);
+                return items
+                    .map(item => {
+                        try {
+                            return JSON.parse(item) as DLQItem;
+                        } catch {
+                            return null;
+                        }
+                    })
+                    .filter((item): item is DLQItem => item !== null);
             } else {
                 return this.getFromDatabase();
             }

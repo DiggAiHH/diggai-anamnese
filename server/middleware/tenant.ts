@@ -106,10 +106,14 @@ async function resolveTenantFromHost(host: string): Promise<TenantContext | null
     
     try {
         // Look up tenant by custom domain
+        const visibilityFilter = process.env.NODE_ENV === 'production'
+            ? { visibility: 'PUBLIC' as const }
+            : {};
         const tenant = await prisma.tenant.findFirst({
             where: {
                 customDomain: cleanHost,
                 status: 'ACTIVE',
+                ...visibilityFilter,
             },
             select: {
                 id: true,
@@ -149,9 +153,9 @@ export async function resolveTenant(req: Request, res: Response, next: NextFunct
     // Bypass tenant resolution for public endpoints
     if (
         req.path === '/api/health' ||
-        req.path.startsWith('/api/health?') ||
+        req.path?.startsWith('/api/health?') ||
         // Public BSNR lookup — tenant context is the query parameter itself
-        req.path.startsWith('/api/tenants/by-bsnr/')
+        req.path?.startsWith('/api/tenants/by-bsnr/')
     ) {
         return next();
     }
@@ -171,7 +175,43 @@ export async function resolveTenant(req: Request, res: Response, next: NextFunct
     
     // Try custom domain resolution first
     let tenant = await resolveTenantFromHost(host);
-    
+
+    // Klaproth Root Binding: explicit mapping for diggai.de root (no BSNR).
+    // The frontend sends x-tenant-id: klaproth; we resolve it to the Klaproth
+    // tenant by its canonical BSNR. This avoids fragile name heuristics.
+    if (!tenant && identifier === 'klaproth') {
+        try {
+            const klaprothTenant = await prisma.tenant.findFirst({
+                where: {
+                    bsnr: '999999999',
+                    status: 'ACTIVE',
+                    ...(process.env.NODE_ENV === 'production' ? { visibility: 'PUBLIC' } : {}),
+                },
+                select: {
+                    id: true,
+                    subdomain: true,
+                    name: true,
+                    plan: true,
+                    status: true,
+                    settings: true,
+                },
+            });
+            if (klaprothTenant) {
+                tenant = {
+                    id: klaprothTenant.id,
+                    subdomain: klaprothTenant.subdomain,
+                    name: klaprothTenant.name,
+                    plan: klaprothTenant.plan,
+                    status: klaprothTenant.status,
+                    settings: (klaprothTenant.settings as Record<string, unknown>) || {},
+                };
+                tenantCache.set(identifier, { tenant, expires: Date.now() + CACHE_TTL_MS });
+            }
+        } catch (err) {
+            console.error('[Tenant] Error resolving Klaproth root tenant:', err);
+        }
+    }
+
     // If no custom domain match, try subdomain/header identifier
     if (!tenant && identifier) {
         // Check cache
@@ -182,6 +222,9 @@ export async function resolveTenant(req: Request, res: Response, next: NextFunct
             try {
                 // Check if identifier is a 9-digit BSNR
                 const isBsnr = /^\d{9}$/.test(identifier);
+                const visibilityFilter = process.env.NODE_ENV === 'production'
+                    ? { visibility: 'PUBLIC' as const }
+                    : {};
                 const dbTenant = await prisma.tenant.findFirst({
                     where: {
                         OR: [
@@ -190,6 +233,7 @@ export async function resolveTenant(req: Request, res: Response, next: NextFunct
                             { id: identifier },
                         ],
                         status: 'ACTIVE',
+                        ...visibilityFilter,
                     },
                     select: {
                         id: true,

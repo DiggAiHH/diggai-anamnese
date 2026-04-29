@@ -272,7 +272,7 @@ router.put('/draft/:id/publish', requireAuth, requireRole('admin'), async (req: 
         // Invalidate all atom caches after publishing
         await invalidateCachePattern('atoms:*');
 
-        res.json({ atom: formatAtom(atom), draft: { ...updatedDraft, draftData: JSON.parse(updatedDraft.draftData) } });
+        res.json({ atom: formatAtom(atom), draft: { ...updatedDraft, draftData: updatedDraft.draftData ? JSON.parse(updatedDraft.draftData) : null } });
     } catch (err) {
         console.error('[Atoms] Publish error:', err);
         res.status(500).json({ error: 'Veröffentlichung fehlgeschlagen' });

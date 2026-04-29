@@ -12,6 +12,8 @@ async function broadcastQueue() {
     if (!io) return;
 
     const state = await queueService.getQueueState();
+    if (!state || !state.queue) return;
+
     io.to('arzt').emit('queue:update', state);
 
     // Also broadcast individual positions to each patient

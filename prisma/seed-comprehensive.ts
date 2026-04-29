@@ -596,12 +596,13 @@ async function main() {
     const passwordHash = await bcrypt.hash(password, 12);
     const pinHash = await bcrypt.hash('1234', 12);
 
-    // Ensure default tenant
+    // Ensure default tenant (Klaproth root — publicly visible)
     const tenant = await prisma.tenant.upsert({
         where: { subdomain: 'default' },
         update: {
             bsnr: '999999999',
             name: 'Praxis Dr. Klaproth',
+            visibility: 'PUBLIC',
             settings: {
                 features: {
                     showWaitingRoom: false,
@@ -612,6 +613,7 @@ async function main() {
             subdomain: 'default',
             name: 'Praxis Dr. Klaproth',
             bsnr: '999999999',
+            visibility: 'PUBLIC',
             settings: {
                 features: {
                     showWaitingRoom: false,

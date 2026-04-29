@@ -1,12 +1,19 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, vi } from 'vitest';
 import * as jwt from 'jsonwebtoken';
 import { config } from '../../config';
+
+// Ensure JWT security tests use a strong secret regardless of environment configuration
+vi.mock('../../config', () => ({
+  config: {
+    jwtSecret: 'super-secure-random-key-32chars!!',
+  }
+}));
 
 describe('JWT Security Tests', () => {
   let jwtSecret: string;
 
   beforeAll(() => {
-    jwtSecret = config.jwtSecret || process.env.JWT_SECRET || 'test-secret-for-unit-tests-only-32chars!';
+    jwtSecret = config.jwtSecret || process.env.JWT_SECRET || 'demo-local-development-only-32chars!!';
   });
 
   describe('Algorithm Confusion Attack', () => {

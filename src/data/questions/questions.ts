@@ -13,8 +13,8 @@
  * - Completion (summary and closure)
  */
 
-import type { Question } from '../../types/question';
-import { newQuestions } from '../new-questions';
+import type { Question } from '../../types/question.ts';
+import { newQuestions } from '../new-questions.ts';
 
 /**
  * Core question definitions (114 main questions)

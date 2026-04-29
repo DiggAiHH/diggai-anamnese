@@ -1,5 +1,47 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const joseMockState = vi.hoisted(() => ({
+  store: new Map<string, Uint8Array>(),
+}));
+
+const MockFlattenedEncrypt = vi.hoisted(() => {
+  return class MockFlattenedEncrypt {
+    private plaintext: Uint8Array;
+    private header: Record<string, unknown> = {};
+
+    constructor(plaintext: Uint8Array) {
+      this.plaintext = new Uint8Array(plaintext);
+    }
+
+    setProtectedHeader(header: Record<string, unknown>) {
+      this.header = header;
+      return this;
+    }
+
+    async encrypt(_key: unknown) {
+      const encryptedKey = `ek_${Math.random().toString(36).slice(2, 10)}`;
+      joseMockState.store.set(encryptedKey, this.plaintext);
+      return {
+        encrypted_key: encryptedKey,
+        iv: `iv_${Math.random().toString(36).slice(2, 10)}`,
+        ciphertext: `ct_${Math.random().toString(36).slice(2, 10)}`,
+        tag: `tag_${Math.random().toString(36).slice(2, 10)}`,
+      };
+    }
+  };
+});
+
+vi.mock('jose', () => ({
+  importSPKI: vi.fn(async () => 'mock-public-key'),
+  importPKCS8: vi.fn(async () => 'mock-private-key'),
+  FlattenedEncrypt: MockFlattenedEncrypt,
+  flattenedDecrypt: vi.fn(async (jwe: { encrypted_key: string }) => {
+    const plaintext = joseMockState.store.get(jwe.encrypted_key);
+    if (!plaintext) throw new Error('decrypt failed');
+    return { plaintext };
+  }),
+}));
+
 const dbState = vi.hoisted(() => ({
   keyRecord: null as null | Record<string, unknown>,
   linkRecord: null as null | Record<string, unknown>,
@@ -67,6 +109,7 @@ describe('package service', () => {
     dbState.keyRecord = null;
     dbState.linkRecord = null;
     vi.clearAllMocks();
+    joseMockState.store.clear();
   });
 
   it('creates and decrypts a secure package roundtrip', async () => {

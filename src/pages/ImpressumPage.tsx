@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Building, Mail, Phone, Scale, Globe, Shield, Stethoscope } from 'lucide-react';
+import { practiceConfig } from '../lib/practiceConfig';
 
 /**
  * Impressum — §5 TMG / §5 DDG (Digitale-Dienste-Gesetz) / §18 MStV
@@ -62,13 +63,13 @@ export function ImpressumPage() {
                                 <p className="flex items-center gap-2">
                                     <Mail className="w-4 h-4 text-[var(--text-secondary)]" />
                                     {t('imprint.s2_email', 'E-Mail:')}{' '}
-                                    <a href="mailto:kontakt@praxis.de" className="text-blue-500 hover:underline">kontakt@praxis.de</a>
+                                    <a href={`mailto:${practiceConfig.email}`} className="text-blue-500 hover:underline">{practiceConfig.email}</a>
                                 </p>
                                 <p className="flex items-center gap-2">
                                     <Globe className="w-4 h-4 text-[var(--text-secondary)]" />
                                     {t('imprint.s2_web', 'Web:')}{' '}
-                                    <a href="https://diggai-drklaproth.netlify.app" className="text-blue-500 hover:underline" target="_blank" rel="noopener noreferrer">
-                                        diggai-drklaproth.netlify.app
+                                    <a href="https://diggai.de" className="text-blue-500 hover:underline" target="_blank" rel="noopener noreferrer">
+                                        diggai.de
                                     </a>
                                 </p>
                             </div>

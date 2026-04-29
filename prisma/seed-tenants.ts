@@ -26,6 +26,7 @@ async function main() {
                 legalName: 'Dr. med. Martin Klapproth',
                 plan: 'ENTERPRISE',
                 status: 'ACTIVE',
+                visibility: 'PUBLIC',
                 primaryColor: '#3b82f6',
                 welcomeMessage: 'Willkommen in unserer Praxis',
                 dsgvoAgreementSigned: true,
@@ -104,6 +105,7 @@ async function main() {
                     name: demo.name,
                     plan: demo.plan as any,
                     status: 'ACTIVE',
+                    visibility: 'DEMO',
                     dsgvoAgreementSigned: true,
                     dsgvoAgreementSignedAt: new Date(),
                 }

@@ -84,10 +84,9 @@ export const GERMAN_NAME_REGEX = new RegExp(
   '\\b' +
   '(?:[A-ZÄÖÜ][a-zäöüß]{1,20}|' +
   '[A-ZÄÖÜ][a-zäöüß]{1,15}-[A-ZÄÖÜ][a-zäöüß]{1,15})' +
-  '(?:\\s+(?:von|van|zu|zur|zum|der|die|den|de|di|del|dos|da|du)\\s+' +
-  '[A-ZÄÖÜ][a-zäöüß]{1,20}|' +
-  '\\s+[A-ZÄÖÜ][a-zäöüß]{0,15}){0,2}' +
+  '(?:\\s+[A-ZÄÖÜ][a-zäöüß]{0,15}){0,2}' +
   '[\\s-]+' +
+  '(?:\\s*(?:von|van|zu|zur|zum|der|die|den|de|di|del|dos|da|du)\\s+){0,2}' +
   '(?:[A-ZÄÖÜ][a-zäöüß]{1,20}(?:-[A-ZÄÖÜ][a-zäöüß]{1,20}){0,2}|' +
   "O[''][A-ZÄÖÜ][a-zäöüß]{1,15}|" +
   'M[ac][A-ZÄÖÜ][a-zäöüß]{1,15})' +
@@ -115,7 +114,7 @@ export const GERMAN_POSTAL_CODE_REGEX = /\b([0-9]{5})\b/g;
 
 /** German postal code with city name */
 export const GERMAN_POSTAL_CITY_REGEX = new RegExp(
-  '\\b([0-9]{5})\\s*' +
+  '\\b(?:([0-9]{5})\\s*)?' +
   '(Berlin|München|Hamburg|Köln|Frankfurt|Stuttgart|Düsseldorf|' +
   'Dortmund|Essen|Leipzig|Bremen|Dresden|Hannover|Nürnberg|' +
   'Duisburg|Bochum|Wuppertal|Bielefeld|Bonn|Münster|Karlsruhe|' +
@@ -210,7 +209,7 @@ export const GERMAN_LANDLINE_REGEX = new RegExp(
 export const GERMAN_PHONE_REGEX = new RegExp(
   '(?:\\+|00)?(?:49|0049)?[\\s/-]?' +
   '0?' +
-  '(?:[1-9]\\d{2,5})' +
+  '(?:[1-9]\\d{1,5})' +
   '[\\s/-]?' +
   '(?:\\d{2,4}[\\s/-]?){1,3}\\d{2,4}' +
   '(?=\\D|$)',
@@ -281,7 +280,7 @@ export function isLikelyRealName(
   startIndex: number
 ): boolean {
   const lowerMatch = match.toLowerCase().trim();
-  const parts = lowerMatch.split(/\s+/);
+  const parts = lowerMatch.split(/[\s-]+/);
   
   // Must have at least 2 parts
   if (parts.length < 2) return false;
@@ -301,13 +300,17 @@ export function isLikelyRealName(
   );
   
   // Check if it looks like a valid name pattern
-  const hasValidPattern = /^[A-ZÄÖÜ][a-zäöüß]+\s+[A-ZÄÖÜ]/.test(match);
+  const hasValidPattern = /^[A-ZÄÖÜ][a-zäöüß]+(?:[\s-]+[A-ZÄÖÜ])/.test(match);
+  
+  // Check for noble/location prefixes
+  const hasNamePrefix = /\s+(?:von|van|zu|zur|zum|der|die|den|de|di|del|dos|da|du)\s+[A-ZÄÖÜ]/.test(match);
   
   // Score-based validation
   let score = 0;
   if (isCommonFirstName) score++;
   if (hasPersonalContext) score++;
   if (hasValidPattern) score++;
+  if (hasNamePrefix) score++;
   
   return score >= 2;
 }
@@ -335,6 +338,11 @@ export function isLikelyBirthdate(
     const year = parseInt(yearMatch[0]);
     const currentYear = new Date().getFullYear();
     const age = currentYear - year;
+    
+    // Reject future dates regardless of context
+    if (year > currentYear) {
+      return false;
+    }
     
     // Reasonable birth year
     if (year >= 1900 && year <= currentYear - 5) {
@@ -429,10 +437,10 @@ export function detectGermanPII(
     const value = match[0];
     if (value.length >= minNameLength * 2) {
       const confidence = checkContext
-        ? isLikelyRealName(value, text, match.index) ? 'high' : 'medium'
+        ? isLikelyRealName(value, text, match.index) ? 'high' : 'low'
         : 'medium';
       
-      if (!strictMode || confidence === 'high') {
+      if (confidence !== 'low') {
         addResult('NAME', value, match.index, match.index + value.length, confidence);
       }
     }

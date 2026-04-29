@@ -2,15 +2,59 @@
  * Shared E2E test utilities for DiggAI Anamnese
  */
 import { Page, expect, APIRequestContext } from '@playwright/test';
+import { existsSync } from 'node:fs';
+import { AUTH_FIXTURE_FILE, loadAuthFixtures } from './auth-fixtures';
 
 // ─── Test Credentials ───────────────────────────────────────
 
-const DEFAULT_ARZT_USERNAME = process.env.E2E_ARZT_USERNAME ?? 'admin';
-const DEFAULT_MFA_USERNAME = process.env.E2E_MFA_USERNAME ?? 'mfa';
-const DEFAULT_ARZT_PASSWORD = process.env.E2E_ARZT_PASSWORD ?? process.env.ARZT_PASSWORD ?? '';
-const DEFAULT_MFA_PASSWORD = process.env.E2E_MFA_PASSWORD ?? DEFAULT_ARZT_PASSWORD;
+type StaffTestRole = 'admin' | 'arzt' | 'mfa';
+
+function loadFixtureStaffCredentials(role: StaffTestRole): { username: string; password: string } | null {
+    try {
+        if (!existsSync(AUTH_FIXTURE_FILE)) {
+            return null;
+        }
+
+        const fixtures = loadAuthFixtures();
+        const staff = fixtures.staff?.[role];
+
+        if (!staff?.username || !staff?.password) {
+            return null;
+        }
+
+        return { username: staff.username, password: staff.password };
+    } catch {
+        return null;
+    }
+}
+
+const ADMIN_FIXTURE = loadFixtureStaffCredentials('admin');
+const ARZT_FIXTURE = loadFixtureStaffCredentials('arzt');
+const MFA_FIXTURE = loadFixtureStaffCredentials('mfa');
+
+const DEFAULT_ADMIN_USERNAME = process.env.E2E_ADMIN_USERNAME ?? ADMIN_FIXTURE?.username ?? 'admin';
+const DEFAULT_ARZT_USERNAME = process.env.E2E_ARZT_USERNAME ?? ARZT_FIXTURE?.username ?? 'arzt';
+const DEFAULT_MFA_USERNAME = process.env.E2E_MFA_USERNAME ?? MFA_FIXTURE?.username ?? 'mfa';
+
+const DEFAULT_ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD
+    ?? process.env.E2E_STAFF_PASSWORD
+    ?? ADMIN_FIXTURE?.password
+    ?? process.env.ARZT_PASSWORD
+    ?? 'praxis2026';
+
+const DEFAULT_ARZT_PASSWORD = process.env.E2E_ARZT_PASSWORD
+    ?? process.env.E2E_STAFF_PASSWORD
+    ?? ARZT_FIXTURE?.password
+    ?? 'arzt1234';
+
+const DEFAULT_MFA_PASSWORD = process.env.E2E_MFA_PASSWORD
+    ?? process.env.E2E_STAFF_PASSWORD
+    ?? MFA_FIXTURE?.password
+    ?? process.env.MFA_PASSWORD
+    ?? 'mfa1234';
 
 export const TEST_CREDENTIALS = {
+    admin: { username: DEFAULT_ADMIN_USERNAME, password: DEFAULT_ADMIN_PASSWORD },
     arzt: { username: DEFAULT_ARZT_USERNAME, password: DEFAULT_ARZT_PASSWORD },
     mfa: { username: DEFAULT_MFA_USERNAME, password: DEFAULT_MFA_PASSWORD }
 } as const;
@@ -361,33 +405,63 @@ export async function selectService(page: Page, service: string) {
 
 /** Login to MFA dashboard */
 export async function loginMFA(page: Page, username = TEST_CREDENTIALS.mfa.username, password = TEST_CREDENTIALS.mfa.password) {
-    assertPasswordConfigured(password, 'E2E_MFA_PASSWORD, E2E_ARZT_PASSWORD, or ARZT_PASSWORD');
+    assertPasswordConfigured(password, 'E2E_MFA_PASSWORD, E2E_STAFF_PASSWORD, or PLAYWRIGHT fixture credentials');
 
-    await page.goto('/mfa');
-    await page.fill('input[type="text"]', username);
-    await page.fill('input[type="password"]', password);
-    await page.click('button[type="submit"]');
-    await page.waitForSelector('text=MFA-Portal', { timeout: 10000 });
+    await gotoWithRetry(page, '/verwaltung/login');
+    await waitForIdle(page, { timeout: 8000, includeNetworkIdle: false });
+
+    const modernUserInput = page.getByTestId('staff-username');
+    if (await modernUserInput.isVisible().catch(() => false)) {
+        await modernUserInput.fill(username);
+        await page.getByTestId('staff-password').fill(password);
+        await page.getByTestId('staff-login-submit').click();
+    } else {
+        await page.fill('input[type="text"], input[name="username"]', username);
+        await page.fill('input[type="password"]', password);
+        await page.click('button[type="submit"], button:has-text("Anmelden"), button:has-text("Login")');
+    }
+
+    await page.waitForURL(/\/verwaltung\/mfa$/, { timeout: 15000 }).catch(() => {});
+    await page.waitForSelector('text=/MFA|Wartezimmer|Dashboard/i', { timeout: 12000 }).catch(() => {});
 }
 
 /** Login to Arzt dashboard */
 export async function loginArzt(page: Page, username = TEST_CREDENTIALS.arzt.username, password = TEST_CREDENTIALS.arzt.password) {
-    assertPasswordConfigured(password, 'E2E_ARZT_PASSWORD or ARZT_PASSWORD');
+    assertPasswordConfigured(password, 'E2E_ARZT_PASSWORD, E2E_STAFF_PASSWORD, or PLAYWRIGHT fixture credentials');
 
-    await page.goto('/arzt');
-    await page.fill('input[type="text"]', username);
-    await page.fill('input[type="password"]', password);
-    await page.click('button[type="submit"]');
-    await page.waitForSelector('text=Arzt-Portal', { timeout: 10000 }).catch(() => {});
+    await gotoWithRetry(page, '/verwaltung/login');
+    await waitForIdle(page, { timeout: 8000, includeNetworkIdle: false });
+
+    const modernUserInput = page.getByTestId('staff-username');
+    if (await modernUserInput.isVisible().catch(() => false)) {
+        await modernUserInput.fill(username);
+        await page.getByTestId('staff-password').fill(password);
+        await page.getByTestId('staff-login-submit').click();
+    } else {
+        await page.fill('input[type="text"], input[name="username"]', username);
+        await page.fill('input[type="password"]', password);
+        await page.click('button[type="submit"], button:has-text("Anmelden"), button:has-text("Login")');
+    }
+
+    await page.waitForURL(/\/verwaltung\/arzt$/, { timeout: 15000 }).catch(() => {});
+    await page.waitForSelector('text=/Arzt|Dashboard|Portal/i', { timeout: 12000 }).catch(() => {});
 }
 
 /** Login with "remember me" option */
 export async function loginWithRememberMe(page: Page, username: string, password: string) {
-    assertPasswordConfigured(password, 'E2E_ARZT_PASSWORD or ARZT_PASSWORD');
+    assertPasswordConfigured(password, 'E2E_ARZT_PASSWORD, E2E_STAFF_PASSWORD, or PLAYWRIGHT fixture credentials');
 
-    await page.goto('/arzt');
-    await page.fill('input[type="text"]', username);
-    await page.fill('input[type="password"]', password);
+    await gotoWithRetry(page, '/verwaltung/login');
+    await waitForIdle(page, { timeout: 8000, includeNetworkIdle: false });
+
+    const modernUserInput = page.getByTestId('staff-username');
+    if (await modernUserInput.isVisible().catch(() => false)) {
+        await modernUserInput.fill(username);
+        await page.getByTestId('staff-password').fill(password);
+    } else {
+        await page.fill('input[type="text"], input[name="username"]', username);
+        await page.fill('input[type="password"]', password);
+    }
     
     // Check "remember me" checkbox if present
     const rememberMeCheckboxByLabel = page.getByLabel(/angemeldet|remember|merken/i).first();
@@ -400,7 +474,7 @@ export async function loginWithRememberMe(page: Page, username: string, password
         }
     }
     
-    await page.click('button[type="submit"]');
+    await page.click('button[type="submit"], button:has-text("Anmelden"), button:has-text("Login")');
     await page.waitForSelector('text=Arzt-Portal', { timeout: 10000 }).catch(() => {});
 }
 

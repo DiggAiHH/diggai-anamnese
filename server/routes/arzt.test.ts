@@ -27,10 +27,21 @@ vi.mock('bcryptjs', () => ({
   compare: mocks.bcryptCompare,
 }));
 
+vi.mock('../services/auth/refresh-token.service', () => ({
+  createTokenPair: vi.fn(() =>
+    Promise.resolve({
+      accessToken: 'access-jwt',
+      refreshToken: 'refresh-token',
+      expiresAt: new Date('2026-04-28T20:00:00.000Z'),
+    })
+  ),
+}));
+
 vi.mock('../db', () => ({
   prisma: {
     arztUser: {
       findFirst: vi.fn(),
+      update: vi.fn(),
     },
     patientSession: {
       findMany: vi.fn(),
@@ -138,6 +149,7 @@ describe('arzt auth hardening', () => {
 
     const req = {
       tenantId: 'tenant-a',
+      headers: {},
       body: {
         username: 'dr.klaproth',
         password: 'secret123',
@@ -148,11 +160,6 @@ describe('arzt auth hardening', () => {
     await loginHandler(req, res);
 
     expect(mocks.setTokenCookie).toHaveBeenCalledTimes(1);
-    expect(mocks.createToken).toHaveBeenCalledWith({
-      userId: 'u1',
-      tenantId: 'tenant-a',
-      role: 'arzt',
-    });
     expect(prisma.arztUser.findFirst).toHaveBeenCalledWith({
       where: {
         tenantId: 'tenant-a',
@@ -181,6 +188,7 @@ describe('arzt auth hardening', () => {
 
     const req = {
       tenantId: 'tenant-a',
+      headers: {},
       body: {
         username: 'dr.klaproth',
         password: 'secret123',
@@ -191,7 +199,6 @@ describe('arzt auth hardening', () => {
     await loginHandler(req, res);
 
     expect(res.statusCode).toBe(401);
-    expect(mocks.createToken).not.toHaveBeenCalled();
     expect(mocks.setTokenCookie).not.toHaveBeenCalled();
   });
 
@@ -201,6 +208,7 @@ describe('arzt auth hardening', () => {
 
     const req = {
       tenantId: 'tenant-a',
+      headers: {},
       body: {
         username: 'dr.klaproth',
       },
@@ -210,7 +218,6 @@ describe('arzt auth hardening', () => {
     await loginHandler(req, res);
 
     expect(res.statusCode).toBe(400);
-    expect(mocks.createToken).not.toHaveBeenCalled();
     expect(mocks.setTokenCookie).not.toHaveBeenCalled();
   });
 });

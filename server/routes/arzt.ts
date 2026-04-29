@@ -93,7 +93,7 @@ function resolveEffectiveTenant(req: Request):
  *             type: object
  *             required: [username, password]
  *             properties:
- *               username: { type: string, example: "dr.klaproth" }
+ *               username: { type: string, example: "dr.mustermann" }
  *               password: { type: string, format: password }
  *     responses:
  *       200:

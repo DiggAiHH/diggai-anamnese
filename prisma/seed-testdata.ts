@@ -218,6 +218,7 @@ async function main(): Promise<void> {
             legalName: 'DiggAI Testpraxis GmbH — NUR FÜR ENTWICKLUNG',
             plan: 'ENTERPRISE',
             status: 'ACTIVE',
+            visibility: 'INTERNAL',
             primaryColor: '#6366f1',
             welcomeMessage: '⚠️ TESTPRAXIS — Alle Daten sind 100 % fiktiv!',
             maxUsers: 200,

@@ -39,6 +39,12 @@ enum TenantStatus {
   PENDING_SETUP
 }
 
+enum TenantVisibility {
+  PUBLIC
+  INTERNAL
+  DEMO
+}
+
 model Tenant {
   id        String  @id @default(uuid())
   subdomain String  @unique
@@ -46,8 +52,9 @@ model Tenant {
   legalName String?
   bsnr      String? @unique
 
-  plan   TenantPlan   @default(STARTER)
-  status TenantStatus @default(ACTIVE)
+  plan       TenantPlan       @default(STARTER)
+  status     TenantStatus     @default(ACTIVE)
+  visibility TenantVisibility @default(PUBLIC)
 
   // White-Labeling
   primaryColor   String? @default("#3b82f6")

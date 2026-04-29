@@ -1,5 +1,5 @@
 import { expect, type APIRequestContext, type Page } from '@playwright/test';
-import type { AuthFixtureBundle, StaffAuthFixture } from './auth-fixtures.js';
+import { loadAuthFixtures, type AuthFixtureBundle, type StaffAuthFixture } from './auth-fixtures.js';
 import {
     dismissCookieBannerIfPresent,
     gotoWithRetry,
@@ -25,6 +25,21 @@ export async function loginStaff(page: Page, fixture: StaffAuthFixture): Promise
     await page.getByTestId('staff-login-submit').click();
     await expect(page).toHaveURL(new RegExp(`${escapeForRegExp(fixture.dashboardPath)}$`), { timeout: 15000 });
     await waitForIdle(page, { includeNetworkIdle: false });
+}
+
+export async function loginAsAdmin(page: Page): Promise<void> {
+    const fixtures = loadAuthFixtures();
+    await loginStaff(page, fixtures.staff.admin);
+}
+
+export async function loginAsArzt(page: Page): Promise<void> {
+    const fixtures = loadAuthFixtures();
+    await loginStaff(page, fixtures.staff.arzt);
+}
+
+export async function loginAsMFA(page: Page): Promise<void> {
+    const fixtures = loadAuthFixtures();
+    await loginStaff(page, fixtures.staff.mfa);
 }
 
 export async function openPwaRegister(page: Page): Promise<void> {

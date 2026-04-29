@@ -1085,7 +1085,7 @@ describe('wave 1.8 RED-first: role-permission guard tightening', () => {
 
 describe('wave 1.8 RED-first: duplicate audit describe consolidation safety checks', () => {
   it('keeps the wave 1.4 audit tenant-scope describe block unique after consolidation', () => {
-    const source = readFileSync(new URL('./admin.test.ts', import.meta.url), 'utf8');
+    const source = readFileSync(import.meta.filename, 'utf8');
     const occurrences = (source.match(/describe\('wave 1\.4 RED-first: audit tenant scope guards'/g) || []).length;
 
     expect(occurrences).toBe(1);

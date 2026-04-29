@@ -1,18 +1,27 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { AgentTask } from '../services/agent/task.queue';
 
-// Mock dependencies
+// Mock dependencies BEFORE importing the agent
 vi.mock('child_process', () => ({
     execSync: vi.fn(),
     spawn: vi.fn(),
+    default: { execSync: vi.fn(), spawn: vi.fn() },
 }));
 
-vi.mock('fs', () => ({
-    promises: {
-        mkdir: vi.fn(),
-        writeFile: vi.fn(),
-    },
-}));
+vi.mock('fs', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('fs')>();
+    return {
+        ...actual,
+        promises: {
+            ...(actual.promises || {}),
+            mkdir: vi.fn(),
+            writeFile: vi.fn(),
+        },
+    };
+});
+
+// Import agent to trigger side-effect registration (AFTER mocks are defined)
+import './deploy.agent';
 
 describe('DeployAgent', () => {
     beforeEach(() => {
@@ -72,14 +81,14 @@ describe('DeployAgent', () => {
     });
 
     it('should create dashboard when createDashboard is true', async () => {
-        const { execSync } = await import('child_process');
+        const childProcess = await import('child_process');
         const { mkdir, writeFile } = await import('fs').then(m => m.promises);
-        const mockExecSync = vi.mocked(execSync);
         const mockMkdir = vi.mocked(mkdir);
         const mockWriteFile = vi.mocked(writeFile);
 
-        // Mock successful git workflow
-        mockExecSync.mockImplementation((cmd: string) => {
+        // Override execSync directly on the module (ESM live binding)
+        const origExecSync = childProcess.execSync;
+        const mockExecSync = vi.fn((cmd: string) => {
             if (cmd.includes('diff --cached')) {
                 return 'src/file.ts\n';
             }
@@ -87,7 +96,8 @@ describe('DeployAgent', () => {
                 return 'abc123\n';
             }
             return '';
-        });
+        }) as any;
+        childProcess.execSync = mockExecSync;
 
         mockMkdir.mockResolvedValue(undefined);
         mockWriteFile.mockResolvedValue(undefined);
@@ -119,6 +129,9 @@ describe('DeployAgent', () => {
         expect(parsed.dashboardPath).toBeDefined();
         expect(mockMkdir).toHaveBeenCalled();
         expect(mockWriteFile).toHaveBeenCalled();
+
+        // Restore original execSync
+        childProcess.execSync = origExecSync;
     });
 
     it('should include execution time in result', async () => {

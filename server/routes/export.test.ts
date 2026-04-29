@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const middlewareMocks = vi.hoisted(() => ({
   requireAuth: vi.fn((_req, _res, next) => next()),
@@ -80,6 +80,12 @@ function createMockResponse() {
 }
 
 describe('export route query-token hardening', () => {
+  let roleFactoryCalls: unknown[][] = [];
+
+  beforeAll(() => {
+    roleFactoryCalls = middlewareMocks.requireRoleFactory.mock.calls.slice();
+  });
+
   const guardedRoutes = [
     '/sessions/:id/export/csv',
     '/sessions/:id/export/pdf',
@@ -106,7 +112,7 @@ describe('export route query-token hardening', () => {
     const handlers = getRouteHandlers('/sessions/:id/export/ccd', 'get');
     expect(handlers).toContain(middlewareMocks.requireAuth);
     expect(handlers).toContain(middlewareMocks.requireRole);
-    expect(middlewareMocks.requireRoleFactory).toHaveBeenCalledWith('arzt', 'admin', 'mfa');
+    expect(roleFactoryCalls).toEqual(expect.arrayContaining([['arzt', 'admin', 'mfa']]));
   });
 
   it.each(guardedRoutes)('rejects token query parameter before auth middleware on %s', async (path) => {
