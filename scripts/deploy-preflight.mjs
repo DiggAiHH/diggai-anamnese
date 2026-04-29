@@ -49,12 +49,13 @@ function warn(msg) { console.warn(`  ⚠️  ${msg}`); warnings.push(msg); }
 function section(title) { console.log(`\n📋 ${title}`); }
 function info(msg) { console.log(`  ℹ️  ${msg}`); }
 
-function runCommand(command, args) {
+function runCommand(command, args, timeoutMs = 120000) {
   return execFileSync(command, args, {
     cwd: ROOT_DIR,
     encoding: 'utf8',
     stdio: 'pipe',
     shell: process.platform === 'win32',
+    timeout: timeoutMs,
   });
 }
 
@@ -166,7 +167,7 @@ const migrationFail = (msg) => {
 };
 
 try {
-  const result = runCommand(NPX_CMD, ['prisma', 'migrate', 'status']);
+  const result = runCommand(NPX_CMD, ['prisma', 'migrate', 'status'], 15000);
   
   if (result.includes('have not yet been applied')) {
     migrationFail('Unapplied Prisma migrations detected — run: npx prisma migrate deploy');
