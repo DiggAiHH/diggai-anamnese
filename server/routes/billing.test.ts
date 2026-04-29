@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.hoisted(() => {
+  process.env.STRIPE_SECRET_KEY = 'sk_test_billing123';
+});
+
 const middlewareMocks = vi.hoisted(() => ({
   requireAuth: vi.fn((_req, _res, next) => next()),
   requireAdmin: vi.fn((_req, _res, next) => next()),

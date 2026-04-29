@@ -18,6 +18,7 @@ vi.mock('fs', () => ({
     unlink: vi.fn(),
     mkdir: vi.fn(),
     rename: vi.fn(),
+    stat: vi.fn(),
   },
 }));
 
@@ -84,14 +85,15 @@ describe('MedistarAdapter', () => {
       await adapter.initialize(mockConnection);
       
       vi.mocked(fs.access).mockResolvedValue(undefined);
+      vi.mocked(fs.stat).mockResolvedValue({ isDirectory: () => true } as any);
       vi.mocked(fs.writeFile).mockResolvedValue(undefined);
       vi.mocked(fs.unlink).mockResolvedValue(undefined);
 
       const result = await adapter.testConnection();
       
       expect(result.ok).toBe(true);
-      expect(result.message).toContain('Import-Verzeichnis erreichbar');
-      expect(result.message).toContain('Export-Verzeichnis erreichbar');
+      expect(result.message).toContain('✅ Import-Verzeichnis:');
+      expect(result.message).toContain('✅ Export-Verzeichnis beschreibbar:');
     });
   });
 
@@ -142,7 +144,7 @@ describe('MedistarAdapter', () => {
       const result = await adapter.exportAnamneseResult(mockSession);
 
       expect(result.success).toBe(true);
-      expect(result.transferLogId).toMatch(/^gdt-/);
+      expect(result.transferLogId).toBe('session-1');
     });
   });
 
