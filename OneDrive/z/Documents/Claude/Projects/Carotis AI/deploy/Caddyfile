@@ -1,0 +1,30 @@
+{
+	email {$ACME_EMAIL}
+}
+
+(security_headers) {
+	header {
+		X-Robots-Tag "noindex, nofollow, noarchive"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+	}
+}
+
+app.carotis.diggai.de {
+	import security_headers
+
+	@robots path /robots.txt
+	respond @robots "User-agent: *\nDisallow: /\n" 200
+
+	@api path /api/*
+	rate_limit @api {
+		zone demo_api {
+			key {http.request.header.X-Demo-Token}
+			events 120
+			window 1m
+		}
+	}
+
+	reverse_proxy carotis-demo:8080
+}

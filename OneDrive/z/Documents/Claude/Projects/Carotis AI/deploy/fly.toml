@@ -1,0 +1,33 @@
+app = "carotis-ai-demo"
+primary_region = "fra"
+
+[build]
+  dockerfile = "deploy/Dockerfile.demo"
+
+[env]
+  DATABASE_URL = "sqlite+aiosqlite:////data/carotis_demo.db"
+  ONNX_MODEL_PATH = "/data/models/mfsd_unet.onnx"
+  CORS_ORIGINS = "https://app.carotis.diggai.de"
+  DEBUG = "false"
+
+[[mounts]]
+  source = "carotis_demo_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+  [http_service.concurrency]
+    type = "requests"
+    hard_limit = 80
+    soft_limit = 40
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 2
+  memory_mb = 4096
