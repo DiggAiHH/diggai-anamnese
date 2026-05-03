@@ -170,8 +170,15 @@ jobs:
             # We do NOT stop system nginx -- doing so kills the SSH session on this VPS.
             # Instead, write a vhost that proxies api.diggai.de to localhost:3001.
             echo "Configuring system nginx vhost for api.diggai.de..."
-            VHOST_PATH="/etc/nginx/sites-available/api.diggai.de"
-            VHOST_ENABLED="/etc/nginx/sites-enabled/api.diggai.de"
+            # Detect nginx config dir: prefer conf.d, fall back to sites-available (create if needed)
+            if [ -d "/etc/nginx/conf.d" ]; then
+              VHOST_CONF="/etc/nginx/conf.d/api.diggai.de.conf"
+              echo "Using /etc/nginx/conf.d/ path"
+            else
+              mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled 2>/dev/null || true
+              VHOST_CONF="/etc/nginx/sites-available/api.diggai.de"
+              echo "Using /etc/nginx/sites-available/ path"
+            fi
             printf '%s\n' \
               'server {' \
               '    listen 80;' \
@@ -191,14 +198,18 @@ jobs:
               '        proxy_read_timeout 90s;' \
               '    }' \
               '}' \
-              > "$VHOST_PATH" 2>/dev/null || true
-            # Enable vhost (no sudo needed if running as root)
-            ln -sf "$VHOST_PATH" "$VHOST_ENABLED" 2>/dev/null || true
+              > "$VHOST_CONF"
+            echo "Wrote vhost config to $VHOST_CONF"
+            # If using sites-available pattern, create symlink in sites-enabled
+            if echo "$VHOST_CONF" | grep -q "sites-available"; then
+              ln -sf "$VHOST_CONF" "/etc/nginx/sites-enabled/api.diggai.de" 2>/dev/null || true
+            fi
             # Test + reload nginx (nginx -s reload is safe, does not kill master or SSH)
             if nginx -t 2>/dev/null; then
               nginx -s reload 2>/dev/null && echo "System nginx reloaded" || echo "nginx reload: n/a"
             else
-              echo "nginx -t failed (may need DNS update or different config path)"
+              echo "nginx -t failed — check config"
+              nginx -t 2>&1 || true
             fi
             echo "System nginx vhost write done"
 
