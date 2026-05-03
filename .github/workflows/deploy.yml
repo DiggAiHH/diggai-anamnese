@@ -170,6 +170,10 @@ jobs:
             # We do NOT stop system nginx -- doing so kills the SSH session on this VPS.
             # Instead, write a vhost that proxies api.diggai.de to localhost:3001.
             echo "Configuring system nginx vhost for api.diggai.de..."
+            echo "nginx config directory contents:"
+            ls -la /etc/nginx/ 2>/dev/null || echo "  /etc/nginx not accessible"
+            ls -la /etc/nginx/conf.d/ 2>/dev/null || echo "  /etc/nginx/conf.d not present"
+            ls -la /etc/nginx/sites-available/ 2>/dev/null || echo "  /etc/nginx/sites-available not present"
             # Detect nginx config dir: prefer conf.d, fall back to sites-available (create if needed)
             if [ -d "/etc/nginx/conf.d" ]; then
               VHOST_CONF="/etc/nginx/conf.d/api.diggai.de.conf"
@@ -198,7 +202,7 @@ jobs:
               '        proxy_read_timeout 90s;' \
               '    }' \
               '}' \
-              > "$VHOST_CONF"
+              > "$VHOST_CONF" 2>&1 || { echo "WARN: could not write vhost to $VHOST_CONF"; }
             echo "Wrote vhost config to $VHOST_CONF"
             # If using sites-available pattern, create symlink in sites-enabled
             if echo "$VHOST_CONF" | grep -q "sites-available"; then
