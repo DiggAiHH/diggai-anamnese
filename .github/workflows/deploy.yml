@@ -172,7 +172,6 @@ jobs:
             echo "Configuring system nginx vhost for api.diggai.de..."
             VHOST_PATH="/etc/nginx/sites-available/api.diggai.de"
             VHOST_ENABLED="/etc/nginx/sites-enabled/api.diggai.de"
-            VHOST_TMP="/tmp/diggai-nginx-vhost.conf"
             printf '%s\n' \
               'server {' \
               '    listen 80;' \
@@ -192,11 +191,16 @@ jobs:
               '        proxy_read_timeout 90s;' \
               '    }' \
               '}' \
-              > "$VHOST_TMP"
-            sudo cp "$VHOST_TMP" "$VHOST_PATH" 2>/dev/null || cp "$VHOST_TMP" "$VHOST_PATH" 2>/dev/null || true
-            sudo ln -sf "$VHOST_PATH" "$VHOST_ENABLED" 2>/dev/null || ln -sf "$VHOST_PATH" "$VHOST_ENABLED" 2>/dev/null || true
-            sudo nginx -t 2>&1 && sudo nginx -s reload 2>&1 || nginx -s reload 2>/dev/null || true
-            echo "System nginx vhost configured"
+              > "$VHOST_PATH" 2>/dev/null || true
+            # Enable vhost (no sudo needed if running as root)
+            ln -sf "$VHOST_PATH" "$VHOST_ENABLED" 2>/dev/null || true
+            # Test + reload nginx (nginx -s reload is safe, does not kill master or SSH)
+            if nginx -t 2>/dev/null; then
+              nginx -s reload 2>/dev/null && echo "System nginx reloaded" || echo "nginx reload: n/a"
+            else
+              echo "nginx -t failed (may need DNS update or different config path)"
+            fi
+            echo "System nginx vhost write done"
 
             # Include override.yml if present
             OVERRIDE_FLAG=""
