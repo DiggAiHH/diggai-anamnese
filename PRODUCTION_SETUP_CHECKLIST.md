@@ -1,3 +1,5 @@
+> ⚠️ **SUPERSEDED — see workspace-root [`DEPLOY.md`](./DEPLOY.md)**  Kept for historical reference; do not follow these steps for new deploys.
+
 # DiggAI Anamnese — Production Setup Checklist
 **Stack:** Supabase (DB) + Railway (Backend) + Netlify (Frontend)
 **Generated:** 2026-03-31

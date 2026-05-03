@@ -1,3 +1,5 @@
+> ⚠️ **SUPERSEDED — see workspace-root [`DEPLOY.md`](../DEPLOY.md)**  Kept for historical reference; do not follow these steps for new deploys.
+
 # DEPLOYMENT.md — Operations & Deployment Guide
 
 ## Architecture Overview

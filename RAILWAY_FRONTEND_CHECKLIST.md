@@ -1,3 +1,5 @@
+> ⚠️ **SUPERSEDED — see workspace-root [`DEPLOY.md`](./DEPLOY.md)**  Kept for historical reference; do not follow these steps for new deploys.
+
 # Railway Frontend Deployment Checklist
 ## DiggAI Anamnese Final Phase — Frontend Synchronization
 

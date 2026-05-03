@@ -1,3 +1,5 @@
+> ⚠️ **SUPERSEDED — see workspace-root [`DEPLOY.md`](./DEPLOY.md)**  Kept for historical reference; do not follow these steps for new deploys.
+
 # DiggAI Anamnese — Pilot Deployment Guide
 ## Stack: Netlify (Frontend) + Railway (Backend) + Supabase (Database)
 
