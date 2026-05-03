@@ -19,6 +19,14 @@ concurrency:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    env:
+      JWT_SECRET: test-jwt-secret-minimum-32-characters
+      ENCRYPTION_KEY: 12345678901234567890123456789012
+      ARZT_PASSWORD: test-arzt-password
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test?schema=public
+      DATABASE_URL_PRACTICE: postgresql://postgres:postgres@localhost:5432/test?schema=public
+      DATABASE_URL_COMPANY: postgresql://postgres:postgres@localhost:5432/test?schema=public
+      DATABASE_URL_AUTHORITY: postgresql://postgres:postgres@localhost:5432/test?schema=public
     steps:
       - uses: actions/checkout@v4
 

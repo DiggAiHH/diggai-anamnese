@@ -59,16 +59,31 @@ jobs:
           script: |
             set -e
 
-            # Get repo path from docker inspect labels
+            # Resolve repo path with a safe production-first fallback.
+            # The docker label can point to an unrelated project on shared hosts.
+            DEFAULT_REPO_PATH="/opt/diggai/anamnese-app"
             CONTAINER_ID=$(docker ps -q | head -1)
-            REPO_PATH=$(docker inspect "$CONTAINER_ID" \
-              | grep '"com.docker.compose.project.working_dir"' \
-              | head -1 \
-              | sed 's/.*": "\([^"]*\)".*/\1/' \
-              | tr -d '[:space:]')
+            DERIVED_REPO_PATH=""
+            if [ -n "$CONTAINER_ID" ]; then
+              DERIVED_REPO_PATH=$(docker inspect "$CONTAINER_ID" \
+                | grep '"com.docker.compose.project.working_dir"' \
+                | head -1 \
+                | sed 's/.*": "\([^"]*\)".*/\1/' \
+                | tr -d '[:space:]')
+            fi
+
+            if [ -f "${DEFAULT_REPO_PATH}/docker-compose.yml" ]; then
+              REPO_PATH="$DEFAULT_REPO_PATH"
+            elif [ -n "$DERIVED_REPO_PATH" ] && [ -f "${DERIVED_REPO_PATH}/docker-compose.yml" ]; then
+              REPO_PATH="$DERIVED_REPO_PATH"
+            elif [ -n "$DERIVED_REPO_PATH" ]; then
+              REPO_PATH="$DERIVED_REPO_PATH"
+            else
+              REPO_PATH="$DEFAULT_REPO_PATH"
+            fi
 
             if [ -z "$REPO_PATH" ]; then
-              echo "ERROR: Cannot find repo path"; exit 1
+              echo "ERROR: Cannot resolve repo path"; exit 1
             fi
 
             echo ">>> Repo: $REPO_PATH"
@@ -84,6 +99,12 @@ jobs:
               alpine sh -c "test -d '${REPO_PATH}/.git' && echo yes || echo no" 2>/dev/null || echo no)
 
             if [ "$REPO_EXISTS" != "yes" ]; then
+              if [ -d "$REPO_PATH" ] && [ -n "$(ls -A "$REPO_PATH" 2>/dev/null)" ]; then
+                echo "ERROR: Repo path exists but is not a git repository: $REPO_PATH"
+                echo "       Refusing to clone into a non-empty directory."
+                exit 1
+              fi
+
               echo "Repo missing — cloning fresh..."
               docker run --rm \
                 -v "${PARENT}:${PARENT}" \
@@ -91,6 +112,7 @@ jobs:
                 -e "REPO_PATH=${REPO_PATH}" \
                 -e "UID_GID=${UID_GID}" \
                 alpine sh -c '
+                  set -e
                   apk add --no-cache git > /dev/null 2>&1
                   mkdir -p "$REPO_PATH"
                   git clone --depth=50 "$CLONE_URL" "$REPO_PATH"
@@ -153,6 +175,12 @@ jobs:
                 test -f "${REPO_PATH}/docker-compose.override.yml" 2>/dev/null; then
               OVERRIDE_FLAG="-f ${REPO_PATH}/docker-compose.override.yml"
             fi
+            if [ ! -f "${REPO_PATH}/docker-compose.yml" ]; then
+              echo "ERROR: docker-compose.yml not found at ${REPO_PATH}"
+              ls -la "${REPO_PATH}" || true
+              exit 1
+            fi
+
             DC="docker compose -f ${REPO_PATH}/docker-compose.yml ${OVERRIDE_FLAG} --project-directory ${REPO_PATH}"
 
             echo "Building app image..."
