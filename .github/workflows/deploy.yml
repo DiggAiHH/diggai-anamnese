@@ -231,7 +231,7 @@ jobs:
             $DC up -d --force-recreate --no-deps app
 
             echo "Ensuring nginx is running..."
-            $DC up -d --no-recreate nginx
+            $DC up -d --no-recreate --no-deps nginx
 
             echo "Health check (waiting for app startup, max 90s)..."
             APP_OK=0
