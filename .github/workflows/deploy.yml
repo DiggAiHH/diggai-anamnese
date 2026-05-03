@@ -202,11 +202,24 @@ jobs:
 
             REDIS_STATUS=$(docker inspect --format='{{.State.Status}}' diggai-redis 2>/dev/null || echo missing)
             POSTGRES_STATUS=$(docker inspect --format='{{.State.Status}}' diggai-postgres 2>/dev/null || echo missing)
-            # Always run up --no-recreate: this starts containers if stopped AND joins
-            # existing containers to the diggai_default network (critical when they were
-            # started by a different compose project and are on a different network).
-            echo "Joining postgres/redis to diggai network (redis=$REDIS_STATUS postgres=$POSTGRES_STATUS)..."
-            $DC up -d --no-recreate postgres redis
+            echo "Ensuring postgres/redis are on the diggai network (redis=$REDIS_STATUS postgres=$POSTGRES_STATUS)..."
+            # Ensure the network exists (compose creates it, but may not exist yet on first deploy)
+            docker network create diggai_default 2>/dev/null || true
+            # Use network connect (not compose up) to avoid name conflicts with cross-project containers
+            if [ "$REDIS_STATUS" = "running" ]; then
+              docker network connect diggai_default diggai-redis 2>/dev/null || true
+              echo "  diggai-redis: already running — connected to diggai_default"
+            else
+              echo "  diggai-redis missing/stopped — starting via compose..."
+              $DC up -d redis
+            fi
+            if [ "$POSTGRES_STATUS" = "running" ]; then
+              docker network connect diggai_default diggai-postgres 2>/dev/null || true
+              echo "  diggai-postgres: already running — connected to diggai_default"
+            else
+              echo "  diggai-postgres missing/stopped — starting via compose..."
+              $DC up -d postgres
+            fi
 
             echo "Waiting for redis/postgres to be healthy (max 120s)..."
             ELAPSED=0
