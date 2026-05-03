@@ -239,6 +239,17 @@ jobs:
                 docker rm -f diggai-nginx 2>/dev/null || true
               fi
             fi
+            # Free port 80/443 if held by any other container
+            PORT80_CTR=$(docker ps --format '{{.Names}}' --filter publish=80 | grep -v '^diggai-nginx$' | head -1)
+            PORT443_CTR=$(docker ps --format '{{.Names}}' --filter publish=443 | grep -v '^diggai-nginx$' | head -1)
+            if [ -n "$PORT80_CTR" ]; then
+              echo "Stopping container $PORT80_CTR (holding port 80)..."
+              docker stop "$PORT80_CTR" 2>/dev/null || true
+            fi
+            if [ -n "$PORT443_CTR" ] && [ "$PORT443_CTR" != "$PORT80_CTR" ]; then
+              echo "Stopping container $PORT443_CTR (holding port 443)..."
+              docker stop "$PORT443_CTR" 2>/dev/null || true
+            fi
             $DC up -d --no-recreate --no-deps nginx
 
             echo "Health check (waiting for app startup, max 90s)..."
