@@ -203,21 +203,24 @@ jobs:
             REDIS_STATUS=$(docker inspect --format='{{.State.Status}}' diggai-redis 2>/dev/null || echo missing)
             POSTGRES_STATUS=$(docker inspect --format='{{.State.Status}}' diggai-postgres 2>/dev/null || echo missing)
             echo "Ensuring postgres/redis are on the diggai network (redis=$REDIS_STATUS postgres=$POSTGRES_STATUS)..."
+            # The compose project 'diggai' uses network 'diggai-network' → full Docker name: diggai_diggai-network
+            COMPOSE_NET="diggai_diggai-network"
             # Ensure the network exists (compose creates it, but may not exist yet on first deploy)
-            docker network create diggai_default 2>/dev/null || true
-            # Use network connect (not compose up) to avoid name conflicts with cross-project containers
+            docker network create "$COMPOSE_NET" 2>/dev/null || true
+            # Use network connect (not compose up) to avoid name conflicts with cross-project containers.
+            # Disconnect first to ensure aliases are re-applied correctly.
             if [ "$REDIS_STATUS" = "running" ]; then
-              # --alias redis so the hostname 'redis' resolves in the diggai_default network
-              docker network connect --alias redis diggai_default diggai-redis 2>/dev/null || true
-              echo "  diggai-redis: already running — connected to diggai_default (alias: redis)"
+              docker network disconnect "$COMPOSE_NET" diggai-redis 2>/dev/null || true
+              docker network connect --alias redis "$COMPOSE_NET" diggai-redis
+              echo "  diggai-redis: connected to $COMPOSE_NET (alias: redis)"
             else
               echo "  diggai-redis missing/stopped — starting via compose..."
               $DC up -d redis
             fi
             if [ "$POSTGRES_STATUS" = "running" ]; then
-              # --alias postgres so the hostname 'postgres' resolves in the diggai_default network
-              docker network connect --alias postgres diggai_default diggai-postgres 2>/dev/null || true
-              echo "  diggai-postgres: already running — connected to diggai_default (alias: postgres)"
+              docker network disconnect "$COMPOSE_NET" diggai-postgres 2>/dev/null || true
+              docker network connect --alias postgres "$COMPOSE_NET" diggai-postgres
+              echo "  diggai-postgres: connected to $COMPOSE_NET (alias: postgres)"
             else
               echo "  diggai-postgres missing/stopped — starting via compose..."
               $DC up -d postgres
