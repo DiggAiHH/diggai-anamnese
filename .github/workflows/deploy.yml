@@ -166,8 +166,42 @@ jobs:
             fi
             echo "DATABASE_URL found in .env.production ✓"
 
-            # SSL cert renewal (best-effort)
+            # Stop system nginx so Docker nginx can bind ports 80/443
+            echo "Stopping host system nginx (if running)..."
+            systemctl stop nginx 2>/dev/null || service nginx stop 2>/dev/null || true
+            systemctl disable nginx 2>/dev/null || true
+
+            # SSL cert provisioning
+            CERT_DIR="${REPO_PATH}/docker/certs"
+            mkdir -p "$CERT_DIR"
+
+            # Renew existing Let's Encrypt cert (best-effort)
             certbot renew --quiet 2>/dev/null || true
+
+            # Provision new cert if not yet present (requires port 80 free + correct DNS)
+            if [ ! -f "/etc/letsencrypt/live/api.diggai.de/fullchain.pem" ]; then
+              echo "Provisioning Let's Encrypt cert for api.diggai.de (standalone)..."
+              certbot certonly --standalone --non-interactive --agree-tos \
+                --email admin@diggai.de -d api.diggai.de 2>&1 || \
+                echo "WARNING: certbot provisioning failed (DNS not yet updated?)"
+            fi
+
+            # Copy Let's Encrypt certs to docker/certs if available
+            if [ -f "/etc/letsencrypt/live/api.diggai.de/fullchain.pem" ]; then
+              cp /etc/letsencrypt/live/api.diggai.de/fullchain.pem "${CERT_DIR}/fullchain.pem"
+              cp /etc/letsencrypt/live/api.diggai.de/privkey.pem "${CERT_DIR}/privkey.pem"
+              echo "SSL certs copied to docker/certs ✓"
+            fi
+
+            # Generate self-signed cert as fallback so nginx can always start
+            if [ ! -f "${CERT_DIR}/fullchain.pem" ]; then
+              echo "Generating self-signed cert as fallback..."
+              openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+                -keyout "${CERT_DIR}/privkey.pem" \
+                -out "${CERT_DIR}/fullchain.pem" \
+                -subj "/CN=api.diggai.de" 2>/dev/null
+              echo "Self-signed cert created ✓"
+            fi
 
             # Include override.yml if present
             OVERRIDE_FLAG=""
@@ -268,6 +302,25 @@ jobs:
               docker stop "$PORT443_CTR" 2>/dev/null || true
             fi
             $DC up -d --no-recreate --no-deps nginx
+
+            # Verify Docker nginx bound port 80 (container may have started but nginx crashed)
+            sleep 3
+            NGINX_STATE=$(docker inspect --format='{{.State.Status}}' diggai-nginx 2>/dev/null || echo missing)
+            if [ "$NGINX_STATE" != "running" ]; then
+              echo "WARNING: diggai-nginx not running (state=$NGINX_STATE) — checking logs..."
+              docker logs diggai-nginx --tail 30 2>&1 || true
+              echo "Recreating nginx container..."
+              docker rm -f diggai-nginx 2>/dev/null || true
+              $DC up -d --no-deps nginx
+              sleep 3
+            fi
+            NGINX_STATE=$(docker inspect --format='{{.State.Status}}' diggai-nginx 2>/dev/null || echo missing)
+            echo "Nginx state: $NGINX_STATE"
+            if curl -sf http://localhost/api/health >/dev/null 2>&1; then
+              echo "Nginx proxy working ✓"
+            else
+              echo "Nginx health via proxy: n/a (SSL or upstream not yet ready)"
+            fi
 
             echo "Health check (waiting for app startup, max 90s)..."
             APP_OK=0
