@@ -16,6 +16,9 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onScan, onClose })
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [stream, setStream] = useState<MediaStream | null>(null);
+    // Bug fix 2026-05-04: cleanup-effect captured `stream` at mount when it was null.
+    // Mirror the live stream into a ref so unmount actually stops the tracks.
+    const streamRef = useRef<MediaStream | null>(null);
     const [isScanning, setIsScanning] = useState(false);
     const [status, setStatus] = useState<'idle' | 'starting' | 'scanning' | 'success' | 'error' | 'manual'>('idle');
     const [errorMsg, setErrorMsg] = useState('');
@@ -37,6 +40,7 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onScan, onClose })
             const mediaStream = await navigator.mediaDevices.getUserMedia({
                 video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
             });
+            streamRef.current = mediaStream;
             setStream(mediaStream);
             if (videoRef.current) {
                 videoRef.current.srcObject = mediaStream;
@@ -49,12 +53,18 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onScan, onClose })
         }
     };
 
-    // Auto-start camera
+    // Auto-start camera. Cleanup must use the ref because the closure captures
+    // `stream` at mount-time (when it is still null).
     React.useEffect(() => {
         startCamera();
         return () => {
-            if (stream) stream.getTracks().forEach(track => track.stop());
+            const live = streamRef.current;
+            if (live) {
+                live.getTracks().forEach(track => track.stop());
+                streamRef.current = null;
+            }
         };
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: mount-only
     }, []);
 
     const extractEGKData = (text: string) => {

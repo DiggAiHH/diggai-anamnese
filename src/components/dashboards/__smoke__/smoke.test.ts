@@ -1,6 +1,11 @@
-// @ts-nocheck
 /**
- * Dashboard Smoke Tests - Quick validation tests
+ * Dashboard Smoke Tests — quick existence assertions for the components index.
+ *
+ * Earlier versions of this file referenced modules that no longer exist
+ * (`hooks/useDashboard`, `data/mockDashboards`, `store/dashboardStore`,
+ * `services/queueService`). Those imports were removed in 2026-05-03 to
+ * unblock the test suite. Smoke now only checks what the public barrel
+ * (`components/dashboards/index.ts`) actually exports.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -18,43 +23,19 @@ describe('Dashboard Types', () => {
   });
 });
 
-describe('Mock Dashboard Engine', () => {
-  it('should be importable', async () => {
-    const { getMockDashboardEngine } = await import('../../data/mockDashboards');
-    expect(getMockDashboardEngine).toBeDefined();
+describe('Dashboard Components Barrel', () => {
+  it('should export shared components', async () => {
+    const components = await import('../index');
+    expect(components.PatientCard).toBeDefined();
+    expect(components.TriageBadge).toBeDefined();
+    expect(components.StatusColumn).toBeDefined();
   });
-});
 
-describe('Dashboard Store', () => {
-  it('should be importable', async () => {
-    const { useDashboardStore } = await import('../../store/dashboardStore');
-    expect(useDashboardStore).toBeDefined();
-  });
-});
-
-describe('Queue Service', () => {
-  it('should be importable', async () => {
-    const { getQueueService, isMockMode } = await import('../../services/queueService');
-    expect(getQueueService).toBeDefined();
-    expect(isMockMode).toBeDefined();
-  });
-});
-
-describe('Dashboard Hooks', () => {
-  it('should export all hooks', async () => {
-    const hooks = await import('../../hooks/useDashboard');
-    expect(hooks.useRealtimeQueue).toBeDefined();
-    expect(hooks.useSupabaseRealtime).toBeDefined();
-    expect(hooks.useQueueStats).toBeDefined();
-  });
-});
-
-describe('Dashboard Components', () => {
-  it('should export all components', async () => {
+  it('should export role-specific dashboards', async () => {
     const components = await import('../index');
     expect(components.MfaKanbanBoard).toBeDefined();
     expect(components.AnamneseRadar).toBeDefined();
     expect(components.KpiCards).toBeDefined();
-    expect(components.PatientCard).toBeDefined();
+    expect(components.AdminAnalyticsDashboard).toBeDefined();
   });
 });

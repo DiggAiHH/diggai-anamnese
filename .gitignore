@@ -122,3 +122,18 @@ pw-penetration-test.txt
 tests_py/venv/
 tests_py/__pycache__/
 tests_py/*.pyc
+
+# ── Agent / dev scratch ───────────────────────────────────────
+.tmp/
+.tmp_*
+.pr_body_*.md
+*.tsx.bak
+*.ts.bak
+*.config.ts.bak
+audit-high-*.json
+debug_step*.png
+lint-report.json
+failures.json
+graphify-out/CLAUDE_*.md
+graphify-out/.graphify_python
+tsc.out
