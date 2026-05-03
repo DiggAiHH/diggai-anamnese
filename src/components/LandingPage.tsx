@@ -56,9 +56,13 @@ export function LandingPage({ forceClassic = false }: LandingPageProps) {
     const [showDSGVO, setShowDSGVO] = useState(false);
     const [showSignature, setShowSignature] = useState(false);
     const [selectedService, setSelectedService] = useState<ServiceCard | null>(null);
-    const classicLayoutFromQuery = searchParams.get('layout');
-    const showClassicLayout =
-        forceClassic || classicLayoutFromQuery === 'classic' || classicLayoutFromQuery === 'classic4';
+    // H1 (Arzt-Feedback 2026-05-03): 4-Felder Toggle entfernt, immer alle Services zeigen.
+    // Patienten uebersahen Kacheln im 4-Modus. Buendelung von Service-Kacheln
+    // (Dateien & Dokumente, Kontakt & Nachrichten) ist Follow-up.
+    // 'forceClassic' und ?layout=classic werden ignoriert; nur dokumentiert fuer Backwards-Compat.
+    void forceClassic;
+    void searchParams;
+    const showClassicLayout = false;
 
     useEffect(() => {
         if (createStatus !== 'success' || !sessionId || !selectedService) {
