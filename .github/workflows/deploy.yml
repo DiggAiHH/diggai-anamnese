@@ -167,9 +167,12 @@ jobs:
             echo "DATABASE_URL found in .env.production ✓"
 
             # Stop system nginx so Docker nginx can bind ports 80/443
-            echo "Stopping host system nginx (if running)..."
-            sudo systemctl stop nginx 2>/dev/null || sudo service nginx stop 2>/dev/null || systemctl stop nginx 2>/dev/null || true
-            sudo systemctl disable nginx 2>/dev/null || systemctl disable nginx 2>/dev/null || true
+            echo "Stopping and masking host system nginx (if running)..."
+            sudo systemctl stop nginx 2>/dev/null || service nginx stop 2>/dev/null || true
+            # mask prevents systemd from ever auto-starting nginx again
+            sudo systemctl mask nginx 2>/dev/null || true
+            # Kill any remaining nginx processes (e.g., started outside systemd)
+            sudo pkill -f "nginx: master process" 2>/dev/null || pkill -f "nginx: master process" 2>/dev/null || true
             # Also stop any running Docker nginx from previous deploy (frees port 80 for certbot)
             docker stop diggai-nginx 2>/dev/null || true
 
@@ -322,6 +325,10 @@ jobs:
             fi
             NGINX_STATE=$(docker inspect --format='{{.State.Status}}' diggai-nginx 2>/dev/null || echo missing)
             echo "Nginx state: $NGINX_STATE"
+            # Final safety: kill any system nginx that may have restarted during the build (host-level processes only, not container ones)
+            sudo pkill -f "nginx: master process" 2>/dev/null || pkill -f "nginx: master process" 2>/dev/null || true
+            echo "Port 80/443 listeners: $(ss -tlnp 2>/dev/null | grep ':80\|:443' || netstat -tlnp 2>/dev/null | grep ':80\|:443' || echo 'n/a')"
+            echo "Docker port bindings: $(docker ps --format '{{.Names}} {{.Ports}}' 2>/dev/null | grep -E '80|443' || echo 'none')"
             if curl -sf http://localhost/api/health >/dev/null 2>&1; then
               echo "Nginx proxy working ✓"
             else
