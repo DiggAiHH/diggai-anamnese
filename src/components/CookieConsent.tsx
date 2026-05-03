@@ -4,7 +4,7 @@ import { Shield, Cookie, ChevronDown, ChevronUp, Check, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 /**
- * Cookie Consent Banner — TTDSG §25 / ePrivacy-Konformität (Section 2.1.1)
+ * Cookie Consent Banner — § 25 TDDDG / ePrivacy-Konformität (Section 2.1.1)
  * 
  * Granulare Einwilligungsverwaltung:
  * - Essenziell (immer aktiv, nicht abwählbar)
@@ -103,7 +103,7 @@ export function CookieConsent() {
                             {t('cookie.title', 'Cookie-Einstellungen')}
                         </h2>
                         <p className="text-xs text-[var(--text-secondary)]">
-                            {t('cookie.subtitle', 'TTDSG §25 — Ihre Privatsphäre ist uns wichtig')}
+                            {t('cookie.subtitle', '§ 25 TDDDG — Ihre Privatsphäre ist uns wichtig')}
                         </p>
                     </div>
                 </div>
