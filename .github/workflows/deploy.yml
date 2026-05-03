@@ -168,19 +168,23 @@ jobs:
 
             # Stop system nginx so Docker nginx can bind ports 80/443
             echo "Stopping host system nginx (if running)..."
-            systemctl stop nginx 2>/dev/null || service nginx stop 2>/dev/null || true
-            systemctl disable nginx 2>/dev/null || true
+            sudo systemctl stop nginx 2>/dev/null || sudo service nginx stop 2>/dev/null || systemctl stop nginx 2>/dev/null || true
+            sudo systemctl disable nginx 2>/dev/null || systemctl disable nginx 2>/dev/null || true
+            # Also stop any running Docker nginx from previous deploy (frees port 80 for certbot)
+            docker stop diggai-nginx 2>/dev/null || true
 
             # SSL cert provisioning
             CERT_DIR="${REPO_PATH}/docker/certs"
-            mkdir -p "$CERT_DIR"
+            mkdir -p "$CERT_DIR" || true
 
             # Renew existing Let's Encrypt cert (best-effort)
-            certbot renew --quiet 2>/dev/null || true
+            sudo certbot renew --quiet 2>/dev/null || certbot renew --quiet 2>/dev/null || true
 
             # Provision new cert if not yet present (requires port 80 free + correct DNS)
             if [ ! -f "/etc/letsencrypt/live/api.diggai.de/fullchain.pem" ]; then
               echo "Provisioning Let's Encrypt cert for api.diggai.de (standalone)..."
+              sudo certbot certonly --standalone --non-interactive --agree-tos \
+                --email admin@diggai.de -d api.diggai.de 2>&1 || \
               certbot certonly --standalone --non-interactive --agree-tos \
                 --email admin@diggai.de -d api.diggai.de 2>&1 || \
                 echo "WARNING: certbot provisioning failed (DNS not yet updated?)"
@@ -188,8 +192,10 @@ jobs:
 
             # Copy Let's Encrypt certs to docker/certs if available
             if [ -f "/etc/letsencrypt/live/api.diggai.de/fullchain.pem" ]; then
-              cp /etc/letsencrypt/live/api.diggai.de/fullchain.pem "${CERT_DIR}/fullchain.pem"
-              cp /etc/letsencrypt/live/api.diggai.de/privkey.pem "${CERT_DIR}/privkey.pem"
+              sudo cp /etc/letsencrypt/live/api.diggai.de/fullchain.pem "${CERT_DIR}/fullchain.pem" 2>/dev/null || \
+                cp /etc/letsencrypt/live/api.diggai.de/fullchain.pem "${CERT_DIR}/fullchain.pem" 2>/dev/null || true
+              sudo cp /etc/letsencrypt/live/api.diggai.de/privkey.pem "${CERT_DIR}/privkey.pem" 2>/dev/null || \
+                cp /etc/letsencrypt/live/api.diggai.de/privkey.pem "${CERT_DIR}/privkey.pem" 2>/dev/null || true
               echo "SSL certs copied to docker/certs ✓"
             fi
 
@@ -199,8 +205,8 @@ jobs:
               openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
                 -keyout "${CERT_DIR}/privkey.pem" \
                 -out "${CERT_DIR}/fullchain.pem" \
-                -subj "/CN=api.diggai.de" 2>/dev/null
-              echo "Self-signed cert created ✓"
+                -subj "/CN=api.diggai.de" 2>/dev/null || true
+              [ -f "${CERT_DIR}/fullchain.pem" ] && echo "Self-signed cert created ✓" || echo "WARNING: cert creation failed"
             fi
 
             # Include override.yml if present
