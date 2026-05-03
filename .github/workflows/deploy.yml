@@ -167,38 +167,36 @@ jobs:
             echo "DATABASE_URL found in .env.production ✓"
 
             # Strategy: use system nginx as reverse proxy to Docker app on port 3001.
-            # We do NOT stop system nginx — doing so kills the SSH session on this VPS.
-            # Instead, write a vhost that proxies api.diggai.de → localhost:3001.
-            echo "Configuring system nginx vhost for api.diggai.de → localhost:3001..."
-            VHOST_CONTENT='server {
-    listen 80;
-    server_name api.diggai.de;
-
-    location /.well-known/acme-challenge/ {
-        root /var/www/html;
-    }
-
-    location / {
-        proxy_pass http://127.0.0.1:3001;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_read_timeout 90s;
-    }
-}'
-            # Write vhost (try sudo, fall back to direct write)
+            # We do NOT stop system nginx -- doing so kills the SSH session on this VPS.
+            # Instead, write a vhost that proxies api.diggai.de to localhost:3001.
+            echo "Configuring system nginx vhost for api.diggai.de..."
             VHOST_PATH="/etc/nginx/sites-available/api.diggai.de"
             VHOST_ENABLED="/etc/nginx/sites-enabled/api.diggai.de"
-            echo "$VHOST_CONTENT" | sudo tee "$VHOST_PATH" > /dev/null 2>&1 || echo "$VHOST_CONTENT" > "$VHOST_PATH" 2>/dev/null || true
-            # Enable vhost
+            VHOST_TMP="/tmp/diggai-nginx-vhost.conf"
+            printf '%s\n' \
+              'server {' \
+              '    listen 80;' \
+              '    server_name api.diggai.de;' \
+              '    location /.well-known/acme-challenge/ {' \
+              '        root /var/www/html;' \
+              '    }' \
+              '    location / {' \
+              '        proxy_pass http://127.0.0.1:3001;' \
+              '        proxy_http_version 1.1;' \
+              '        proxy_set_header Host $host;' \
+              '        proxy_set_header X-Real-IP $remote_addr;' \
+              '        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;' \
+              '        proxy_set_header X-Forwarded-Proto $scheme;' \
+              '        proxy_set_header Upgrade $http_upgrade;' \
+              '        proxy_set_header Connection upgrade;' \
+              '        proxy_read_timeout 90s;' \
+              '    }' \
+              '}' \
+              > "$VHOST_TMP"
+            sudo cp "$VHOST_TMP" "$VHOST_PATH" 2>/dev/null || cp "$VHOST_TMP" "$VHOST_PATH" 2>/dev/null || true
             sudo ln -sf "$VHOST_PATH" "$VHOST_ENABLED" 2>/dev/null || ln -sf "$VHOST_PATH" "$VHOST_ENABLED" 2>/dev/null || true
-            # Reload nginx config (nginx -s reload does NOT kill the master process or SSH session)
-            sudo nginx -t 2>/dev/null && sudo nginx -s reload 2>/dev/null || nginx -s reload 2>/dev/null || true
-            echo "System nginx vhost configured ✓"
+            sudo nginx -t 2>&1 && sudo nginx -s reload 2>&1 || nginx -s reload 2>/dev/null || true
+            echo "System nginx vhost configured"
 
             # Include override.yml if present
             OVERRIDE_FLAG=""
