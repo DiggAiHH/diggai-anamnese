@@ -1,4 +1,5 @@
 import React, { memo, useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { Option } from '../../types/question';
 import { Check, ChevronDown, ChevronUp } from 'lucide-react';
 
@@ -27,8 +28,10 @@ export const MultiSelectInput: React.FC<MultiSelectInputProps> = memo(function M
     onChange,
     options,
     className = '',
-    maxVisibleOptions = 7  // Default to Miller's Law max (7)
+    // H3 (Arzt-Feedback 2026-05-03): konsistent 6-8 sichtbar, default 6.
+    maxVisibleOptions = 6
 }) {
+    const { t } = useTranslation();
     const [showAll, setShowAll] = useState(false);
 
     const visibleOptions = showAll ? options : options.slice(0, maxVisibleOptions);
@@ -94,12 +97,12 @@ export const MultiSelectInput: React.FC<MultiSelectInputProps> = memo(function M
                     {showAll ? (
                         <>
                             <ChevronUp className="w-4 h-4" aria-hidden="true" />
-                            Weniger anzeigen
+                            {t('multiselect.show_less', 'Weniger anzeigen')}
                         </>
                     ) : (
                         <>
                             <ChevronDown className="w-4 h-4" aria-hidden="true" />
-                            +{hiddenCount} weitere anzeigen
+                            {t('multiselect.show_more', { count: hiddenCount, defaultValue: '+{{count}} weitere anzeigen' })}
                         </>
                     )}
                 </button>
@@ -107,8 +110,8 @@ export const MultiSelectInput: React.FC<MultiSelectInputProps> = memo(function M
 
             {/* Selected count indicator for accessibility */}
             {values.length > 0 && (
-                <div className="text-xs text-blue-400 font-medium">
-                    {values.length} {values.length === 1 ? 'Option ausgewählt' : 'Optionen ausgewählt'}
+                <div className="text-xs text-blue-400 font-medium" aria-live="polite">
+                    {t('multiselect.count', { count: values.length, defaultValue: '{{count}} Option(en) ausgewählt' })}
                 </div>
             )}
         </div>
