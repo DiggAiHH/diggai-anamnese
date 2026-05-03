@@ -25,7 +25,12 @@ function resolveLocaleBasePath(): string {
     return '/locales';
 }
 
-function formatMissingKey(key: string): string {
+function formatMissingKey(key: string, defaultValue?: string): string {
+    // Prefer explicit fallback text from t(key, defaultValue) before showing debug markers.
+    if (typeof defaultValue === 'string' && defaultValue.trim().length > 0 && defaultValue !== key) {
+        return defaultValue;
+    }
+
     const keyParts = key.split('.');
     return `[?] ${keyParts[keyParts.length - 1] || key}`;
 }
