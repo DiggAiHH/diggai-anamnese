@@ -2432,5 +2432,6 @@
   "consent.error_checkboxes": "يرجى تحديد جميع المربعات.",
   "consent.error_signature": "يرجى التوقيع في الحقل أعلاه.",
   "consent.submit": "تأكيد الموافقة والمتابعة",
-  "consent.cancel": "إلغاء"
+  "consent.cancel": "إلغاء",
+  "service.start_cta": "Anamnese jetzt starten"
 }

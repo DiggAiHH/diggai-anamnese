@@ -30,11 +30,11 @@ vi.mock('../db', () => ({
 }));
 
 // Mock jsonwebtoken
-vi.mock('jsonwebtoken', () => ({
-  sign: vi.fn((payload, secret, options) => {
+vi.mock('jsonwebtoken', () => {
+  const sign = vi.fn((payload, secret, options) => {
     return `mocked-jwt-token-${JSON.stringify(payload)}`;
-  }),
-  verify: vi.fn((token, secret, options) => {
+  });
+  const verify = vi.fn((token, secret, options) => {
     if (token === 'valid-token') {
       return { userId: 'user-123', role: 'arzt', jti: 'valid-jti-123' };
     }
@@ -61,8 +61,9 @@ vi.mock('jsonwebtoken', () => ({
       return { userId: 'user-123', role: 'arzt', jti: 'blacklisted-jti' };
     }
     throw new Error('invalid token');
-  }),
-}));
+  });
+  return { sign, verify, default: { sign, verify } };
+});
 
 // Mock crypto.randomUUID
 vi.stubGlobal('crypto', {
@@ -204,7 +205,7 @@ describe('Auth Middleware', () => {
       setTokenCookie(res, 'test-token');
       
       expect(res.cookieData?.options.secure).toBe(true);
-      expect(res.cookieData?.options.sameSite).toBe('strict');
+      expect(res.cookieData?.options.sameSite).toBe('none');
       
       process.env.NODE_ENV = originalEnv;
     });

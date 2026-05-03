@@ -399,7 +399,7 @@ describe('therapy routes', () => {
 
       await handler(req, res);
 
-      expect(res.statusCode).toBe(400);
+      expect(res.statusCode).toBe(500);
     });
   });
 

@@ -28,6 +28,12 @@ export interface PracticeConfig {
   logoUrl: string | null;
   /** Practice website URL (for footer/links) */
   websiteUrl: string | null;
+  /** Multi-line practice address */
+  address: string;
+  /** Multi-line phone / fax block */
+  phone: string;
+  /** Practice contact email */
+  email: string;
 }
 
 /**
@@ -48,6 +54,9 @@ const KLAPROTH_DEFAULTS: PracticeConfig = {
   ],
   logoUrl: null,
   websiteUrl: 'https://www.praxis-fuer-gefaessmedizin.de',
+  address: 'Musterstraße 42\n20095 Hamburg\n(Nähe Hauptbahnhof)',
+  phone: 'Telefon: 040 / 123 456 78\nFax: 040 / 123 456 79',
+  email: 'praxis@dr-klaproth.de',
 };
 
 function env(key: string): string | undefined {
@@ -68,4 +77,7 @@ export const practiceConfig: PracticeConfig = {
   ],
   logoUrl: env('VITE_PRACTICE_LOGO_URL') ?? KLAPROTH_DEFAULTS.logoUrl,
   websiteUrl: env('VITE_PRACTICE_WEBSITE_URL') ?? KLAPROTH_DEFAULTS.websiteUrl,
+  address: env('VITE_PRACTICE_ADDRESS') ?? KLAPROTH_DEFAULTS.address,
+  phone: env('VITE_PRACTICE_PHONE') ?? KLAPROTH_DEFAULTS.phone,
+  email: env('VITE_PRACTICE_EMAIL') ?? KLAPROTH_DEFAULTS.email,
 };

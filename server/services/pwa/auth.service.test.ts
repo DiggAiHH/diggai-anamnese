@@ -40,9 +40,11 @@ vi.mock('../security-audit.service', () => ({
 }));
 
 vi.mock('jsonwebtoken', () => ({
-  sign: vi.fn(() => 'jwt-token'),
-  decode: vi.fn(() => ({ exp: Math.floor(Date.now() / 1000) + 900 })),
-  verify: vi.fn(),
+  default: {
+    sign: vi.fn(() => 'jwt-token'),
+    decode: vi.fn(() => ({ exp: Math.floor(Date.now() / 1000) + 900 })),
+    verify: vi.fn(),
+  },
 }));
 
 vi.mock('nodemailer', () => ({

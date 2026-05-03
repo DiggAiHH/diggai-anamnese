@@ -2280,5 +2280,6 @@
   "consent.error_checkboxes": "Por favor, marque todas las casillas.",
   "consent.error_signature": "Por favor, firme en el campo de arriba.",
   "consent.submit": "Confirmar consentimiento y continuar",
-  "consent.cancel": "Cancelar"
+  "consent.cancel": "Cancelar",
+  "service.start_cta": "Anamnese jetzt starten"
 }

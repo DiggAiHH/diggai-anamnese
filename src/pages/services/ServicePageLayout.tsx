@@ -1,6 +1,6 @@
 import React, { lazy, Suspense, useState, useCallback, useMemo } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, ShieldCheck, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, Clock, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import type { ServiceFlowState } from '../../hooks/useServiceFlow';
@@ -131,7 +131,7 @@ export function ServicePageLayout({
         >
           {flow.createStatus === 'pending'
             ? t('service.loading')
-            : t('service.start_cta')}
+            : t('service.start_cta', { defaultValue: 'Anamnese jetzt starten' })}
         </button>
       </div>
 
@@ -183,6 +183,7 @@ function ConsentSignatureModal({ flow }: { flow: ServiceFlowState }) {
   );
   const hasSigned = signatureData !== null;
   const canSubmit = allChecked && hasSigned;
+  const isPending = flow.submitStatus === 'pending';
 
   const toggleCheck = useCallback((id: string) => {
     setChecks(prev => ({ ...prev, [id]: !prev[id] }));
@@ -236,6 +237,7 @@ function ConsentSignatureModal({ flow }: { flow: ServiceFlowState }) {
                 type="checkbox"
                 checked={checks[cb.id] ?? false}
                 onChange={() => toggleCheck(cb.id)}
+                disabled={isPending}
                 className="mt-0.5 w-5 h-5 rounded border-2 border-[var(--border-primary)] text-blue-600 focus:ring-blue-500 shrink-0 accent-blue-600"
               />
               <span className="text-sm text-[var(--text-secondary)] leading-relaxed">
@@ -256,20 +258,28 @@ function ConsentSignatureModal({ flow }: { flow: ServiceFlowState }) {
             <SignaturePad
               documentText={t('consent.document_text') + ' — DiggAI Praxis — ' + new Date().toISOString()}
               onComplete={handleSignatureComplete}
-              label={t('consent.signature_hint')}
+              label={t('consent.signature_hint', { defaultValue: 'Bitte unterschreiben Sie im Feld unten.' })}
             />
           </div>
         </div>
 
-        {/* Error message */}
+        {/* Validation error */}
         {showError && !canSubmit && (
           <div className="flex items-center gap-2 p-3 rounded-xl border border-red-500/30 bg-red-500/10 text-red-400 text-sm">
             <AlertCircle className="w-4 h-4 shrink-0" />
             {!allChecked && !hasSigned
               ? t('consent.error_both')
               : !allChecked
-              ? t('consent.error_checkboxes')
+              ? t('consent.error_checkboxes', { defaultValue: 'Bitte bestätigen Sie alle erforderlichen Einwilligungen.' })
               : t('consent.error_signature')}
+          </div>
+        )}
+
+        {/* K8: Inline submit error (e.g. network failure during session creation) */}
+        {flow.submitError && (
+          <div className="flex items-center gap-2 p-3 rounded-xl border border-red-500/30 bg-red-500/10 text-red-400 text-sm" role="alert">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            {flow.submitError}
           </div>
         )}
 
@@ -277,18 +287,32 @@ function ConsentSignatureModal({ flow }: { flow: ServiceFlowState }) {
         <div className="flex flex-col gap-3 pt-1">
           <button
             onClick={handleSubmit}
+            disabled={isPending || (!canSubmit && flow.submitStatus !== 'error')}
+            aria-busy={isPending}
             className={`w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-bold text-sm transition-all ${
-              canSubmit
+              isPending
+                ? 'bg-emerald-700 text-white cursor-wait'
+                : canSubmit
                 ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/30 hover:scale-[1.02]'
                 : 'bg-gray-600 text-gray-400 cursor-not-allowed'
             }`}
           >
-            <CheckCircle className="w-4 h-4" />
-            {t('consent.submit')}
+            {isPending ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Wird gespeichert…
+              </>
+            ) : (
+              <>
+                <CheckCircle className="w-4 h-4" />
+                {t('consent.submit', { defaultValue: 'Einwilligung abgeben' })}
+              </>
+            )}
           </button>
           <button
             onClick={flow.handleConsentCancel}
-            className="w-full py-2 text-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
+            disabled={isPending}
+            className="w-full py-2 text-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors disabled:opacity-50"
           >
             {t('consent.cancel')}
           </button>

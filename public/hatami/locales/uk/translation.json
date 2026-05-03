@@ -2366,5 +2366,6 @@
   "consent.error_checkboxes": "Будь ласка, поставте всі галочки.",
   "consent.error_signature": "Будь ласка, підпишіть у полі вище.",
   "consent.submit": "Підтвердити згоду та продовжити",
-  "consent.cancel": "Скасувати"
+  "consent.cancel": "Скасувати",
+  "service.start_cta": "Anamnese jetzt starten"
 }

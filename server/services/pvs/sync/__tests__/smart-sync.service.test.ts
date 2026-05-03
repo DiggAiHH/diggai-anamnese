@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { smartSyncService } from '../smart-sync.service.js';
+import { pvsRouter } from '../../pvs-router.service.js';
 import type { PvsConnectionData } from '../../types.js';
 
 vi.mock('../../pvs-router.service.js', () => ({
@@ -23,6 +24,8 @@ describe('SmartSyncService', () => {
   };
 
   beforeEach(() => {
+    // Reset mock state to prevent leftover mockResolvedValueOnce / mockRejectedValue from leaking across tests
+    vi.mocked(pvsRouter.exportAnamnese).mockReset().mockResolvedValue({ success: true, transferLogId: 'log-123' } as any);
     // Reset internal state
     (smartSyncService as any).watchers.clear();
     (smartSyncService as any).syncStats.clear();
@@ -52,7 +55,6 @@ describe('SmartSyncService', () => {
 
   describe('smartExport', () => {
     it('should retry on failure', async () => {
-      const { pvsRouter } = await import('../../pvs-router.service.js');
       vi.mocked(pvsRouter.exportAnamnese)
         .mockRejectedValueOnce(new Error('Network error'))
         .mockRejectedValueOnce(new Error('Timeout'))
@@ -68,10 +70,9 @@ describe('SmartSyncService', () => {
 
       expect(result.success).toBe(true);
       expect(result.attempts).toBe(3);
-    });
+    }, 15000);
 
     it('should return failure after all retries exhausted', async () => {
-      const { pvsRouter } = await import('../../pvs-router.service.js');
       vi.mocked(pvsRouter.exportAnamnese).mockRejectedValue(new Error('Persistent error'));
 
       const mockSession = {

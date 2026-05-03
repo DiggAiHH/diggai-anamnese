@@ -523,6 +523,7 @@ async function main() {
         update: {
             bsnr: '999999999',
             name: 'Praxis Dr. Klaproth',
+            visibility: 'PUBLIC',
             settings: {
                 features: {
                     showWaitingRoom: false,
@@ -533,6 +534,7 @@ async function main() {
             subdomain: 'default',
             name: 'Praxis Dr. Klaproth',
             bsnr: '999999999',
+            visibility: 'PUBLIC',
             settings: {
                 features: {
                     showWaitingRoom: false,

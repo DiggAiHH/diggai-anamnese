@@ -106,14 +106,14 @@ describe('atoms routes', () => {
       const handlers = getRouteHandlers('/', 'get');
       const handler = handlers[handlers.length - 1] as (req: unknown, res: unknown) => Promise<void>;
 
-      const req = { query: { module: 'basis', section: 'personal' } };
+      const req = { query: { module: '1', section: 'personal' } };
       const res = createMockResponse();
 
       await handler(req, res);
 
       expect(prisma.medicalAtom.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { module: 'basis', section: 'personal' },
+          where: { module: 1, section: 'personal' },
           orderBy: { orderIndex: 'asc' },
         })
       );

@@ -54,10 +54,11 @@ function createRequest(options: {
     host: options.host || 'localhost:3000',
     ...options.headers,
   };
-  
+
   return {
     headers,
     query: options.query || {},
+    path: '/api/sessions',
     tenant: options.tenant,
     tenantId: options.tenantId,
   } as unknown as Request;
@@ -66,6 +67,7 @@ function createRequest(options: {
 describe('Tenant Middleware', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockFindFirst.mockReset();
     clearTenantCache();
   });
 
@@ -86,10 +88,8 @@ describe('Tenant Middleware', () => {
         status: 'ACTIVE',
         settings: {},
       };
-      // First call is for custom domain check (returns null), second is for identifier
-      mockFindFirst
-        .mockResolvedValueOnce(null) // custom domain check
-        .mockResolvedValueOnce(mockTenant); // identifier check
+      // Localhost: no custom domain check. Single identifier lookup.
+      mockFindFirst.mockResolvedValueOnce(mockTenant);
 
       const req = createRequest({
         headers: { 'x-tenant-id': 'praxis-mueller' },
@@ -101,6 +101,30 @@ describe('Tenant Middleware', () => {
 
       expect(req.tenant).toBeDefined();
       expect(req.tenant?.id).toBe('tenant-123');
+      expect(next).toHaveBeenCalled();
+    });
+
+    it('should resolve Klaproth root tenant from x-tenant-id: klaproth', async () => {
+      const mockKlaproth = {
+        id: 'tenant-klaproth',
+        subdomain: 'default',
+        name: 'Praxis Dr. Klaproth',
+        plan: 'ENTERPRISE',
+        status: 'ACTIVE',
+        settings: {},
+      };
+      mockFindFirst.mockResolvedValueOnce(mockKlaproth);
+
+      const req = createRequest({
+        headers: { 'x-tenant-id': 'klaproth' },
+      });
+      const res = createResponse();
+      const next = vi.fn();
+
+      await resolveTenant(req as unknown as Request, res as unknown as Response, next);
+
+      expect(req.tenant).toBeDefined();
+      expect(req.tenant?.name).toBe('Praxis Dr. Klaproth');
       expect(next).toHaveBeenCalled();
     });
 
@@ -143,9 +167,8 @@ describe('Tenant Middleware', () => {
         status: 'ACTIVE',
         settings: {},
       };
-      mockFindFirst
-        .mockResolvedValueOnce(null) // custom domain check
-        .mockResolvedValueOnce(mockTenant); // identifier check
+      // Localhost: no custom domain check. Single identifier lookup.
+      mockFindFirst.mockResolvedValueOnce(mockTenant);
 
       const req = createRequest({
         query: { tenant: 'test-praxis' },
@@ -270,10 +293,8 @@ describe('Tenant Middleware', () => {
         settings: {},
       };
       
-      mockFindFirst
-        .mockResolvedValueOnce(null) // custom domain check
-        .mockResolvedValueOnce(null) // identifier check
-        .mockResolvedValueOnce(mockDefaultTenant); // default tenant check
+      // Localhost: no custom domain check. Single fallback lookup.
+      mockFindFirst.mockResolvedValueOnce(mockDefaultTenant);
 
       const req = createRequest({ host: 'localhost:3000' });
       const res = createResponse();
@@ -412,8 +433,8 @@ describe('Tenant Middleware', () => {
 
       await resolveTenant(req2 as unknown as Request, res2 as unknown as Response, next2);
 
-      // Database should only be queried twice (custom domain + identifier for first request)
-      expect(mockFindFirst).toHaveBeenCalledTimes(2);
+      // 3 calls: custom domain miss (req1), identifier lookup (req1), custom domain miss (req2 — not cached)
+      expect(mockFindFirst).toHaveBeenCalledTimes(3);
       expect(req2.tenant?.id).toBe('tenant-cached');
     });
 
@@ -599,8 +620,8 @@ describe('Tenant Middleware', () => {
 
       expect(getTenantCacheStats().size).toBe(1);
 
-      // Clear cache for specific tenant (using full host as key)
-      clearTenantCache('cache-test.diggai.de');
+      // Clear cache for specific tenant (identifier key, not full host)
+      clearTenantCache('cache-test');
 
       expect(getTenantCacheStats().size).toBe(0);
     });
@@ -666,8 +687,8 @@ describe('Tenant Middleware', () => {
 
       const stats = getTenantCacheStats();
       expect(stats.size).toBe(1);
-      // Cache key is the full host
-      expect(stats.entries).toContain('stats-test.diggai.de');
+      // Cache key is the identifier (subdomain), not the full host
+      expect(stats.entries).toContain('stats-test');
     });
   });
 

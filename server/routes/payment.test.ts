@@ -319,9 +319,13 @@ describe('payment routes', () => {
 
   describe('GET /session/:sessionId', () => {
     it('should return payments for session', async () => {
-      vi.mocked(prisma.paymentTransaction.findMany).mockResolvedValue([
-        { id: validUUID('txn-1'), amount: 5000, status: 'succeeded' },
-      ] as never);
+      (globalThis as any).__prisma = {
+        paymentTransaction: {
+          findMany: vi.fn().mockResolvedValue([
+            { id: validUUID('txn-1'), amount: 5000, status: 'succeeded' },
+          ]),
+        },
+      };
 
       const handlers = getRouteHandlers('/session/:sessionId', 'get');
       const handler = handlers[handlers.length - 1] as (req: unknown, res: unknown) => Promise<void>;

@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useCreateSession } from './useApi/usePatientApi';
 import { useSessionStore } from '../store/sessionStore';
@@ -8,11 +8,16 @@ import {
   getPatientServiceById,
   type PatientServiceId,
 } from '../lib/patientFlow';
+import { submitSignatureToBackend } from '../services/signatureService';
 
 export interface ServiceFlowState {
   showDSGVO: boolean;
   showConsent: boolean;
   createStatus: 'idle' | 'pending' | 'success' | 'error';
+  /** Status of the full consent+session submission (K8 fix) */
+  submitStatus: 'idle' | 'pending' | 'success' | 'error';
+  /** Inline error message for the consent modal (K8 fix) */
+  submitError: string | null;
   handleSelect: () => void;
   handleConsentAccept: () => void;
   handleConsentDecline: () => void;
@@ -33,6 +38,15 @@ export function useServiceFlow(serviceId: PatientServiceId): ServiceFlowState {
   const completeDsgvoConsent = useSessionStore(state => state.completeDsgvoConsent);
   const [showDSGVO, setShowDSGVO] = useState(false);
   const [showConsent, setShowConsent] = useState(false);
+  // K8: track the full consent submission lifecycle so the modal stays open on error
+  const [submitStatus, setSubmitStatus] = useState<'idle' | 'pending' | 'success' | 'error'>('idle');
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  // Pending consent data used by the async effect after session creation
+  const pendingConsentRef = useRef<{
+    signatureData: string;
+    documentHash: string;
+    flags: Record<string, boolean>;
+  } | null>(null);
   const service = getPatientServiceById(serviceId);
 
   const startFlow = useCallback(() => {
@@ -48,13 +62,40 @@ export function useServiceFlow(serviceId: PatientServiceId): ServiceFlowState {
     });
   }, [service, setPatientData, createSession]);
 
+  // K8: watch session creation after consent submission
+  // Keeps modal open during pending, surfaces errors inline, POSTs signature after session is ready
   useEffect(() => {
-    if (!service || createStatus !== 'success' || !sessionId) {
-      return;
-    }
+    if (submitStatus !== 'pending') return;
+    if (!service) return;
 
+    if (createStatus === 'success' && sessionId) {
+      // Session created — best-effort backend signature storage (non-blocking for the user flow)
+      const consent = pendingConsentRef.current;
+      if (consent) {
+        void submitSignatureToBackend({
+          signatureData: consent.signatureData,
+          documentHash: consent.documentHash,
+          formType: 'DSGVO',
+          sessionId,
+        });
+        pendingConsentRef.current = null;
+      }
+      setSubmitStatus('success');
+      setShowConsent(false);
+      navigate(getPatientQuestionnairePath(service.id, bsnr), { replace: true });
+    } else if (createStatus === 'error') {
+      setSubmitStatus('error');
+      setSubmitError('Verbindungsfehler. Bitte versuchen Sie es erneut.');
+    }
+  }, [createStatus, sessionId, submitStatus, bsnr, navigate, service]);
+
+  // Navigation for direct start (consent already in localStorage)
+  useEffect(() => {
+    if (!service || createStatus !== 'success' || !sessionId) return;
+    // The consent submission effect handles navigation when submitStatus === 'pending'
+    if (submitStatus === 'pending') return;
     navigate(getPatientQuestionnairePath(service.id, bsnr), { replace: true });
-  }, [bsnr, createStatus, navigate, service, sessionId]);
+  }, [bsnr, createStatus, navigate, service, sessionId, submitStatus]);
 
   const handleSelect = useCallback(() => {
     const consentGiven = localStorage.getItem('dsgvo_consent');
@@ -82,24 +123,31 @@ export function useServiceFlow(serviceId: PatientServiceId): ServiceFlowState {
     setShowDSGVO(false);
   }, []);
 
-  // User completed mandatory consent (checkboxes + signature)
+  // K8: keep modal open during submission; only close on success (handled in useEffect above)
   const handleConsentComplete = useCallback((signatureData: string, documentHash: string, flags: Record<string, boolean>) => {
-    // Persist to localStorage for quick re-check
+    setSubmitStatus('pending');
+    setSubmitError(null);
+
+    // Store for the async effect
+    pendingConsentRef.current = { signatureData, documentHash, flags };
+
+    // Optimistic local persistence (kept even if backend call fails)
     localStorage.setItem('dsgvo_consent', new Date().toISOString());
     localStorage.setItem('dsgvo_signature_hash', documentHash);
-
-    // Persist to Zustand store for PDF export / GDT
     setDsgvoSignature(signatureData, documentHash);
     for (const [id, checked] of Object.entries(flags)) {
       setDsgvoConsentFlag(id, checked);
     }
     completeDsgvoConsent();
 
-    setShowConsent(false);
+    // Trigger session creation — modal stays open (submitStatus = 'pending')
     startFlow();
   }, [startFlow, setDsgvoSignature, setDsgvoConsentFlag, completeDsgvoConsent]);
 
   const handleConsentCancel = useCallback(() => {
+    setSubmitStatus('idle');
+    setSubmitError(null);
+    pendingConsentRef.current = null;
     setShowConsent(false);
   }, []);
 
@@ -111,6 +159,8 @@ export function useServiceFlow(serviceId: PatientServiceId): ServiceFlowState {
     showDSGVO,
     showConsent,
     createStatus,
+    submitStatus,
+    submitError,
     handleSelect,
     handleConsentAccept,
     handleConsentDecline,

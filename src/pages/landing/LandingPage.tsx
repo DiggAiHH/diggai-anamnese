@@ -69,7 +69,7 @@ const FEATURES = [
 const TESTIMONIALS = [
     {
         text: 'Unsere Wartezeit hat sich halbiert. Die Patienten kommen mit einem fertigen Anamnesebogen — der Arzt kann sofort loslegen.',
-        author: 'Dr. med. S. Klapproth',
+        author: 'Dr. med. S. Mustermann',
         role: 'Hausarztpraxis, Hamburg',
     },
     {

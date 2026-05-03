@@ -31,6 +31,10 @@ vi.mock('../encryption', () => ({
   isPIIAtom: vi.fn((atomId: string) => atomId === '3003'),
 }));
 
+vi.mock('../episode.service', () => ({
+  ensureSessionStoredInEpisode: vi.fn(async () => 'episode-1'),
+}));
+
 import { importEncryptedPackagePayload } from './package-import.service';
 
 describe('package import service', () => {

@@ -1,9 +1,10 @@
 // ─── AssistantAvatar ────────────────────────────────────────────────────────
-// Visual representation of the AI-assisted doctor companion (Dr. Klaproth)
+// Visual representation of the AI-assisted doctor companion
 // Phase 12 – Avatar placeholder with speaking pulse, ready for real image swap
 
 import { useEffect, useRef } from 'react';
 import { Mic, MicOff } from 'lucide-react';
+import { practiceConfig } from '../../lib/practiceConfig';
 
 export interface AssistantAvatarProps {
   /** Whether the avatar is currently speaking (triggers pulse + mic icon) */
@@ -41,7 +42,7 @@ const SIZE_MAP = {
 export function AssistantAvatar({
   isSpeaking = false,
   isLoading = false,
-  name = 'Dr. Klaproth',
+  name = practiceConfig.doctor,
   subtitle = 'Ihr digitaler Assistent',
   avatarUrl,
   brandColor = '#1e3a8a',

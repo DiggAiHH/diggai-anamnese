@@ -12,6 +12,24 @@ import { registerPatientFlowResources } from './lib/patientFlow';
 // RTL languages that require layout mirroring
 const rtlLanguageSet = new Set<string>(RTL_APP_LANGUAGE_CODES);
 
+function resolveLocaleBasePath(): string {
+    if (typeof window === 'undefined') {
+        return '/locales';
+    }
+
+    // Support both root app and /hatami sub-path deployments.
+    if (window.location.pathname.startsWith('/hatami/')) {
+        return '/hatami/locales';
+    }
+
+    return '/locales';
+}
+
+function formatMissingKey(key: string): string {
+    const keyParts = key.split('.');
+    return `[?] ${keyParts[keyParts.length - 1] || key}`;
+}
+
 /**
  * i18n Configuration for DiggAI Anamnese Platform
  * 
@@ -29,7 +47,7 @@ i18n
         fallbackLng: 'de',
         supportedLngs: APP_LANGUAGE_CODES,
         backend: {
-            loadPath: '/locales/{{lng}}/{{ns}}.json',
+            loadPath: `${resolveLocaleBasePath()}/{{lng}}/{{ns}}.json`,
         },
         interpolation: {
             escapeValue: false, // not needed for react as it escapes by default
@@ -49,6 +67,7 @@ i18n
         // i18next uses suffixes: _zero, _one, _two, _few, _many, _other
         // Persian (fa) uses 2 forms: one, other
         pluralSeparator: '_',
+        parseMissingKeyHandler: formatMissingKey,
     });
 
 registerPatientFlowResources(i18n);

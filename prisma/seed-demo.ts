@@ -3,7 +3,8 @@
  * seed-demo.ts — DiggAI Demo-Daten für den Humano/Ärzte-Pitch
  *
  * Erstellt realistische Musterdaten für 3 Praxen auf verschiedenen Plan-Stufen.
- * Passwort aller Demo-Accounts: DiggAI2024!
+ * Demo-Tenants: Passwort aller Demo-Accounts: DiggAI2024!
+ * Localhost-Default-Tenant: admin=praxis2026, arzt=arzt1234, mfa=mfa1234
  *
  * Ausführen: npx tsx prisma/seed-demo.ts
  */
@@ -20,6 +21,9 @@ const prisma = new PrismaClient();
 
 const sha256 = (s: string) => crypto.createHash('sha256').update(s).digest('hex');
 const DEMO_PW = 'DiggAI2024!';
+const LOCAL_ADMIN_PW = process.env.ARZT_PASSWORD || 'praxis2026';
+const LOCAL_ARZT_PW = process.env.DEMO_ARZT_PASSWORD || 'arzt1234';
+const LOCAL_MFA_PW = process.env.DEMO_MFA_PASSWORD || 'mfa1234';
 
 // ─────────────────────────────────────────────────────────────────
 // TENANT 1 — Hausarztpraxis Muster (STARTER)
@@ -30,6 +34,7 @@ const TENANT_HAUSARZT = {
   legalName: 'Dr. med. Klaus Musterarzt, Facharzt für Allgemeinmedizin',
   plan: 'STARTER' as const,
   status: 'ACTIVE' as const,
+  visibility: 'DEMO' as const,
   primaryColor: '#2563eb',
   welcomeMessage: 'Willkommen in unserer Hausarztpraxis! Bitte füllen Sie den digitalen Fragebogen aus.',
   maxUsers: 5,
@@ -49,6 +54,7 @@ const TENANT_KARDIO = {
   legalName: 'Prof. Dr. med. Herzmann & Partner GbR',
   plan: 'PROFESSIONAL' as const,
   status: 'ACTIVE' as const,
+  visibility: 'DEMO' as const,
   primaryColor: '#dc2626',
   welcomeMessage: 'Herzlich willkommen in unserer kardiologischen Spezialpraxis. Ihre Herzgesundheit liegt uns am Herzen.',
   maxUsers: 15,
@@ -68,6 +74,7 @@ const TENANT_MVZ = {
   legalName: 'DiggAI Medizinisches Versorgungszentrum GmbH',
   plan: 'ENTERPRISE' as const,
   status: 'ACTIVE' as const,
+  visibility: 'DEMO' as const,
   primaryColor: '#7c3aed',
   welcomeMessage: 'Willkommen im MVZ DiggAI – KI-gestützte Medizin der Zukunft. Heute verfügbar.',
   maxUsers: 100,
@@ -85,6 +92,9 @@ async function main() {
   console.log('\n🚀 DiggAI Demo-Seed startet...\n');
 
   const pwHash = await bcrypt.hash(DEMO_PW, 12);
+  const localAdminHash = await bcrypt.hash(LOCAL_ADMIN_PW, 12);
+  const localArztHash = await bcrypt.hash(LOCAL_ARZT_PW, 12);
+  const localMfaHash = await bcrypt.hash(LOCAL_MFA_PW, 12);
   const pinHash = await bcrypt.hash('1234', 10);
 
   // ── Tenants ──────────────────────────────────────────────────
@@ -92,10 +102,40 @@ async function main() {
 
   await prisma.tenant.deleteMany({ where: { subdomain: { in: ['demo-hausarzt', 'demo-kardio', 'demo-mvz'] } } });
 
+  const tDefault = await prisma.tenant.upsert({
+    where: { subdomain: 'default' },
+    update: {
+      name: 'DiggAI Demo-Praxis (Localhost)',
+      legalName: 'DiggAI Demo GmbH',
+      visibility: 'PUBLIC',
+      primaryColor: '#2563eb',
+      welcomeMessage: 'Willkommen in der DiggAI Demo-Praxis! Dies ist die lokale Entwicklungsumgebung.',
+      dsgvoAgreementSigned: true,
+      dataRegion: 'de',
+    },
+    create: {
+      subdomain: 'default',
+      name: 'DiggAI Demo-Praxis (Localhost)',
+      legalName: 'DiggAI Demo GmbH',
+      plan: 'PROFESSIONAL',
+      status: 'ACTIVE',
+      visibility: 'PUBLIC',
+      primaryColor: '#2563eb',
+      welcomeMessage: 'Willkommen in der DiggAI Demo-Praxis! Dies ist die lokale Entwicklungsumgebung.',
+      maxUsers: 50,
+      maxPatientsPerMonth: 5000,
+      storageLimitMB: 10240,
+      dsgvoAgreementSigned: true,
+      dsgvoAgreementSignedAt: new Date(),
+      dataRegion: 'de',
+    },
+  });
+
   const t1 = await prisma.tenant.create({ data: TENANT_HAUSARZT });
   const t2 = await prisma.tenant.create({ data: TENANT_KARDIO });
   const t3 = await prisma.tenant.create({ data: TENANT_MVZ });
 
+  console.log(`  ✅ ${tDefault.name} [DEFAULT/LOCALHOST]`);
   console.log(`  ✅ ${t1.name} [STARTER]`);
   console.log(`  ✅ ${t2.name} [PROFESSIONAL]`);
   console.log(`  ✅ ${t3.name} [ENTERPRISE]`);
@@ -133,6 +173,12 @@ async function main() {
   // ── ArztUsers ─────────────────────────────────────────────────
   console.log('\n👨‍⚕️ Erstelle Arzt-Accounts...');
 
+  const [ad_admin, ad_arzt, ad_mfa] = await Promise.all([
+    prisma.arztUser.create({ data: { tenantId: tDefault.id, username: 'admin', passwordHash: localAdminHash, pinHash, displayName: 'System Administrator', role: 'ADMIN', loginCount: 42, lastLoginAt: new Date() } }),
+    prisma.arztUser.create({ data: { tenantId: tDefault.id, username: 'arzt', passwordHash: localArztHash, displayName: 'Dr. Demo (Localhost)', role: 'ARZT', loginCount: 15 } }),
+    prisma.arztUser.create({ data: { tenantId: tDefault.id, username: 'mfa', passwordHash: localMfaHash, displayName: 'MFA Demo (Localhost)', role: 'MFA', loginCount: 30 } }),
+  ]);
+
   // Tenant 1: Hausarzt
   const [a1_admin, a1_arzt, a1_mfa] = await Promise.all([
     prisma.arztUser.create({ data: { tenantId: t1.id, username: 'admin', passwordHash: pwHash, pinHash, displayName: 'Dr. Klaus Musterarzt', role: 'ADMIN', loginCount: 142, lastLoginAt: new Date() } }),
@@ -158,6 +204,7 @@ async function main() {
     prisma.arztUser.create({ data: { tenantId: t3.id, username: 'mfa2', passwordHash: pwHash, displayName: 'Omar Hassan (MFA)', role: 'MFA', loginCount: 983 } }),
   ]);
 
+  console.log(`  ✅ Default: ${[ad_admin, ad_arzt, ad_mfa].length} Accounts`);
   console.log(`  ✅ Tenant 1: ${[a1_admin, a1_arzt, a1_mfa].length} Accounts`);
   console.log(`  ✅ Tenant 2: ${[a2_admin, a2_arzt1, a2_arzt2, a2_mfa].length} Accounts`);
   console.log(`  ✅ Tenant 3: ${[a3_admin, a3_arzt1, a3_arzt2, a3_arzt3, a3_mfa1, a3_mfa2].length} Accounts`);
@@ -789,9 +836,14 @@ PWA-FEATURES AKTIV:
   • 3 Tagebuch-Einträge (PWA-Showcase)
   • ROI-Analytics für alle 3 Praxen
 
-🔑 DEMO-ZUGANGSDATEN (alle Praxen):
-  Passwort: ${DEMO_PW}
-  PIN:      1234
+🔑 DEMO-ZUGANGSDATEN:
+  Demo-Tenants Passwort: ${DEMO_PW}
+  PIN:                    1234
+
+  Localhost (Default):    default
+    Admin:   admin / ${LOCAL_ADMIN_PW}
+    Arzt:    arzt  / ${LOCAL_ARZT_PW}
+    MFA:     mfa   / ${LOCAL_MFA_PW}
 
   Praxis 1 (Hausarzt):   https://demo-hausarzt.diggai.de
     Admin:   admin / ${DEMO_PW}

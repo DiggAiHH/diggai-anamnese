@@ -20,11 +20,11 @@
  * ```
  */
 
-export { questions, coreQuestions } from './questions';
-export type { QuestionSection } from './sections';
-export { sections } from './sections';
-export type { QuestionGroup } from './groups';
-export { groups } from './groups';
+export { questions, coreQuestions } from './questions.ts';
+export type { QuestionSection } from './sections.ts';
+export { sections } from './sections.ts';
+export type { QuestionGroup } from './groups.ts';
+export { groups } from './groups.ts';
 
 // Re-export main questions array as default for convenience
-export { questions as default } from './questions';
+export { questions as default } from './questions.ts';

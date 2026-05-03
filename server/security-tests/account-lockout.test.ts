@@ -84,6 +84,7 @@ vi.mock('../db', () => ({
     triageEvent: { findMany: vi.fn(), update: vi.fn() },
     auditLog: { create: vi.fn() },
     chatMessage: { create: vi.fn() },
+    refreshToken: { create: vi.fn() },
   },
 }));
 

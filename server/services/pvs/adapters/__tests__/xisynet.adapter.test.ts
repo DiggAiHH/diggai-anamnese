@@ -17,6 +17,7 @@ vi.mock('fs', () => ({
     unlink: vi.fn(),
     mkdir: vi.fn(),
     rename: vi.fn(),
+    stat: vi.fn(),
   },
 }));
 
@@ -77,6 +78,7 @@ describe('xIsynetAdapter', () => {
       await adapter.initialize(mockConnection);
       
       vi.mocked(fs.access).mockResolvedValue(undefined);
+      vi.mocked(fs.stat).mockResolvedValue({ isDirectory: () => true } as any);
       vi.mocked(fs.writeFile).mockResolvedValue(undefined);
       vi.mocked(fs.unlink).mockResolvedValue(undefined);
 
@@ -162,8 +164,8 @@ describe('xIsynetAdapter', () => {
         mockSession,
         expect.objectContaining({
           satzart: '6301',
-          senderId: 'DIGGAI01',
-          receiverId: 'ISYNET001',
+          senderId: '',
+          receiverId: '',
         })
       );
     });

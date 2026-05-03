@@ -16,7 +16,8 @@
  *   • Arzt-, MFA-, und Admin-Flows
  *
  * Ausführen: npx tsx prisma/seed-demo-complete.ts
- * Passwort aller Demo-Accounts: DiggAI2024!
+ * Demo-Tenants: Passwort aller Demo-Accounts: DiggAI2024!
+ * Localhost-Default-Tenant: admin=praxis2026, arzt=arzt1234, mfa=mfa1234
  */
 
 import { PrismaClient } from '@prisma/client';
@@ -31,6 +32,9 @@ const prisma = new PrismaClient();
 
 const sha256 = (s: string) => crypto.createHash('sha256').update(s).digest('hex');
 const DEMO_PW = 'DiggAI2024!';
+const LOCAL_ADMIN_PW = process.env.ARZT_PASSWORD || 'praxis2026';
+const LOCAL_ARZT_PW = process.env.DEMO_ARZT_PASSWORD || 'arzt1234';
+const LOCAL_MFA_PW = process.env.DEMO_MFA_PASSWORD || 'mfa1234';
 
 // ─────────────────────────────────────────────────────────────────
 // TENANTS
@@ -41,6 +45,7 @@ const TENANT_HAUSARZT = {
   legalName: 'Dr. med. Klaus Musterarzt, Facharzt für Allgemeinmedizin',
   plan: 'STARTER' as const,
   status: 'ACTIVE' as const,
+  visibility: 'DEMO' as const,
   primaryColor: '#2563eb',
   welcomeMessage: 'Willkommen in unserer Hausarztpraxis! Bitte füllen Sie den digitalen Fragebogen aus.',
   maxUsers: 5, maxPatientsPerMonth: 500, storageLimitMB: 1024,
@@ -53,6 +58,7 @@ const TENANT_KARDIO = {
   legalName: 'Prof. Dr. med. Herzmann & Partner GbR',
   plan: 'PROFESSIONAL' as const,
   status: 'ACTIVE' as const,
+  visibility: 'DEMO' as const,
   primaryColor: '#dc2626',
   welcomeMessage: 'Herzlich willkommen in unserer kardiologischen Spezialpraxis. Ihre Herzgesundheit liegt uns am Herzen.',
   maxUsers: 15, maxPatientsPerMonth: 2000, storageLimitMB: 10240,
@@ -65,6 +71,7 @@ const TENANT_MVZ = {
   legalName: 'DiggAI Medizinisches Versorgungszentrum GmbH',
   plan: 'ENTERPRISE' as const,
   status: 'ACTIVE' as const,
+  visibility: 'DEMO' as const,
   primaryColor: '#7c3aed',
   welcomeMessage: 'Willkommen im MVZ DiggAI – KI-gestützte Medizin der Zukunft. Heute verfügbar.',
   maxUsers: 100, maxPatientsPerMonth: 10000, storageLimitMB: 102400,
@@ -134,6 +141,9 @@ async function main() {
   console.log('\n🚀 DiggAI Demo-Complete-Seed startet (30 Patienten)...\n');
 
   const pwHash = await bcrypt.hash(DEMO_PW, 12);
+  const localAdminHash = await bcrypt.hash(LOCAL_ADMIN_PW, 12);
+  const localArztHash = await bcrypt.hash(LOCAL_ARZT_PW, 12);
+  const localMfaHash = await bcrypt.hash(LOCAL_MFA_PW, 12);
   const pinHash = await bcrypt.hash('1234', 10);
 
   // ── Clean up demo tenants ─────────────────────────────────────
@@ -148,13 +158,14 @@ async function main() {
   // Default tenant for localhost development (resolveTenant fallback)
   const tDefault = await prisma.tenant.upsert({
     where: { subdomain: 'default' },
-    update: {},
+    update: { visibility: 'PUBLIC' },
     create: {
       subdomain: 'default',
       name: 'DiggAI Demo-Praxis (Localhost)',
       legalName: 'DiggAI Demo GmbH',
       plan: 'PROFESSIONAL',
       status: 'ACTIVE',
+      visibility: 'PUBLIC',
       primaryColor: '#2563eb',
       welcomeMessage: 'Willkommen in der DiggAI Demo-Praxis! Dies ist die lokale Entwicklungsumgebung.',
       maxUsers: 50, maxPatientsPerMonth: 5000, storageLimitMB: 10240,
@@ -193,9 +204,9 @@ async function main() {
 
   // Default tenant accounts (for localhost development)
   const [aD_admin, aD_arzt, aD_mfa] = await Promise.all([
-    prisma.arztUser.create({ data: { tenantId: tDefault.id, username: 'admin',   passwordHash: pwHash, pinHash, displayName: 'System Administrator', role: 'ADMIN', loginCount: 42, lastLoginAt: new Date() } }),
-    prisma.arztUser.create({ data: { tenantId: tDefault.id, username: 'arzt',    passwordHash: pwHash, displayName: 'Dr. Demo (Localhost)',        role: 'ARZT',  loginCount: 15 } }),
-    prisma.arztUser.create({ data: { tenantId: tDefault.id, username: 'mfa',     passwordHash: pwHash, displayName: 'MFA Demo (Localhost)',         role: 'MFA',   loginCount: 30 } }),
+    prisma.arztUser.create({ data: { tenantId: tDefault.id, username: 'admin',   passwordHash: localAdminHash, pinHash, displayName: 'System Administrator', role: 'ADMIN', loginCount: 42, lastLoginAt: new Date() } }),
+    prisma.arztUser.create({ data: { tenantId: tDefault.id, username: 'arzt',    passwordHash: localArztHash, displayName: 'Dr. Demo (Localhost)',        role: 'ARZT',  loginCount: 15 } }),
+    prisma.arztUser.create({ data: { tenantId: tDefault.id, username: 'mfa',     passwordHash: localMfaHash, displayName: 'MFA Demo (Localhost)',         role: 'MFA',   loginCount: 30 } }),
   ]);
 
   const [a1_admin, a1_arzt, a1_mfa] = await Promise.all([
@@ -816,11 +827,11 @@ async function main() {
   MFA Queue:             Alle ACTIVE-Sessions (P-10006, P-20003, P-30007, P-30013)
   Admin ROI Dashboard:   ROI-Snapshots aller 3 Praxen
 
-🔑 DEMO-ZUGANGSDATEN (alle Praxen):
-  Passwort: ${DEMO_PW}   PIN: 1234
+🔑 DEMO-ZUGANGSDATEN:
+  Demo-Tenants Passwort: ${DEMO_PW}   PIN: 1234
 
   Localhost (Default):    default
-    admin / ${DEMO_PW}   |   arzt / ${DEMO_PW}   |   mfa / ${DEMO_PW}
+    admin / ${LOCAL_ADMIN_PW}   |   arzt / ${LOCAL_ARZT_PW}   |   mfa / ${LOCAL_MFA_PW}
 
   Praxis 1 (Hausarzt):    demo-hausarzt
     admin / ${DEMO_PW}   |   arzt / ${DEMO_PW}   |   mfa / ${DEMO_PW}

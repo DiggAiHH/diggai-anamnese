@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Play, Heart, Share2, Info, ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { practiceConfig } from '../../lib/practiceConfig';
 
 export default function PwaReels() {
   const { t } = useTranslation();
@@ -11,7 +12,7 @@ export default function PwaReels() {
     {
       id: 1,
       title: 'Blutzucker richtig messen',
-      doctor: 'Dr. med. Klaproth',
+      doctor: practiceConfig.doctor,
       tags: ['Diabetes', 'Prävention'],
       likes: 124,
       gradient: 'from-blue-500 to-indigo-600'
@@ -27,7 +28,7 @@ export default function PwaReels() {
     {
       id: 3,
       title: 'Was passiert bei einer Magenspiegelung?',
-      doctor: 'Dr. med. Klaproth',
+      doctor: practiceConfig.doctor,
       tags: ['Aufklärung', 'Gastroenterologie'],
       likes: 256,
       gradient: 'from-purple-500 to-pink-600'

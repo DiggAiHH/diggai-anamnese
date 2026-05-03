@@ -282,11 +282,14 @@ export function HomeScreen() {
             </div>
           )}
           <div>
+            {/* Root branding is anchored to practiceConfig and must NOT be
+                overridable via translation files. This prevents accidental
+                cross-tenant branding leakage on diggai.de (/). */}
             <h1 className="text-lg font-bold text-[var(--text-primary)]">
-              {t('home.clinic_name', practiceConfig.name)}
+              {practiceConfig.name}
             </h1>
             <p className="text-xs text-[var(--text-secondary)]">
-              {t('home.subtitle', practiceConfig.specialty)}
+              {practiceConfig.specialty}
             </p>
           </div>
         </div>
@@ -306,7 +309,7 @@ export function HomeScreen() {
             isSpeaking={isSpeaking}
             isLoading={ttsLoading}
             size="sm"
-            name={t('home.doctor_name', practiceConfig.doctor)}
+            name={practiceConfig.doctor}
             subtitle={t('home.avatar_subtitle', 'KI-Assistent')}
             onClick={() =>
               void playVoice(

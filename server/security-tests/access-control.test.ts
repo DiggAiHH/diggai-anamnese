@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * @module access-control.test
  * @description OWASP A01: Broken Access Control Security Tests
@@ -12,7 +13,17 @@
  * @security These tests verify that users cannot access resources outside their authorization scope.
  */
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+
+vi.mock('@prisma/client', () => ({
+  PrismaClient: function MockPrismaClient(_options: any) {
+    this.patientSession = { create: vi.fn(({ data }: any) => Promise.resolve(data)) };
+    this.arztUser = { create: vi.fn(({ data }: any) => Promise.resolve(data)), findUnique: vi.fn(() => Promise.resolve(null)) };
+    this.answer = { create: vi.fn(({ data }: any) => Promise.resolve(data)), delete: vi.fn(() => Promise.resolve()) };
+    this.$disconnect = vi.fn(() => Promise.resolve());
+  }
+}));
+
 import { PrismaClient } from '@prisma/client';
 import { encrypt } from '../services/encryption';
 import { createToken, setTokenCookie } from '../middleware/auth';

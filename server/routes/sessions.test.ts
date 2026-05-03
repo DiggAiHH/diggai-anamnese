@@ -10,7 +10,7 @@ const middlewareMocks = vi.hoisted(() => ({
 }));
 
 const episodeServiceMocks = vi.hoisted(() => ({
-  ensureSessionStoredInEpisode: vi.fn(),
+  ensureSessionStoredInEpisode: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('../middleware/auth', () => ({

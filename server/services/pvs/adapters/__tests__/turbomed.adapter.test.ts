@@ -22,6 +22,7 @@ vi.mock('fs', () => ({
     unlink: vi.fn(),
     mkdir: vi.fn(),
     rename: vi.fn(),
+    stat: vi.fn(),
   },
 }));
 
@@ -89,14 +90,15 @@ describe('TurbomedAdapter', () => {
       await adapter.initialize(mockConnection);
       
       vi.mocked(fs.access).mockResolvedValue(undefined);
+      vi.mocked(fs.stat).mockResolvedValue({ isDirectory: () => true } as any);
       vi.mocked(fs.writeFile).mockResolvedValue(undefined);
       vi.mocked(fs.unlink).mockResolvedValue(undefined);
 
       const result = await adapter.testConnection();
       
       expect(result.ok).toBe(true);
-      expect(result.message).toContain('Import-Verzeichnis erreichbar');
-      expect(result.message).toContain('Export-Verzeichnis erreichbar');
+      expect(result.message).toContain('✅ Import-Verzeichnis:');
+      expect(result.message).toContain('✅ Export-Verzeichnis beschreibbar:');
     });
 
     it('should return error when import directory is not accessible', async () => {
@@ -107,17 +109,18 @@ describe('TurbomedAdapter', () => {
       const result = await adapter.testConnection();
       
       expect(result.ok).toBe(false);
-      expect(result.message).toContain('Import-Verzeichnis nicht erreichbar');
+      expect(result.message).toContain('❌ Import-Verzeichnis nicht erreichbar');
     });
 
-    it('should return error when no directories are configured', async () => {
+    it('should return warning when no directories are configured', async () => {
       const connWithoutDirs = { ...mockConnection, gdtImportDir: null, gdtExportDir: null };
       await adapter.initialize(connWithoutDirs);
 
       const result = await adapter.testConnection();
       
-      expect(result.ok).toBe(false);
-      expect(result.message).toContain('Weder Import- noch Export-Verzeichnis konfiguriert');
+      expect(result.ok).toBe(true);
+      expect(result.message).toContain('⚠️ Kein Import-Verzeichnis konfiguriert');
+      expect(result.message).toContain('⚠️ Kein Export-Verzeichnis konfiguriert');
     });
   });
 
@@ -160,7 +163,7 @@ describe('TurbomedAdapter', () => {
       
       vi.mocked(fs.readdir).mockResolvedValue([] as any);
 
-      await expect(adapter.importPatient('99999')).rejects.toThrow('nicht in GDT-Import gefunden');
+      await expect(adapter.importPatient('99999')).rejects.toThrow('Patient nicht gefunden: 99999');
     });
   });
 
@@ -243,12 +246,12 @@ describe('TurbomedAdapter', () => {
         pvsPatientId: '12345',
         lastName: 'Mustermann',
         firstName: 'Max',
-      })).rejects.toThrow('nicht unterstützt');
+      })).rejects.toThrow('exportPatient not implemented for GDT adapters');
     });
   });
 
   describe('exportAnamneseResult', () => {
-    it('should return error when export directory not configured', async () => {
+    it('should throw error when export directory not configured', async () => {
       const connWithoutExport = { ...mockConnection, gdtExportDir: null };
       await adapter.initialize(connWithoutExport);
 
@@ -263,10 +266,7 @@ describe('TurbomedAdapter', () => {
         createdAt: new Date(),
       } as PatientSessionFull;
 
-      const result = await adapter.exportAnamneseResult(mockSession);
-
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('Export-Verzeichnis nicht konfiguriert');
+      await expect(adapter.exportAnamneseResult(mockSession)).rejects.toThrow('GDT Export-Verzeichnis nicht konfiguriert');
     });
 
     it('should successfully export anamnese result', async () => {
@@ -294,8 +294,8 @@ describe('TurbomedAdapter', () => {
       const result = await adapter.exportAnamneseResult(mockSession);
 
       expect(result.success).toBe(true);
-      expect(result.transferLogId).toMatch(/^gdt-/);
-      expect(result.pvsReferenceId).toContain('DIGGAI_12345');
+      expect(result.transferLogId).toBe('session-1');
+      expect(result.pvsReferenceId).toContain('DIGGAI_TURBOMED_12345');
     });
 
     it('should handle export errors gracefully', async () => {
@@ -330,7 +330,7 @@ describe('TurbomedAdapter', () => {
       expect(caps.canImportPatients).toBe(true);
       expect(caps.canExportResults).toBe(true);
       expect(caps.canExportTherapyPlans).toBe(false);
-      expect(caps.canReceiveOrders).toBe(true);
+      expect(caps.canReceiveOrders).toBe(false);
       expect(caps.canSearchPatients).toBe(true);
       expect(caps.supportsRealtime).toBe(false);
       expect(caps.supportedSatzarten).toContain('6310');

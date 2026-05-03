@@ -427,6 +427,7 @@ function containsPathTraversal(input: string): boolean {
         /\.\.\\/,          // ..\
         /%2e%2e/i,          // URL-encoded .. (case insensitive)
         /\.%00/i,           // Null byte injection attempt
+        /%25/i,             // Double-encoded URL sequences
     ];
     return traversalPatterns.some(p => p.test(input));
 }

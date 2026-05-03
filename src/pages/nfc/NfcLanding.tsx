@@ -10,29 +10,32 @@ import { api } from '../../api/client';
 export function NfcLanding() {
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
-  const [status, setStatus] = useState<'scanning' | 'accepted' | 'rejected' | 'error'>('scanning');
+  const locationId = searchParams.get('loc') || searchParams.get('locationId');
+  const praxisId = searchParams.get('p') || searchParams.get('praxisId');
+  const timestamp = searchParams.get('ts');
+  const signature = searchParams.get('sig');
+
+  const hasRequiredParams = Boolean(locationId && praxisId && timestamp && signature);
+  const [status, setStatus] = useState<'scanning' | 'accepted' | 'rejected' | 'error'>(
+    hasRequiredParams ? 'scanning' : 'error',
+  );
   const [result, setResult] = useState<any>(null);
-  const [error, setError] = useState<string>('');
+  const [error, setError] = useState<string>(
+    hasRequiredParams ? '' : t('nfc.missing_params', 'Ungültiger NFC-Link. Bitte erneut scannen.'),
+  );
 
   useEffect(() => {
-    const locationId = searchParams.get('loc') || searchParams.get('locationId');
-    const praxisId = searchParams.get('p') || searchParams.get('praxisId');
-    const timestamp = searchParams.get('ts');
-    const signature = searchParams.get('sig');
-
-    if (!locationId || !praxisId || !timestamp || !signature) {
-      setStatus('error');
-      setError(t('nfc.missing_params', 'Ungültiger NFC-Link. Bitte erneut scannen.'));
+    if (!hasRequiredParams) {
       return;
     }
 
     const processScan = async () => {
       try {
         const res = await api.nfcScan({
-          locationId,
-          praxisId,
+          locationId: locationId as string,
+          praxisId: praxisId as string,
           timestamp: Number(timestamp),
-          signature,
+          signature: signature as string,
           deviceInfo: navigator.userAgent,
         });
 
@@ -50,7 +53,7 @@ export function NfcLanding() {
     };
 
     processScan();
-  }, [searchParams, t]);
+  }, [hasRequiredParams, locationId, praxisId, signature, t, timestamp]);
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center p-4">

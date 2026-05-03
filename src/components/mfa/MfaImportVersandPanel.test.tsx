@@ -15,6 +15,7 @@ vi.mock('lucide-react', () => ({
   FileJson: () => <span data-testid="icon-filejson" />,
   Mail: () => <span data-testid="icon-mail" />,
   Upload: () => <span data-testid="icon-upload" />,
+  ChevronDown: () => <span data-testid="icon-chevrondown" />,
 }));
 
 vi.mock('../../api/client', () => ({

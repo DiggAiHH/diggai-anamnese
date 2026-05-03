@@ -2556,10 +2556,11 @@
   "consent.checkbox_revocation": "Mir ist bekannt, dass ich die Einwilligung jederzeit widerrufen kann.",
   "consent.signature_label": "Ihre Unterschrift",
   "consent.document_text": "DSGVO-Einwilligung",
-  "consent.signature_hint": "Hier unterschreiben",
+  "consent.signature_hint": "Bitte unterschreiben Sie im Feld unten.",
   "consent.error_both": "Bitte haken Sie alle Checkboxen ab und unterschreiben Sie.",
-  "consent.error_checkboxes": "Bitte haken Sie alle Checkboxen ab.",
+  "consent.error_checkboxes": "Bitte bestaetigen Sie alle erforderlichen Einwilligungen.",
   "consent.error_signature": "Bitte unterschreiben Sie im Feld oben.",
-  "consent.submit": "Einwilligung bestätigen & fortfahren",
-  "consent.cancel": "Abbrechen"
+  "consent.submit": "Einwilligung abgeben",
+  "consent.cancel": "Abbrechen",
+  "service.start_cta": "Anamnese jetzt starten"
 }

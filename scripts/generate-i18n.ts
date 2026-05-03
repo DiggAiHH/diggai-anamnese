@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { questions } from '../src/data/questions.ts';
+import { questions } from '../src/data/questions/index.ts';
 
 // Diese statischen UI-Texte fügen wir hinzu
 const uiKeys = [

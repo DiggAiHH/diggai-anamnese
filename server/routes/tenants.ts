@@ -83,7 +83,7 @@ function resolveFeatureFlags(
  * ```json
  * {
  *   "bsnr": "999999999",
- *   "name": "Praxis Dr. Klaproth",
+ *   "name": "Praxis Dr. Mustermann",
  *   "plan": "STARTER",
  *   "primaryColor": "#3b82f6",
  *   "logoUrl": null,
@@ -114,6 +114,7 @@ router.get('/by-bsnr/:bsnr', async (req: Request, res: Response): Promise<void> 
             where: {
                 bsnr,
                 status: 'ACTIVE',
+                visibility: 'PUBLIC',
             },
             select: {
                 // Only public, non-sensitive fields

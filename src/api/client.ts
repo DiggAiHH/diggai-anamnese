@@ -78,41 +78,13 @@ if (isDemoMode()) {
     console.warn('Demo API mode is active. Data is stored locally in this browser.');
 }
 
-function slugifyTenantId(value: string): string {
-    return value
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '');
-}
-
-function deriveTenantIdFromDoctorName(): string | null {
-    const rawDoctor = practiceConfig.doctor?.trim();
-    if (!rawDoctor) {
-        return null;
-    }
-
-    const withoutTitles = rawDoctor
-        .replace(/\bdr\.?\b/gi, '')
-        .replace(/\bmed\.?\b/gi, '')
-        .trim();
-    if (!withoutTitles) {
-        return null;
-    }
-
-    const parts = withoutTitles.split(/\s+/).filter(Boolean);
-    const surname = parts[parts.length - 1] || '';
-    const slug = slugifyTenantId(surname);
-    return slug || null;
-}
-
+/**
+ * Root tenant identifier sent to the backend for all non-BSNR deployments.
+ * Hardcoded to 'klaproth' so the root (/) on diggai.de explicitly resolves
+ * to the Klaproth tenant — no fragile name heuristics, no locale overrides.
+ */
 function resolveTenantIdHint(): string | null {
-    if (configuredTenantId) {
-        return configuredTenantId;
-    }
-
-    return deriveTenantIdFromDoctorName();
+    return configuredTenantId || 'klaproth';
 }
 
 /**

@@ -8,8 +8,13 @@
  * - 25+ Intents für Praxis-Workflows
  * - Multi-language Support (DE, EN, TR, RU, AR, PL)
  * 
+ * Practice-specific responses (address, team, greeting) are injected from
+ * practiceConfig so they adapt to the deployed tenant automatically.
+ * 
  * DSGVO-konform: Alle Verarbeitung findet lokal statt.
  */
+
+import { practiceConfig } from '../lib/practiceConfig';
 
 // ─── Levenshtein Distance ───────────────────────────────
 
@@ -213,12 +218,12 @@ const INTENTS: IntentDef[] = [
     id: 'INFO_ADRESSE',
     keywords: ['adresse', 'wo', 'standort', 'anschrift', 'praxis finden'],
     patterns: [/wo.*praxis/i, /wo.*sind.*sie/i],
-    response: 'Praxis Dr. Klaproth\nMusterstraße 42\n20095 Hamburg\n(Nähe Hauptbahnhof)',
+    response: `${practiceConfig.name}\n${practiceConfig.address}`,
   },
   {
     id: 'INFO_TELEFON',
     keywords: ['telefon', 'telefonnummer', 'anrufen', 'nummer', 'fax'],
-    response: 'Telefon: 040 / 123 456 78\nFax: 040 / 123 456 79\nE-Mail: praxis@dr-klaproth.de',
+    response: `${practiceConfig.phone}\nE-Mail: ${practiceConfig.email}`,
   },
   {
     id: 'INFO_NOTFALL',
@@ -234,7 +239,7 @@ const INTENTS: IntentDef[] = [
   {
     id: 'INFO_TEAM',
     keywords: ['team', 'ärzte', 'mitarbeiter', 'wer arbeitet', 'praxisteam'],
-    response: 'Unser Team:\n• Dr. Klaproth — Facharzt für Allgemeinmedizin\n• Sandra Meier — Medizinische Fachangestellte\n• Dr. Fischer — Assistenzarzt',
+    response: `Unser Team:\n• ${practiceConfig.doctor} — Praxisleitung\n• Sandra Meier — Medizinische Fachangestellte\n• Dr. Fischer — Assistenzarzt`,
   },
   {
     id: 'INFO_ANFAHRT',
@@ -370,7 +375,7 @@ const INTENTS: IntentDef[] = [
   {
     id: 'CHITCHAT_GRUSS',
     keywords: ['hallo', 'hi', 'guten tag', 'guten morgen', 'guten abend', 'moin', 'servus', 'hello'],
-    response: 'Hallo! 👋 Willkommen in der Praxis Dr. Klaproth. Wie kann ich Ihnen helfen?',
+    response: `Hallo! 👋 Willkommen in der ${practiceConfig.name}. Wie kann ich Ihnen helfen?`,
   },
   {
     id: 'CHITCHAT_DANKE',
