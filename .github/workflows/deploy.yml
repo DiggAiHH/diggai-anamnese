@@ -181,7 +181,7 @@ jobs:
               exit 1
             fi
 
-            DC="docker compose -f ${REPO_PATH}/docker-compose.yml ${OVERRIDE_FLAG} --project-directory ${REPO_PATH}"
+            DC="docker compose --project-name diggai -f ${REPO_PATH}/docker-compose.yml ${OVERRIDE_FLAG} --project-directory ${REPO_PATH}"
 
             echo "Building app image..."
             $DC build app
@@ -224,6 +224,10 @@ jobs:
             [ "$P" != "healthy" ] && { echo "ERROR: Postgres unhealthy: $P"; exit 1; }
 
             echo "Deploying app container..."
+            # Avoid container-name conflicts from legacy compose project labels on shared hosts.
+            if docker ps -a --format '{{.Names}}' | grep -qx 'diggai-app'; then
+              docker rm -f diggai-app 2>/dev/null || true
+            fi
             $DC up -d --force-recreate --no-deps app
 
             echo "Ensuring nginx is running..."
