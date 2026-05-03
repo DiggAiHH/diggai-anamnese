@@ -231,6 +231,14 @@ jobs:
             $DC up -d --force-recreate --no-deps app
 
             echo "Ensuring nginx is running..."
+            # Remove stale nginx container that may belong to a different compose project
+            if docker ps -a --format '{{.Names}}' | grep -qx 'diggai-nginx'; then
+              NGINX_PROJECT=$(docker inspect --format='{{index .Config.Labels "com.docker.compose.project"}}' diggai-nginx 2>/dev/null || echo "")
+              if [ "$NGINX_PROJECT" != "diggai" ]; then
+                echo "Removing stale diggai-nginx container (project=$NGINX_PROJECT)..."
+                docker rm -f diggai-nginx 2>/dev/null || true
+              fi
+            fi
             $DC up -d --no-recreate --no-deps nginx
 
             echo "Health check (waiting for app startup, max 90s)..."
