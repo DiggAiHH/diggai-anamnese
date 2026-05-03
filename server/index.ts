@@ -493,7 +493,17 @@ messageBroker.connect().catch(err =>
 );
 
 // Initialize Redis (non-blocking — graceful degradation)
-initRedis().catch(err => console.warn('[Server] Redis init skipped:', err.message));
+// A1: After Redis is up, hydrate the agent task queue from persisted state.
+initRedis()
+    .then(async () => {
+        try {
+            const { taskQueue } = await import('./services/agent/task.queue');
+            await taskQueue.hydrateFromRedis();
+        } catch (err) {
+            console.warn('[Server] Agent task queue hydrate skipped:', (err as Error).message);
+        }
+    })
+    .catch(err => console.warn('[Server] Redis init skipped:', err.message));
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {
