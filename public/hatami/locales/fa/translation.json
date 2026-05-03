@@ -2279,5 +2279,6 @@
   "consent.error_checkboxes": "لطفاً تمام کادرها را علامت بزنید.",
   "consent.error_signature": "لطفاً در فیلد بالا امضا کنید.",
   "consent.submit": "تأیید رضایت و ادامه",
-  "consent.cancel": "لغو"
+  "consent.cancel": "لغو",
+  "service.start_cta": "Anamnese jetzt starten"
 }

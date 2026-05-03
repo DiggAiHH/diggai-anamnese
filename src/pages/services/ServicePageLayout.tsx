@@ -131,7 +131,7 @@ export function ServicePageLayout({
         >
           {flow.createStatus === 'pending'
             ? t('service.loading')
-            : t('service.start_cta')}
+            : t('service.start_cta', { defaultValue: 'Anamnese jetzt starten' })}
         </button>
       </div>
 
@@ -256,7 +256,7 @@ function ConsentSignatureModal({ flow }: { flow: ServiceFlowState }) {
             <SignaturePad
               documentText={t('consent.document_text') + ' — DiggAI Praxis — ' + new Date().toISOString()}
               onComplete={handleSignatureComplete}
-              label={t('consent.signature_hint')}
+              label={t('consent.signature_hint', { defaultValue: 'Bitte unterschreiben Sie im Feld unten.' })}
             />
           </div>
         </div>
@@ -268,7 +268,7 @@ function ConsentSignatureModal({ flow }: { flow: ServiceFlowState }) {
             {!allChecked && !hasSigned
               ? t('consent.error_both')
               : !allChecked
-              ? t('consent.error_checkboxes')
+              ? t('consent.error_checkboxes', { defaultValue: 'Bitte bestätigen Sie alle erforderlichen Einwilligungen.' })
               : t('consent.error_signature')}
           </div>
         )}
@@ -284,7 +284,7 @@ function ConsentSignatureModal({ flow }: { flow: ServiceFlowState }) {
             }`}
           >
             <CheckCircle className="w-4 h-4" />
-            {t('consent.submit')}
+            {t('consent.submit', { defaultValue: 'Einwilligung abgeben' })}
           </button>
           <button
             onClick={flow.handleConsentCancel}

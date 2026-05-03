@@ -2279,5 +2279,6 @@
   "consent.error_checkboxes": "Veuillez cocher toutes les cases.",
   "consent.error_signature": "Veuillez signer dans le champ ci-dessus.",
   "consent.submit": "Confirmer le consentement et continuer",
-  "consent.cancel": "Annuler"
+  "consent.cancel": "Annuler",
+  "service.start_cta": "Anamnese jetzt starten"
 }

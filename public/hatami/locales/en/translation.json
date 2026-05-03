@@ -2520,10 +2520,11 @@
   "consent.checkbox_revocation": "I am aware that I can revoke my consent at any time.",
   "consent.signature_label": "Your signature",
   "consent.document_text": "GDPR Consent",
-  "consent.signature_hint": "Sign here",
+  "consent.signature_hint": "Please sign in the field below.",
   "consent.error_both": "Please check all boxes and provide your signature.",
-  "consent.error_checkboxes": "Please check all required boxes.",
+  "consent.error_checkboxes": "Please confirm all required consents.",
   "consent.error_signature": "Please sign in the field above.",
-  "consent.submit": "Confirm consent & continue",
-  "consent.cancel": "Cancel"
+  "consent.submit": "Submit consent",
+  "consent.cancel": "Cancel",
+  "service.start_cta": "Start anamnesis now"
 }

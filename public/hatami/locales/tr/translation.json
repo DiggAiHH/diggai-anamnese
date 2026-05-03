@@ -2423,5 +2423,6 @@
   "consent.error_checkboxes": "Lütfen tüm kutuları işaretleyin.",
   "consent.error_signature": "Lütfen yukarıdaki alana imzalayın.",
   "consent.submit": "Onaylayın ve devam edin",
-  "consent.cancel": "İptal"
+  "consent.cancel": "İptal",
+  "service.start_cta": "Anamnese jetzt starten"
 }

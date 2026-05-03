@@ -40,6 +40,7 @@ const checkStatus = {
   typecheck: true,
   security: true,
   rollback: true,
+  i18n: true,
 };
 
 // ─── Output Helpers ────────────────────────────────────────────
@@ -340,6 +341,25 @@ if (backupDocFound || backupScriptFound) {
 
 checkStatus.rollback = true;
 
+// ─── 7. i18n Completeness Guard ───────────────────────────────
+section('7. i18n Completeness Guard');
+
+let i18nSectionFailed = false;
+const i18nFail = (msg) => {
+  i18nSectionFailed = true;
+  fail(msg);
+};
+
+try {
+  info('Running translation completeness test...');
+  runCommand(NPM_CMD, ['run', 'test:run', '--', 'src/i18n/translation-completeness.test.ts'], 120000);
+  ok('Translation completeness test passed');
+} catch (error) {
+  i18nFail(`Translation completeness test failed:\n${error.stdout || error.message}`);
+}
+
+checkStatus.i18n = !i18nSectionFailed;
+
 // ─── Additional Checks ─────────────────────────────────────────
 section('Additional Checks');
 
@@ -379,6 +399,7 @@ console.log(`  3. Migration Check          ${checkStatus.migration ? '✅' : '�
 console.log(`  4. TypeCheck                ${checkStatus.typecheck ? '✅' : '❌'}`);
 console.log(`  5. Security Audit           ${checkStatus.security ? '✅' : '❌'}`);
 console.log(`  6. Rollback Readiness       ${checkStatus.rollback ? '✅' : '❌'}`);
+console.log(`  7. i18n Completeness        ${checkStatus.i18n ? '✅' : '❌'}`);
 
 if (warnings.length > 0) {
   console.log(`\n⚠️  Warnings (${warnings.length}):`);

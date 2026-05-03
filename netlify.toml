@@ -5,8 +5,8 @@
   functions = "netlify/no-functions-placeholder"
 
 [build.environment]
-  NODE_VERSION = "20"
-  NETLIFY_SITE_ID = "aeb2a8e2-e8ac-47e0-a5bc-fef4df4aceaa"
+  NODE_VERSION = "22"
+  NETLIFY_SITE_ID = "4e24807c-6ea8-482e-8bef-6c688f7172bb"
   # VITE_API_URL is injected per-context below.
   # Override in Netlify Dashboard > Site configuration > Environment variables
   # if you want to test a branch against a specific backend.

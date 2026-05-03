@@ -2,7 +2,7 @@
 import { existsSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 
-const SITE_ID = process.env.NETLIFY_SITE_ID || 'd4c9bba2-71cc-48a1-81a4-14cb9ac5cb90';
+const SITE_ID = process.env.NETLIFY_SITE_ID || '4e24807c-6ea8-482e-8bef-6c688f7172bb';
 const AUTH_TOKEN = process.env.NETLIFY_AUTH_TOKEN;
 const isPreview = process.argv.includes('--preview');
 const isProd = !isPreview;
