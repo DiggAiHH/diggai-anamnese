@@ -168,56 +168,22 @@ jobs:
 
             # Strategy: use system nginx as reverse proxy to Docker app on port 3001.
             # We cannot access /etc/nginx directly, so use a privileged Docker container.
-            echo "Configuring system nginx vhost via Docker (privileged)..."
+            echo "Diagnosing nginx config location via Docker (privileged)..."
             docker run --rm --privileged \
-              -v /etc/nginx:/etc/nginx \
-              -v /run/nginx.pid:/run/nginx.pid \
+              --pid=host \
+              -v /:/host \
               alpine sh -c '
-                set -e
-                # Detect which config dir nginx uses
-                if [ -d "/etc/nginx/conf.d" ]; then
-                  VHOST_CONF="/etc/nginx/conf.d/api.diggai.de.conf"
-                elif [ -d "/etc/nginx/sites-available" ]; then
-                  VHOST_CONF="/etc/nginx/sites-available/api.diggai.de"
-                else
-                  echo "ERROR: no known nginx config dir found in /etc/nginx/"
-                  ls -la /etc/nginx/ || true
-                  exit 1
-                fi
-                printf "%s\n" \
-                  "server {" \
-                  "    listen 80;" \
-                  "    server_name api.diggai.de;" \
-                  "    location /.well-known/acme-challenge/ {" \
-                  "        root /var/www/html;" \
-                  "    }" \
-                  "    location / {" \
-                  "        proxy_pass http://127.0.0.1:3001;" \
-                  "        proxy_http_version 1.1;" \
-                  "        proxy_set_header Host \$host;" \
-                  "        proxy_set_header X-Real-IP \$remote_addr;" \
-                  "        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;" \
-                  "        proxy_set_header X-Forwarded-Proto \$scheme;" \
-                  "        proxy_set_header Upgrade \$http_upgrade;" \
-                  "        proxy_set_header Connection upgrade;" \
-                  "        proxy_read_timeout 90s;" \
-                  "    }" \
-                  "}" \
-                  > "$VHOST_CONF"
-                echo "Wrote $VHOST_CONF"
-                if [ -d "/etc/nginx/sites-available" ] && [ -d "/etc/nginx/sites-enabled" ]; then
-                  ln -sf "$VHOST_CONF" "/etc/nginx/sites-enabled/api.diggai.de"
-                fi
-                echo "Vhost config written"
-              ' && echo "Docker nginx vhost write: OK" || echo "Docker nginx vhost write: failed"
-            # Now reload nginx — send SIGHUP to nginx master process via nsenter or kill
-            NGINX_PID=$(cat /run/nginx.pid 2>/dev/null || pgrep -x nginx 2>/dev/null | head -1 || true)
-            if [ -n "$NGINX_PID" ]; then
-              kill -HUP "$NGINX_PID" 2>/dev/null && echo "nginx reloaded via SIGHUP (pid $NGINX_PID)" || echo "nginx SIGHUP failed"
-            else
-              echo "nginx master PID not found — skipping reload"
-            fi
-            echo "System nginx vhost write done"
+                echo "=== nginx processes ==="
+                cat /host/proc/*/cmdline 2>/dev/null | tr "\0" " " | grep nginx || echo "no nginx processes found"
+                echo "=== /host/etc/nginx contents ==="
+                ls -la /host/etc/nginx/ 2>/dev/null || echo "/host/etc/nginx not found"
+                echo "=== find nginx configs ==="
+                find /host/etc -name "nginx.conf" 2>/dev/null | head -5 || echo "no nginx.conf found"
+                find /host -path "*/nginx/sites-available" -type d 2>/dev/null | head -5 || true
+                find /host -path "*/nginx/conf.d" -type d 2>/dev/null | head -5 || true
+                echo "=== done ==="
+              ' 2>&1 || echo "Docker diagnostic: failed"
+            echo "System nginx vhost write done (diagnostic run)"
 
             # Include override.yml if present
             OVERRIDE_FLAG=""
