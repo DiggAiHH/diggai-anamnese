@@ -1,6 +1,12 @@
 @import "tailwindcss";
 @import "./tokens/tokens.css";
 
+/* M2 Pastel Tokens (Arzt-Feedback 2026-05-03) — einheitlicher Compliance-Pill-Ton */
+:root {
+  --pastel-compliance: #E8F0FE;
+  --pastel-compliance-border: #C9D9F4;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════════
    PHASE 4: MICRO-INTERACTIONS & ANIMATIONS
    Calming Animation System for Anxiety Reduction
