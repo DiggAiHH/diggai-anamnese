@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import type { ServiceFlowState } from '../../hooks/useServiceFlow';
 import { getPatientAppBasePath } from '../../lib/patientFlow';
+import { SovereigntyBanner } from '../../components/SovereigntyBanner';
 
 const DatenschutzGame = lazy(() => import('../../components/DatenschutzGame').then(m => ({ default: m.DatenschutzGame })));
 const SignaturePad = lazy(() => import('../../components/SignaturePad').then(m => ({ default: m.SignaturePad })));
@@ -69,6 +70,9 @@ export function ServicePageLayout({
           {t('service.back')}
         </Link>
 
+        {/* M6 (Arzt-Feedback 2026-05-03): Daten-Hoheit-Banner */}
+        <SovereigntyBanner />
+
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start gap-6 mb-12">
           <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-white shadow-[0_8px_32px_rgba(0,0,0,0.3)] bg-gradient-to-br ${color}`}>
@@ -122,17 +126,44 @@ export function ServicePageLayout({
 
         {children}
 
-        {/* CTA */}
-        <button
+        {/* K9 (Arzt-Feedback 2026-05-03): Start-CTA prominent — gross, mit subtilem Pulse,
+            Sticky-Bottom auf Mobile, zentral auf Desktop. Min-Height 56px (>=44px WCAG). */}
+        <motion.button
+          type="button"
           onClick={flow.handleSelect}
           onMouseEnter={flow.preloadConsent}
           onFocus={flow.preloadConsent}
-          className={`w-full sm:w-auto px-10 py-4 rounded-2xl text-white font-bold text-lg shadow-2xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] bg-gradient-to-r ${color}`}
+          aria-label={t('service.start_cta', { defaultValue: 'Anamnese jetzt starten' })}
+          initial={{ scale: 1 }}
+          animate={{ scale: [1, 1.03, 1] }}
+          transition={{ duration: 1.6, repeat: 2, ease: 'easeInOut' }}
+          className={`hidden sm:inline-flex w-auto min-h-14 items-center justify-center px-10 py-4 rounded-2xl text-white font-bold text-lg shadow-2xl transition-transform duration-300 hover:scale-[1.02] active:scale-[0.98] bg-gradient-to-r ${color}`}
         >
           {flow.createStatus === 'pending'
             ? t('service.loading')
             : t('service.start_cta', { defaultValue: 'Anamnese jetzt starten' })}
-        </button>
+        </motion.button>
+
+        {/* Sticky-Bottom CTA fuer Mobile */}
+        <div className="sm:hidden fixed inset-x-0 bottom-0 z-40 px-4 py-3 bg-[var(--bg-primary)]/95 backdrop-blur border-t border-[var(--border-primary)]">
+          <motion.button
+            type="button"
+            onClick={flow.handleSelect}
+            onMouseEnter={flow.preloadConsent}
+            onFocus={flow.preloadConsent}
+            aria-label={t('service.start_cta', { defaultValue: 'Anamnese jetzt starten' })}
+            initial={{ scale: 1 }}
+            animate={{ scale: [1, 1.03, 1] }}
+            transition={{ duration: 1.6, repeat: 2, ease: 'easeInOut' }}
+            className={`w-full min-h-14 inline-flex items-center justify-center px-6 py-4 rounded-2xl text-white font-bold text-base shadow-2xl active:scale-[0.98] bg-gradient-to-r ${color}`}
+          >
+            {flow.createStatus === 'pending'
+              ? t('service.loading')
+              : t('service.start_cta', { defaultValue: 'Anamnese jetzt starten' })}
+          </motion.button>
+        </div>
+        {/* Spacer so sticky-bottom button does not overlap content on mobile */}
+        <div className="sm:hidden h-20" aria-hidden="true" />
       </div>
 
       {/* DSGVO Consent Modal */}
