@@ -290,6 +290,7 @@ interface ClientToServerEvents {
 - Für komplexe Aufgaben ist ein **mindestens 7-stufiger Ausführungsplan** die bevorzugte Struktur.
 - Halte nach größeren Umsetzungs- oder Validierungsphasen eine kompakte Session-Zusammenfassung fest, um Kontextverlust zu vermeiden.
 - Zerlege Aufgaben maximal fein, solange die Teilaufgaben noch operativ sinnvoll und überprüfbar sind.
+- Für persistente Memory-Kontexte über mehrere CLI-Umgebungen hinweg einmalig `npm run mem:install:all` ausführen (Claude Code + Codex CLI + Copilot CLI).
 
 ---
 
@@ -503,3 +504,35 @@ Rules:
 - For non-code changes (docs/images/pdfs), run /graphify --update in Copilot Chat to refresh semantic nodes.
 - Keep graphify-out/graph.json current after substantial changes.
 - Privacy note: AST extraction is local; semantic extraction for non-code content can use the assistant model API.
+
+
+---
+
+## Definition of Done — Memory Discipline (REQUIRED for every prompt)
+
+A prompt with an observable outcome (commit, file change, PR, deployment, decision) is NOT done until you append a 5-line run-log entry at:
+
+```
+Ananmese/diggai-anamnese-master/memory/runs/YYYY-MM-DD_<agent>_<model>-<run>.md
+```
+
+**Naming rules.**
+- `<agent>` = lowercase short name. Established: `claude-code`, `copilot`, `codex`, `kimi`, `gemini`, `cursor`. Pick one and reuse it.
+- `<model>` = short tag. Examples: `opus-4-7`, `sonnet-4-6`, `gpt-5`, `gemini-2-5`, `kimi-k2`.
+- `<run>` = monotonic counter for that (agent, model) pair on this calendar day. `01`, `02`, …
+
+**Format (matches existing Kimi pattern in `memory/runs/`):**
+
+```markdown
+YYYY-MM-DDTHH:MM+02:00 | Lauf <agent>-<run> | <one-line topic>
+---
+- Aktion: <what you did, concrete>
+- Blocker: <what tripped you, or "—">
+- Fix: <how you got past it, or "—">
+- Ergebnis: <observable outcome — commit hash, PR #, file path>
+- Out: <verified state — "tests green", "PR #N open", "blocked on F1-F8", …>
+```
+
+**Why this is non-negotiable.** Agents lose context between sessions but the run-log persists. The next agent reads the last 3 entries and knows what was tried, what works on this machine, and what is still open. Without this log the engineering-harness advantage is forfeited and the next agent re-discovers the same footguns.
+
+See workspace-root [`AGENT_PREFLIGHT_PROTOCOL.md`](../AGENT_PREFLIGHT_PROTOCOL.md) §10 for the full preflight context (boot checklist, tool decision tree, machine footguns, append-log).

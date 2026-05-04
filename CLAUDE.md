@@ -82,6 +82,11 @@ npm run monitoring:up  # Prometheus + Grafana monitoring stack
 node scripts/generate-i18n.ts          # Detect missing translation keys
 node compare-translations.cjs          # Compare all 10 language files
 
+# Cross-session memory (Claude-Mem)
+npm run mem:install:all                # Claude Code + Codex CLI + Copilot CLI
+npm run mem:install:all:gemini         # Same install targets, Gemini provider
+npm run mem:install:all:openrouter     # Same install targets, OpenRouter provider
+
 # Deployment
 npm run preflight        # Pre-deploy checks
 npm run deploy           # Guided deployment script
@@ -346,9 +351,9 @@ npm run deploy          # Guided production deploy (builds if dist/ missing)
 npm run deploy:preview  # Preview deploy
 ```
 
-- Site ID: `d4c9bba2-71cc-48a1-81a4-14cb9ac5cb90`
+- Site ID: `4e24807c-6ea8-482e-8bef-6c688f7172bb` (canonical, per `netlify.toml`)
 - Script: `scripts/deploy-guided.mjs` — uses `NETLIFY_AUTH_TOKEN`, falls back to `npx netlify login`
-- NEVER store Netlify passwords in repo files.
+- NEVER store Netlify passwords in repo files. See [`DEPLOY.md`](./DEPLOY.md) (also at workspace root) for the canonical deploy doc.
 
 ---
 
@@ -375,6 +380,8 @@ scripts\once-guard.cmd precheck --task "<task-key>"
 ```
 
 Registry: `shared/knowledge/task-registry.json` | Knowledge: `shared/knowledge/knowledge-share.md` | Checkpoints: `shared/knowledge/checkpoints/`
+
+Claude-Mem cross-session bootstrap: run `npm run mem:install:all` once per machine so persistent memory is available to Claude and non-Claude CLI sessions.
 
 ## Welcome-Back Protocol
 
@@ -411,3 +418,35 @@ Rules:
 - For non-code changes (docs/images/pdfs), run /graphify --update in the assistant to refresh semantic nodes.
 - After substantial changes, verify graphify-out/graph.json exists and is current.
 - Privacy note: AST extraction is local; semantic extraction for non-code content can use the assistant model API.
+
+
+---
+
+## Definition of Done — Memory Discipline (REQUIRED for every prompt)
+
+A prompt with an observable outcome (commit, file change, PR, deployment, decision) is NOT done until you append a 5-line run-log entry at:
+
+```
+Ananmese/diggai-anamnese-master/memory/runs/YYYY-MM-DD_<agent>_<model>-<run>.md
+```
+
+**Naming rules.**
+- `<agent>` = lowercase short name. Established: `claude-code`, `copilot`, `codex`, `kimi`, `gemini`, `cursor`. Pick one and reuse it.
+- `<model>` = short tag. Examples: `opus-4-7`, `sonnet-4-6`, `gpt-5`, `gemini-2-5`, `kimi-k2`.
+- `<run>` = monotonic counter for that (agent, model) pair on this calendar day. `01`, `02`, …
+
+**Format (matches existing Kimi pattern in `memory/runs/`):**
+
+```markdown
+YYYY-MM-DDTHH:MM+02:00 | Lauf <agent>-<run> | <one-line topic>
+---
+- Aktion: <what you did, concrete>
+- Blocker: <what tripped you, or "—">
+- Fix: <how you got past it, or "—">
+- Ergebnis: <observable outcome — commit hash, PR #, file path>
+- Out: <verified state — "tests green", "PR #N open", "blocked on F1-F8", …>
+```
+
+**Why this is non-negotiable.** Agents lose context between sessions but the run-log persists. The next agent reads the last 3 entries and knows what was tried, what works on this machine, and what is still open. Without this log the engineering-harness advantage is forfeited and the next agent re-discovers the same footguns.
+
+See workspace-root [`AGENT_PREFLIGHT_PROTOCOL.md`](../AGENT_PREFLIGHT_PROTOCOL.md) §10 for the full preflight context (boot checklist, tool decision tree, machine footguns, append-log).

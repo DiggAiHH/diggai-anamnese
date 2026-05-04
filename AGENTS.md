@@ -63,6 +63,11 @@ npm run db:seed:demo                   # demo seed (32 patients, 10 users)
 # i18n
 node scripts/generate-i18n.ts          # detect missing translation keys (run before commit)
 
+# Cross-session memory (Claude-Mem)
+npm run mem:install:all                # Claude Code + Codex CLI + Copilot CLI
+npm run mem:install:all:gemini         # Same install targets, Gemini provider
+npm run mem:install:all:openrouter     # Same install targets, OpenRouter provider
+
 # Infra
 npm run docker:up       # app + PostgreSQL + Redis
 npm run monitoring:up   # Prometheus + Grafana
@@ -162,6 +167,8 @@ node scripts/once-guard.mjs complete --task "<task-key>" --agent "<name>" --arti
 Registry: `shared/knowledge/task-registry.json` — read before starting any task.
 Knowledge base: `shared/knowledge/knowledge-share.md` — past decisions and lessons learned.
 
+Claude-Mem cross-session bootstrap: run `npm run mem:install:all` once per machine to keep persistent memory active across Claude and non-Claude CLI sessions.
+
 ## graphify
 
 This project uses a graphify knowledge graph in graphify-out/.
@@ -173,3 +180,35 @@ Rules:
 - For non-code changes (docs/images/pdfs), run /graphify --update in the assistant to refresh semantic nodes.
 - After substantial changes, verify graphify-out/graph.json exists and is current.
 - Privacy note: AST extraction is local; semantic extraction for non-code content can use the assistant model API.
+
+
+---
+
+## Definition of Done — Memory Discipline (REQUIRED for every prompt)
+
+A prompt with an observable outcome (commit, file change, PR, deployment, decision) is NOT done until you append a 5-line run-log entry at:
+
+```
+Ananmese/diggai-anamnese-master/memory/runs/YYYY-MM-DD_<agent>_<model>-<run>.md
+```
+
+**Naming rules.**
+- `<agent>` = lowercase short name. Established: `claude-code`, `copilot`, `codex`, `kimi`, `gemini`, `cursor`. Pick one and reuse it.
+- `<model>` = short tag. Examples: `opus-4-7`, `sonnet-4-6`, `gpt-5`, `gemini-2-5`, `kimi-k2`.
+- `<run>` = monotonic counter for that (agent, model) pair on this calendar day. `01`, `02`, …
+
+**Format (matches existing Kimi pattern in `memory/runs/`):**
+
+```markdown
+YYYY-MM-DDTHH:MM+02:00 | Lauf <agent>-<run> | <one-line topic>
+---
+- Aktion: <what you did, concrete>
+- Blocker: <what tripped you, or "—">
+- Fix: <how you got past it, or "—">
+- Ergebnis: <observable outcome — commit hash, PR #, file path>
+- Out: <verified state — "tests green", "PR #N open", "blocked on F1-F8", …>
+```
+
+**Why this is non-negotiable.** Agents lose context between sessions but the run-log persists. The next agent reads the last 3 entries and knows what was tried, what works on this machine, and what is still open. Without this log the engineering-harness advantage is forfeited and the next agent re-discovers the same footguns.
+
+See workspace-root [`AGENT_PREFLIGHT_PROTOCOL.md`](../AGENT_PREFLIGHT_PROTOCOL.md) §10 for the full preflight context (boot checklist, tool decision tree, machine footguns, append-log).
