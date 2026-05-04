@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate, Outlet, useParams, useNavigate,
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useSessionStore } from './store/sessionStore';
 import { useThemeStore } from './store/themeStore';
+import { useAutoTheme } from './hooks/useAutoTheme';
 import { useTenantStore, type TenantConfig } from './store/tenantStore';
 import { DEFAULT_FEATURE_FLAGS } from './lib/featureFlags';
 import { API_BASE_URL } from './api/client';
@@ -271,6 +272,8 @@ function PatientApp({ defaultLayout = 'default' }: { defaultLayout?: PatientLayo
 
 function App() {
   const { t } = useTranslation();
+  // H2 (Arzt-Feedback 2026-05-03): folgt prefers-color-scheme bis User explizit togglet.
+  useAutoTheme();
   // Initialize theme from persisted store on mount
   const theme = useThemeStore(state => state.theme);
   useEffect(() => {

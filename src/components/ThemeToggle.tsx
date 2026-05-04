@@ -2,14 +2,21 @@ import React from 'react';
 import { Sun, Moon } from 'lucide-react';
 import { useThemeStore } from '../store/themeStore';
 import { useTranslation } from 'react-i18next';
+import { markThemeOverride } from '../hooks/useAutoTheme';
 
 export const ThemeToggle: React.FC = () => {
     const { theme, toggleTheme } = useThemeStore();
     const { t } = useTranslation();
 
+    const handleToggle = () => {
+        // H2: explizite User-Wahl markieren -> auto-theme respektiert das fortan.
+        markThemeOverride();
+        toggleTheme();
+    };
+
     return (
         <button
-            onClick={toggleTheme}
+            onClick={handleToggle}
             className="flex items-center gap-2 px-3 py-2 bg-white/5 hover:bg-white/10 dark:bg-white/5 dark:hover:bg-white/10 light:bg-black/5 light:hover:bg-black/10 border border-white/10 dark:border-white/10 light:border-black/10 rounded-xl transition-all text-sm font-medium backdrop-blur-md"
             title={theme === 'dark' ? t('Zum hellen Modus wechseln') : t('Zum dunklen Modus wechseln')}
             aria-label={theme === 'dark' ? t('Zum hellen Modus wechseln') : t('Zum dunklen Modus wechseln')}
