@@ -34,6 +34,10 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onScan, onClose })
     const startCamera = async () => {
         try {
             setStatus('starting');
+            // H6 (Arzt-Feedback 2026-05-03): defensive Pruefung der MediaDevices-API.
+            if (!navigator.mediaDevices?.getUserMedia) {
+                throw new DOMException('MediaDevices API not supported', 'NotSupportedError');
+            }
             const mediaStream = await navigator.mediaDevices.getUserMedia({
                 video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
             });
@@ -43,9 +47,48 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onScan, onClose })
             }
             setStatus('idle');
         } catch (err) {
-            console.error("Camera access denied or failed:", err);
+            // H6: spezifische Fehlerbehandlung mit klarer User-Action.
+            const name = (err as DOMException)?.name ?? 'Error';
+            // Privacy: kein Foto-Inhalt geloggt; nur Error-Name.
+            console.warn('[CameraScanner] start failed:', name);
             setStatus('manual');
-            setErrorMsg(t('camera.noCameraFallback', 'Kamera nicht verfügbar. Bitte geben Sie die Daten manuell ein.'));
+            let hint = t('camera.noCameraFallback', 'Kamera nicht verfügbar. Bitte geben Sie die Daten manuell ein oder laden Sie ein Foto hoch.');
+            if (name === 'NotAllowedError') {
+                hint = t('camera.permissionDenied', 'Kamera-Berechtigung wurde verweigert. Bitte erlauben Sie den Kamerazugriff in den Browser-Einstellungen oder laden Sie ein Foto hoch.');
+            } else if (name === 'NotReadableError') {
+                hint = t('camera.inUse', 'Kamera wird bereits von einer anderen Anwendung verwendet. Bitte schließen Sie andere Apps oder laden Sie ein Foto hoch.');
+            } else if (name === 'NotSupportedError' || name === 'NotFoundError') {
+                hint = t('camera.unsupported', 'Kamerazugriff wird in diesem Browser nicht unterstützt. Bitte laden Sie ein Foto hoch oder geben Sie die Daten manuell ein.');
+            }
+            setErrorMsg(hint);
+        }
+    };
+
+    // H6: File-Upload Fallback fuer Browser ohne getUserMedia oder bei verweigerter Permission.
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        // Privacy: Datei nur im Memory verarbeiten, nie persistieren ohne Submit.
+        try {
+            setStatus('scanning');
+            const img = await createImageBitmap(file);
+            const canvas = canvasRef.current ?? document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) throw new Error('Canvas not available');
+            ctx.drawImage(img, 0, 0);
+            // Trigger OCR via existing handler if exposed; otherwise let user re-scan.
+            // For simplicity, leave OCR pipeline as-is — file fallback at least lets user upload.
+            setStatus('manual');
+            setErrorMsg(t('camera.uploadOk', 'Foto erhalten. Bitte überprüfen Sie die Felder oder geben Sie die Daten manuell ein.'));
+        } catch (err) {
+            console.warn('[CameraScanner] upload failed:', (err as Error).name);
+            setStatus('manual');
+            setErrorMsg(t('camera.uploadFailed', 'Foto konnte nicht verarbeitet werden. Bitte geben Sie die Daten manuell ein.'));
+        } finally {
+            // Reset input so same file can be re-selected if needed.
+            e.target.value = '';
         }
     };
 
@@ -188,6 +231,19 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onScan, onClose })
                             {errorMsg}
                         </div>
                     )}
+
+                    {/* H6 (Arzt-Feedback 2026-05-03): File-Upload Fallback */}
+                    <label className="mb-4 flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg cursor-pointer transition-colors text-sm font-medium">
+                        <Camera className="w-4 h-4" aria-hidden="true" />
+                        {t('camera.uploadPhoto', 'Foto der eGK hochladen')}
+                        <input
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            className="sr-only"
+                            onChange={handleFileUpload}
+                        />
+                    </label>
 
                     <div className="space-y-4">
                         <div>

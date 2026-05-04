@@ -50,10 +50,15 @@ export function VoiceInputButton({ onTranscript, lang = 'de-DE', className = '',
   const [isListening, setIsListening] = useState(false);
   const [interimText, setInterimText] = useState('');
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
       if (recognitionRef.current) {
         recognitionRef.current.abort();
         recognitionRef.current = null;
@@ -105,7 +110,8 @@ export function VoiceInputButton({ onTranscript, lang = 'de-DE', className = '',
     };
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-      // 'aborted' and 'no-speech' are non-critical
+      // H5 (Arzt-Feedback 2026-05-03): unterscheide transient vs. fatal.
+      // 'no-speech' / 'aborted' / 'audio-capture' / 'network': transient, koennen wiederholt werden.
       if (event.error !== 'aborted' && event.error !== 'no-speech') {
         console.warn('[VoiceInput] Error:', event.error);
       }
@@ -116,20 +122,39 @@ export function VoiceInputButton({ onTranscript, lang = 'de-DE', className = '',
     recognition.onend = () => {
       setIsListening(false);
       setInterimText('');
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
     };
 
     recognitionRef.current = recognition;
 
     try {
       recognition.start();
+      // H5: 30s Auto-Stop, sonst kann SpeechRecognition unbemerkt im Hintergrund bleiben.
+      timeoutRef.current = setTimeout(() => {
+        try { recognition.stop(); } catch { /* ignore */ }
+      }, 30_000);
     } catch {
       // Chrome sometimes throws if already started
       setIsListening(false);
     }
   }, [isListening, lang, onTranscript]);
 
-  // Don't render if Speech API not supported
-  if (!isSpeechSupported()) return null;
+  // H5 Fallback: Speech API not supported -> Hinweis statt unsichtbar.
+  if (!isSpeechSupported()) {
+    return (
+      <div
+        role="note"
+        className={`inline-flex items-center gap-1.5 text-xs text-[var(--text-muted)] italic ${className}`}
+        title="Spracheingabe wird in diesem Browser nicht unterstützt. Bitte tippen Sie."
+      >
+        <MicOff className="w-3.5 h-3.5" aria-hidden="true" />
+        <span>Spracheingabe nicht verfügbar</span>
+      </div>
+    );
+  }
 
   return (
     <div className={`inline-flex items-center gap-2 ${className}`}>
@@ -159,9 +184,12 @@ export function VoiceInputButton({ onTranscript, lang = 'de-DE', className = '',
         )}
       </button>
 
-      {/* Interim text indicator */}
+      {/* Interim text indicator (H5: aria-live fuer Screen-Reader) */}
       {isListening && interimText && (
-        <div className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] italic max-w-[200px] truncate">
+        <div
+          aria-live="polite"
+          className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] italic max-w-[200px] truncate"
+        >
           <Loader2 className="w-3 h-3 animate-spin text-red-400 shrink-0" />
           <span className="truncate">{interimText}</span>
         </div>
