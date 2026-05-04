@@ -8,7 +8,7 @@
  *  - Pfad muss in einem Allowlist-Verzeichnis liegen (default: /tmp/diggai-tomedo.*)
  *  - Schema wird mit Zod validiert
  *  - PII wird NIE geloggt — nur pId + Mode + Timestamp
- *  - Audit-Log via auditLoggerAgent (Team Delta)
+ *  - Audit-Log via structured logger (actor+pid+mode, kein PII)
  */
 
 import { Router, type Request, type Response } from 'express';
@@ -17,7 +17,6 @@ import path from 'path';
 import { z } from 'zod';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { executeTomedoBridge } from '../agents/tomedo-bridge.agent.js';
-import { auditLoggerAgent } from '../agents/tomedo-bridge/team-delta/audit-logger.agent.js';
 import { createLogger } from '../logger.js';
 
 const logger = createLogger('TomedoImportRoutes');
@@ -136,26 +135,20 @@ router.post(
                     tenantId,
                     connectionId: String(connectionId),
                     anamneseData: {
-                        akte: payload.akte,
-                        selection: payload.selection,
-                        mode: payload.mode,
+                        // BridgeInput.anamneseData expects `answers` — wrap tomedo-specific
+                        // fields so downstream agents can access them via answers.*
+                        answers: {
+                            akte: payload.akte,
+                            selection: payload.selection,
+                            mode: payload.mode,
+                        },
                     },
                     patientData: {
-                        externalId: payload.patient.id,
-                        lastName: payload.patient.lastName,
-                        firstName: payload.patient.firstName,
-                        birthDate: payload.patient.birthDate,
-                        gender: payload.patient.gender,
-                        contact: {
-                            email: payload.patient.email,
-                            phone: payload.patient.phone,
-                            mobile: payload.patient.mobile,
-                        },
-                        insurance: { number: payload.patient.insuranceNumber },
-                        address: payload.patient.address,
-                        practice: payload.practice,
+                        externalPatientId: payload.patient.id,
+                        // BridgeInput.patientData has a single `name` field
+                        name: `${payload.patient.firstName} ${payload.patient.lastName}`.trim(),
+                        dob: payload.patient.birthDate,
                     },
-                    options: { waitForCompletion: true },
                 },
                 { waitForCompletion: true }
             );
@@ -173,18 +166,16 @@ router.post(
                 }
             }
 
-            // Audit
-            try {
-                await auditLoggerAgent.logAction?.({
-                    action: 'tomedo-import',
-                    actor: (req as any).user?.id ?? 'unknown',
-                    pid: payload.patient.id,
-                    mode: payload.mode,
-                    taskId,
-                });
-            } catch {
-                // best-effort
-            }
+            // Audit — best-effort via auditLoggerAgent.execute
+            // (logAction is not on the class; use the standard IBridgeAgent.execute interface
+            // through the orchestrator. A direct call is not possible without a full context,
+            // so we only log at service level here.)
+            logger.info('[Import] Audit: import completed', {
+                actor: (req as any).user?.id ?? 'unknown',
+                pid: payload.patient.id,
+                mode: payload.mode,
+                taskId,
+            });
 
             return res.status(result?.success ? 200 : 207).json({
                 success: result?.success ?? true,

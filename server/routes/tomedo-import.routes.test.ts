@@ -389,8 +389,9 @@ describe('tomedo-import.routes', () => {
       await handler(req, res);
 
       const [bridgeArg] = bridgeMocks.executeTomedoBridge.mock.calls[0];
-      expect(bridgeArg.anamneseData.akte).toBe('Ausführliche Anamnese');
-      expect(bridgeArg.anamneseData.mode).toBe('Nur Auswahl');
+      // akte/mode are wrapped inside anamneseData.answers (BridgeInput type constraint)
+      expect(bridgeArg.anamneseData.answers.akte).toBe('Ausführliche Anamnese');
+      expect(bridgeArg.anamneseData.answers.mode).toBe('Nur Auswahl');
     });
 
     it('does NOT log PII fields (lastName, email, birthDate)', async () => {
