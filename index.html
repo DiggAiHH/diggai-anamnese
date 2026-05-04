@@ -3,47 +3,54 @@
 
 <head>
   <meta charset="UTF-8" />
-  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+  <!-- F-04: eigenes Brand-Icon statt Vite-Default -->
+  <link rel="icon" type="image/svg+xml" href="/icons/icon-192.svg" />
+  <link rel="alternate icon" href="/favicon.ico" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="description"
-    content="Medizinischer Anamnese-Fragebogen — Digitale Voraberfassung Ihrer Gesundheitsdaten" />
+    content="DiggAi · DSGVO-konforme digitale Anamnese für Arztpraxen. 270+ medizinische Fragen, 5 Sprachen, AES-256 Verschlüsselung." />
   <meta name="robots" content="index, follow" />
   <!-- Open Graph -->
-  <meta property="og:title" content="DiggAI Anamnese – Digitale Patientenaufnahme" />
+  <meta property="og:title" content="DiggAi · DSGVO-konforme digitale Anamnese" />
   <meta property="og:description" content="DSGVO-konforme digitale Anamnese für Arztpraxen. 270+ medizinische Fragen, 5 Sprachen, AES-256 Verschlüsselung." />
   <meta property="og:type" content="website" />
-  <meta property="og:url" content="https://diggai-drklaproth.netlify.app" />
+  <!-- F-03: og:url auf Production-Domain -->
+  <meta property="og:url" content="https://diggai.de" />
   <meta property="og:locale" content="de_DE" />
-  <meta property="og:site_name" content="DiggAI" />
-  <!-- Security — CSP is handled via Netlify HTTP headers (netlify.toml) to avoid dual-policy conflicts.
-       Meta CSP removed: having both meta + header applies BOTH — meta blocked eval() (lottie-web)
-       and blocked connect-src to api-takios.diggai.de. Netlify header alone is sufficient. -->
+  <meta property="og:site_name" content="DiggAi" />
+  <!-- F-07: og:image -->
+  <meta property="og:image" content="https://diggai.de/og-image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="DiggAi — Digitale Anamnese für Arztpraxen" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:image" content="https://diggai.de/og-image.png" />
+  <!-- Security — CSP wird über netlify.toml ausgeliefert (siehe Kommentar dort) -->
   <meta http-equiv="Permissions-Policy" content="camera=(self), microphone=(self), geolocation=()" />
   <!-- PWA -->
   <link rel="manifest" href="/manifest.json" />
-  <meta name="theme-color" content="#3b82f6" />
+  <!-- F-08: Brand-Blau statt Tailwind-Default -->
+  <meta name="theme-color" content="#1e40af" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="DiggAI" />
+  <meta name="apple-mobile-web-app-title" content="DiggAi" />
   <link rel="apple-touch-icon" href="/icons/icon-192.svg" />
-  <!-- Typography: Phase 2 Optimization for Elderly/Anxious Users -->
-  <!-- Primary Font: Inter with RTL support via Noto Sans Arabic -->
-  <!-- DNS prefetch + preconnect for API backend (reduces TCP handshake latency) -->
-  <link rel="dns-prefetch" href="https://api-takios.diggai.de" />
-  <link rel="preconnect" href="https://api-takios.diggai.de" crossorigin />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@400;500;600;700&display=swap" fetchpriority="high" />
-  <link
-    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@400;500;600;700&display=swap"
-    rel="stylesheet" />
-  <title>Anamnese-Fragebogen</title>
+  <!--
+    Typography — F-02 DSGVO-Härtung
+    Inter + Noto Sans Arabic werden self-hosted via @fontsource/* (siehe src/main.tsx).
+    KEIN externer Request mehr an fonts.googleapis.com / fonts.gstatic.com.
+    Für Build-Pipeline: `npm install @fontsource/inter @fontsource/noto-sans-arabic`
+  -->
+  <!-- API-Backend Preconnect — Production-Domain (api.diggai.de, NICHT api-takios) -->
+  <link rel="dns-prefetch" href="https://api.diggai.de" />
+  <link rel="preconnect" href="https://api.diggai.de" crossorigin />
+  <title>DiggAi · Digitale Anamnese</title>
+  <script type="module" src="/src/main.tsx"></script>
 </head>
 
 <body>
   <div id="root"></div>
-  <script type="module" src="/src/main.tsx"></script>
 </body>
 
 </html>
