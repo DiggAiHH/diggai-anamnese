@@ -8,7 +8,7 @@
  *  - Pfad muss in einem Allowlist-Verzeichnis liegen (default: /tmp/diggai-tomedo.*)
  *  - Schema wird mit Zod validiert
  *  - PII wird NIE geloggt — nur pId + Mode + Timestamp
- *  - Audit-Log via structured logger (actor+pid+mode, kein PII)
+ *  - Audit-Log via auditLoggerAgent.logAction (actor+pid+mode, kein PII)
  */
 
 import { Router, type Request, type Response } from 'express';
@@ -17,6 +17,7 @@ import path from 'path';
 import { z } from 'zod';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { executeTomedoBridge } from '../agents/tomedo-bridge.agent.js';
+import { auditLoggerAgent } from '../agents/tomedo-bridge/team-delta/audit-logger.agent.js';
 import { createLogger } from '../logger.js';
 
 const logger = createLogger('TomedoImportRoutes');
@@ -166,16 +167,18 @@ router.post(
                 }
             }
 
-            // Audit — best-effort via auditLoggerAgent.execute
-            // (logAction is not on the class; use the standard IBridgeAgent.execute interface
-            // through the orchestrator. A direct call is not possible without a full context,
-            // so we only log at service level here.)
-            logger.info('[Import] Audit: import completed', {
-                actor: (req as any).user?.id ?? 'unknown',
-                pid: payload.patient.id,
-                mode: payload.mode,
-                taskId,
-            });
+            // Audit — best-effort, non-blocking
+            try {
+                auditLoggerAgent.logAction({
+                    action: 'tomedo-import',
+                    actor: (req as any).user?.id ?? 'unknown',
+                    pid: payload.patient.id,
+                    mode: payload.mode,
+                    taskId,
+                });
+            } catch {
+                // best-effort: audit failure must never break the response
+            }
 
             return res.status(result?.success ? 200 : 207).json({
                 success: result?.success ?? true,

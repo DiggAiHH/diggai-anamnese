@@ -273,6 +273,29 @@ class AuditLoggerAgent implements IBridgeAgent<AuditLoggerInput, AuditTrailOutpu
     async getAuditTrail(): Promise<AuditTrailOutput | null> {
         return null;
     }
+
+    /**
+     * Lightweight single-action audit entry for route-level events.
+     * Does NOT require a full BridgeInput/context — suitable for HTTP handlers.
+     * PII fields MUST NOT be passed (actor = userId, pid = patientId only).
+     */
+    logAction(entry: {
+        action: string;
+        actor: string;
+        pid: string;
+        mode?: string;
+        taskId?: string;
+        [key: string]: unknown;
+    }): void {
+        logger.info('[AuditLogger] route-action', {
+            action: entry.action,
+            actor: entry.actor,
+            pid: entry.pid,
+            mode: entry.mode,
+            taskId: entry.taskId,
+            ts: new Date().toISOString(),
+        });
+    }
 }
 
 export const auditLoggerAgent = new AuditLoggerAgent();
