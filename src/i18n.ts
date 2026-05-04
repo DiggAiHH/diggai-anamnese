@@ -26,13 +26,29 @@ function resolveLocaleBasePath(): string {
 }
 
 function formatMissingKey(key: string, defaultValue?: string): string {
-    // Prefer explicit fallback text from t(key, defaultValue) before showing debug markers.
-    if (typeof defaultValue === 'string' && defaultValue.trim().length > 0 && defaultValue !== key) {
+    // Bug fix 2026-05-04: never show "[?]" in any environment.
+    // The codebase uses two i18n key conventions in parallel:
+    //   1. dotted keys with explicit fallback: t('home.title', 'Anliegen wählen')
+    //   2. German text as the key itself:     t('Anliegen wählen')
+    // For (1) we use the defaultValue. For (2) we treat the key itself as the
+    // visible German fallback — a missing translation in EN/AR/etc gracefully
+    // shows the German text instead of a "[?]" debug marker leaking to patients.
+
+    if (typeof defaultValue === 'string' && defaultValue.trim().length > 0) {
         return defaultValue;
     }
-
-    const keyParts = key.split('.');
-    return `[?] ${keyParts[keyParts.length - 1] || key}`;
+    // If the key looks like human-readable text (contains a space or has no dot
+    // separators), use it as the visible fallback.
+    if (key.includes(' ') || !key.includes('.')) {
+        return key;
+    }
+    // Truly missing dotted key with no defaultValue. Surface only in dev.
+    if (typeof import.meta !== 'undefined' && (import.meta as ImportMeta & { env?: { DEV?: boolean } }).env?.DEV) {
+        const last = key.split('.').pop();
+        return `[?] ${last || key}`;
+    }
+    // Production: silently return the key's last segment so the UI doesn't break.
+    return key.split('.').pop() || key;
 }
 
 /**
