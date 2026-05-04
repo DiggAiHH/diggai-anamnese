@@ -58,6 +58,10 @@ export function DatenschutzPage() {
                                 E-Mail: <a href="mailto:datenschutz@praxis.de" className="text-blue-500 hover:underline">datenschutz@praxis.de</a><br />
                                 Telefon: [Telefonnummer]
                             </address>
+                            <div className="mt-3 p-3 rounded-lg border-2 border-amber-500/60 bg-amber-500/10 text-xs" role="alert">
+                                <strong>{t('privacy.s1_warning_label', 'Konfigurationshinweis:')}</strong>{' '}
+                                {t('privacy.s1_warning', 'Sofern oben Platzhalter sichtbar sind, ist die Praxis-Konfiguration unvollständig. Bitte kontaktieren Sie Ihren Praxis-Administrator. In Produktion werden diese Werte über den Endpoint /api/legal/responsible-party aus der Praxis-Konfiguration geladen.')}
+                            </div>
                         </section>
 
                         {/* §2 — Datenschutzbeauftragter */}
@@ -83,7 +87,7 @@ export function DatenschutzPage() {
                             <ul className="list-disc pl-6 space-y-1">
                                 <li><strong>Zweck:</strong> {t('privacy.s3a_purpose', 'Digitale Voraberfassung von Gesundheitsdaten für die ärztliche Behandlung')}</li>
                                 <li><strong>Daten:</strong> {t('privacy.s3a_data', 'Gesundheitsdaten (Art. 9 Abs. 1 DSGVO), Kontaktdaten, Versicherungsdaten, Medikation')}</li>
-                                <li><strong>Rechtsgrundlage:</strong> {t('privacy.s3a_legal', 'Art. 9 Abs. 2 lit. h DSGVO i.V.m. §22 Abs. 1 Nr. 1 lit. b BDSG (Gesundheitsvorsorge/medizinische Diagnostik); Art. 6 Abs. 1 lit. a DSGVO (Einwilligung)')}</li>
+                                <li><strong>Rechtsgrundlage:</strong> {t('privacy.s3a_legal', 'Art. 9 Abs. 2 lit. h DSGVO i.V.m. § 22 Abs. 1 Nr. 1 lit. b BDSG (Gesundheitsvorsorge/medizinische Diagnostik). Diese Rechtsgrundlage ist self-contained und steht nicht in Kombination mit Art. 6 Abs. 1 lit. a DSGVO.')}</li>
                             </ul>
 
                             <h4 className="font-bold mt-4 mb-2 text-[var(--text-primary)]">
@@ -101,7 +105,7 @@ export function DatenschutzPage() {
                             <ul className="list-disc pl-6 space-y-1">
                                 <li><strong>Zweck:</strong> {t('privacy.s3c_purpose', 'Echtzeit-Kommunikation zwischen Patient und Praxispersonal')}</li>
                                 <li><strong>Daten:</strong> {t('privacy.s3c_data', 'Nachrichteninhalt, Absender, Zeitstempel')}</li>
-                                <li><strong>Rechtsgrundlage:</strong> {t('privacy.s3c_legal', 'Art. 6 Abs. 1 lit. b DSGVO (Vertragserfüllung / vorvertragliche Maßnahmen)')}</li>
+                                <li><strong>Rechtsgrundlage:</strong> {t('privacy.s3c_legal', 'Art. 6 Abs. 1 lit. b DSGVO (Vertragserfüllung / vorvertragliche Maßnahmen). Soweit über den Chat Gesundheitsdaten ausgetauscht werden, gilt zusätzlich Art. 9 Abs. 2 lit. h DSGVO i.V.m. § 22 BDSG.')}</li>
                             </ul>
 
                             <h4 className="font-bold mt-4 mb-2 text-[var(--text-primary)]">
@@ -129,7 +133,7 @@ export function DatenschutzPage() {
                             <SectionHeader icon={<Server className="w-4 h-4" />} title={t('privacy.s5_title', '5. Übermittlung in Drittländer')} />
                             <p>
                                 {t('privacy.s5_text',
-                                    'Netlify Inc. (Sitz: USA) wird als Hosting-Provider eingesetzt. Die Datenübermittlung erfolgt auf Grundlage von EU-Standardvertragsklauseln (SCC) gemäß Art. 46 Abs. 2 lit. c DSGVO. Netlify ist zudem unter dem EU-US Data Privacy Framework zertifiziert. Ergänzende technische Schutzmaßnahmen: TLS 1.3, AES-256-Verschlüsselung, serverseitige Verschlüsselung sensibler Felder.'
+                                    'Netlify Inc. (Sitz: USA) wird als Hosting-Provider eingesetzt. Die Datenübermittlung erfolgt auf Grundlage von EU-Standardvertragsklauseln (SCC) gemäß Art. 46 Abs. 2 lit. c DSGVO. Netlify ist zudem unter dem EU-US Data Privacy Framework zertifiziert. Ergänzende technische Schutzmaßnahmen: TLS 1.3, AES-256-Verschlüsselung, serverseitige Verschlüsselung sensibler Felder. Hinweis: Wir evaluieren derzeit den Wechsel zu einem nach BSI C5 zertifizierten Hosting-Provider mit Sitz in Deutschland.'
                                 )}
                             </p>
                         </section>
@@ -169,8 +173,8 @@ export function DatenschutzPage() {
                                         </tr>
                                         <tr>
                                             <td className="py-2 pr-4">{t('privacy.s6_r5c1', 'Cookie-Consent')}</td>
-                                            <td className="py-2 pr-4">{t('privacy.s6_r5c2', '1 Jahr (TTDSG §25)')}</td>
-                                            <td className="py-2">{t('privacy.s6_r5c3', 'TTDSG §25 Abs. 1')}</td>
+                                            <td className="py-2 pr-4">{t('privacy.s6_r5c2', '1 Jahr (§ 25 TDDDG)')}</td>
+                                            <td className="py-2">{t('privacy.s6_r5c3', '§ 25 Abs. 1 TDDDG')}</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -192,6 +196,10 @@ export function DatenschutzPage() {
                                 <li><strong>{t('privacy.s7_r6', 'Widerspruchsrecht (Art. 21)')}</strong> — {t('privacy.s7_r6d', 'Widerspruch gegen Verarbeitung auf Grundlage berechtigter Interessen')}</li>
                                 <li><strong>{t('privacy.s7_r7', 'Widerruf der Einwilligung (Art. 7 Abs. 3)')}</strong> — {t('privacy.s7_r7d', 'Jederzeitiger Widerruf erteilter Einwilligungen für die Zukunft')}</li>
                             </ul>
+                            <p className="mt-3 p-3 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-primary)] text-xs">
+                                <strong>{t('privacy.s7_art20_note_label', 'Hinweis zur Datenübertragbarkeit:')}</strong>{' '}
+                                {t('privacy.s7_art20_note', 'Das Recht auf Datenübertragbarkeit gemäß Art. 20 DSGVO besteht nur für Daten, die Sie uns auf Basis einer Einwilligung (Art. 6 Abs. 1 lit. a) oder zur Vertragserfüllung (Art. 6 Abs. 1 lit. b) übermittelt haben und die automatisiert verarbeitet werden. Daten, die wir aufgrund gesetzlicher Aufbewahrungspflichten (z. B. § 630f BGB) speichern, fallen NICHT darunter.')}
+                            </p>
                             <p className="mt-3">{t('privacy.s7_authority', 'Beschwerderecht bei der zuständigen Aufsichtsbehörde (Art. 77 DSGVO).')}</p>
                         </section>
 
@@ -204,7 +212,7 @@ export function DatenschutzPage() {
                                 <li>{t('privacy.s8_t3', 'Passwort-Hashing: bcrypt mit Salting (mind. 12 Runden)')}</li>
                                 <li>{t('privacy.s8_t4', 'Content Security Policy (CSP) mit strikten Direktiven')}</li>
                                 <li>{t('privacy.s8_t5', 'Rate Limiting: Brute-Force-Schutz auf Authentifizierungs-Endpunkten')}</li>
-                                <li>{t('privacy.s8_t6', 'HIPAA-konformes Audit-Logging aller Datenzugriffe')}</li>
+                                <li>{t('privacy.s8_t6', 'DSGVO-konformes Audit-Logging gemäß Art. 32 DSGVO (Sicherheit der Verarbeitung)')}</li>
                                 <li>{t('privacy.s8_t7', 'Rollenbasierte Zugriffskontrolle (RBAC): Patient, Arzt, MFA, Admin')}</li>
                                 <li>{t('privacy.s8_t8', 'Automatische Session-Bereinigung (24h TTL)')}</li>
                             </ul>
@@ -217,6 +225,11 @@ export function DatenschutzPage() {
                                 {t('privacy.s9_text',
                                     'Diese Anwendung verwendet ausschließlich technisch notwendige Cookies und localStorage-Einträge. ' +
                                     'Es werden keine Tracking-Cookies oder Cookies von Drittanbietern eingesetzt.'
+                                )}
+                            </p>
+                            <p className="mt-3">
+                                {t('privacy.s9_consent_process',
+                                    'Beim ersten Besuch erscheint ein Cookie-Banner. Sie können zwischen "Nur essentielle" und "Alle akzeptieren" wählen. Die Einwilligung speichern wir in localStorage als "dsgvo_consent" (JSON mit Zeitstempel und Version). Diese Einträge sind keine Cookies im Sinne des TDDDG, dienen aber dem Nachweis Ihrer Einwilligung gemäß Art. 7 Abs. 1 DSGVO. Sie können Ihre Einwilligung jederzeit über das Cookie-Icon unten links widerrufen.'
                                 )}
                             </p>
                             <div className="overflow-x-auto mt-3">
