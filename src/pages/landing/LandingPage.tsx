@@ -134,12 +134,16 @@ export default function LandingPage() {
             <section className="pt-28 pb-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-blue-50 to-white">
                 <div className="max-w-5xl mx-auto text-center">
                     <div className="inline-flex items-center gap-2 bg-blue-100 text-blue-700 text-xs font-semibold px-3 py-1.5 rounded-full mb-6 uppercase tracking-wide">
-                        DSGVO · HIPAA · eIDAS · gematik TI
+                        DSGVO · BSI TR-03161 · eIDAS · gematik TI
                     </div>
                     <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-gray-900 leading-tight mb-6">
                         Digitale Patientenaufnahme{' '}
                         <span className="text-blue-600">für moderne Arztpraxen</span>
                     </h1>
+                    {/* M3 (Arzt-Feedback 2026-05-03): Privacy-Promise-Tagline */}
+                    <p className="text-base sm:text-lg text-gray-700 italic max-w-2xl mx-auto mb-6">
+                        Ihre persönliche Patientenakte — nur Ihr Arzt und Sie sehen diese Daten.
+                    </p>
                     <p className="text-xl text-gray-600 max-w-3xl mx-auto mb-10 leading-relaxed">
                         270+ medizinische Fragen, KI-gestützte Triage, eIDAS-konforme Einwilligung — komplett offline-fähig
                         als Progressive Web App. Patienten bringen einen fertigen Anamnesebogen mit. Ärzte gewinnen Zeit.

@@ -4,6 +4,14 @@
  * Spacing, radii, shadows are fixed values.
  */
 
+// ─── Pastel Tokens ──────────────────────────────────────────
+// M2 (Arzt-Feedback 2026-05-03): einheitlicher Pastell-Ton fuer Compliance-Pills.
+// CSS-Variablen werden in index.css unter :root gesetzt; siehe TrustBadgeBar.
+export const pastel = {
+  compliance: '#E8F0FE',         // Lavendel-light
+  complianceBorder: '#C9D9F4',
+} as const;
+
 // ─── Spacing ────────────────────────────────────────────────
 export const spacing = {
   xs: '0.25rem',   // 4px
