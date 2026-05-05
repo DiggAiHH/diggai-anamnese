@@ -710,10 +710,14 @@ export const MFADashboard: React.FC = React.memo(function MFADashboard() {
             socket.emit('join:arzt');
         });
 
-        socket.on('triage:alert', () => {
+        // Personal-Listener: kanonisch 'routing:hint', Backwards-Compat 'triage:alert'.
+        // Hier wird nur die Cache-Invalidierung getriggert — keine Patient-UI-Aktion.
+        const invalidateMfa = () => {
             queryClient.invalidateQueries({ queryKey: ['mfa'] });
             queryClient.invalidateQueries({ queryKey: ['mfa', 'reception'] });
-        });
+        };
+        socket.on('routing:hint', invalidateMfa);
+        socket.on('triage:alert', invalidateMfa);
 
         socket.on('session:complete', () => {
             queryClient.invalidateQueries({ queryKey: ['mfa'] });
@@ -722,7 +726,8 @@ export const MFADashboard: React.FC = React.memo(function MFADashboard() {
 
         return () => {
             socket.off('connect');
-            socket.off('triage:alert');
+            socket.off('routing:hint', invalidateMfa);
+            socket.off('triage:alert', invalidateMfa);
             socket.off('session:complete');
             socket.disconnect();
         };

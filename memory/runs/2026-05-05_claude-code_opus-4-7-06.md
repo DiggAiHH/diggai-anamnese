@@ -1,0 +1,7 @@
+2026-05-05T19:15+02:00 | Lauf claude-code-06 | Frontend-Listener-Migration + RoutingEngine-Tests portiert
+---
+- Aktion: types.ts mit neuem RoutingHint-Typ erweitert; usePatientApi.ts Patient-Response-Mapping auf routingHints + patientMessage umgestellt; useSupabaseRealtime + MFADashboard + ArztDashboard auf Doppel-Lauschstrategie (routing:hint kanonisch + triage:alert backwards-compat); ArztDashboard mit eigenem SocketRoutingHint-Typ + staffMessage-Verarbeitung; RoutingEngine.performance.test.ts (NEU, 1:1-Portierung) + RoutingEngine.priority.test.ts (NEU, mit toPatientSafeView-Leak-Garantie als Strukturtest); CHANGE_LOG_REGULATORY.md erweitert (4. Audit-Eintrag); Run-Log
+- Blocker: Workspace-Bash nicht verfügbar — keine CI-Verifikation; usePatientApi.test.tsx Mock-Fixtures müssen auf neues Schema angepasst werden (Folge-Aufgabe)
+- Fix: Backwards-Compat in zwei Schichten: (1) Server emittiert beide Events, (2) Frontend lauscht auf beide; das vermeidet Race-Conditions während Roll-Out
+- Ergebnis: 5 EDITs (types.ts, usePatientApi.ts, useSupabaseRealtime.ts, MFADashboard.tsx, ArztDashboard.tsx) + 2 NEU (Routing*.test.ts) + CHANGE_LOG; toPatientSafeView-Strukturtest verhindert künftige Leak-Regressionen
+- Out: Frontend-Pfad ist durchgängig dual-listener; Patient-API liest patientMessage nicht mehr message; Test-Coverage auf RoutingEngine portiert; verbleibend: usePatientApi.test.tsx anpassen, dann Backwards-Compat-Mirror entfernen, dann TriageEngine-Tests löschen, dann questions.ts triage.message iterativ entlasten

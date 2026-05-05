@@ -11,12 +11,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | **Product** | DiggAI Anamnese Platform |
 | **Version** | 3.0.0 |
 | **Live URL** | https://diggai.de (Vercel — pending DNS) \| API: https://api.diggai.de |
-| **Purpose** | DSGVO-compliant digital patient intake for German medical practices (Arztpraxis) |
+| **Purpose** | Administrative Praxis-Anmelde- und Routing-Plattform für deutsche Arztpraxen — **kein Medizinprodukt** im Sinne der MDR Art. 2(1) (siehe `docs/INTENDED_USE.md` + `docs/REGULATORY_POSITION.md`) |
 | **Stack** | React 19 + TypeScript 5.9 + Vite 8 + Express 5 + Prisma 6 + PostgreSQL 16 |
-| **Compliance** | DSGVO, HIPAA audit logging, BSI TR-03161, gematik TI/ePA, eIDAS |
+| **Compliance** | DSGVO, HIPAA-style audit logging, BSI TR-03161 (Best-Practice), eIDAS. **NICHT MDR/MPDG** (administrative Software, kein Medizinprodukt) |
 | **Architecture** | DiggAI Service 4 of 4 (Python Agent Core / Tauri Desktop / Monorepo / **this**) |
 
 **SCOPE: Work EXCLUSIVELY in this repository root. Do NOT touch sibling folders.**
+
+> **REGULATORY GUARD (Pflicht für alle Agenten):** DiggAi ist als „Kein Medizinprodukt" deklariert. **Niemals** Patient-facing-Strings hinzufügen, die Diagnose-Aussagen, Verdachts-Hypothesen, Risiko-Bewertungen oder Notfall-Erkennungs-Sprache enthalten. Verbotene Wörter im Patient-Output: *Diagnose, Verdacht, hindeuten, Notfall-Erkennung, Risiko, lebensrettend, Triage, Krankheit, Therapie, Behandlung*. Erlaubt: workflow-orientierte Sprache wie „Bitte sprechen Sie das Praxispersonal an". Vor Änderungen an `server/engine/TriageEngine.ts` (zu refactorisieren in `RoutingEngine`), an LLM-Prompts oder an Marketing-Texten zwingend `docs/REGULATORY_STRATEGY.md` lesen + Eintrag in `docs/CHANGE_LOG_REGULATORY.md` ergänzen.
 
 ---
 
@@ -216,6 +218,8 @@ Medical application — violations cause DSGVO fines or patient harm.
 - DO NOT modify TriageEngine without clinical review.
 - DO NOT add triage logic outside TriageEngine.
 - DO NOT commit `dist/`, `.env`, `anamnese.db`, `*.log`, or `build_*.txt`.
+- **DO NOT add diagnostic, prognostic, or risk-assessment language to ANY patient-facing string** (UI, alerts, LLM outputs, marketing, AGB, App-Store-Beschreibungen). This would push DiggAi into MDR Class IIa/IIb. See `docs/REGULATORY_STRATEGY.md` §9.1 for verbots-wortliste.
+- **DO NOT publish marketing material with phrases like "rettet Leben", "Notfall-Erkennung", "Herzinfarkt-Verdacht", "klinische Entscheidungsunterstützung", "KI-Triage"** — alle vor Veröffentlichung gegen `docs/INTENDED_USE.md` prüfen.
 
 ---
 

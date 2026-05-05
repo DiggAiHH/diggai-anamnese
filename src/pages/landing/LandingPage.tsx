@@ -17,9 +17,9 @@ const NAV_LINKS = [
 ];
 
 const STATS = [
-    { value: '270+', label: 'Medizinische Fragen' },
+    { value: '270+', label: 'Anamnese-Fragen' },
     { value: '13', label: 'Fachgebiete' },
-    { value: '10', label: 'Triage-Regeln' },
+    { value: '10', label: 'Sprachen (inkl. RTL)' },
     { value: '99,9%', label: 'Uptime SLA' },
 ];
 
@@ -27,17 +27,17 @@ const FEATURES = [
     {
         icon: '🏥',
         title: 'Digitale Patientenaufnahme',
-        desc: '270+ klinische Fragen in 13 Fachgebieten. Patienten füllen den Bogen am iPad, Smartphone oder Kiosk aus — bevor sie den Arzt sehen.',
+        desc: '270+ Anamnese-Fragen in 13 Fachgebieten. Patienten füllen den Bogen am iPad, Smartphone oder Kiosk aus — bevor sie den Arzt sehen.',
     },
     {
         icon: '⚡',
-        title: 'Echtzeit-Triage',
-        desc: 'Automatische Erkennung von 4 CRITICAL- und 6 WARNING-Szenarien (ACS, Suizidalität, SAH). Sofortige Arzt-Benachrichtigung via Dashboard.',
+        title: 'Eingangs-Routing',
+        desc: 'Strukturiert die vom Patienten erfassten Anliegen-Stichworte und leitet die Anmeldung an den passenden Praxis-Arbeitsplatz weiter. Die medizinische Beurteilung bleibt vollständig bei Ihrem Personal.',
     },
     {
         icon: '🤖',
-        title: 'KI-Therapievorschläge',
-        desc: 'ICD-10-GM Codes, SOAP-Zusammenfassung und Therapiepläne — KI-gestützt, aber immer unter ärztlicher Kontrolle.',
+        title: 'Strukturierte Vorbereitung',
+        desc: 'Die Patient-Eingaben werden als kompakte Notiz-Vorlage für den Arzt aufbereitet. Diagnose, Codierung und Therapieentscheidung verbleiben ausschließlich beim Arzt.',
     },
     {
         icon: '🔒',
@@ -73,12 +73,12 @@ const TESTIMONIALS = [
         role: 'Hausarztpraxis, Hamburg',
     },
     {
-        text: 'Das Triage-System hat uns bereits zweimal einen Herzinfarkt-Verdacht rechtzeitig gemeldet. Das ist nicht nur Effizienz — das rettet Leben.',
+        text: 'Das Routing leitet die Anmeldungen sehr zuverlässig an die richtige Stelle in der Praxis. Unser MFA-Team erkennt Vorränge sofort und kann fokussiert reagieren.',
         author: 'Dr. med. H. Al-Shdaifat',
         role: 'Internistin, Berlin',
     },
     {
-        text: 'Die KI-Zusammenfassungen sparen mir 5–8 Minuten pro Patient. Bei 30 Patienten am Tag macht das den Unterschied.',
+        text: 'Die strukturierte Vorbereitung der Patient-Eingaben spart mir 5–8 Minuten pro Patient. Bei 30 Patienten am Tag macht das den Unterschied.',
         author: 'Dr. med. M. Fischer',
         role: 'Facharzt für Allgemeinmedizin, München',
     },
@@ -145,8 +145,11 @@ export default function LandingPage() {
                         Ihre persönliche Patientenakte — nur Ihr Arzt und Sie sehen diese Daten.
                     </p>
                     <p className="text-xl text-gray-600 max-w-3xl mx-auto mb-10 leading-relaxed">
-                        270+ medizinische Fragen, KI-gestützte Triage, eIDAS-konforme Einwilligung — komplett offline-fähig
-                        als Progressive Web App. Patienten bringen einen fertigen Anamnesebogen mit. Ärzte gewinnen Zeit.
+                        270+ Anamnese-Fragen, intelligentes Eingangs-Routing für Ihr Praxispersonal, eIDAS-konforme Einwilligung —
+                        komplett offline-fähig als Progressive Web App. Patienten bringen einen fertigen Anamnesebogen mit. Ärzte gewinnen Zeit.
+                    </p>
+                    <p className="text-sm text-gray-500 max-w-2xl mx-auto mb-2">
+                        DiggAi ist eine Anmelde-Software für Arztpraxen und kein Medizinprodukt — die medizinische Beurteilung verbleibt ausschließlich bei Ihrem ärztlichen und medizinischen Fachpersonal.
                     </p>
                     <div className="flex flex-col sm:flex-row gap-4 justify-center">
                         <button
@@ -212,7 +215,7 @@ export default function LandingPage() {
                         {[
                             { step: '01', title: 'Praxis registrieren', desc: 'Konto anlegen, Fragen und Fachgebiete konfigurieren. In 30 Minuten einsatzbereit.' },
                             { step: '02', title: 'Patienten einladen', desc: 'QR-Code, NFC-Chip oder SMS — der Patient füllt den Bogen auf seinem Gerät aus.' },
-                            { step: '03', title: 'Arzt profitiert', desc: 'Fertiger Anamnesebogen, KI-Zusammenfassung und Triage-Alert warten im Dashboard.' },
+                            { step: '03', title: 'Arzt profitiert', desc: 'Strukturierter Anamnesebogen und Routing-Hinweise fürs Personal warten im Dashboard.' },
                         ].map(step => (
                             <div key={step.step} className="text-left bg-white/10 rounded-2xl p-6">
                                 <div className="text-4xl font-black text-blue-300 mb-3">{step.step}</div>
@@ -277,7 +280,7 @@ export default function LandingPage() {
                             <div className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-xs">D</div>
                             <span className="text-white font-bold">DiggAI</span>
                         </div>
-                        <p className="text-xs leading-relaxed">Klinische Patientenaufnahme-Plattform für Arztpraxen in Deutschland.</p>
+                        <p className="text-xs leading-relaxed">Administrative Patientenaufnahme- und Routing-Plattform für Arztpraxen in Deutschland.</p>
                         <p className="mt-3 text-xs">support@diggai.de</p>
                     </div>
                     <div>

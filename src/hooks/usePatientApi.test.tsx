@@ -153,6 +153,7 @@ describe('useSubmitAnswer', () => {
     const mockResponse = {
       nextAtomIds: ['atom-2'],
       progress: { completed: 1, total: 10, percentage: 10 },
+      routingHints: [],
       redFlags: [],
     };
     vi.mocked(client.api.submitAnswer).mockResolvedValueOnce(mockResponse);
@@ -172,12 +173,19 @@ describe('useSubmitAnswer', () => {
     });
   });
 
-  it('should handle red flags in response', async () => {
+  it('should handle routing hints in response', async () => {
+    // Neuer kanonischer Schlüssel `routingHints`. Inhalt = patient-sichere RoutingHint-Objekte
+    // (siehe RoutingEngine.toPatientSafeView). `staffMessage` existiert in der Response NICHT.
     const mockResponse = {
       nextAtomIds: ['atom-2'],
       progress: { completed: 1, total: 10, percentage: 10 },
-      redFlags: [
-        { severity: 'CRITICAL', atomId: 'atom-1', message: 'Critical alert' },
+      routingHints: [
+        {
+          ruleId: 'PRIORITY_TEST',
+          level: 'PRIORITY' as const,
+          patientMessage: 'Bitte wenden Sie sich umgehend an das Praxispersonal.',
+          workflowAction: 'inform_staff_now' as const,
+        },
       ],
     };
     vi.mocked(client.api.submitAnswer).mockResolvedValueOnce(mockResponse);
@@ -185,7 +193,7 @@ describe('useSubmitAnswer', () => {
     const wrapper = createWrapper();
     const { result } = renderHook(() => useSubmitAnswer(), { wrapper });
 
-    result.current.mutate({ atomId: 'atom-1', value: 'critical' });
+    result.current.mutate({ atomId: 'atom-1', value: 'priority' });
 
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true);
@@ -193,7 +201,38 @@ describe('useSubmitAnswer', () => {
 
     const store = useSessionStore.getState();
     expect(store.activeAlerts).toHaveLength(1);
-    expect(store.activeAlerts[0].level).toBe('CRITICAL');
+    expect(store.activeAlerts[0].level).toBe('CRITICAL'); // Store-Schema mappt PRIORITY → CRITICAL
+    expect(store.activeAlerts[0].message).toBe('Bitte wenden Sie sich umgehend an das Praxispersonal.');
+  });
+
+  it('should fall back to redFlags alias when routingHints absent (backwards-compat)', async () => {
+    const mockResponse = {
+      nextAtomIds: ['atom-2'],
+      progress: { completed: 1, total: 10, percentage: 10 },
+      // Server-Build noch ohne routingHints — redFlags trägt aber bereits den neuen RoutingHint-Shape.
+      redFlags: [
+        {
+          ruleId: 'INFO_TEST',
+          level: 'INFO' as const,
+          patientMessage: 'Bitte besprechen Sie diesen Punkt mit dem Personal.',
+          workflowAction: 'mark_for_review' as const,
+        },
+      ],
+    };
+    vi.mocked(client.api.submitAnswer).mockResolvedValueOnce(mockResponse);
+
+    const wrapper = createWrapper();
+    const { result } = renderHook(() => useSubmitAnswer(), { wrapper });
+
+    result.current.mutate({ atomId: 'atom-1', value: 'info' });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    const store = useSessionStore.getState();
+    expect(store.activeAlerts).toHaveLength(1);
+    expect(store.activeAlerts[0].level).toBe('WARNING'); // INFO → WARNING im Store-Mapping
   });
 
   it('should throw error when no session exists', async () => {

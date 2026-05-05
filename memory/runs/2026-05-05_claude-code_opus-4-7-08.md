@@ -1,0 +1,7 @@
+2026-05-05T21:30+02:00 | Lauf claude-code-08 | i18n-Audit + Final-Sweep + MIGRATION_NEXT_STEPS.md
+---
+- Aktion: 9 i18n-Werte in public/locales/de/translation.json entlastet (docs.feature.triage.{title,desc,h1,h2,h3} + ai.{suggestTherapy,suggestedMeasures,summarize} + arzt.aiAnalysis); Final-Grep über src/ nach kritischen Diagnose-Wörtern → nur regulatorisch zulässige Treffer (Frage-Optionen-Labels als Patient-Selbstauskunft + Personal-/Admin-Doku-Liste in AdminDashboard); docs/MIGRATION_NEXT_STEPS.md geschrieben (6-Phasen-Cleanup-Plan mit Roll-Out-Reihenfolge, Diff-Snippets, Native-Speaker-Review-Prio, Hygiene-Punkten); CHANGE_LOG_REGULATORY.md erweitert (6. Audit-Eintrag); Run-Log
+- Blocker: 9 weitere Sprachen (en/fr/it/es/tr/ar/fa/uk/pl) mit den entsprechenden i18n-Werten noch nicht angepasst — Native-Speaker-Review priorisiert + parallel
+- Fix: Werte-Bereinigung erstmal in DE als Quelle; in MIGRATION_NEXT_STEPS.md §5 dokumentiert dass die anderen 9 Sprachen im Native-Speaker-Review-Prozess nachgezogen werden müssen
+- Ergebnis: 1 EDIT (de/translation.json mit 9 Werten) + 1 NEU (MIGRATION_NEXT_STEPS.md, ~280 Zeilen) + CHANGE_LOG-Eintrag #6
+- Out: Spur A inhaltlich abgeschlossen — Foundation-Doks + Code + UI + Adapter + i18n + Marketing + Daten + Tests + Doku alle entlastet; Cleanup-PR-Plan steht; verbleibend nur extern: Native-Speaker-Review + CI-Lauf + Sign-off + Roll-Out + Cleanup-PR nach Cache-Drain

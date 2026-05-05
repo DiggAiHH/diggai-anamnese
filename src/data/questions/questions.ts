@@ -372,7 +372,10 @@ const coreQuestions: Question[] = [
             triage: {
                 when: ['brust', 'atemnot', 'laehmung'],
                 level: 'critical',
-                message: 'ACHTUNG: Ihre Symptome könnten auf einen medizinischen Notfall hindeuten. Bitte wählen Sie umgehend den Notruf 112 oder wenden Sie sich sofort an das Praxispersonal!'
+                // Patient-Output durchläuft routingHintFromTriage und wird durch
+                // einen zentralen Workflow-Hinweis ersetzt (siehe docs/REGULATORY_POSITION.md §5.2).
+                // Dieser Text dient nur noch als interner Marker für die Frage selbst.
+                message: 'PRIORITY-Routing: Personal sofort informieren.'
             }
         }
     },

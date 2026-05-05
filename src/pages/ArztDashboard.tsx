@@ -41,10 +41,25 @@ interface ToastAlert {
     level?: string;
 }
 
+/** Legacy 'triage:alert'-Event-Payload. */
 interface SocketTriageAlert {
     level: string;
     message: string;
     sessionId: string;
+}
+
+/**
+ * Neuer kanonischer 'routing:hint'-Event-Payload. Empfänger ist medizinisches
+ * Personal — `staffMessage` darf fachliche Begriffe enthalten.
+ */
+interface SocketRoutingHint {
+    ruleId: string;
+    level: 'INFO' | 'PRIORITY';
+    atomId: string;
+    staffMessage: string;
+    sessionId: string;
+    workflowAction?: string;
+    triggerValues?: unknown;
 }
 
 interface SocketSessionComplete {
@@ -416,6 +431,20 @@ export const ArztDashboard: React.FC = React.memo(function ArztDashboard() {
             socket.emit('join:arzt');
         });
 
+        // Personal-Listener: kanonisch 'routing:hint', Backwards-Compat auf 'triage:alert'.
+        // Hinweistext für Personal: staffMessage (neu) bzw. message (legacy) — siehe
+        // docs/REGULATORY_POSITION.md §5.3 (Praxis-interne Fachkommunikation).
+        socket.on('routing:hint', (hint: SocketRoutingHint) => {
+            playAlertSound();
+            setToastAlerts(prev => [...prev, {
+                id: Date.now() + Math.random(),
+                type: 'triage',
+                level: hint.level === 'PRIORITY' ? 'CRITICAL' : 'WARNING',
+                message: hint.staffMessage,
+                sessionId: hint.sessionId,
+            }]);
+            queryClient.invalidateQueries({ queryKey: ['arzt'] });
+        });
         socket.on('triage:alert', (alertData: SocketTriageAlert) => {
             playAlertSound();
             setToastAlerts(prev => [...prev, { id: Date.now() + Math.random(), type: 'triage', ...alertData }]);
@@ -441,6 +470,7 @@ export const ArztDashboard: React.FC = React.memo(function ArztDashboard() {
 
         return () => {
             socket.off('connect');
+            socket.off('routing:hint');
             socket.off('triage:alert');
             socket.off('session:complete');
             socket.off('session:locked');

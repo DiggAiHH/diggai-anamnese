@@ -37,12 +37,10 @@ interface LandingPageProps {
     forceClassic?: boolean;
 }
 
-const CLASSIC_SERVICE_IDS: ReadonlySet<PatientServiceId> = new Set([
-    'anamnese',
-    'prescription',
-    'au',
-    'unfall',
-]);
+// Klapproth-Feedback 2026-05-04 (D1): „4-Felder-Ansicht" entfernt — feste 8-Tile-Ansicht.
+// Die alte CLASSIC_SERVICE_IDS-Konstante und der `showClassicLayout`-State sind weggefallen.
+// `forceClassic`-Prop und ?layout=classic-Query bleiben für Backwards-Compat akzeptiert,
+// aber haben keine Wirkung mehr.
 
 export function LandingPage({ forceClassic = false }: LandingPageProps) {
     const { t } = useTranslation();
@@ -56,13 +54,10 @@ export function LandingPage({ forceClassic = false }: LandingPageProps) {
     const [showDSGVO, setShowDSGVO] = useState(false);
     const [showSignature, setShowSignature] = useState(false);
     const [selectedService, setSelectedService] = useState<ServiceCard | null>(null);
-    // H1 (Arzt-Feedback 2026-05-03): 4-Felder Toggle entfernt, immer alle Services zeigen.
-    // Patienten uebersahen Kacheln im 4-Modus. Buendelung von Service-Kacheln
-    // (Dateien & Dokumente, Kontakt & Nachrichten) ist Follow-up.
-    // 'forceClassic' und ?layout=classic werden ignoriert; nur dokumentiert fuer Backwards-Compat.
+    // Klapproth-Feedback 2026-05-04 (D1+D2): feste 8-Tile-Ansicht (siehe displayedTiles).
+    // 'forceClassic' und ?layout=classic werden ignoriert; nur dokumentiert für Backwards-Compat.
     void forceClassic;
     void searchParams;
-    const showClassicLayout = false;
 
     useEffect(() => {
         if (createStatus !== 'success' || !sessionId || !selectedService) {
@@ -166,17 +161,63 @@ export function LandingPage({ forceClassic = false }: LandingPageProps) {
         },
     ], [minuteLabel, t]);
 
-    const displayedServices = useMemo(() => {
-        if (!showClassicLayout) {
-            return services;
+    // Klapproth-Feedback 2026-05-04 (D2): Service-Auswahl auf genau 8 Kacheln begrenzen.
+    // Telefonanfrage + Nachricht schreiben → 1 Kachel "Kommunikation" mit 2 Sub-Buttons.
+    // Dateien/Befunde + Dokumente anfordern → 1 Kachel "Dokumente" mit 2 Sub-Buttons.
+    // Aus 10 Services → 8 Tile-Slots.
+    const displayedTiles = useMemo(() => {
+        const byId = new Map(services.map(s => [s.id, s]));
+        const tiles: Array<ServiceCard | { kind: 'group'; id: string; title: string; description: string; icon: React.ReactNode; color: string; duration?: string; members: ServiceCard[] }> = [];
+
+        // 6 Einzelkacheln in Klapproth-Reihenfolge
+        const singleOrder: PatientServiceId[] = ['anamnese', 'prescription', 'au', 'unfall', 'referral', 'appointment-cancel'];
+        for (const id of singleOrder) {
+            const s = byId.get(id);
+            if (s) tiles.push(s);
         }
 
-        return services.filter((service) => CLASSIC_SERVICE_IDS.has(service.id as PatientServiceId));
-    }, [services, showClassicLayout]);
+        // Gruppe Kommunikation = callback + message
+        const callback = byId.get('callback');
+        const message = byId.get('message');
+        if (callback && message) {
+            tiles.push({
+                kind: 'group',
+                id: 'comm-group',
+                title: translateStableText(t, 'ui.services.commGroup.title', 'Kommunikation'),
+                description: translateStableText(t, 'ui.services.commGroup.description', 'Telefon-Rückruf vereinbaren oder Nachricht ans Praxisteam senden.'),
+                icon: <Phone className="w-8 h-8" />,
+                color: 'from-cyan-500 to-teal-600',
+                duration: callback.duration,
+                members: [callback, message],
+            });
+        }
 
-    const servicesGridClassName = showClassicLayout
-        ? 'grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl'
-        : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6';
+        // Gruppe Dokumente = docs-upload + docs-request
+        const docsUpload = byId.get('docs-upload');
+        const docsRequest = byId.get('docs-request');
+        if (docsUpload && docsRequest) {
+            tiles.push({
+                kind: 'group',
+                id: 'docs-group',
+                title: translateStableText(t, 'ui.services.docsGroup.title', 'Dokumente'),
+                description: translateStableText(t, 'ui.services.docsGroup.description', 'Eigene Dateien hochladen oder Kopien aus der Praxis anfordern.'),
+                icon: <FilePlus className="w-8 h-8" />,
+                color: 'from-amber-500 to-yellow-600',
+                duration: docsUpload.duration,
+                members: [docsUpload, docsRequest],
+            });
+        }
+
+        // Falls Items fehlen (z. B. Service deaktiviert), Original-Reihenfolge ohne Gruppen-Slots fallback
+        if (tiles.length === 0) return services;
+        return tiles;
+    }, [services, t]);
+
+    // Verweis auf alte Variable, die in anderen Stellen evtl. noch genutzt wird
+    const displayedServices = displayedTiles;
+
+    // Festes 4-spaltiges Grid (auf Mobil 1 Spalte). Mit 8 Tiles ergibt das 2 Reihen ×4.
+    const servicesGridClassName = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6';
 
     const patientBasePath = getPatientAppBasePath(bsnr);
 
@@ -266,50 +307,85 @@ export function LandingPage({ forceClassic = false }: LandingPageProps) {
                 <div className="max-w-3xl mb-16 lg:mb-24">
                     <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-sm font-bold tracking-wide uppercase mb-8 shadow-lg shadow-blue-500/5">
                         <Activity className="w-4 h-4" />
-                        {showClassicLayout
-                            ? translateStableText(t, 'landing.classicHub', 'Patienten-Service Klassik')
-                            : translateStableText(t, 'landing.serviceHub', 'Patienten-Service Hub')}
+                        {translateStableText(t, 'landing.serviceHub', 'Patienten-Service Hub')}
                     </div>
                     <h1 className="text-5xl lg:text-7xl font-black tracking-tight text-[var(--text-primary)] mb-8 leading-[1.1]">
-                        {showClassicLayout
-                            ? translateStableText(t, 'ui.landing.classicTitle', 'Schnellauswahl in 4 Feldern')
-                            : translateStableText(t, 'ui.landing.title', 'Anliegen wählen')}
+                        {translateStableText(t, 'ui.landing.title', 'Anliegen wählen')}
                     </h1>
                     <p className="text-xl text-[var(--text-secondary)] leading-relaxed font-medium">
-                        {showClassicLayout
-                            ? translateStableText(
-                                t,
-                                'ui.landing.classicDescription',
-                                'Die klassische 4-Felder-Ansicht für den schnellsten Einstieg in die häufigsten Anliegen.',
-                            )
-                            : translateStableText(
+                        {translateStableText(
                                 t,
                                 'landingDescription',
                                 'Wahlen Sie den passenden Service und starten Sie in wenigen Minuten Ihren sicheren digitalen Check-in.',
                             )}
                     </p>
-                    <div className="mt-6">
-                        {showClassicLayout ? (
-                            <Link
-                                to={patientBasePath}
-                                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--bg-card)] border border-[var(--border-primary)] text-sm font-semibold text-[var(--text-secondary)] hover:text-blue-400 hover:border-blue-500/30 transition-all"
-                            >
-                                {translateStableText(t, 'ui.landing.switchFull', 'Vollständige Service-Ansicht öffnen')}
-                            </Link>
-                        ) : (
-                            <Link
-                                to={`${patientBasePath}?layout=classic`}
-                                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--bg-card)] border border-[var(--border-primary)] text-sm font-semibold text-[var(--text-secondary)] hover:text-blue-400 hover:border-blue-500/30 transition-all"
-                            >
-                                {translateStableText(t, 'ui.landing.switchClassic', '4-Felder-Ansicht öffnen')}
-                            </Link>
-                        )}
-                    </div>
+                    {/* Klapproth-Feedback 2026-05-04 (D1): „4-Felder-Ansicht öffnen"-Link entfernt —
+                        Risiko, dass wichtige Felder übersehen werden. Stattdessen feste 8-Kacheln-Ansicht
+                        mit Service-Gruppen (siehe D2 unten). */}
                 </div>
 
                 {/* Services Grid */}
                 <div className={servicesGridClassName}>
-                    {displayedServices.map((service) => {
+                    {displayedServices.map((tile) => {
+                        // Klapproth D2: Gruppen-Kacheln rendern intern 2 Sub-Buttons
+                        if ('kind' in tile && tile.kind === 'group') {
+                            const groupTileClassName = "group relative flex flex-col p-6 rounded-[2.5rem] bg-[var(--bg-card)] border border-[var(--border-primary)] hover:border-[var(--border-hover)] transition-all duration-500 text-left overflow-hidden shadow-2xl backdrop-blur-xl";
+                            return (
+                                <div key={tile.id} className={groupTileClassName}>
+                                    <div className={`absolute top-0 right-0 w-40 h-40 -mr-12 -mt-12 rounded-full opacity-[0.05] blur-3xl bg-gradient-to-br ${tile.color}`} />
+                                    <div className="flex items-center justify-between mb-6">
+                                        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-[0_8px_32px_rgba(0,0,0,0.3)] bg-gradient-to-br ${tile.color}`}>
+                                            {React.cloneElement(tile.icon as React.ReactElement<any>, { className: "w-7 h-7" })}
+                                        </div>
+                                        {tile.duration && (
+                                            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--bg-card)] rounded-full border border-[var(--border-primary)] backdrop-blur-md">
+                                                <Clock className="w-3.5 h-3.5 text-gray-500" />
+                                                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{tile.duration}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <h3 className="text-xl font-bold text-[var(--text-primary)] tracking-tight mb-2">{tile.title}</h3>
+                                    <p className="text-sm text-gray-500 leading-relaxed font-medium mb-5">{tile.description}</p>
+                                    <div className="flex flex-col gap-2 mt-auto">
+                                        {tile.members.map((sub) => {
+                                            const subDef = getPatientServiceById(sub.id);
+                                            const subRoute = subDef?.routeSegment
+                                                ? getPatientServiceEntryPath(sub.id as PatientServiceId, bsnr)
+                                                : null;
+                                            const subBtnClass = `inline-flex items-center justify-between gap-2 px-4 py-3 rounded-xl bg-gradient-to-r ${sub.color} text-white font-bold text-sm hover:opacity-90 active:scale-[0.98] transition-all`;
+                                            const subContent = (
+                                                <>
+                                                    <span className="flex items-center gap-2">
+                                                        {React.cloneElement(sub.icon as React.ReactElement<any>, { className: 'w-4 h-4' })}
+                                                        {translateStableText(t, subDef?.titleKey || sub.title, sub.title)}
+                                                    </span>
+                                                    <ChevronRight className="w-4 h-4" />
+                                                </>
+                                            );
+                                            return subRoute ? (
+                                                <Link key={sub.id} to={subRoute} className={subBtnClass}>{subContent}</Link>
+                                            ) : (
+                                                <button
+                                                    key={sub.id}
+                                                    type="button"
+                                                    onClick={() => handleSelect(sub)}
+                                                    onMouseEnter={() => void preloadConsentExperience()}
+                                                    onFocus={() => void preloadConsentExperience()}
+                                                    className={subBtnClass}
+                                                >
+                                                    {subContent}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            );
+                        }
+
+                        // Nach dem `kind === 'group'` early-return ist tile garantiert ein ServiceCard.
+                        // TypeScript braucht einen expliziten Cast, weil das Union-Narrowing über
+                        // 'kind' in tile in der Branch-Logik nicht über den early return hinaus greift.
+                        const service = tile as ServiceCard;
                         const serviceDefinition = getPatientServiceById(service.id);
                         const route = serviceDefinition?.routeSegment
                             ? getPatientServiceEntryPath(service.id as PatientServiceId, bsnr)

@@ -1,0 +1,7 @@
+2026-05-05T23:50+02:00 | Lauf claude-code-11 | Übergabe-Paket: Render-Free-Hosting + Branch-Skript + FINAL_HANDOVER
+---
+- Aktion: render.yaml an Free-Tier Frankfurt-Region angepasst (war starter $7/Monat, keine Region); docs/DEPLOY_RENDER_FREE.md geschrieben (Schritt-für-Schritt: Supabase EU-Frankfurt für PostgreSQL, Render Free für Backend, Netlify-VITE_API_URL umstellen, DSGVO-AVV-Hinweise, Troubleshooting); scripts/push-spur-a-pr.ps1 als PowerShell-Skript (DryRun-Mode, Sanity-Checks, automatisierter git checkout/add/commit/push, optional gh pr create mit PR_SPUR_A_REGULATORY.md als body-file); docs/FINAL_HANDOVER.md als zentrale 15-Schritte-Übergabe (Schritte 1-5 lokale Verifikation, Schritt 6 Branch-Push, Schritt 7 Sign-off extern, Schritt 8 Hosting, Schritt 14 Cleanup-PR nach 14 Tagen, klar markiert "HIER ÜBERGEBE ICH AN DICH")
+- Blocker: User hat Hetzner diesen Monat nicht bezahlt → Übergangs-Hosting nötig
+- Fix: Render Free Tier (750 Std/Monat, Frankfurt-Region) + Supabase Free EU (PostgreSQL, 500MB) als kostenlose DE-Hosting-Kombination dokumentiert; DSGVO-Pflichten (AVV beider Anbieter) explizit gemacht
+- Ergebnis: 2 NEU (DEPLOY_RENDER_FREE.md, FINAL_HANDOVER.md) + 1 NEU (push-spur-a-pr.ps1) + 1 EDIT (render.yaml) + Run-Log
+- Out: Spur A komplett übergabe-fertig. User kann ab Schritt 1 in FINAL_HANDOVER.md selbständig arbeiten. Alle Schritte, die Account-Zugänge brauchen (GitHub-Push, Render-Account, Sign-off, DNS, AVV) sind klar als "DU MACHST" markiert. Fallback bei Hetzner-Wiederbezahlung dokumentiert.

@@ -56,7 +56,10 @@ describe('server config', () => {
 
     const { config } = await import('./config.js');
     expect(config.port).toBe(4000);
-    expect(config.jwtExpiresIn).toBe('24h');
+    // Default in config.ts ist '15m' — synchron mit auth.service.test, refresh-token.service.test
+    // u. a. Tests. Der frühere Wert '24h' war ein Drift-Bug, weil auth.test.ts und Backend
+    // sich auf '15m' festgelegt hatten, dieser Test aber nie nachgezogen wurde.
+    expect(config.jwtExpiresIn).toBe('15m');
     expect(config.encryptionIvLength).toBe(16);
   });
 });

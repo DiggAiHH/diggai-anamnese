@@ -20,10 +20,10 @@ als Hausarzt mit Erstkontakten kennen Sie das Problem: Der Patient kommt rein,
 und die ersten 7 Minuten gehen für „Was bringt Sie zu mir?" drauf — oft drei Mal,
 weil die Anamnese fragmentiert kommt.
 
-DiggAI strukturiert das **vor** dem Termin: 270+ Fragen, Triage mit Red-Flag-Pfaden,
+DiggAI strukturiert das **vor** dem Termin: 270+ Fragen, Eingangs-Routing für Ihr Personal,
 direkt in Ihr PVS. 150 € pro Monat, für Patienten kostenlos, 30 Tage Pilot ohne Verlängerung.
 
-Klinisch verantwortet von Dr. Klaproth (Allgemeinmedizin) und Dr. Al-Shdaifat (Innere).
+Ärztlich verantwortet von Dr. Klaproth (Allgemeinmedizin) und Dr. Al-Shdaifat (Innere).
 
 Hätten Sie 15 Minuten für eine Demo nächste Woche?
 
@@ -35,7 +35,7 @@ diggai.de · praxis@diggai.de
 
 ## Variante B — Internist / Facharzt
 
-**Betreff:** Vorab-Anamnese mit Triage-Logik — passt das in {{Fachrichtung}}?
+**Betreff:** Vorab-Anamnese mit Eingangs-Routing — passt das in {{Fachrichtung}}?
 
 {{Anrede}} Dr. {{Nachname}},
 
@@ -43,10 +43,11 @@ bei internistischen Erstkontakten zählen die Vorerkrankungen, Medikation und
 Symptomverläufe — Daten, die Patienten oft nur lückenhaft mitbringen.
 
 DiggAI lässt den Patienten vor dem Termin eine strukturierte Anamnese ausfüllen
-(10 Sprachen, eGK-Scan, Medikation strukturiert). Triage-Engine markiert ACS,
-Synkope, SAH-Verdacht. Übergabe in Ihr PVS — keine Doppelerfassung.
+(10 Sprachen, eGK-Scan, Medikation strukturiert). Das Eingangs-Routing markiert
+priorisierte Anmeldungen für Ihr Praxispersonal — die fachliche Beurteilung
+verbleibt bei Ihrem Team. Übergabe in Ihr PVS — keine Doppelerfassung.
 
-150 €/Monat netto. 30 Tage Pilot. Klinisch verantwortet, keine Marketing-Logik.
+150 €/Monat netto. 30 Tage Pilot. Ärztlich verantwortet, keine Marketing-Logik.
 
 Lohnt sich ein 15-Minuten-Call?
 
@@ -66,10 +67,11 @@ bei einer Neugründung ist jede vermiedene Personalstelle bares Geld — und
 Online-Rezeptions-Kosten skalieren mit den Patienten.
 
 DiggAI strukturiert die Vorab-Anamnese digital: 10 Sprachen, eGK-Foto-Upload,
-Triage, PVS-Übergabe. 150 €/Monat — günstiger als eine halbe MFA-Stunde am Tag.
+Eingangs-Routing für Ihr Personal, PVS-Übergabe. 150 €/Monat — günstiger als
+eine halbe MFA-Stunde am Tag.
 
 Patient hat die Daten-Hoheit (USP gegenüber ePA), keine Vendor-Bindung.
-Klinisch verantwortet von Dr. Klaproth & Dr. Al-Shdaifat.
+Ärztlich verantwortet von Dr. Klaproth & Dr. Al-Shdaifat.
 
 30 Tage kostenlos testen, monatlich kündbar.
 

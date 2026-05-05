@@ -38,20 +38,23 @@ Frequenz: 1 Post pro Woche, 5 Wochen
 
 ---
 
-## Woche 3 — Inhalt: Klinisch validiert ist nicht „klinisch validiert"
+## Woche 3 — Inhalt: „Ärztlich verantwortet" ist nicht „klinisch validiert"
 
-> „Klinisch validiert" steht auf jedem Symptom-Checker. Was es bei uns heißt:
+> „Klinisch validiert" steht auf jedem Symptom-Checker. Wir vermeiden den Begriff bewusst:
 >
-> 270+ Fragen, jede einzeln durchgegangen von Dr. Klaproth (Allgemeinmedizin)
-> und Dr. Al-Shdaifat (Innere). Triage-Logik mit 4 CRITICAL-Pfaden:
-> ACS, Suizidalität, Subarachnoidalblutung, Synkope.
+> DiggAi ist kein Medizinprodukt, keine Diagnose-Software und kein Symptom-Checker.
+> DiggAi ist eine **Anmelde- und Routing-Plattform** für die Praxis. 270+ Fragen,
+> jede einzeln durchgegangen von Dr. Klaproth (Allgemeinmedizin) und Dr. Al-Shdaifat
+> (Innere). Das Eingangs-Routing markiert priorisierte Anmeldungen für das Praxispersonal —
+> die fachliche Beurteilung und jede medizinische Entscheidung verbleibt beim Personal.
 >
-> Keine ML-Black-Box. Jede Regel ist ärztlich nachvollziehbar.
-> Wenn die Triage einen Red Flag wirft, weiß der Arzt warum.
+> Keine ML-Black-Box. Jede Routing-Regel ist transparent dokumentiert.
+> Wenn das Routing eine Anmeldung priorisiert, weiß das Praxispersonal warum.
 >
-> Verantwortlichkeit ist nicht delegierbar — auch nicht an die KI.
+> Verantwortlichkeit bleibt beim Arzt — und wir sind sehr bewusst nicht der Versuch,
+> sie zu delegieren.
 >
-> #ÄrztlicheVerantwortung #Triage
+> #ÄrztlicheVerantwortung #Praxisorganisation
 
 ---
 
@@ -75,7 +78,7 @@ Frequenz: 1 Post pro Woche, 5 Wochen
 
 > 5 Wochen, 5 Posts. Eine Frage steht am Ende: ist das was für Ihre Praxis?
 >
-> 150 € im Monat. Patient kostenlos. 10 Sprachen. PVS-Anbindung. Klinisch verantwortet.
+> 150 € im Monat. Patient kostenlos. 10 Sprachen. PVS-Anbindung. Ärztlich verantwortet.
 > 30 Tage testen, monatlich kündbar, keine Setup-Gebühr.
 >
 > Wenn Sie sagen, das löst kein Problem, das Sie haben — fair. Wenn Sie sagen, das klingt

@@ -1,3 +1,16 @@
+/**
+ * @deprecated Verwende `AnmeldeHinweisOverlay` aus `./AnmeldeHinweisOverlay.tsx`.
+ *
+ * Diese Komponente rendert das diagnostisch formulierte `alert.message`-Feld
+ * direkt an den Patienten (Titel „MEDIZINISCHER NOTFALL" + Symbol-Warnung).
+ * Das wäre als Hersteller-Output unter MDR Art. 2(1) ein medizinischer Zweck
+ * und würde DiggAi in MDR Klasse IIa/IIb drücken (siehe `docs/REGULATORY_POSITION.md`).
+ *
+ * Nachfolge-Komponente `AnmeldeHinweisOverlay` rendert ausschließlich den
+ * `patientMessage`-String (workflow-only) und verwendet einen neutralen Titel
+ * sowie ein Info-Icon. Der Code-Pfad hier bleibt für Übergangszeit funktional,
+ * darf in produktiven Patient-Pfaden aber NICHT mehr gemountet werden.
+ */
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AlertTriangle, Phone, X } from 'lucide-react';

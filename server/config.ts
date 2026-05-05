@@ -11,6 +11,18 @@ const requireEnv = (key: string, customMessage?: string): string => {
     if (!value) {
         throw new Error(customMessage || `FATAL: Die Umgebungsvariable ${key} fehlt. Security by Design Richtlinie verletzt!`);
     }
+    // Defensiv gegen CI-/Build-Systeme, die rein-numerische ENV-Werte ohne Quotes
+    // implizit als Number behandeln und als Scientific-Notation serialisieren
+    // (z. B. ENCRYPTION_KEY=12345678901234567890123456789012 → "1.2345678901234568e+31").
+    // Das ist ein häufiger Footgun in GitHub-Actions-/Docker-/.env-Pipelines.
+    if (/^\d+(?:\.\d+)?[eE][+-]?\d+$/.test(value)) {
+        throw new Error(
+            `FATAL: ${key} wurde als Scientific-Notation eingelesen ("${value}"). ` +
+            `Das passiert, wenn der Wert in YAML/Docker/CI ohne Anführungszeichen gesetzt ist und ` +
+            `wie eine Zahl aussieht. Setze den Wert mit Quotes (z. B. ${key}="<wert>") ` +
+            `oder beginne ihn mit einem nicht-numerischen Zeichen (z. B. einem Buchstaben).`,
+        );
+    }
     return value;
 };
 

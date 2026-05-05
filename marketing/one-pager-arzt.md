@@ -7,16 +7,18 @@ Design-Notiz: Headline groß (48pt), Bullets 14pt, QR rechts unten 4cm × 4cm
 
 # DiggAI
 
-## Strukturierte Vor-Anamnese. Klinisch verantwortet. Patient hält die Daten.
+## Strukturierte Vor-Anamnese. Ärztlich verantwortet. Patient hält die Daten.
 
 ---
 
 ### Was Sie bekommen
 
 - **270+ medizinisch validierte Fragen** — abgestimmt auf Hausarzt- und Facharztkontexte
-- **Triage-Engine mit 4 CRITICAL-Pfaden** — ACS, Suizidalität, SAH, Synkope
+- **Eingangs-Routing für Ihr Praxispersonal** — strukturiert die Patient-Eingaben und markiert vorrangige Anmeldungen für die schnellere Sichtung durch Ihr Team
 - **10 Sprachen inkl. RTL** — Arabisch, Farsi, Türkisch, Ukrainisch und mehr
 - **PVS-Anbindung** — Tomedo (in Vorbereitung), GDT-Export universell
+
+> *DiggAi ist eine administrative Praxis-Anmelde- und Routing-Software. Kein Medizinprodukt. Die medizinische Beurteilung verbleibt vollständig beim Praxispersonal.*
 
 ### Was Ihre Patienten bekommen
 
@@ -32,7 +34,7 @@ Design-Notiz: Headline groß (48pt), Bullets 14pt, QR rechts unten 4cm × 4cm
 
 ---
 
-### Klinisch verantwortet von
+### Ärztlich verantwortet von
 
 **Dr. med. Christian Klaproth** — Allgemeinmedizin
 **Dr. Mohammed Al-Shdaifat** — Innere Medizin

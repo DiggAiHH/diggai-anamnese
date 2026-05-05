@@ -4,8 +4,8 @@ import rateLimit from 'express-rate-limit';
 import { prisma } from '../db';
 import { requireAuth, requireSessionOwner } from '../middleware/auth';
 import { decrypt, encrypt, isPIIAtom } from '../services/encryption';
-import { TriageEngine } from '../engine/TriageEngine';
-import { emitTriageAlert, emitAnswerSubmitted, emitSessionProgress } from '../socket';
+import { RoutingEngine } from '../engine/RoutingEngine';
+import { emitRoutingHint, emitAnswerSubmitted, emitSessionProgress } from '../socket';
 import { z } from 'zod';
 
 const router = Router();
@@ -262,25 +262,36 @@ router.post('/:id', requireAuth, requireSessionOwner, answerSubmissionLimiter, a
             if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
         }
 
-        const triageResults = TriageEngine.evaluateForAtom(atomId, answerMap, {
+        // Routing-Engine ausführen — siehe docs/ROUTING_RULES.md
+        const routingResults = RoutingEngine.evaluateForAtom(atomId, answerMap, {
             gender: updatedSession.gender || undefined,
             age: age,
             isNewPatient: updatedSession.isNewPatient ?? true,
         });
 
-        for (const triage of triageResults) {
+        for (const hint of routingResults) {
+            // DB-Persistenz: schema-Feld 'level' akzeptiert beliebigen String;
+            // staffMessage wird im 'message'-Feld archiviert (interne Audit-Daten).
             await prisma.triageEvent.create({
                 data: {
                     sessionId,
-                    level: triage.level,
-                    atomId: triage.atomId,
-                    triggerValues: JSON.stringify(triage.triggerValues),
-                    message: triage.message,
+                    level: hint.level === 'PRIORITY' ? 'CRITICAL' : 'WARNING',
+                    atomId: hint.atomId,
+                    triggerValues: JSON.stringify(hint.triggerValues),
+                    message: hint.staffMessage,
                 },
             });
 
-            if (triage.level === 'CRITICAL') {
-                emitTriageAlert(sessionId, triage);
+            // PRIORITY → sofortige Personal-Benachrichtigung. INFO bleibt im Dashboard sichtbar.
+            if (hint.workflowAction === 'inform_staff_now' || hint.level === 'PRIORITY') {
+                emitRoutingHint(sessionId, {
+                    ruleId: hint.ruleId,
+                    level: hint.level,
+                    atomId: hint.atomId,
+                    staffMessage: hint.staffMessage,
+                    triggerValues: hint.triggerValues,
+                    workflowAction: hint.workflowAction,
+                });
             }
         }
 
@@ -292,14 +303,21 @@ router.post('/:id', requireAuth, requireSessionOwner, answerSubmissionLimiter, a
             atomId,
             progress,
             totalAnswers: allAnswers.length,
-            hasRedFlag: triageResults.length > 0,
+            hasRedFlag: routingResults.length > 0,
         });
         emitSessionProgress(sessionId, progress);
+
+        // REGULATORISCH KRITISCH: Patient-Response darf NIEMALS staffMessage enthalten.
+        // toPatientSafeView() ist die technische Garantie — siehe docs/REGULATORY_POSITION.md §5.2
+        const patientSafeHints = routingResults.map(r => RoutingEngine.toPatientSafeView(r));
 
         res.json({
             success: true,
             answerId: answer.id,
-            redFlags: triageResults.length > 0 ? triageResults : null,
+            // Neuer kanonischer Schlüssel: routingHints. 'redFlags' bleibt für Übergangszeit
+            // als Backwards-Compat-Alias, damit alte Frontend-Builds nicht brechen.
+            routingHints: patientSafeHints.length > 0 ? patientSafeHints : null,
+            redFlags: patientSafeHints.length > 0 ? patientSafeHints : null,
             progress,
         });
     } catch (err: unknown) {

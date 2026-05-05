@@ -45,6 +45,10 @@ export interface SessionResponse {
 
 /**
  * Triage-Alert Typ
+ *
+ * @deprecated Verwende `RoutingHint` für neue Patient-facing Code-Pfade.
+ * Der Typ bleibt für Backwards-Compat bestehen, solange das `redFlags`-Alias-Feld
+ * in der API-Response existiert (siehe SubmitAnswerResponse.redFlags).
  */
 export interface TriageAlert {
     id: string;
@@ -54,10 +58,30 @@ export interface TriageAlert {
 }
 
 /**
- * Antwort-Submission Response
+ * Patient-sicherer Routing-Hinweis aus dem Server (siehe `RoutingEngine.toPatientSafeView`).
+ * Enthält ausschließlich `patientMessage` — niemals `staffMessage`.
+ *
+ * @see docs/REGULATORY_POSITION.md §5.2
+ * @see docs/ROUTING_RULES.md
+ */
+export interface RoutingHint {
+    ruleId: string;
+    level: 'INFO' | 'PRIORITY';
+    patientMessage: string;
+    workflowAction?: 'inform_staff_now' | 'priority_queue' | 'mark_for_review' | 'continue';
+}
+
+/**
+ * Antwort-Submission Response.
+ *
+ * `routingHints` ist der kanonische Schlüssel ab v3.x; `redFlags` ist ein
+ * Backwards-Compat-Alias, der den GLEICHEN Inhalt (RoutingHint[]) trägt — nicht
+ * das alte `TriageAlert[]`-Schema. Frontend-Konsumenten sollten `routingHints`
+ * bevorzugen und `redFlags` nur als Fallback nutzen.
  */
 export interface SubmitAnswerResponse {
-    redFlags?: TriageAlert[];
+    routingHints?: RoutingHint[] | null;
+    redFlags?: RoutingHint[] | null;
     progress?: {
         completed: number;
         total: number;

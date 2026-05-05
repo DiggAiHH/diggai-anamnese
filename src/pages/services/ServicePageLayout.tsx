@@ -1,6 +1,6 @@
 import React, { lazy, Suspense, useState, useCallback, useMemo } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, ShieldCheck, Clock, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, Clock, CheckCircle, AlertCircle, Loader2, Info, RefreshCw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import type { ServiceFlowState } from '../../hooks/useServiceFlow';
@@ -73,8 +73,11 @@ export function ServicePageLayout({
         {/* M6 (Arzt-Feedback 2026-05-03): Daten-Hoheit-Banner */}
         <SovereigntyBanner />
 
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row items-start gap-6 mb-12">
+        {/* Header — Klapproth-Feedback 2026-05-04 (A1+A2+A3+B1+B2):
+            steps_title und Schritt-Liste entfernt; Start-Button steht direkt neben dem Titel;
+            Button-Label „Jetzt starten" ohne Wort „Anamnese". Bei Loading-Hänger (Backend
+            nicht erreichbar, A5/C1) wird ein Error-Banner gerendert. */}
+        <div className="flex flex-col sm:flex-row items-start gap-6 mb-10">
           <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-white shadow-[0_8px_32px_rgba(0,0,0,0.3)] bg-gradient-to-br ${color}`}>
             {icon}
           </div>
@@ -88,82 +91,112 @@ export function ServicePageLayout({
               <span className="text-sm font-bold text-gray-400 uppercase tracking-wide">{duration}</span>
             </div>
           </div>
+          {/* Inline Start-CTA — Desktop, direkt neben dem Titel */}
+          <motion.button
+            type="button"
+            onClick={flow.handleSelect}
+            onMouseEnter={flow.preloadConsent}
+            onFocus={flow.preloadConsent}
+            disabled={flow.createStatus === 'pending'}
+            aria-label={t('service.start_cta_short', { defaultValue: 'Jetzt starten' })}
+            initial={{ scale: 1 }}
+            animate={flow.createStatus === 'pending' ? {} : { scale: [1, 1.02, 1] }}
+            transition={{ duration: 1.6, repeat: 2, ease: 'easeInOut' }}
+            className={`hidden sm:inline-flex shrink-0 min-h-14 items-center justify-center gap-2 px-8 py-4 rounded-2xl text-white font-bold text-base shadow-xl transition-transform duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-60 disabled:cursor-wait bg-gradient-to-r ${color}`}
+          >
+            {flow.createStatus === 'pending' && <Loader2 className="w-4 h-4 animate-spin" />}
+            {flow.createStatus === 'pending'
+              ? t('service.loading')
+              : t('service.start_cta_short', { defaultValue: 'Jetzt starten' })}
+          </motion.button>
         </div>
+
+        {/* A5/C1 Error-Banner — sichtbar wenn createSession fehlschlägt
+            (häufige Ursache: Backend offline, z. B. Hetzner-Down). Statt endlosem Loading
+            sieht der Patient eine klare Fehlermeldung und einen Retry-Button. */}
+        {flow.createStatus === 'error' && (
+          <div
+            role="alert"
+            aria-live="assertive"
+            className="mb-10 p-5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-4"
+          >
+            <AlertCircle className="w-6 h-6 text-amber-400 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="font-bold text-amber-200 mb-1">
+                {t('service.error_title', { defaultValue: 'Verbindung zum Praxis-Server unterbrochen' })}
+              </p>
+              <p className="text-sm text-amber-100/80 leading-relaxed">
+                {t('service.error_body', {
+                  defaultValue:
+                    'Bitte prüfen Sie Ihre Internetverbindung und versuchen Sie es in einem Moment erneut. Falls das Problem bestehen bleibt, sprechen Sie das Praxispersonal an der Anmeldung an.',
+                })}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={flow.handleSelect}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-100 font-bold text-sm transition-colors shrink-0"
+            >
+              <RefreshCw className="w-4 h-4" />
+              {t('service.error_retry', { defaultValue: 'Erneut versuchen' })}
+            </button>
+          </div>
+        )}
 
         {/* Description */}
         <div className="p-6 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-primary)] mb-10">
           <p className="text-[var(--text-secondary)] leading-relaxed">{description}</p>
         </div>
 
-        {/* Steps */}
-        <div className="mb-10">
-          <h2 className="text-xl font-bold text-[var(--text-primary)] mb-6">
-            {t('service.steps_title')}
-          </h2>
-          <div className="grid gap-4">
-            {steps.map((step, i) => (
-              <div key={i} className="flex items-start gap-4 p-4 rounded-xl bg-[var(--bg-card)] border border-[var(--border-primary)]">
-                <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0">
-                  <span className="text-sm font-black text-blue-400">{i + 1}</span>
-                </div>
-                <p className="text-[var(--text-secondary)] font-medium pt-1">{step.label}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Trust indicators */}
+        {/* Trust indicators — Klapproth-Feedback 2026-05-04 (A4):
+            DSGVO + Encrypted Pills mit Hover-Tooltips, die die wichtigsten Infos aus dem
+            späteren Quiz vermitteln. Damit kann das eigene Quiz langfristig entfallen. */}
         <div className="flex flex-wrap items-center gap-4 mb-10">
-          <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--bg-card)] border border-[var(--border-primary)]">
-            <ShieldCheck className="w-4 h-4 text-green-500" />
-            <span className="text-xs font-bold text-gray-400 uppercase tracking-wide">{t('service.dsgvo')}</span>
-          </div>
-          <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--bg-card)] border border-[var(--border-primary)]">
-            <CheckCircle className="w-4 h-4 text-blue-400" />
-            <span className="text-xs font-bold text-gray-400 uppercase tracking-wide">{t('service.encrypted')}</span>
-          </div>
+          <TrustPill
+            icon={<ShieldCheck className="w-4 h-4 text-green-500" />}
+            label={t('service.dsgvo')}
+            tooltip={t('service.dsgvo_tooltip', {
+              defaultValue:
+                'Ihre Daten werden gemäß DSGVO Art. 9 Abs. 2 lit. h verarbeitet — ausschließlich für die Behandlung in dieser Praxis. Sie haben jederzeit Auskunfts-, Lösch- und Widerrufsrecht. Hosting in Deutschland.',
+            })}
+          />
+          <TrustPill
+            icon={<CheckCircle className="w-4 h-4 text-blue-400" />}
+            label={t('service.encrypted')}
+            tooltip={t('service.encrypted_tooltip', {
+              defaultValue:
+                'Übertragung per TLS 1.3, Speicherung mit AES-256-GCM verschlüsselt. Ihr Patientenname und Geburtsdatum sind als PII markiert und werden gesondert gesichert.',
+            })}
+          />
         </div>
 
         {children}
 
-        {/* K9 (Arzt-Feedback 2026-05-03): Start-CTA prominent — gross, mit subtilem Pulse,
-            Sticky-Bottom auf Mobile, zentral auf Desktop. Min-Height 56px (>=44px WCAG). */}
-        <motion.button
-          type="button"
-          onClick={flow.handleSelect}
-          onMouseEnter={flow.preloadConsent}
-          onFocus={flow.preloadConsent}
-          aria-label={t('service.start_cta', { defaultValue: 'Anamnese jetzt starten' })}
-          initial={{ scale: 1 }}
-          animate={{ scale: [1, 1.03, 1] }}
-          transition={{ duration: 1.6, repeat: 2, ease: 'easeInOut' }}
-          className={`hidden sm:inline-flex w-auto min-h-14 items-center justify-center px-10 py-4 rounded-2xl text-white font-bold text-lg shadow-2xl transition-transform duration-300 hover:scale-[1.02] active:scale-[0.98] bg-gradient-to-r ${color}`}
-        >
-          {flow.createStatus === 'pending'
-            ? t('service.loading')
-            : t('service.start_cta', { defaultValue: 'Anamnese jetzt starten' })}
-        </motion.button>
-
-        {/* Sticky-Bottom CTA fuer Mobile */}
+        {/* Sticky-Bottom CTA — Mobile only. Inline-Button im Header reicht für Desktop. */}
         <div className="sm:hidden fixed inset-x-0 bottom-0 z-40 px-4 py-3 bg-[var(--bg-primary)]/95 backdrop-blur border-t border-[var(--border-primary)]">
           <motion.button
             type="button"
             onClick={flow.handleSelect}
             onMouseEnter={flow.preloadConsent}
             onFocus={flow.preloadConsent}
-            aria-label={t('service.start_cta', { defaultValue: 'Anamnese jetzt starten' })}
+            disabled={flow.createStatus === 'pending'}
+            aria-label={t('service.start_cta_short', { defaultValue: 'Jetzt starten' })}
             initial={{ scale: 1 }}
-            animate={{ scale: [1, 1.03, 1] }}
+            animate={flow.createStatus === 'pending' ? {} : { scale: [1, 1.03, 1] }}
             transition={{ duration: 1.6, repeat: 2, ease: 'easeInOut' }}
-            className={`w-full min-h-14 inline-flex items-center justify-center px-6 py-4 rounded-2xl text-white font-bold text-base shadow-2xl active:scale-[0.98] bg-gradient-to-r ${color}`}
+            className={`w-full min-h-14 inline-flex items-center justify-center gap-2 px-6 py-4 rounded-2xl text-white font-bold text-base shadow-2xl active:scale-[0.98] disabled:opacity-60 disabled:cursor-wait bg-gradient-to-r ${color}`}
           >
+            {flow.createStatus === 'pending' && <Loader2 className="w-4 h-4 animate-spin" />}
             {flow.createStatus === 'pending'
               ? t('service.loading')
-              : t('service.start_cta', { defaultValue: 'Anamnese jetzt starten' })}
+              : t('service.start_cta_short', { defaultValue: 'Jetzt starten' })}
           </motion.button>
         </div>
         {/* Spacer so sticky-bottom button does not overlap content on mobile */}
         <div className="sm:hidden h-20" aria-hidden="true" />
+        {/* Steps-Zubehör: nicht mehr gerendert (Klapproth A1). steps-Prop bleibt erhalten,
+            damit Aufrufer keine Breaking-API-Änderung haben — wird intern ignoriert. */}
+        <span className="sr-only">{steps.length > 0 ? `${steps.length} Schritte` : ''}</span>
       </div>
 
       {/* DSGVO Consent Modal */}
@@ -187,6 +220,49 @@ export function ServicePageLayout({
         </Suspense>
       )}
     </motion.main>
+  );
+}
+
+// ─── Trust Pill mit Hover-Tooltip ──────────────────────────
+// Klapproth-Feedback 2026-05-04 (A4): DSGVO/Encrypted-Pills tragen die wichtigen
+// Quiz-Inhalte als Tooltip — damit kann das langfristig das Quiz ersetzen.
+// Tooltip ist auf Touch-Geräten via Click toggle-bar.
+
+interface TrustPillProps {
+  icon: React.ReactNode;
+  label: string;
+  tooltip: string;
+}
+
+function TrustPill({ icon, label, tooltip }: TrustPillProps) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => setOpen(false)}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+        onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
+        aria-describedby={open ? `tooltip-${label}` : undefined}
+        className="flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--bg-card)] border border-[var(--border-primary)] hover:border-blue-500/40 transition-colors"
+      >
+        {icon}
+        <span className="text-xs font-bold text-gray-400 uppercase tracking-wide">{label}</span>
+        <Info className="w-3.5 h-3.5 text-gray-500" aria-hidden="true" />
+      </button>
+      {open && (
+        <div
+          id={`tooltip-${label}`}
+          role="tooltip"
+          className="absolute left-0 top-full mt-2 z-50 max-w-sm w-[min(22rem,80vw)] p-4 rounded-xl bg-gray-900/95 backdrop-blur border border-gray-700 shadow-2xl text-sm text-gray-200 leading-relaxed"
+        >
+          {tooltip}
+        </div>
+      )}
+    </div>
   );
 }
 

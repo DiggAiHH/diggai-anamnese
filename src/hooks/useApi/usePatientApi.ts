@@ -138,14 +138,17 @@ export function useSubmitAnswer() {
          * - Korrigiert Fortschritt mit Server-Daten
          */
         onSuccess: (response) => {
-            // Triage-Alerts verarbeiten (NIE optimistisch - medizinisch relevant)
-            if (response.redFlags && response.redFlags.length > 0) {
-                for (const flag of response.redFlags) {
-                    // Konvertiere API-TriageAlert zu Store-TriageAlert
+            // Routing-Hinweise verarbeiten — ausschließlich `patientMessage` aus dem
+            // Server-Response (RoutingEngine.toPatientSafeView) wird in den Store geschrieben.
+            // Der `staffMessage` existiert in dieser Response nicht und kann daher nicht leaken.
+            // `routingHints` ist der kanonische Schlüssel; `redFlags` bleibt als Fallback während Übergangszeit.
+            const hints = response.routingHints ?? response.redFlags ?? [];
+            if (hints.length > 0) {
+                for (const hint of hints) {
                     const storeAlert: TriageAlert = {
-                        level: flag.severity === 'CRITICAL' || flag.severity === 'HIGH' ? 'CRITICAL' : 'WARNING',
-                        atomId: flag.atomId || 'unknown',
-                        message: flag.message,
+                        level: hint.level === 'PRIORITY' ? 'CRITICAL' : 'WARNING',
+                        atomId: 'unknown',
+                        message: hint.patientMessage,
                         triggerValues: null,
                     };
                     addAlert(storeAlert);

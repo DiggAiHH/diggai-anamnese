@@ -154,7 +154,10 @@ export const newQuestions: Question[] = [
             triage: {
                 when: ['nackensteife'],
                 level: 'critical',
-                message: 'Nackensteifigkeit mit Fieber ist ein Hinweis auf Meningitis! Sofortige ärztliche Abklärung erforderlich.'
+                // Patient-Output durchläuft routingHintFromTriage und wird durch
+                // einen zentralen Workflow-Hinweis ersetzt (siehe docs/REGULATORY_POSITION.md §5.2).
+                // Dieser Text dient nur noch als interner Marker für die Frage selbst.
+                message: 'PRIORITY-Routing: Personal sofort informieren.'
             }
         }
     },
@@ -548,7 +551,7 @@ export const newQuestions: Question[] = [
             triage: {
                 when: ['sehverlust'],
                 level: 'critical',
-                message: 'Plötzlicher Sehverlust ist ein Notfall! Sofortige augenärztliche Vorstellung erforderlich.'
+                message: 'PRIORITY-Routing: Personal sofort informieren.'
             }
         }
     },
@@ -625,7 +628,7 @@ export const newQuestions: Question[] = [
             triage: {
                 when: ['brustschmerz'],
                 level: 'critical',
-                message: 'ACHTUNG: Brustschmerzen können auf einen Herzinfarkt hindeuten. Bitte wählen Sie 112!'
+                message: 'PRIORITY-Routing: Personal sofort informieren.'
             }
         }
     },
@@ -653,7 +656,7 @@ export const newQuestions: Question[] = [
             triage: {
                 when: ['druck_20min'],
                 level: 'critical',
-                message: '⚠️ NOTFALLPAD: Anhaltender Brustdruck >20 Minuten ist ein Hinweis auf akutes Koronarsyndrom! Bitte sofort den Notruf 112 wählen!'
+                message: 'PRIORITY-Routing: Personal sofort informieren.'
             }
         }
     },
@@ -943,7 +946,7 @@ export const newQuestions: Question[] = [
             triage: {
                 when: ['ikterus'],
                 level: 'warning',
-                message: 'Gelbe Bindehäute bei Koliken können auf einen Gallengangsverschluss hinweisen. Bitte zeitnah ärztlich abklären lassen.'
+                message: 'INFO-Routing: Hinweis ans Praxispersonal markieren.'
             }
         }
     },
@@ -991,7 +994,7 @@ export const newQuestions: Question[] = [
             triage: {
                 when: ['bleistift'],
                 level: 'warning',
-                message: 'Bleistiftstuhl kann ein Alarmsymptom für eine Darmerkrankung sein. Bitte lassen Sie dies zeitnah ärztlich abklären.'
+                message: 'INFO-Routing: Hinweis ans Praxispersonal markieren.'
             }
         }
     },
@@ -1155,7 +1158,7 @@ export const newQuestions: Question[] = [
             triage: {
                 when: ['beim_aufwachen'],
                 level: 'warning',
-                message: 'Kopfschmerzen beim Aufwachen können auf eine ernsthafte Ursache hindeuten. Bitte lassen Sie dies ärztlich abklären.'
+                message: 'INFO-Routing: Hinweis ans Praxispersonal markieren.'
             }
         }
     },
@@ -1213,7 +1216,7 @@ export const newQuestions: Question[] = [
             triage: {
                 when: ['donnerschlag'],
                 level: 'critical',
-                message: 'Donnerschlagkopfschmerz kann auf eine Subarachnoidalblutung hinweisen! Sofortiger Notfall – bitte umgehend den Notruf wählen!'
+                message: 'PRIORITY-Routing: Personal sofort informieren.'
             }
         }
     },
@@ -1251,7 +1254,7 @@ export const newQuestions: Question[] = [
             triage: {
                 when: ['laehmung', 'sprachstoerung'],
                 level: 'critical',
-                message: 'ACHTUNG: Lähmungen oder Sprachstörungen können auf einen Schlaganfall hinweisen. Bitte rufen Sie sofort 112!'
+                message: 'PRIORITY-Routing: Personal sofort informieren.'
             }
         }
     },
@@ -1696,7 +1699,7 @@ export const newQuestions: Question[] = [
             triage: {
                 when: ['ja'],
                 level: 'critical',
-                message: 'Wenn Sie sich in einer akuten Krise befinden, wenden Sie sich bitte sofort an die Telefonseelsorge (0800 111 0 111) oder den Notruf 112.'
+                message: 'PRIORITY-Routing: Suizid-/Krisen-Support-Pfad — Personal informieren, Patient sieht zentralen Support-Hinweis.'
             }
         }
     },
@@ -1716,7 +1719,7 @@ export const newQuestions: Question[] = [
             triage: {
                 when: ['ja'],
                 level: 'critical',
-                message: 'Wenn Sie akute Suizidgedanken haben, wenden Sie sich bitte sofort an die Telefonseelsorge (0800 111 0 111) oder den Notruf 112.'
+                message: 'PRIORITY-Routing: Suizid-/Krisen-Support-Pfad — Personal informieren, Patient sieht zentralen Support-Hinweis.'
             }
         }
     },

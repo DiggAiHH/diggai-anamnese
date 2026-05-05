@@ -8,7 +8,9 @@ Quelle: Arzt-Feedback Dr. Klaproth 2026-05-03 (Issues B1-B3)
 ## Strukturierte Anamnese vor dem Erstkontakt — damit Sie sich auf das Wesentliche konzentrieren können.
 
 DiggAI ist die DSGVO-konforme digitale Patientenaufnahme, die Ihren Patienten Daten-Hoheit gibt
-und Ihnen den klinischen Erstkontakt vorbereitet — strukturiert, mehrsprachig, klinisch validiert.
+und Ihnen den ärztlichen Erstkontakt vorbereitet — strukturiert, mehrsprachig, ärztlich verantwortet.
+
+> *DiggAI ist eine administrative Praxis-Anmelde- und Routing-Software und kein Medizinprodukt. Die medizinische Beurteilung verbleibt vollständig beim ärztlichen und medizinischen Fachpersonal Ihrer Praxis.*
 
 **150 € pro Monat. Pro Praxis. Patientennutzung kostenlos. 30 Tage unverbindlich testen.**
 
@@ -19,14 +21,15 @@ und Ihnen den klinischen Erstkontakt vorbereitet — strukturiert, mehrsprachig,
 ## Warum DiggAI?
 
 ### 1. Sie sparen Zeit — und Online-Rezeptions-Kosten
-270+ medizinisch validierte Fragen, Triage-Logik mit 4 CRITICAL-Pfaden (ACS, Suizidalität, SAH, Synkope),
-strukturierte Übergabe direkt in Ihr PVS (Tomedo, MediStar, weitere folgen). Pilotpraxen 2025 berichten
-**durchschnittlich 7 Minuten Zeitersparnis pro Erstkontakt** (Disclaimer: kleine Stichprobe, individuell variabel).
+270+ medizinisch validierte Fragen, Eingangs-Routing für Ihr Praxispersonal mit transparent dokumentierten
+Routing-Regeln, strukturierte Übergabe direkt in Ihr PVS (Tomedo, MediStar, weitere folgen). Pilotpraxen 2025
+berichten **durchschnittlich 7 Minuten Zeitersparnis pro Erstkontakt** (Disclaimer: kleine Stichprobe,
+individuell variabel).
 
-### 2. Klinisch validiert — von Ärzten, für Ärzte
+### 2. Ärztlich verantwortet — von Ärzten, für Ärzte
 Inhaltlich verantwortet von Dr. med. Christian Klaproth (Allgemeinmedizin) und
 Dr. Mohammed Al-Shdaifat (Innere Medizin). Keine Marketing-Symptom-Checker-Logik,
-sondern klinisch nachvollziehbare Triage und Anamnese-Strukturen.
+sondern transparent dokumentierte Routing-Regeln und nachvollziehbare Anamnese-Strukturen.
 
 ### 3. Patient hat die Daten-Hoheit — echter USP gegenüber ePA
 Patient pflegt seine Daten einmal, gibt sie an jeden Arzt seiner Wahl weiter.
@@ -70,8 +73,12 @@ Wir sind ePA-kompatibel, sehen sie aber als komplementär — die ePA löst Pati
 DiggAI löst strukturierte Anamnese-Erhebung vor dem Termin. Zwei verschiedene Probleme.
 
 **Wer haftet inhaltlich?**
-Klinische Inhalte sind ärztlich verantwortet (siehe oben). Triage-Empfehlungen sind Empfehlungen,
-keine Diagnosen — die ärztliche Letztentscheidung bleibt bei Ihnen.
+DiggAI gibt **keine medizinischen Empfehlungen** und stellt keine Diagnose-Hypothesen aus. Das System
+strukturiert ausschließlich die vom Patienten erfassten Eingaben und markiert vorrangige Anmeldungen
+für Ihr Praxispersonal. Die medizinische Beurteilung — einschließlich der Erkennung von Notfällen und
+der Triagierung von Dringlichkeitsstufen — verbleibt vollständig bei Ihnen und Ihrem Team. Die
+Anamnese-Inhalte sind ärztlich verantwortet von Dr. Klapproth und Dr. Al-Shdaifat (siehe oben).
+Verbindliche Zweckbestimmung: docs/INTENDED_USE.md im Repository.
 
 **Datenschutz?**
 DSGVO Art. 9 Abs. 2 lit. h i.V.m. § 22 BDSG. AVV liegt bereit. TOMs dokumentiert.

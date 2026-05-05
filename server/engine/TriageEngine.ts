@@ -1,9 +1,22 @@
 /**
  * @module TriageEngine
- * @description Klinische Red-Flag-Erkennung — Real-time Triage-Auswertung
+ * @deprecated Verwende stattdessen `server/engine/RoutingEngine.ts`.
  *
- * Wertet Patientenantworten in Echtzeit aus und erkennt klinische Warnsignale
- * (Red Flags), die sofortige ärztliche Aufmerksamkeit erfordern.
+ * **REGULATORISCHER HINWEIS (Pflicht-Lektüre vor Änderungen):**
+ * Diese Datei produziert Patient-facing-Texte mit diagnostischen Aussagen
+ * („Ihre Symptome könnten auf einen medizinischen Notfall hindeuten" etc.) und
+ * würde DiggAi unter MDR Annex VIII Rule 11 als Klasse IIa/IIb-Medizinprodukt
+ * qualifizieren. Die Hersteller-Position ist „Kein Medizinprodukt" (siehe
+ * `docs/INTENDED_USE.md`, `docs/REGULATORY_POSITION.md`).
+ *
+ * Die `RoutingEngine` ist die regulatorisch konforme Nachfolgerin: Sie trennt
+ * `patientMessage` (workflow-only, kein Diagnose-Wort) von `staffMessage`
+ * (fachlich, nur fürs Personal). Code-Pfade, die heute noch die TriageEngine
+ * nutzen, sind in `docs/REGULATORY_STRATEGY.md` §11.2 als Migrations-Ziel
+ * gelistet. Bitte beim nächsten Anfassen der jeweiligen Aufrufstelle direkt
+ * auf RoutingEngine umstellen, nicht TriageEngine erweitern.
+ *
+ * @description (historisch) Klinische Red-Flag-Erkennung — Real-time Triage-Auswertung.
  *
  * @architecture
  * - Wird nach JEDER Antwortübermittlung aufgerufen: `POST /api/answers`
@@ -16,8 +29,10 @@
  * 2. Sign-off Dr. Klapproth (Arztpraxis) — PFLICHT für alle Regel-Typen
  * 3. Sign-off Dr. Al-Shdaifat (DiggAI Medical Advisor) — PFLICHT für CRITICAL
  * 4. Update docs/TRIAGE_RULES.md + e2e/questionnaire-flow.spec.ts
+ * 5. Eintrag in docs/CHANGE_LOG_REGULATORY.md (regulatorisch relevant)
  *
  * @see docs/TRIAGE_RULES.md — vollständige Regelreferenz mit klinischer Begründung
+ * @see docs/REGULATORY_STRATEGY.md — Migrationsplan TriageEngine → RoutingEngine
  */
 
 export interface TriageResult {

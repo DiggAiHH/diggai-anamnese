@@ -1,13 +1,22 @@
 # Render.com deployment configuration for DiggAI Anamnese Backend
-# Alternative to Railway — free tier available
+# Free Tier, Frankfurt-Region (EU/DE-Hosting)
 # Docs: https://render.com/docs/infrastructure-as-code
+#
+# WICHTIG — Free-Tier-Limits (Stand 2026-05):
+#   - Web-Service schläft nach 15 min Inaktivität (erster Aufruf danach: 30–60 s Cold-Start)
+#   - 750 Stunden/Monat (reicht für eine Single-Instance-Praxis)
+#   - PostgreSQL Free läuft 90 Tage, danach Datenverlust → Empfehlung: Supabase EU als externe DB
+#
+# Übergangs-Lösung — sobald Hetzner wieder bezahlt ist, einfach DNS/CNAME zurückschwenken,
+# diese Datei bleibt als Fallback im Repo.
 
 services:
   - type: web
     name: anamnese-backend
     runtime: docker
     dockerfilePath: ./Dockerfile
-    plan: starter
+    plan: free                      # ← war "starter" ($7/Monat); jetzt kostenlos
+    region: frankfurt               # ← war nicht gesetzt; jetzt EU/DE (DSGVO-konform)
     healthCheckPath: /api/health
     autoDeploy: false
     envVars:
@@ -20,16 +29,18 @@ services:
       - key: LOG_LEVEL
         value: info
       # --- Required secrets: set manually in Render Dashboard ---
+      # WICHTIG: ENCRYPTION_KEY mit Quotes setzen (siehe .env.example) —
+      # ohne Quotes wird ein rein-numerischer Wert in Scientific-Notation gecastet.
       - key: DATABASE_URL
-        sync: false
+        sync: false                 # → Supabase-Connection-String aus dashboard.supabase.com einfügen
       - key: JWT_SECRET
-        sync: false
+        sync: false                 # → mind. 32 Zeichen, beliebig
       - key: ENCRYPTION_KEY
-        sync: false
+        sync: false                 # → exakt 32 Zeichen, mit Buchstabe beginnen
       - key: FRONTEND_URL
-        sync: false
+        value: https://diggai.de
       - key: API_PUBLIC_URL
-        sync: false
+        value: https://anamnese-backend.onrender.com
       - key: ARZT_PASSWORD
         sync: false
       # --- Optional: email, push, AI ---
@@ -51,3 +62,14 @@ services:
         sync: false
       - key: SENTRY_DSN
         sync: false
+
+# OPTIONAL: Render-eigene PostgreSQL-DB (Free-Tier läuft 90 Tage, dann Datenverlust!)
+# Auskommentiert, weil Supabase EU-Frankfurt langfristig stabiler ist.
+# Falls aktiviert: DATABASE_URL oben kann auf den hier erzeugten Service verweisen.
+#
+# databases:
+#   - name: anamnese-postgres
+#     plan: free
+#     region: frankfurt
+#     databaseName: anamnese
+#     user: anamnese

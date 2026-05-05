@@ -446,7 +446,46 @@ export function setupSocketIO(httpServer: HttpServer): Server {
 }
 
 /**
- * Sendet einen CRITICAL Triage-Alert an alle verbundenen Arzt-Dashboards
+ * Sendet einen Routing-Hinweis an alle verbundenen Arzt-Dashboards.
+ *
+ * Empfänger ist medizinisches Fachpersonal — `staffMessage` darf fachliche
+ * Begriffe enthalten. NIEMALS dieses Event an Patient-Clients weiterleiten.
+ *
+ * @see docs/REGULATORY_POSITION.md §5.3
+ * @see docs/ROUTING_RULES.md
+ */
+export function emitRoutingHint(sessionId: string, hint: {
+    ruleId: string;
+    level: 'INFO' | 'PRIORITY';
+    atomId: string;
+    staffMessage: string;
+    triggerValues: unknown;
+    workflowAction?: string;
+}): void {
+    if (!io) return;
+    const payload = {
+        sessionId,
+        ...hint,
+        timestamp: new Date().toISOString(),
+    };
+    // Neuer kanonischer Event-Name
+    io.to('arzt').emit('routing:hint', payload);
+    // Backwards-Compat: alte Listener auf 'triage:alert' weiterhin bedienen.
+    // TODO(REGULATORY-MIGRATION): Entfernen, sobald alle Frontend-Listener
+    // auf 'routing:hint' umgestellt sind (siehe docs/CHANGE_LOG_REGULATORY.md).
+    io.to('arzt').emit('triage:alert', {
+        sessionId,
+        level: hint.level === 'PRIORITY' ? 'CRITICAL' : 'WARNING',
+        atomId: hint.atomId,
+        message: hint.staffMessage,
+        triggerValues: hint.triggerValues,
+        timestamp: payload.timestamp,
+    });
+}
+
+/**
+ * @deprecated Verwende `emitRoutingHint`. Diese Funktion bleibt erhalten,
+ * damit Aufrufer migriert werden können, ohne den Live-Pfad zu brechen.
  */
 export function emitTriageAlert(sessionId: string, alert: {
     level: string;

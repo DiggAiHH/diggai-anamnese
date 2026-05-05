@@ -307,25 +307,40 @@ export function useRealtimeAlerts() {
     if (isMockMode()) return;
 
     const s = getSocket();
-    s.on('triage:alert', (data: {
-      patientId: string;
-      level: 'CRITICAL' | 'WARNING';
-      message: string;
+    // Personal-Listener: empfängt fachliche Hinweise (staffMessage darf diagnostisch sein,
+    // weil Empfänger medizinisches Personal ist — siehe docs/REGULATORY_POSITION.md §5.3).
+    // Neuer kanonischer Event-Name 'routing:hint' (RoutingEngine);
+    // Backwards-Compat: 'triage:alert' wird ebenfalls verarbeitet, solange der Server
+    // beide Events spiegelt (siehe server/socket.ts emitRoutingHint).
+    const handleRoutingHint = (data: {
+      patientId?: string;
+      sessionId?: string;
+      level?: 'CRITICAL' | 'WARNING' | 'INFO' | 'PRIORITY';
+      message?: string;        // legacy 'triage:alert' shape
+      staffMessage?: string;   // new 'routing:hint' shape
+      ruleId?: string;
     }) => {
+      const patientId = data.patientId ?? data.sessionId ?? 'unknown';
+      const level: 'CRITICAL' | 'WARNING' =
+        data.level === 'PRIORITY' || data.level === 'CRITICAL' ? 'CRITICAL' : 'WARNING';
+      const message = data.staffMessage ?? data.message ?? '';
       setAlerts((prev) => [
         ...prev,
         {
-          id: `${Date.now()}-${data.patientId}`,
-          patientId: data.patientId,
-          message: data.message,
-          level: data.level,
+          id: `${Date.now()}-${patientId}-${data.ruleId ?? ''}`,
+          patientId,
+          message,
+          level,
           timestamp: new Date(),
         },
       ]);
-    });
+    };
+    s.on('routing:hint', handleRoutingHint);
+    s.on('triage:alert', handleRoutingHint);
 
     return () => {
-      s.off('triage:alert');
+      s.off('routing:hint', handleRoutingHint);
+      s.off('triage:alert', handleRoutingHint);
     };
   }, []);
 

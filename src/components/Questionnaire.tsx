@@ -16,7 +16,8 @@ import {
 } from '../utils/questionLogic';
 import { AnswerSummary } from './AnswerSummary';
 import { HistorySidebar } from './HistorySidebar';
-import { RedFlagOverlay, WarningBanner } from './RedFlagOverlay';
+import { AnmeldeHinweisOverlay, AnmeldeHinweisBanner, type AnmeldeHinweis } from './AnmeldeHinweisOverlay';
+import { routingHintFromTriage } from '../utils/routingHintFromTriage';
 import { MedicationManager } from './MedicationManager';
 import { SurgeryManager } from './SurgeryManager';
 import { SchwangerschaftCheck } from './SchwangerschaftCheck';
@@ -142,8 +143,11 @@ export function Questionnaire() {
 
     const [localError, setLocalError] = useState<string | null>(null);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-    const [triageAlert, setTriageAlert] = useState<{ level: 'warning' | 'critical'; message: string } | null>(null);
-    const [criticalOverlay, setCriticalOverlay] = useState<{ level: 'WARNING' | 'CRITICAL'; atomId: string; message: string; triggerValues: Record<string, unknown> | null } | null>(null);
+    // Patient-facing routing hints — werden über das AnmeldeHinweisOverlay/Banner gerendert.
+    // Hier wird KEIN diagnostischer Text aus question.logic.triage.message gespeichert,
+    // sondern ein patient-sicherer Hinweis (siehe routingHintFromTriage).
+    const [triageAlert, setTriageAlert] = useState<AnmeldeHinweis | null>(null);
+    const [criticalOverlay, setCriticalOverlay] = useState<AnmeldeHinweis | null>(null);
     const [showPDF, setShowPDF] = useState(false);
     const [isSubmitted, setIsSubmitted] = useState(false);
     const [showEmailFallback, setShowEmailFallback] = useState(false);
@@ -247,21 +251,19 @@ export function Questionnaire() {
             submitAccident(value);
         }
 
-        // Check for clinical triage local
+        // Lokale Routing-Heuristik (Frontend-only) — der Patient sieht ausschließlich
+        // patient-sichere Workflow-Hinweise; der diagnostische Text aus
+        // question.logic.triage.message wird im Adapter routingHintFromTriage verworfen.
+        // Definitive Auswertung erfolgt serverseitig durch RoutingEngine (server/engine/RoutingEngine.ts).
         const question = allQuestions.find(q => q.id === questionId);
         if (question) {
-            const alert = getTriageAlert(question, { atomId: questionId, value, answeredAt: new Date() } as Answer);
-            if (alert) {
-                if (alert.level === 'critical') {
-                    // Zeige Vollbild-Overlay für CRITICAL
-                    setCriticalOverlay({
-                        level: 'CRITICAL',
-                        atomId: questionId,
-                        message: alert.message,
-                        triggerValues: typeof value === 'object' && value !== null && !Array.isArray(value) ? value : null,
-                    });
+            const rawTriage = getTriageAlert(question, { atomId: questionId, value, answeredAt: new Date() } as Answer);
+            if (rawTriage) {
+                const hinweis = routingHintFromTriage(rawTriage, questionId, t);
+                if (hinweis.level === 'PRIORITY') {
+                    setCriticalOverlay(hinweis);
                 } else {
-                    setTriageAlert(alert);
+                    setTriageAlert(hinweis);
                 }
             } else {
                 setTriageAlert(null);
@@ -681,15 +683,10 @@ export function Questionnaire() {
                             </div>
                         </div>
 
-                        {/* Warning Banner (non-critical) */}
-                        {triageAlert && triageAlert.level !== 'critical' && (
-                            <WarningBanner
-                                alert={{
-                                    level: 'WARNING',
-                                    atomId: state.currentQuestionId || '',
-                                    message: triageAlert.message,
-                                    triggerValues: null,
-                                }}
+                        {/* Workflow-Hinweis-Banner (INFO-Level — patient-sicher) */}
+                        {triageAlert && triageAlert.level !== 'PRIORITY' && (
+                            <AnmeldeHinweisBanner
+                                hinweis={triageAlert}
                                 onDismiss={() => setTriageAlert(null)}
                             />
                         )}
@@ -926,10 +923,10 @@ export function Questionnaire() {
                 </div>
             </main>
 
-            {/* CRITICAL Red Flag Overlay */}
+            {/* PRIORITY Anmelde-Hinweis Overlay — patient-sicher */}
             {criticalOverlay && (
-                <RedFlagOverlay
-                    alert={criticalOverlay}
+                <AnmeldeHinweisOverlay
+                    hinweis={criticalOverlay}
                     onAcknowledge={() => setCriticalOverlay(null)}
                 />
             )}

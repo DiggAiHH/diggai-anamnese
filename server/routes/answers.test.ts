@@ -5,11 +5,18 @@ const middlewareMocks = vi.hoisted(() => ({
   requireSessionOwner: vi.fn((_req, _res, next) => next()),
 }));
 
-const triageEngineMocks = vi.hoisted(() => ({
+const routingEngineMocks = vi.hoisted(() => ({
   evaluateForAtom: vi.fn(() => []),
+  toPatientSafeView: vi.fn((r: any) => ({
+    ruleId: r.ruleId,
+    level: r.level,
+    patientMessage: r.patientMessage,
+    workflowAction: r.workflowAction,
+  })),
 }));
 
 const socketMocks = vi.hoisted(() => ({
+  emitRoutingHint: vi.fn(),
   emitTriageAlert: vi.fn(),
   emitAnswerSubmitted: vi.fn(),
   emitSessionProgress: vi.fn(),
@@ -27,11 +34,12 @@ vi.mock('../services/encryption', () => ({
   hashEmail: vi.fn((v: string) => `hash-${v}`),
 }));
 
-vi.mock('../engine/TriageEngine', () => ({
-  TriageEngine: triageEngineMocks,
+vi.mock('../engine/RoutingEngine', () => ({
+  RoutingEngine: routingEngineMocks,
 }));
 
 vi.mock('../socket', () => ({
+  emitRoutingHint: socketMocks.emitRoutingHint,
   emitTriageAlert: socketMocks.emitTriageAlert,
   emitAnswerSubmitted: socketMocks.emitAnswerSubmitted,
   emitSessionProgress: socketMocks.emitSessionProgress,
@@ -118,7 +126,7 @@ describe('answers routes', () => {
       } as never);
       vi.mocked(prisma.answer.upsert).mockResolvedValue({ id: 'answer-1' } as never);
       vi.mocked(prisma.answer.findMany).mockResolvedValue([] as never);
-      triageEngineMocks.evaluateForAtom.mockReturnValue([]);
+      routingEngineMocks.evaluateForAtom.mockReturnValue([]);
 
       const handlers = getRouteHandlers('/:id', 'post');
       const handler = handlers[handlers.length - 1] as (req: unknown, res: unknown) => Promise<void>;
@@ -301,8 +309,16 @@ describe('answers routes', () => {
       } as never);
       vi.mocked(prisma.answer.upsert).mockResolvedValue({ id: 'answer-1' } as never);
       vi.mocked(prisma.answer.findMany).mockResolvedValue([] as never);
-      triageEngineMocks.evaluateForAtom.mockReturnValue([
-        { level: 'WARNING', atomId: 'atom-1', message: 'Check needed', triggerValues: {} },
+      routingEngineMocks.evaluateForAtom.mockReturnValue([
+        {
+          ruleId: 'INFO_TEST',
+          level: 'INFO',
+          atomId: 'atom-1',
+          patientMessage: 'Bitte sprechen Sie das Praxispersonal an.',
+          staffMessage: 'Check needed',
+          triggerValues: {},
+          workflowAction: 'mark_for_review',
+        },
       ] as any);
 
       const handlers = getRouteHandlers('/:id', 'post');
@@ -330,8 +346,16 @@ describe('answers routes', () => {
       } as never);
       vi.mocked(prisma.answer.upsert).mockResolvedValue({ id: 'answer-1' } as never);
       vi.mocked(prisma.answer.findMany).mockResolvedValue([] as never);
-      triageEngineMocks.evaluateForAtom.mockReturnValue([
-        { level: 'CRITICAL', atomId: 'atom-1', message: 'Emergency!', triggerValues: {} },
+      routingEngineMocks.evaluateForAtom.mockReturnValue([
+        {
+          ruleId: 'PRIORITY_TEST',
+          level: 'PRIORITY',
+          atomId: 'atom-1',
+          patientMessage: 'Bitte wenden Sie sich umgehend an das Praxispersonal.',
+          staffMessage: 'Emergency!',
+          triggerValues: {},
+          workflowAction: 'inform_staff_now',
+        },
       ] as any);
 
       const handlers = getRouteHandlers('/:id', 'post');
@@ -345,7 +369,7 @@ describe('answers routes', () => {
 
       await handler(req, res);
 
-      expect(socketMocks.emitTriageAlert).toHaveBeenCalled();
+      expect(socketMocks.emitRoutingHint).toHaveBeenCalled();
     });
 
     it('should link patient by email when email atom submitted', async () => {
@@ -364,7 +388,7 @@ describe('answers routes', () => {
       vi.mocked(prisma.patient.findFirst).mockResolvedValue(null as never);
       vi.mocked(prisma.patient.create).mockResolvedValue({ id: 'patient-1' } as never);
       vi.mocked(prisma.patientSession.update).mockResolvedValue({ id: 'session-1', patientId: 'patient-1' } as never);
-      triageEngineMocks.evaluateForAtom.mockReturnValue([]);
+      routingEngineMocks.evaluateForAtom.mockReturnValue([]);
 
       const handlers = getRouteHandlers('/:id', 'post');
       const handler = handlers[handlers.length - 1] as (req: unknown, res: unknown) => Promise<void>;
@@ -399,7 +423,7 @@ describe('answers routes', () => {
         id: 'patient-locked',
         hashedEmail: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
       } as never);
-      triageEngineMocks.evaluateForAtom.mockReturnValue([]);
+      routingEngineMocks.evaluateForAtom.mockReturnValue([]);
 
       const handlers = getRouteHandlers('/:id', 'post');
       const handler = handlers[handlers.length - 1] as (req: unknown, res: unknown) => Promise<void>;

@@ -70,9 +70,12 @@
 
 ### Regulatorische Positionierung
 
-- **Explizit KEINE DiGA** (Digitale Gesundheitsanwendung)
-- **KEIN Medizinprodukt** — keine CE-Kennzeichnung erforderlich
-- Verwendet den Begriff *„klinische Entscheidungsunterstützung"*
+- **DiggAi ist administratives Werkzeug — KEIN Medizinprodukt** im Sinne der MDR Verordnung (EU) 2017/745 Art. 2(1) und keine DiGA nach §139e SGB V.
+- **Verbindliche Zweckbestimmung:** [`docs/INTENDED_USE.md`](./docs/INTENDED_USE.md) — administrative Praxis-Anmelde- und Routing-Plattform. DiggAi trifft keine medizinischen Entscheidungen, stellt keine Diagnosen, gibt dem Patienten keine medizinischen Hinweise.
+- **MDCG-2019-11-Subsumtion + Reaktionsplan:** [`docs/REGULATORY_POSITION.md`](./docs/REGULATORY_POSITION.md).
+- **Strategie-Roadmap (Spur A „Kein MDSW", Spur B optional Klasse I + DiGA Fast-Track):** [`docs/REGULATORY_STRATEGY.md`](./docs/REGULATORY_STRATEGY.md).
+- **Audit-Trail aller regulatorisch relevanten Änderungen:** [`docs/CHANGE_LOG_REGULATORY.md`](./docs/CHANGE_LOG_REGULATORY.md).
+- **Begriff „klinische Entscheidungsunterstützung" wird NICHT mehr verwendet** — er entspricht regulatorisch CDS und würde DiggAi in MDR Klasse IIa drücken.
 
 ---
 
@@ -1098,9 +1101,9 @@ Das Express-Backend mit Prisma + SQLite ist **nicht auf Netlify deployt**. Die N
 
 ### 13.1 Claim & Positionierung
 
-- **Claim:** *„Weniger Papier. Mehr Medizin."* / *„Digitale Patientenaufnahme. Made in Germany."*
-- **Regulatorisch:** KEINE DiGA, KEIN Medizinprodukt, KEINE CE-Kennzeichnung
-- **Differenzierung:** Passive Zeitersparnis durch Automatisierung (Triage, Routing, Screening-Gates)
+- **Claim:** *„Weniger Papier. Mehr Praxis-Effizienz."* / *„Digitale Patientenaufnahme. Made in Germany."*
+- **Regulatorisch:** KEIN Medizinprodukt nach MDR Art. 2(1), keine DiGA nach §139e SGB V, keine CE-Kennzeichnung erforderlich. Verbindliche Zweckbestimmung in [`docs/INTENDED_USE.md`](./docs/INTENDED_USE.md).
+- **Differenzierung:** Passive Zeitersparnis durch Automatisierung (Anmelde-Routing, Sprach-Unterstützung, Screening-Gates ohne medizinische Bewertung). **Die medizinische Beurteilung verbleibt vollständig beim Praxispersonal.**
 
 ### 13.2 Value Proposition
 
