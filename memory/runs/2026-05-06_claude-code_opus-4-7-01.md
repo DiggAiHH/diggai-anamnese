@@ -70,6 +70,15 @@
 - Ergebnis: D:\Klaproth Projekte\DiggAi\DiggAi-Restrukturierungs-Plan-v1.0.docx (23.4 KB). Konkrete file-by-file Anweisungen: jeder Class-IIa-Pfad aus dem Audit hat eine eindeutige Migrations-Aktion (Verschieben → suite/, Splitten, Bleibt capture/, Verschieben → common/).
 - Out: Drei zusammenhängende regulatorische Dokumente liefer-fähig: Strategie (Status-Plan-Regulatorik), Zweckbestimmung (Intended-Purpose v1.0 DE+EN), Restrukturierungs-Plan v1.0. Engineering kann mit Phase 1 (Workspace-Setup) starten ohne weitere Vorgaben. Anwalt + BfArM können auf Konsistenz der drei Docs prüfen.
 
+2026-05-06T11:15+02:00 | Lauf claude-code-10 | Phase 1: Session-Commits + Workspace-Scaffold
+---
+- Aktion: 4 saubere Commits auf regulatory/spur-a-no-mdsw: (1) ux: i18n key leakage + signature button wording + live-mode error, (2) fix(backend): RabbitMQ toggle + seed-demo schema cleanup (aiSummary/title/severity/category/patientName), (3) infra: Hetzner→Fly.io migration + 5 dev-bats + netlify.toml VITE_API_URL fix + CSP fly.dev + NODE_OPTIONS 4GB, (4) docs: 2026-05-06 run-log. Neuer Branch restructure/phase-1-workspace. packages/{common,capture,suite}/ Scaffold mit je package.json (diggaiClassification block: isMedicalDevice, mdrClass, conformityRoute, rationale, buckets, intendedPurposeDoc), README, src/.gitkeep + packages/README.md mit Migrations-Plan-Referenz. Commit aa9b64e: scaffold-only, kein Code bewegt.
+- Blocker: Phase 1b (workspaces field in root package.json) verursachte npm-Hoisting-Konflikte → vite/@vitejs/plugin-react aus node_modules entfernt → Build-Fehler. Mehrfache npm-Reinstalls scheiterten an System-OOM (RAM bei 95%+). 1 Stunde Trial-and-Error.
+- Fix: workspaces-field rolled back. package-lock.json aus git restored. Fresh node_modules via npm ci --legacy-peer-deps --ignore-scripts + explizites NODE_OPTIONS=4096 + manuelle Nachinstallation der hoisting-empfindlichen Module. Build wieder grün (59.22s, 4498 modules).
+- Ergebnis: 4 commits gepusht (untilted Phase-1a auf restructure/phase-1-workspace branch), Build verifiziert. Live-System diggai.de unangetastet, weiterhin grün.
+- Out: Phase-1 SCAFFOLD steht. Phase-1b (workspaces aktivieren) muss in fresher Umgebung passieren — möglichst auf einem Rechner mit mehr RAM, oder nach Reboot. Die Scaffold-Folder + diggaiClassification-Metadata sind aber bereits jetzt nutzbar als Anker für die nächsten Phasen. Empfehlung: Phase 2 (common/-Extraktion) auf einer Maschine mit ≥8GB freiem RAM starten.
+
+
 
 
 
