@@ -86,6 +86,15 @@
 - Ergebnis: Commit 7c33a66 auf restructure/phase-1-workspace. Bundle-Audit ist functional verified (19 Treffer in feature-admin/staff/mfa/Questionnaire/PraxisAdminPage — exakt die Bucket-A-Module aus dem Code-Audit). Nach Phase 3+4 wird derselbe Audit gegen packages/capture/dist 0 Treffer zeigen.
 - Out: Co-Reviewer kann in zweitem Chat aktiviert werden, der User pasten das Briefing-Dokument als ersten Prompt. Open-Items-Tracker ist 1 Item erledigt (H1) von 47, klare Pareto-Liste der nächsten 3 für CK + 3 für ENG. Compliance-Toolkit (feature-flag + bundle-audit + DB-roles + ESLint-guard) steht bereit, Aktivierung erfolgt in Phasen 3-5.
 
+2026-05-06T12:50+02:00 | Lauf claude-code-12 | Parallel-Arbeit während Co-Reviewer läuft: 3 Pflicht-MDR-Dokumente
+---
+- Aktion: Während User Co-Reviewer in 2. Chat (Opus 4.7) aktivierte, drei MDR-Pflicht-Dokumente für Class-I-Konformität erstellt: (1) DiggAi-Capture-Risikomanagement-Akte v1.0 nach ISO 14971:2019 (24.8 KB, 11 Kapitel + FMEA-Tabelle in Landscape mit 34 Risiken in 10 Kategorien DC/DT/DS/UI/AC/HW/UM/CO/SD/PR, S+P-Skala 1-4, Pre+Post-Mitigation-Score farbcodiert grün/gelb/orange/rot, Owner-Spalte ENG/CK/EXT). (2) DiggAi-Capture-IFU v1.0 bilingual DE+EN (19 KB, 8 Kapitel je Sprache, 3 rote/gelbe Notfall-Warning-Boxes für 112/Telefonseelsorge/Software-ersetzt-nicht-Arzt). (3) DiggAi-Capture-MDR-Annex-II-Outline v1.0 (17.8 KB, 44 Anhang-II-Sektionen mit Status fertig/in-Arbeit/TBD/fortlaufend, Quell-Dokumenten-Bibliothek, Konformitätserklärungs-Template, Roadmap zum Markteintritt mit kritischem Pfad).
+- Blocker: C-Drive in einer Phase voll → Skript für Tech-Doc direkt nach D-Drive umgeleitet via require()-Pfad-Trick auf docx-Modul.
+- Fix: build-tech-doc.cjs lokal nach D:\Klaproth Projekte\DiggAi geschrieben + nach Build wieder gelöscht; node_modules-Pfad explizit referenziert.
+- Ergebnis: 6 vollständige Strategie-/Compliance-Dokumente in D:\Klaproth Projekte\DiggAi (134 KB total): Status-Plan-Regulatorik, Restrukturierungs-Plan, Intended-Purpose, Risikomanagement-Akte, IFU, MDR-Annex-II-Outline. Plus Co-Reviewer-Briefing-Paket (3 MD-Dateien) und Open-Items-Tracker.
+- Out: Tech-Doc-Bibliothek ist substantielle Foundation für Class-I-Selbstdeklaration. Anwalt + BfArM bekommen jetzt nicht nur Strategie-Übersicht sondern echte Pflicht-Dokumente. Verbleibend für Markteintritt: GSPR-Checklist, CER-Lite (extern), IEC 62304 Akte, SBOM, UDI-DI, EUDAMED-Reg, Pilot-Studie. Co-Reviewer in 2. Chat liefert parallel Befunde — bei Eingang werden Doc-Updates committed.
+
+
 
 
 
