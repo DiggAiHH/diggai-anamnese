@@ -79,6 +79,9 @@
     "check-all": "npm run type-check && npm run lint && node scripts/generate-i18n.ts && npx prisma migrate status",
     "preflight": "node scripts/deploy-preflight.mjs",
     "export:product": "node scripts/export-product-functionality.mjs",
+    "audit:bundle": "node scripts/bundle-audit.cjs dist",
+    "audit:bundle:strict": "cross-env AUDIT_STRICT=1 node scripts/bundle-audit.cjs dist",
+    "audit:capture": "node scripts/bundle-audit.cjs packages/capture/dist",
     "prepare": "husky"
   },
   "lint-staged": {

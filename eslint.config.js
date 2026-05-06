@@ -53,4 +53,32 @@ export default defineConfig([
       'react-refresh/only-export-components': 'warn',
     },
   },
+
+  // ─────────────────────────────────────────────────────────────
+  //  Class-I Code-Trennung — Capture darf NIE Suite-Code importieren.
+  //
+  //  Anker: DiggAi-Restrukturierungs-Plan v1.0 §6.1 (Static Code Tests).
+  //
+  //  Aktiviert wird diese Regel ab Phase 3 (Capture-Code in
+  //  packages/capture/), wenn die Trennung tatsächlich greift. Heute (Phase 1)
+  //  ist sie ein Tripwire — wenn ein Dev versehentlich einen Suite-Path
+  //  importiert, schlägt der Lint fehl.
+  // ─────────────────────────────────────────────────────────────
+  {
+    files: ['packages/capture/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        patterns: [
+          {
+            group: ['**/packages/suite/**', '@diggai/suite', '@diggai/suite/*'],
+            message: 'Capture (Klasse I) darf KEINE Suite-Module (Klasse IIa) importieren. Siehe DiggAi-Restrukturierungs-Plan §6.1.',
+          },
+          {
+            group: ['**/agent-core/**', '**/services/therapy/**', '**/services/ai/**'],
+            message: 'Capture darf keine Class-IIa-Trigger-Module importieren (Triage, AI-Engine, Therapie-Logik).',
+          },
+        ],
+      }],
+    },
+  },
 ])
