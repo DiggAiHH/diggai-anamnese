@@ -22,6 +22,22 @@ type ConsumeMessage = amqplib.ConsumeMessage;
 
 const RABBITMQ_URL = process.env.RABBITMQ_URL ?? 'amqp://diggai:changeme@localhost:5672/';
 
+/**
+ * Wenn DISABLE_RABBITMQ=1 gesetzt ist, wird der Broker-Connect komplett
+ * übersprungen. Sinnvoll für lokale Entwicklung ohne Python-Agent-Core,
+ * damit das Log nicht alle 5 Sekunden mit ECONNREFUSED zugespammt wird.
+ *
+ * Der Code hat überall Fallbacks (HTTP-only Modus), daher hat das
+ * Disabling keinen Einfluss auf die Kernfunktionalität.
+ */
+const RABBITMQ_DISABLED = process.env.DISABLE_RABBITMQ === '1' || process.env.DISABLE_RABBITMQ === 'true';
+
+/**
+ * Reconnect-Backoff in Millisekunden. Default 30s (statt 5s) damit
+ * ein nicht-laufender RabbitMQ das Log nicht zumüllt.
+ */
+const RECONNECT_INTERVAL_MS = Number(process.env.RABBITMQ_RECONNECT_MS ?? 30_000);
+
 const QUEUES = {
     HIGH:    'agent.tasks.high',
     NORMAL:  'agent.tasks.normal',
@@ -61,8 +77,16 @@ class MessageBrokerService extends EventEmitter {
     private channel: Channel | null = null;
     private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     private isConnecting = false;
+    private hasLoggedFailure = false;
 
     async connect(): Promise<void> {
+        if (RABBITMQ_DISABLED) {
+            if (!this.hasLoggedFailure) {
+                console.log('[MessageBroker] Deaktiviert (DISABLE_RABBITMQ=1) — HTTP-only Modus.');
+                this.hasLoggedFailure = true;
+            }
+            return;
+        }
         if (this.isConnecting || this.connection) return;
         this.isConnecting = true;
 
@@ -85,6 +109,7 @@ class MessageBrokerService extends EventEmitter {
             await this.channel.consume(QUEUES.RESULTS, this.handleResult.bind(this), { noAck: false });
 
             this.isConnecting = false;
+            this.hasLoggedFailure = false;
             console.log('[MessageBroker] Verbunden mit RabbitMQ');
             this.emit('connected');
 
@@ -98,7 +123,14 @@ class MessageBrokerService extends EventEmitter {
             });
         } catch (err) {
             this.isConnecting = false;
-            console.error('[MessageBroker] Verbindung fehlgeschlagen:', err);
+            // Stack-Trace nur EINMAL beim ersten Fehlversuch loggen.
+            // Spätere Reconnect-Versuche bleiben still, sonst spammt
+            // ECONNREFUSED das Dev-Log alle paar Sekunden voll.
+            if (!this.hasLoggedFailure) {
+                const code = (err as { code?: string })?.code ?? 'unknown';
+                console.warn(`[MessageBroker] Verbindung fehlgeschlagen (${code}) — Reconnect alle ${RECONNECT_INTERVAL_MS / 1000}s. Setze DISABLE_RABBITMQ=1 um Reconnects abzustellen.`);
+                this.hasLoggedFailure = true;
+            }
             this.scheduleReconnect();
         }
     }
@@ -107,10 +139,11 @@ class MessageBrokerService extends EventEmitter {
         this.connection = null;
         this.channel = null;
         if (this.reconnectTimer) return;
+        if (RABBITMQ_DISABLED) return; // kein Reconnect, wenn explizit deaktiviert
         this.reconnectTimer = setTimeout(() => {
             this.reconnectTimer = null;
             this.connect();
-        }, 5000);
+        }, RECONNECT_INTERVAL_MS);
     }
 
     /**
