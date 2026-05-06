@@ -1,7 +1,13 @@
 import { getAiConfig, isAiAvailable } from './ai-config';
 import { callLlm } from './llm-client';
+import { requireDecisionSupport } from '../../config/featureFlags';
+
+// Class-IIa-Schutz: Ambient-Scribe erzeugt SOAP-Notizen mit Assessment/
+// Diagnose-Feld — klar Decision-Support. Capture-Build (DECISION_SUPPORT_-
+// ENABLED=false) MUSS hart failen. Anker: Open-Items-Tracker B4.
 
 export async function processAmbientVoice(audioTranscription: string, contextId: string) {
+    requireDecisionSupport('processAmbientVoice');
     const config = await getAiConfig();
     const systemPrompt = `Du bist ein hochqualifizierter medizinischer Dokumentations-Assistent in Deutschland.
 Deine Aufgabe ist es, Arzt-Patienten-Gespräche oder Diktate in präzise, strukturierte SOAP-Notizen (Subjektiv, Objektiv, Assessment, Plan) für das PVS zu übersetzen.

@@ -6,7 +6,11 @@
 import { agentService, type IAgent } from '../services/agent/agent.service';
 import { callLlm } from '../services/ai/llm-client';
 import { getAiConfig, isAiAvailable } from '../services/ai/ai-config';
+import { requireDecisionSupport } from '../config/featureFlags';
 import type { AgentTask } from '../services/agent/task.queue';
+
+// Class-IIa-Schutz: erstellt Anamnese-Zusammenfassungen für medizinisches
+// Personal — Suite-only. Anker: Open-Items-Tracker B4.
 
 const SYSTEM_PROMPT = `Du bist der Dokumentations-Agent einer deutschen Arztpraxis.
 Aufgabe: Erstelle eine strukturierte, sachliche Zusammenfassung einer Anamnese-Session für das Praxisteam.
@@ -31,6 +35,7 @@ const dokumentationAgent: IAgent = {
     description: 'Erstellt strukturierte Anamnese-Zusammenfassungen für das Praxisteam',
 
     async execute(task: AgentTask): Promise<string> {
+        requireDecisionSupport('dokumentationAgent.execute');
         const config = await getAiConfig();
 
         if (!isAiAvailable(config)) {

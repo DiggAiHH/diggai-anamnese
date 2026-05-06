@@ -35,6 +35,13 @@
  * @see docs/REGULATORY_STRATEGY.md — Migrationsplan TriageEngine → RoutingEngine
  */
 
+import { requireDecisionSupport } from '../config/featureFlags';
+
+// Class-IIa-Schutz: TriageEngine produziert klinische Red-Flag-Bewertungen
+// (CRITICAL/WARNING). In einem Capture-Build (DECISION_SUPPORT_ENABLED=false)
+// MUSS jeder Aufruf hart failen — die Engine darf nur in der Suite (Klasse IIa)
+// laufen. Anker: server/config/featureFlags.ts, Open-Items-Tracker B4.
+
 export interface TriageResult {
     level: 'WARNING' | 'CRITICAL';
     atomId: string;        // Auslösende Frage
@@ -296,6 +303,7 @@ export class TriageEngine {
      * Prüft ALLE Regeln gegen die aktuellen Antworten
      */
     static evaluateAll(answers: AnswerMap, context: SessionContext): TriageResult[] {
+        requireDecisionSupport('TriageEngine.evaluateAll');
         const results: TriageResult[] = [];
 
         for (const rule of TRIAGE_RULES) {
@@ -319,6 +327,7 @@ export class TriageEngine {
      * Prüft nur eine einzelne Antwort (inkrementell, für POST /answers)
      */
     static evaluateForAtom(atomId: string, allAnswers: AnswerMap, context: SessionContext): TriageResult[] {
+        requireDecisionSupport('TriageEngine.evaluateForAtom');
         const results: TriageResult[] = [];
 
         for (const rule of TRIAGE_RULES) {

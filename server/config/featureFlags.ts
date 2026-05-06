@@ -27,8 +27,13 @@ const truthy = (v: string | undefined): boolean =>
  * Setzen in Suite-Builds:
  *   - Fly-Secret: flyctl secrets set --app diggai-suite-api DECISION_SUPPORT_ENABLED=1
  *   - Lokal:      set DECISION_SUPPORT_ENABLED=1 && npm run dev:server
+ *
+ * Hinweis: Bewusst Runtime-Lookup (Funktion statt const), damit Tests die Env-
+ * Variable per `process.env.DECISION_SUPPORT_ENABLED = '1'` umschalten können
+ * — ohne dass die Importreihenfolge das Verhalten festschreibt.
  */
-export const DECISION_SUPPORT_ENABLED: boolean = truthy(process.env.DECISION_SUPPORT_ENABLED);
+export const DECISION_SUPPORT_ENABLED = (): boolean =>
+    truthy(process.env.DECISION_SUPPORT_ENABLED);
 
 /**
  * Hilfs-Funktion für Routes/Services: wirft, wenn versucht wird,
@@ -43,7 +48,7 @@ export const DECISION_SUPPORT_ENABLED: boolean = truthy(process.env.DECISION_SUP
  *   }
  */
 export function requireDecisionSupport(feature: string): void {
-    if (!DECISION_SUPPORT_ENABLED) {
+    if (!DECISION_SUPPORT_ENABLED()) {
         throw new Error(
             `Feature "${feature}" ist nicht verfügbar. ` +
             `DECISION_SUPPORT_ENABLED=true erforderlich. ` +
@@ -57,7 +62,7 @@ export function requireDecisionSupport(feature: string): void {
  * Bewertung machen oder den Endpoint mit 404/410 ablehnen sollen.
  */
 export function isDecisionSupportEnabled(): boolean {
-    return DECISION_SUPPORT_ENABLED;
+    return DECISION_SUPPORT_ENABLED();
 }
 
 /**
@@ -66,7 +71,7 @@ export function isDecisionSupportEnabled(): boolean {
  */
 export function logFeatureFlags(logger: { info: (msg: string) => void } = console): void {
     logger.info(
-        '[FeatureFlags] DECISION_SUPPORT_ENABLED=' + DECISION_SUPPORT_ENABLED +
+        '[FeatureFlags] DECISION_SUPPORT_ENABLED=' + DECISION_SUPPORT_ENABLED() +
         ' (Default false; nur in Klasse-IIa-Suite auf true setzen)'
     );
 }

@@ -5,6 +5,7 @@
 import { prisma } from '../../db.js';
 import { getIO } from '../../socket.js';
 import { evaluateAlertRules, DEFAULT_ALERT_RULES } from './alert-rules.js';
+import { requireDecisionSupport } from '../../config/featureFlags.js';
 import type {
   AlertSeverity,
   AlertCategory,
@@ -12,6 +13,11 @@ import type {
   ClinicalAlertData,
   CreateAlertInput,
 } from './types.js';
+
+// Class-IIa-Schutz: AlertEngine bewertet Vital-Werte (RR, HR, SpO2, ...) gegen
+// klinische Schwellen und triggert Alerts ans Personal — paradigmatisches
+// Decision-Support. Capture-Build (DECISION_SUPPORT_ENABLED=false) MUSS hart
+// failen. Anker: Open-Items-Tracker B4.
 
 interface AnswerContext {
   answers: Record<string, string | number>;
@@ -40,6 +46,7 @@ export class AlertEngine {
     answerValue: string | number,
     existingContext?: Partial<AnswerContext>
   ): Promise<ClinicalAlertData[]> {
+    requireDecisionSupport('AlertEngine.evaluateAnswer');
     const context: AnswerContext = {
       answers: { ...existingContext?.answers, [answerField]: answerValue },
       medications: existingContext?.medications ?? [],
@@ -89,6 +96,7 @@ export class AlertEngine {
     patientId: string,
     context: AnswerContext
   ): Promise<ClinicalAlertData[]> {
+    requireDecisionSupport('AlertEngine.evaluateSession');
     const triggered = evaluateAlertRules(context, this.rules);
     const created: ClinicalAlertData[] = [];
 
@@ -130,6 +138,7 @@ export class AlertEngine {
     patientId: string,
     context: AnswerContext
   ): Promise<ClinicalAlertData[]> {
+    requireDecisionSupport('AlertEngine.evaluateTherapyPlan');
     const triggered = evaluateAlertRules(context, this.rules);
     const created: ClinicalAlertData[] = [];
 

@@ -10,7 +10,15 @@ import {
     type IcdSuggestionResult,
 } from './response-parser';
 import { suggestIcdCodes, generateRuleSummary } from './lite-engine.service';
+import { requireDecisionSupport } from '../../config/featureFlags';
 import * as crypto from 'crypto';
+
+// Class-IIa-Schutz: Diese Engine produziert klinische Entscheidungs-Hinweise
+// (Therapie-Vorschlag, ICD-Codierung, Session-Summary). In einem Capture-Build
+// (DECISION_SUPPORT_ENABLED=false) MUSS jeder Aufruf hart failen — damit ist
+// die Class-I-Position auch dann gewährleistet, wenn versehentlich ein Suite-
+// Code-Pfad in den Capture-Bundle gelangt. Anker: DiggAi-Restrukturierungs-
+// Plan v1.0 §6.2 (Stufe 2) und Open-Items-Tracker B4.
 
 export interface AiEngineStatus {
     available: boolean;
@@ -58,6 +66,7 @@ export class AiEngine {
         durationMs: number;
         mode: 'pro' | 'lite';
     }> {
+        requireDecisionSupport('AiEngine.suggestTherapy');
         const config = await this.getConfig();
         const ctx = await aggregateSessionContext(sessionId);
 
@@ -110,6 +119,7 @@ export class AiEngine {
         durationMs: number;
         mode: 'pro' | 'lite';
     }> {
+        requireDecisionSupport('AiEngine.summarizeSession');
         const config = await this.getConfig();
         const ctx = await aggregateSessionContext(sessionId);
 
@@ -146,6 +156,7 @@ export class AiEngine {
         suggestions: IcdSuggestionResult['suggestions'];
         mode: 'pro' | 'lite';
     }> {
+        requireDecisionSupport('AiEngine.suggestIcd');
         const config = await this.getConfig();
 
         if (!isAiAvailable(config)) {

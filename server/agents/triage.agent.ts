@@ -5,7 +5,12 @@
 import { agentService, type IAgent } from '../services/agent/agent.service';
 import { callLlm } from '../services/ai/llm-client';
 import { getAiConfig, isAiAvailable } from '../services/ai/ai-config';
+import { requireDecisionSupport } from '../config/featureFlags';
 import type { AgentTask } from '../services/agent/task.queue';
+
+// Class-IIa-Schutz: Agent priorisiert Patienten-Anfragen und entscheidet
+// Eskalation — clear decision-support territory. Capture-Build (DECISION_-
+// SUPPORT_ENABLED=false) MUSS hart failen. Anker: Open-Items-Tracker B4.
 
 const SYSTEM_PROMPT = `Du bist der Triage-Agent einer deutschen Arztpraxis.
 Aufgaben: Eingehende Anfragen priorisieren, Notfälle identifizieren und eskalieren.
@@ -26,6 +31,7 @@ const triageAgent: IAgent = {
     description: 'Priorisiert Patientenanfragen und erkennt Notfälle',
 
     async execute(task: AgentTask): Promise<string> {
+        requireDecisionSupport('triageAgent.execute');
         const config = await getAiConfig();
 
         if (!isAiAvailable(config)) {

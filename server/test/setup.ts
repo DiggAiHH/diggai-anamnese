@@ -4,6 +4,13 @@
  */
 import { vi } from 'vitest';
 
+// Class-IIa-Schutz: In Tests laufen wir wie im Suite-Build (DECISION_SUPPORT_-
+// ENABLED=true), damit TriageEngine/AlertEngine/AiEngine-Aufrufe nicht durch
+// den `requireDecisionSupport`-Guard blockiert werden. Anker:
+// server/config/featureFlags.ts, Open-Items-Tracker B4. Wer Capture-Mode
+// testen will, setzt das gezielt im Test selbst zurück.
+process.env.DECISION_SUPPORT_ENABLED = '1';
+
 // Mock the db module globally
 vi.mock('../db', async () => {
   const actual = await vi.importActual<typeof import('../db')>('../db');
