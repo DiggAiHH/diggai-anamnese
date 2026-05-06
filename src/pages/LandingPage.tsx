@@ -307,8 +307,8 @@ const FeaturesSection = React.memo(function FeaturesSection() {
     },
     {
       icon: Sparkles,
-      title: t('landing.features.ai.title', 'KI-Unterstützung'),
-      description: t('landing.features.ai.description', 'Intelligente Voranalyse und automatisierte Triage für mehr Effizienz.'),
+      title: t('landing.features.ai.title', 'Strukturierte Aufnahme'),
+      description: t('landing.features.ai.description', 'Strukturierte Erfassung und Weiterleitung der Patienteneingaben für mehr Effizienz in der Praxis.'),
     },
     {
       icon: Stethoscope,

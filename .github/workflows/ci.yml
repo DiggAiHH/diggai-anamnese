@@ -63,6 +63,13 @@ jobs:
         run: npm run audit:bundle
         continue-on-error: true
 
+      # Class-I-Hard-Gate: Marketing-Strings in Source-Files prüfen.
+      # K22: marketing-audit.cjs als Hard-Gate — fängt jede Class-IIa-Drift
+      # in marketing-relevanten Strings mechanisch ab, bevor sie deployed wird.
+      # Anker: DiggAi-Open-Items-Tracker K22.
+      - name: Marketing-Audit Class-I Hard-Gate
+        run: node scripts/marketing-audit.cjs
+
       - name: Prisma generate
         run: npx prisma generate
 
