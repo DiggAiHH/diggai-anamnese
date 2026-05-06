@@ -1,7 +1,7 @@
 {
-  "name": "DiggAI Anamnese App",
+  "name": "DiggAI Capture — Praxis-Anmeldung",
   "short_name": "DiggAI",
-  "description": "DSGVO-konforme digitale Patientenaufnahme für Arztpraxen",
+  "description": "Administrative Praxis-Anmelde- und Anliegen-Erfassungs-Plattform für deutsche Arztpraxen. Kein Medizinprodukt.",
   "id": "/",
   "start_url": "/",
   "display": "standalone",
@@ -9,7 +9,7 @@
   "theme_color": "#3b82f6",
   "orientation": "portrait-primary",
   "lang": "de",
-  "categories": ["medical", "health", "productivity"],
+  "categories": ["productivity", "business", "utilities"],
   "icons": [
     {
       "src": "/icons/icon-192.svg",
