@@ -1,9 +1,13 @@
-# DiggAI Anamnese Platform
+# DiggAi Anamnese Platform
 
-DSGVO-konforme, klinische Patientenaufnahme-Plattform für Arztpraxen in Deutschland.
-Digitalisiert den Anamnese-Prozess mit 270+ medizinischen Fragen, Echtzeit-Triage, KI-gestützter Auswertung und vollständiger Offline-Unterstützung als Progressive Web App.
+DSGVO-konforme administrative Praxis-Anmelde- und Anamnese-Erfassungs-Plattform für Arztpraxen in Deutschland. Erfasst Patienten-Stammdaten und freie Anliegen-Beschreibung in 10 Sprachen, leitet sie strukturiert an die Praxis weiter und unterstützt den Workflow mit PWA-Offline-Modus.
 
-**Live**: [diggai-drklaproth.netlify.app](https://diggai-drklaproth.netlify.app)
+> **Regulatorische Position:** DiggAi ist als zwei separate Anwendungen konzipiert: **DiggAi-Capture** (administrative Datenerfassung, MDR Klasse I in Selbstverifizierung) und **DiggAi-Suite** (Praxis-Workflow-Werkzeuge mit Triage und KI-Therapie-Vorschlägen, MDR Klasse IIa über Notified Body, separater Build/Deploy). Capture liefert keine medizinische Bewertung, keine Diagnose, keine Triage-Empfehlung. Siehe `docs/STATUS_PLAN_REGULATORIK_FLIP.md` und `docs/INTENDED_USE.md`.
+
+**Live (Stand 2026-05-06):**
+- Frontend: [diggai.de](https://diggai.de) (Custom-Domain) und [diggai-anamnese.netlify.app](https://diggai-anamnese.netlify.app)
+- API: [diggai-api.fly.dev](https://diggai-api.fly.dev) und [api.diggai.de](https://api.diggai.de) (DNS-Cutover seit Lauf 13)
+- Datenbank: Neon Postgres EU-Frankfurt
 
 ---
 
