@@ -22,6 +22,7 @@
  *   4) Feature-Flag VOICE_AGENT_ENABLED
  */
 
+import * as React from 'react';
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -44,8 +45,8 @@ export function VoiceAnamneseToggle({
     sessionId,
     language,
     onModeChange,
-    onAnswersReceived,
-}: VoiceAnamneseToggleProps): JSX.Element {
+    onAnswersReceived: _onAnswersReceived,
+}: VoiceAnamneseToggleProps): React.ReactElement {
     const { t } = useTranslation();
     const [state, setState] = useState<VoiceState>('idle');
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
