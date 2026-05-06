@@ -94,15 +94,12 @@ async function main() {
         console.log('  ✓ Umbenannt');
     } else if (klaprothExists) {
         console.log(`✓ Tenant '${TENANT_SUBDOMAIN}' existiert bereits (id=${klaprothExists.id}, status=${klaprothExists.status})`);
-        if (klaprothExists.status !== 'ACTIVE') {
-            tenant = await prisma.tenant.update({
-                where: { id: klaprothExists.id },
-                data: { status: 'ACTIVE' },
-            });
-            console.log(`  → Status war "${klaprothExists.status}" — auf ACTIVE gesetzt`);
-        } else {
-            tenant = klaprothExists;
-        }
+        // Immer Status + visibility sicherstellen (Production-Filter braucht visibility='PUBLIC')
+        tenant = await prisma.tenant.update({
+            where: { id: klaprothExists.id },
+            data: { status: 'ACTIVE', visibility: 'PUBLIC', bsnr: TENANT_BSNR },
+        });
+        console.log(`  → status=ACTIVE, visibility=PUBLIC, bsnr=${TENANT_BSNR} sichergestellt`);
     } else {
         console.log(`→ Kein Tenant gefunden. Erstelle '${TENANT_SUBDOMAIN}'…`);
         tenant = await prisma.tenant.create({
