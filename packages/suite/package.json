@@ -1,0 +1,21 @@
+{
+  "name": "@diggai/suite",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DiggAi Suite — Arzt-Dashboard mit Triage, KI-Bewertung, Therapie-Plänen (MDR Klasse IIa).",
+  "scripts": {
+    "dev:frontend": "echo \"will move in Phase 4\" && exit 0",
+    "dev:backend": "echo \"will move in Phase 4\" && exit 0",
+    "build": "echo \"workspace build follows in Phase 4\" && exit 0",
+    "test": "echo \"suite-tests follow in Phase 4\" && exit 0"
+  },
+  "diggaiClassification": {
+    "isMedicalDevice": true,
+    "mdrClass": "IIa",
+    "conformityRoute": "Annex IX — Konformitätsbewertung durch Benannte Stelle",
+    "rationale": "Liefert Information für klinische Entscheidungen (Triage, KI-Summary, Therapie-Vorschläge). MDR Anhang VIII Regel 11 — Klasse IIa.",
+    "buckets": ["A/Class-IIa-Trigger"],
+    "diGAPath": "§139e SGB V — Antrag auf Aufnahme ins DiGA-Verzeichnis (Fast-Track möglich)",
+    "intendedPurposeDoc": "../../docs/regulatory/intended-purpose-suite.md (TODO Phase 4)"
+  }
+}

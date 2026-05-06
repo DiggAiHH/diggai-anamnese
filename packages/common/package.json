@@ -1,0 +1,17 @@
+{
+  "name": "@diggai/common",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Geteilte Library: Auth, Encryption, Audit, Middleware. KEIN Medizinprodukt.",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "type-check": "tsc --noEmit",
+    "test": "echo \"common-tests follow in Phase 2\" && exit 0"
+  },
+  "diggaiClassification": {
+    "isMedicalDevice": false,
+    "rationale": "Reine Infrastruktur (Auth, Encryption, Audit). Kein medizinischer Zweck im Sinne MDR Art. 2.",
+    "buckets": ["B-C/Infrastructure"]
+  }
+}

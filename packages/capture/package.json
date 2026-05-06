@@ -1,0 +1,20 @@
+{
+  "name": "@diggai/capture",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DiggAi Capture — patientenseitige Anamnese-Erfassung (MDR Klasse I, Selbstdeklaration).",
+  "scripts": {
+    "dev:frontend": "echo \"will move to vite --host in Phase 3\" && exit 0",
+    "dev:backend": "echo \"will move to tsx watch backend/src/index.ts in Phase 3\" && exit 0",
+    "build": "echo \"workspace build follows in Phase 3\" && exit 0",
+    "test": "echo \"capture-tests follow in Phase 3\" && exit 0"
+  },
+  "diggaiClassification": {
+    "isMedicalDevice": true,
+    "mdrClass": "I",
+    "conformityRoute": "Annex IV — Erklärung des Herstellers (Selbstdeklaration)",
+    "rationale": "Reine Datenerfassung patientenseitiger Anamnese. Keine Triage, keine KI-Bewertung, keine Therapieempfehlung. Liefert Daten (nicht Information) im Sinne MDCG 2019-11 §6.1.",
+    "buckets": ["B/Pure-Capture"],
+    "intendedPurposeDoc": "../../docs/regulatory/intended-purpose-capture.md"
+  }
+}
