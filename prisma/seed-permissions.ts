@@ -124,8 +124,10 @@ export async function seedPermissions() {
     return roleAssignments.length;
 }
 
-// Run standalone
-if (require.main === module) {
+// Run standalone — ESM-kompatibel (Node 24 hat kein `require.main`).
+import { fileURLToPath } from 'node:url';
+const __filenamePerm = fileURLToPath(import.meta.url);
+if (process.argv[1] === __filenamePerm) {
     seedPermissions()
         .then(() => prisma.$disconnect())
         .catch(e => { console.error(e); prisma.$disconnect(); process.exit(1); });

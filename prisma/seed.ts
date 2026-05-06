@@ -518,30 +518,39 @@ async function main() {
     console.log(`  ✓ ${LEGACY_QUESTIONS.length} MedicalAtoms eingefügt`);
 
     // 3. Standard-Arzt-Account erstellen
-    const tenant = await prisma.tenant.upsert({
-        where: { subdomain: 'default' },
-        update: {
-            bsnr: '999999999',
-            name: 'Praxis Dr. Klaproth',
-            visibility: 'PUBLIC',
-            settings: {
-                features: {
-                    showWaitingRoom: false,
-                },
-            },
-        },
-        create: {
-            subdomain: 'default',
-            name: 'Praxis Dr. Klaproth',
-            bsnr: '999999999',
-            visibility: 'PUBLIC',
-            settings: {
-                features: {
-                    showWaitingRoom: false,
-                },
-            },
+    // Look-up by either subdomain ('default' or 'klaproth' — historic vs. current
+    // canonical) OR by BSNR='999999999' — verhindert Unique-Konflikte, wenn
+    // bootstrap-prod.ts den Tenant schon umbenannt hat.
+    const existingTenant = await prisma.tenant.findFirst({
+        where: {
+            OR: [
+                { subdomain: 'klaproth' },
+                { subdomain: 'default' },
+                { bsnr: '999999999' },
+            ],
         },
     });
+    const tenant = existingTenant
+        ? await prisma.tenant.update({
+              where: { id: existingTenant.id },
+              data: {
+                  subdomain: 'klaproth',
+                  bsnr: '999999999',
+                  name: 'Praxis Dr. Klaproth',
+                  visibility: 'PUBLIC',
+                  status: 'ACTIVE',
+                  settings: { features: { showWaitingRoom: false } },
+              },
+          })
+        : await prisma.tenant.create({
+              data: {
+                  subdomain: 'klaproth',
+                  name: 'Praxis Dr. Klaproth',
+                  bsnr: '999999999',
+                  visibility: 'PUBLIC',
+                  settings: { features: { showWaitingRoom: false } },
+              },
+          });
     
     const arztPasswordHash = await bcrypt.hash(process.env.ARZT_PASSWORD || 'praxis2026', 10);
     const demoPasswordHash = await bcrypt.hash('arzt1234', 10);

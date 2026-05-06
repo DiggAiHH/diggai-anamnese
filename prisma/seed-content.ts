@@ -114,8 +114,12 @@ export async function seedWaitingContent() {
     return created;
 }
 
-// Run standalone
-if (require.main === module) {
+// Run standalone — ESM-kompatibel: nur via direktem CLI-Aufruf prüfen.
+// Node 24 ESM hat kein `require.main` mehr. Dieser Block wird nur ausgeführt,
+// wenn die Datei DIREKT als Hauptmodul gestartet wird (z.B. `tsx prisma/seed-content.ts`).
+import { fileURLToPath } from 'node:url';
+const __filename = fileURLToPath(import.meta.url);
+if (process.argv[1] === __filename) {
     seedWaitingContent()
         .then(() => prisma.$disconnect())
         .catch(e => { console.error(e); prisma.$disconnect(); process.exit(1); });
