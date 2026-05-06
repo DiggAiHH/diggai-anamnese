@@ -1,0 +1,77 @@
+# ─────────────────────────────────────────────────────────────
+#  DiggAi — Lokale Dev-DB (Postgres + Redis only)
+#
+#  Dieses Compose-File startet NUR die Infrastruktur, die
+#  `npm run dev:all` braucht: PostgreSQL 16 und Redis 7.
+#  Der App-Container wird NICHT mitgestartet (der läuft via
+#  `tsx watch` aus der IDE für Hot-Reload).
+#
+#  Verwendung:
+#    docker compose -f docker-compose.dev-db.yml up -d
+#    docker compose -f docker-compose.dev-db.yml down
+#    docker compose -f docker-compose.dev-db.yml logs -f
+#
+#  Credentials passen zu .env (DATABASE_URL=postgres:postgres@localhost:5432/anamnese)
+# ─────────────────────────────────────────────────────────────
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: diggai-dev-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: anamnese
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - diggai_dev_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d anamnese"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: diggai-dev-redis
+    ports:
+      - "6379:6379"
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 128mb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - diggai_dev_redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  # RabbitMQ ist optional — wird vom Code graceful degraded.
+  # Wer das Python Agent-Core lokal mit-testen will, setzt
+  # ENABLE_RABBITMQ=1 als env-var und startet diesen Service.
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: diggai-dev-rabbitmq
+    profiles: ["agents"]
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: diggai
+      RABBITMQ_DEFAULT_PASS: changeme
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  diggai_dev_pgdata:
+  diggai_dev_redisdata:

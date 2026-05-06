@@ -1,0 +1,76 @@
+# ─── Node / Build ─────────────────────────────────
+node_modules
+dist
+build
+.next
+coverage
+.cache
+.parcel-cache
+
+# ─── Tests ────────────────────────────────────────
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+e2e
+playwright-report
+test-results
+tests_py
+
+# ─── Local / IDE ──────────────────────────────────
+.git
+.github
+.gitignore
+.vscode
+.idea
+*.swp
+*.swo
+
+# ─── Docs / Memory ────────────────────────────────
+*.md
+docs
+memory
+backups
+shared/knowledge
+
+# ─── Env / Secrets ────────────────────────────────
+.env
+.env.local
+.env.*.local
+.env.production
+.env.hetzner.template
+.env.n8n*
+
+# ─── Compose / Deploy ─────────────────────────────
+docker-compose*.yml
+*.bat
+*.ps1
+scripts/once-guard.ps1
+
+# ─── Public assets are NOT needed by backend ──────
+public
+
+# ─── Frontend-only sources ────────────────────────
+src/components
+src/pages
+src/hooks
+src/store
+src/api
+src/lib/i18n
+src/lib/practiceConfig.ts
+src/lib/runtimeEndpoints.ts
+src/test-setup.ts
+src/i18n.ts
+src/main.tsx
+src/App.tsx
+src/index.css
+src/vite-env.d.ts
+index.html
+vite.config.ts
+postcss.config.js
+tailwind.config.js
+eslint.config.js
+playwright.config.ts
+vitest*.config.ts
+
+# Note: server/, prisma/, src/theme/ MUST be included (Dockerfile copies them)

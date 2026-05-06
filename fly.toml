@@ -1,0 +1,58 @@
+# ─────────────────────────────────────────────────────────────
+#  DiggAi Backend — Fly.io Deploy-Config
+#
+#  Region: Frankfurt (fra) — DSGVO-konform
+#  Hosting: Fly.io (formerly fly.io / superfly)
+#  Image:   Multi-stage Dockerfile aus Repo-Root
+#
+#  Setup-Befehle:
+#    flyctl auth login
+#    flyctl launch --no-deploy --copy-config --name diggai-api --region fra
+#    flyctl secrets set DATABASE_URL="postgres://...neon.tech/..."
+#    flyctl secrets set JWT_SECRET="..." ENCRYPTION_KEY="..."
+#    flyctl deploy
+#
+#  Custom-Domain (optional, für api.diggai.de):
+#    flyctl certs add api.diggai.de
+#    DNS-A-Record auf fly-IP setzen (flyctl ips list)
+# ─────────────────────────────────────────────────────────────
+
+app = "diggai-api"
+primary_region = "fra"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  PORT = "3001"
+  DEPLOYMENT_MODE = "CLOUD"
+  # CORS auf Production-Frontend
+  CORS_ORIGIN = "https://diggai.de,https://www.diggai.de,https://diggai-anamnese.netlify.app"
+  # RabbitMQ optional — Agent-Core ist separater Service
+  DISABLE_RABBITMQ = "1"
+
+[http_service]
+  internal_port = 3001
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "20s"
+    method = "GET"
+    path = "/api/health"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1
+
+[[mounts]]
+  source = "diggai_uploads"
+  destination = "/app/uploads"
