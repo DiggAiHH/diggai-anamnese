@@ -78,6 +78,15 @@
 - Ergebnis: 4 commits gepusht (untilted Phase-1a auf restructure/phase-1-workspace branch), Build verifiziert. Live-System diggai.de unangetastet, weiterhin grün.
 - Out: Phase-1 SCAFFOLD steht. Phase-1b (workspaces aktivieren) muss in fresher Umgebung passieren — möglichst auf einem Rechner mit mehr RAM, oder nach Reboot. Die Scaffold-Folder + diggaiClassification-Metadata sind aber bereits jetzt nutzbar als Anker für die nächsten Phasen. Empfehlung: Phase 2 (common/-Extraktion) auf einer Maschine mit ≥8GB freiem RAM starten.
 
+2026-05-06T11:45+02:00 | Lauf claude-code-11 | Co-Reviewer-Paket + Compliance-Toolkit
+---
+- Aktion: 3 Übergabe-Dokumente in D:\Klaproth Projekte\DiggAi\ (workspace-Wurzel) — (1) Co-Reviewer-Briefing.md mit Charakter-Definition (Senior Reg-Affairs + Senior-Engineer mit zwei Hüten), Projekt-Kontext, drei Doc-Reviews + Konsistenz-Check + Eskalations-Protokoll, (2) DiggAi-Open-Items-Tracker.md mit 47 Items in 9 Kategorien (A Sofort, B Engineering, C DB+Sec, D MDR-Tech-Doc, E ISMS, F DiGA, G Marketing, H Bug-Backlog, I Compliance laufend), (3) Co-Reviewer-Konsistenz-Pruefliste.md mit 10 Konsistenz-Checkpoints + Showstopper-Detektor. Compliance-Toolkit committed: server/config/featureFlags.ts (DECISION_SUPPORT_ENABLED + requireDecisionSupport guard), scripts/bundle-audit.cjs (greppt JS-Bundle nach 22 verbotenen Strings, getestet — 19 Treffer im aktuellen monolithischen Bundle = erwartet), prisma/sql/01_postgres_roles.sql (3 Rollen mit minimalen Rechten), eslint.config.js (no-restricted-imports für packages/capture), package.json scripts (audit:bundle, audit:bundle:strict, audit:capture).
+- Blocker: —
+- Fix: —
+- Ergebnis: Commit 7c33a66 auf restructure/phase-1-workspace. Bundle-Audit ist functional verified (19 Treffer in feature-admin/staff/mfa/Questionnaire/PraxisAdminPage — exakt die Bucket-A-Module aus dem Code-Audit). Nach Phase 3+4 wird derselbe Audit gegen packages/capture/dist 0 Treffer zeigen.
+- Out: Co-Reviewer kann in zweitem Chat aktiviert werden, der User pasten das Briefing-Dokument als ersten Prompt. Open-Items-Tracker ist 1 Item erledigt (H1) von 47, klare Pareto-Liste der nächsten 3 für CK + 3 für ENG. Compliance-Toolkit (feature-flag + bundle-audit + DB-roles + ESLint-guard) steht bereit, Aktivierung erfolgt in Phasen 3-5.
+
+
 
 
 
