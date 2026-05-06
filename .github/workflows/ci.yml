@@ -53,6 +53,16 @@ jobs:
       - name: Build frontend
         run: npm run build
 
+      # Class-I-Schutz: Bundle-Audit auf das frische dist/.
+      # Greppt minified JS nach Class-IIa-Strings (triage, redFlag, aiSummary, ...).
+      # Solange noch der Monolith gebaut wird, sind 19 erwartete Treffer ok —
+      # daher hier ohne --strict; nach Phase 4 (Capture-only-Build) auf
+      # `npm run audit:capture` umstellen und einen Treffer als Build-Failure werten.
+      # Anker: DiggAi-Restrukturierungs-Plan v1.0 §6.1, Open-Items-Tracker B6.
+      - name: Bundle-Audit (Class-IIa-Strings im Capture-Bundle)
+        run: npm run audit:bundle
+        continue-on-error: true
+
       - name: Prisma generate
         run: npx prisma generate
 

@@ -82,6 +82,14 @@ if (isDemoMode()) {
  * Root tenant identifier sent to the backend for all non-BSNR deployments.
  * Hardcoded to 'klaproth' so the root (/) on diggai.de explicitly resolves
  * to the Klaproth tenant — no fragile name heuristics, no locale overrides.
+ *
+ * Override via Netlify env-var VITE_TENANT_ID if a deployment maps to a different
+ * tenant subdomain.
+ *
+ * @canonical-tenant 'klaproth' — siehe scripts/bootstrap-prod-tenant.cjs für die
+ *   Production-DB-Seed-Aktion. Backend-Code-Fallbacks auf 'default' sind nur in
+ *   NODE_ENV=development aktiv und stellen keine Bindung an einen DB-Tenant
+ *   namens 'default' dar — die Production-DB enthält 'klaproth'.
  */
 function resolveTenantIdHint(): string | null {
     return configuredTenantId || 'klaproth';
