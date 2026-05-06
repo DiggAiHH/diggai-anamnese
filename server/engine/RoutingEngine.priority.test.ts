@@ -79,7 +79,10 @@ describe('RoutingEngine - PRIORITY Rules (Strukturtests)', () => {
   describe('PRIORITY_SUIZID - Suizidalitäts-Screening', () => {
     it.each([['ja', 'String'], [true, 'Boolean']] as const)(
       'löst aus bei %s (%s)',
-      (value) => {
+      // Tuple-Form liefert 2 Args (value + label) — Vitest-Typing erwartet
+      // dass die Callback-Signatur exakt zur Tuple-Shape passt. Zweiter Arg
+      // wird im Test nicht gebraucht, muss aber deklariert sein. (CI-Fix TS2345)
+      (value, _typeLabel) => {
         const results = RoutingEngine.evaluateAll({ '1C14': { value } } as any, {});
         const r = results.find((r) => r.ruleId === 'PRIORITY_SUIZID');
         expect(r).toBeDefined();
