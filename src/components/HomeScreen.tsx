@@ -46,6 +46,10 @@ interface HomeTile {
   gradient: string;
   labelKey: string;
   descKey: string;
+  /** Visible German fallback when i18n key isn't loaded yet — never let
+   *  raw keys like "patient_desc" leak to patients. */
+  labelFallback: string;
+  descFallback: string;
   preload?: () => Promise<unknown>;
 }
 
@@ -143,7 +147,9 @@ export function HomeScreen() {
       icon: <Stethoscope className="w-16 h-16 md:w-20 md:h-20" />,
       gradient: practiceConfig.tileGradients[0],
       labelKey: 'home.tile.patient',
+      labelFallback: 'Patient',
       descKey: 'home.tile.patient_desc',
+      descFallback: 'Anamnese, Rezepte, Krankschreibung',
       preload: preloadPatientFlow,
     },
     {
@@ -152,7 +158,9 @@ export function HomeScreen() {
       icon: <Smartphone className="w-16 h-16 md:w-20 md:h-20" />,
       gradient: practiceConfig.tileGradients[1],
       labelKey: 'home.tile.pwa',
+      labelFallback: 'Patienten-Portal',
       descKey: 'home.tile.pwa_desc',
+      descFallback: 'Nachrichten, Tagebuch, Einstellungen',
       preload: preloadPwaPortal,
     },
     {
@@ -161,7 +169,9 @@ export function HomeScreen() {
       icon: <Video className="w-16 h-16 md:w-20 md:h-20" />,
       gradient: practiceConfig.tileGradients[2],
       labelKey: 'home.tile.telemedizin',
+      labelFallback: 'Telemedizin',
       descKey: 'home.tile.telemedizin_desc',
+      descFallback: 'Videosprechstunde & Termine',
       preload: preloadTelemedizin,
     },
   ], []);
@@ -355,7 +365,7 @@ export function HomeScreen() {
                   focus:outline-none focus:ring-4 focus:ring-white/30
                   cursor-pointer text-left
                 `}
-                aria-label={t(tile.labelKey, tile.id)}
+                aria-label={t(tile.labelKey, { defaultValue: tile.labelFallback })}
               >
                 <div className="absolute inset-0 bg-gradient-to-t from-black/25 to-transparent" />
                 <div className="absolute -top-6 -right-6 w-32 h-32 rounded-full bg-white/10 group-hover:scale-150 transition-transform duration-500" />
@@ -365,8 +375,8 @@ export function HomeScreen() {
                     {tile.icon}
                   </div>
                   <div>
-                    <h2 className="text-2xl md:text-3xl font-bold">{t(tile.labelKey, tile.id)}</h2>
-                    <p className="text-sm md:text-base text-white/85 mt-1">{t(tile.descKey, '')}</p>
+                    <h2 className="text-2xl md:text-3xl font-bold">{t(tile.labelKey, { defaultValue: tile.labelFallback })}</h2>
+                    <p className="text-sm md:text-base text-white/85 mt-1">{t(tile.descKey, { defaultValue: tile.descFallback })}</p>
                   </div>
                 </div>
               </button>

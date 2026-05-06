@@ -185,7 +185,7 @@ export function SignaturePad({
         disabled={isEmpty}
       >
         <RotateCcw className="w-4 h-4" />
-        <span className="hidden sm:inline">Zurücksetzen</span>
+        <span className="hidden sm:inline">Unterschrift zurücksetzen</span>
       </motion.button>
 
       <motion.button
@@ -203,7 +203,9 @@ export function SignaturePad({
         whileTap={!isEmpty && !isConfirmed ? { scale: 0.99 } : {}}
       >
         <Check className="w-4 h-4" />
-        {isConfirmed ? 'Gespeichert' : 'Bestätigen'}
+        {/* Klarstellung 2026-05-06: explizit "Unterschrift", damit Patient
+            nicht denkt, dass das gesamte Formular gespeichert/abgesendet wird. */}
+        {isConfirmed ? 'Unterschrift gespeichert' : 'Unterschrift bestätigen'}
       </motion.button>
 
       {onCancel && !sticky && (

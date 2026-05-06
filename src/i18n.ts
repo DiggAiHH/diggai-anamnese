@@ -77,6 +77,13 @@ i18n
             order: ['querystring', 'cookie', 'localStorage', 'navigator', 'htmlTag'],
             caches: ['cookie', 'localStorage'],
         },
+        // Bug fix 2026-05-06: translation.json speichert Schlüssel als FLAT dotted keys
+        // ("home.subtitle": "..."), nicht als nested objects. Ohne diese beiden Flags
+        // wuerde i18next den Punkt als Separator interpretieren und im Schluessel
+        // home > subtitle suchen — was nicht existiert. Damit landeten ALLE dotted keys
+        // im formatMissingKey-Handler und wurden als "[?] subtitle" gerendert.
+        keySeparator: false,
+        nsSeparator: false,
         // Accessibility: Simplified language options for cognitive accessibility
         react: {
             useSuspense: true,

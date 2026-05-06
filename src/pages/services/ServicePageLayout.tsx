@@ -320,10 +320,10 @@ function ConsentSignatureModal({ flow }: { flow: ServiceFlowState }) {
             <ShieldCheck className="w-7 h-7 text-blue-400" />
           </div>
           <h2 className="text-xl font-bold text-[var(--text-primary)]">
-            {t('consent.title')}
+            {t('consent.title', { defaultValue: 'Einwilligung & Unterschrift' })}
           </h2>
           <p className="text-sm text-[var(--text-secondary)]">
-            {t('consent.subtitle')}
+            {t('consent.subtitle', { defaultValue: 'Bitte bestätigen Sie alle Punkte und unterschreiben Sie.' })}
           </p>
         </div>
 
@@ -348,7 +348,7 @@ function ConsentSignatureModal({ flow }: { flow: ServiceFlowState }) {
                 className="mt-0.5 w-5 h-5 rounded border-2 border-[var(--border-primary)] text-blue-600 focus:ring-blue-500 shrink-0 accent-blue-600"
               />
               <span className="text-sm text-[var(--text-secondary)] leading-relaxed">
-                {t(cb.labelKey)}
+                {t(cb.labelKey, { defaultValue: cb.fallback })}
               </span>
             </label>
           ))}
@@ -357,7 +357,7 @@ function ConsentSignatureModal({ flow }: { flow: ServiceFlowState }) {
         {/* Signature */}
         <div className="space-y-2">
           <p className="text-sm font-medium text-[var(--text-primary)]">
-            {t('consent.signature_label')}
+            {t('consent.signature_label', { defaultValue: 'Ihre Unterschrift' })}
           </p>
           <div className={`rounded-xl border-2 transition-colors ${
             showError && !hasSigned ? 'border-red-500/50' : 'border-[var(--border-primary)]'

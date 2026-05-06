@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useCreateSession } from './useApi/usePatientApi';
 import { useSessionStore } from '../store/sessionStore';
+import { useModeStore } from '../store/modeStore';
 import { preloadConsentExperience } from '../lib/routePreloaders';
 import {
   getPatientQuestionnairePath,
@@ -85,7 +86,16 @@ export function useServiceFlow(serviceId: PatientServiceId): ServiceFlowState {
       navigate(getPatientQuestionnairePath(service.id, bsnr), { replace: true });
     } else if (createStatus === 'error') {
       setSubmitStatus('error');
-      setSubmitError('Verbindungsfehler. Bitte versuchen Sie es erneut.');
+      // Hilfreichere Meldung: wenn Live-Modus aktiv ist und das Backend nicht
+      // erreichbar ist, dem Patienten den Demo-Modus als Ausweg anbieten.
+      // Bug-Tracking 2026-05-06: api.diggai.de TLS-Handshake bricht ab → Live
+      // ist temporär unbenutzbar. Demo-Modus bleibt voll funktional.
+      const inLive = useModeStore.getState().mode === 'live';
+      setSubmitError(
+        inLive
+          ? 'Live-Server nicht erreichbar. Sie können im Demo-Modus testen — wechseln Sie unten rechts auf "Demo".'
+          : 'Verbindungsfehler. Bitte versuchen Sie es erneut.'
+      );
     }
   }, [createStatus, sessionId, submitStatus, bsnr, navigate, service]);
 
