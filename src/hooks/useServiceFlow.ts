@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, type RefObject } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useCreateSession } from './useApi/usePatientApi';
 import { useSessionStore } from '../store/sessionStore';
@@ -19,6 +19,8 @@ export interface ServiceFlowState {
   submitStatus: 'idle' | 'pending' | 'success' | 'error';
   /** Inline error message for the consent modal (K8 fix) */
   submitError: string | null;
+  /** C12: Honeypot-Ref — muss auf ein hidden-but-in-DOM-input zeigen */
+  honeypotRef: RefObject<HTMLInputElement | null>;
   handleSelect: () => void;
   handleConsentAccept: () => void;
   handleConsentDecline: () => void;
@@ -48,18 +50,23 @@ export function useServiceFlow(serviceId: PatientServiceId): ServiceFlowState {
     documentHash: string;
     flags: Record<string, boolean>;
   } | null>(null);
+  // C12: Honeypot — ref to the hidden-but-visible-to-bots input in the DOM
+  const honeypotRef = useRef<HTMLInputElement | null>(null);
   const service = getPatientServiceById(serviceId);
 
   const startFlow = useCallback(() => {
     if (!service) return;
 
     setPatientData({ selectedService: service.flowValue });
+    // C12: Honeypot — lese DOM-Wert aus (leer = Mensch, gefüllt = Bot)
+    const hp = honeypotRef.current?.value ?? '';
     createSession({
       email: '',
       isNewPatient: true,
       gender: '',
       birthDate: '',
       selectedService: service.flowValue,
+      _hp: hp,
     });
   }, [service, setPatientData, createSession]);
 
@@ -171,6 +178,7 @@ export function useServiceFlow(serviceId: PatientServiceId): ServiceFlowState {
     createStatus,
     submitStatus,
     submitError,
+    honeypotRef,
     handleSelect,
     handleConsentAccept,
     handleConsentDecline,

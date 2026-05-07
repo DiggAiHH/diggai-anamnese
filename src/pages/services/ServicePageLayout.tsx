@@ -61,6 +61,27 @@ export function ServicePageLayout({
       </div>
 
       <div className="relative z-10 max-w-4xl mx-auto px-6 py-12 lg:py-20">
+        {/* C12: Honeypot — sichtbar im DOM für Bots, für echte Nutzer unsichtbar.
+            NICHT type="hidden" (Bots überspringen hidden-Felder), sondern visuell versteckt.
+            aria-hidden + tabIndex=-1 schließen das Feld aus der Barrierefreiheitsbaum und
+            Tastatur-Navigation aus (BITV 2.0 / WCAG 2.1 konform). */}
+        <input
+          ref={flow.honeypotRef}
+          type="text"
+          name="website"
+          id="website"
+          autoComplete="off"
+          tabIndex={-1}
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            opacity: 0,
+            height: 0,
+            width: 0,
+            overflow: 'hidden',
+            pointerEvents: 'none',
+          }}
+        />
         {/* Back button */}
         <Link
           to={getPatientAppBasePath(bsnr)}

@@ -3,11 +3,13 @@ import { NavLink, Navigate, Outlet, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useCallback } from 'react';
 import { api } from '../../api/client';
 import { ThemeToggle } from '../ThemeToggle';
 import { LanguageSelector } from '../LanguageSelector';
 import { clearStoredStaffUser } from '../../lib/staffSession';
 import { STAFF_SESSION_QUERY_KEY, useStaffSession } from '../../hooks/useStaffSession';
+import { useInactivityTimer } from '../../hooks/useInactivityTimer';
 
 interface StaffNavItem {
   to: string;
@@ -22,6 +24,19 @@ export function StaffShell() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { data: user, isLoading } = useStaffSession();
+
+  // C18: DSGVO/BSI Inactivity-Timeout — auto-logout nach 15 Min.
+  const handleInactivityLogout = useCallback(() => {
+    clearStoredStaffUser();
+    queryClient.setQueryData(STAFF_SESSION_QUERY_KEY, null);
+    void api.arztLogout().catch(() => undefined);
+    navigate('/verwaltung/login?reason=timeout', { replace: true });
+  }, [navigate, queryClient]);
+
+  const { isWarning, remainingSeconds, resetTimer } = useInactivityTimer(
+    handleInactivityLogout,
+    !!user, // nur aktiv wenn eingeloggt
+  );
 
   if (isLoading) {
     return null;
@@ -96,6 +111,42 @@ export function StaffShell() {
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col">
+      {/* C18: Inactivity warning modal — shown 2 minutes before auto-logout */}
+      {isWarning && (
+        <div
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="inactivity-title"
+          aria-describedby="inactivity-desc"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+        >
+          <div className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-xl shadow-2xl p-8 max-w-sm w-full mx-4">
+            <h2 id="inactivity-title" className="text-lg font-semibold mb-2 text-[var(--text-primary)]">
+              Sitzung läuft ab
+            </h2>
+            <p id="inactivity-desc" className="text-sm text-[var(--text-secondary)] mb-6">
+              Aus Datenschutzgründen werden Sie in{' '}
+              <strong className="text-[var(--color-warning,#f59e0b)]">{remainingSeconds} Sekunden</strong>{' '}
+              automatisch abgemeldet.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={resetTimer}
+                className="flex-1 px-4 py-2 rounded-lg bg-[var(--color-primary,#2E75B6)] text-white text-sm font-medium hover:opacity-90 transition-opacity"
+                autoFocus
+              >
+                Eingeloggt bleiben
+              </button>
+              <button
+                onClick={handleInactivityLogout}
+                className="px-4 py-2 rounded-lg border border-[var(--border-primary)] text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+              >
+                Abmelden
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <header className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-primary)] bg-[var(--bg-secondary)]/70 backdrop-blur-xl sticky top-0 z-30">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">

@@ -428,6 +428,8 @@ export interface CreateSessionPayload {
     birthDate: string;
     selectedService: string;
     insuranceType?: string;
+    /** C12: Honeypot — muss leer bleiben. Bots füllen versteckte Felder automatisch. */
+    _hp?: string;
 }
 
 export interface SubmitAnswerPayload {

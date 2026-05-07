@@ -44,6 +44,9 @@ const createSessionSchema = z.object({
     selectedService: z.string().min(1, 'Service ist erforderlich'),
     insuranceType: z.string().optional(),
     encryptedName: z.string().optional(),
+    // C12: Honeypot-Feld — muss leer sein. Bots füllen versteckte Felder automatisch aus.
+    // Wenn gefüllt: Request wird still verworfen (kein 4xx → kein Feedback an Bot).
+    _hp: z.string().optional(),
 });
 
 function parseOptionalBirthDate(value: string | undefined): Date | null {
@@ -109,7 +112,18 @@ function parseOptionalBirthDate(value: string | undefined): Date | null {
 router.post('/', async (req: Request, res: Response) => {
     try {
         const validatedData = createSessionSchema.parse(req.body);
-        const { email, isNewPatient, gender, birthDate, selectedService, insuranceType, encryptedName } = validatedData;
+        const { email, isNewPatient, gender, birthDate, selectedService, insuranceType, encryptedName, _hp } = validatedData;
+
+        // C12: Honeypot-Guard — echte Nutzer lassen dieses Feld leer.
+        // Still 200 zurückgeben (kein Feedback → kein Bot-Fingerprint).
+        if (_hp && _hp.length > 0) {
+            console.warn('[Honeypot] Bot-Anfrage blockiert — _hp gefüllt:', {
+                ip: req.ip, userAgent: req.headers['user-agent'],
+            });
+            res.status(200).json({ id: 'bot-blocked', status: 'created' });
+            return;
+        }
+
         const tenantId = req.tenantId || req.auth?.tenantId || null;
 
         if (!tenantId) {
