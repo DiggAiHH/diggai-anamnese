@@ -74,6 +74,28 @@ router.post('/', requireAuth, async (req, res) => {
         },
     });
 
+    // DSGVO Art. 30: Einwilligungs-Signatur protokollieren
+    setImmediate(() => {
+        prisma.auditLog.create({
+            data: {
+                tenantId: auth.tenantId || 'system',
+                userId: auth.userId || null,
+                action: 'SIGNATURE_CREATED',
+                resource: '/api/signatures',
+                ipAddress: ip,
+                userAgent: userAgent.slice(0, 256),
+                metadata: JSON.stringify({
+                    signatureId: signature.id,
+                    formType: signature.formType,
+                    signerRole: signature.signerRole,
+                    documentVersion: signature.documentVersion,
+                    patientId: patientId || null,
+                    sessionId: sessionId || null,
+                }),
+            },
+        }).catch((e: unknown) => console.error('[AuditLog] SIGNATURE_CREATED write failed:', e));
+    });
+
     return res.status(201).json({ success: true, signature });
 });
 
@@ -91,6 +113,21 @@ router.get('/:id', requireAuth, requireRole('arzt', 'admin'), async (req, res) =
     if (req.query.decrypt === 'true') {
         try {
             result.signatureData = decryptSignature(encryptedSignatureData);
+            // DSGVO Art. 30: Entschlüsselungszugriff auf Einwilligung protokollieren
+            setImmediate(() => {
+                const auth2 = (req as any).auth as AuthPayload | undefined;
+                prisma.auditLog.create({
+                    data: {
+                        tenantId: auth2?.tenantId || 'system',
+                        userId: auth2?.userId || null,
+                        action: 'SIGNATURE_DECRYPTED',
+                        resource: `/api/signatures/${param(req, 'id')}`,
+                        ipAddress: req.ip || req.socket.remoteAddress || 'unknown',
+                        userAgent: (req.headers['user-agent'] || 'unknown').slice(0, 256),
+                        metadata: JSON.stringify({ signatureId: param(req, 'id') }),
+                    },
+                }).catch((e: unknown) => console.error('[AuditLog] SIGNATURE_DECRYPTED write failed:', e));
+            });
         } catch {
             return res.status(500).json({ error: 'Entschlüsselung fehlgeschlagen' });
         }

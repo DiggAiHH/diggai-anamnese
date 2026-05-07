@@ -307,6 +307,28 @@ router.post('/:id', requireAuth, requireSessionOwner, answerSubmissionLimiter, a
         });
         emitSessionProgress(sessionId, progress);
 
+        // DSGVO Art. 30: Antwort-Einreichung protokollieren (nicht-blockierend, PHI-frei)
+        setImmediate(() => {
+            prisma.auditLog.create({
+                data: {
+                    tenantId: session.tenantId,
+                    userId: req.auth?.userId || null,
+                    action: 'ANSWER_SUBMITTED',
+                    resource: `/api/sessions/${sessionId}/answers`,
+                    ipAddress: req.ip || req.socket.remoteAddress || 'unknown',
+                    userAgent: (req.headers['user-agent'] || 'unknown').slice(0, 256),
+                    metadata: JSON.stringify({
+                        sessionId,
+                        atomId,
+                        isPII: containsPii,
+                        isE2EE: usesClientEncryption,
+                        answerId: answer.id,
+                        routingHints: routingResults.length,
+                    }),
+                },
+            }).catch((e: unknown) => console.error('[AuditLog] ANSWER_SUBMITTED write failed:', e));
+        });
+
         // REGULATORISCH KRITISCH: Patient-Response darf NIEMALS staffMessage enthalten.
         // toPatientSafeView() ist die technische Garantie — siehe docs/REGULATORY_POSITION.md §5.2
         const patientSafeHints = routingResults.map(r => RoutingEngine.toPatientSafeView(r));

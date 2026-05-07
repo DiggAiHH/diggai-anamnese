@@ -266,6 +266,26 @@ router.post('/:id/submit', requireAuth, requireSessionOwner, async (req: Request
             },
         });
 
+        // DSGVO Art. 30: Anamnese-Abschluss protokollieren
+        setImmediate(() => {
+            prisma.auditLog.create({
+                data: {
+                    tenantId: session.tenantId,
+                    userId: req.auth?.userId || null,
+                    action: 'SESSION_SUBMITTED',
+                    resource: `/api/sessions/${sessionId}/submit`,
+                    ipAddress: req.ip || req.socket.remoteAddress || 'unknown',
+                    userAgent: (req.headers['user-agent'] || 'unknown').slice(0, 256),
+                    metadata: JSON.stringify({
+                        sessionId: session.id,
+                        patientId: session.patientId || null,
+                        selectedService: session.selectedService,
+                        completedAt: session.completedAt?.toISOString(),
+                    }),
+                },
+            }).catch((e: unknown) => console.error('[AuditLog] SESSION_SUBMITTED write failed:', e));
+        });
+
         await ensureSessionStoredInEpisode({
             tenantId: session.tenantId,
             sessionId: session.id,
