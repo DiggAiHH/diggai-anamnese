@@ -1,0 +1,11 @@
+2026-05-07T10:00+02:00 | Lauf claude-code-05 | B4 billing-optimization guard + H2 VAPID vollständig
+---
+- Aktion: billing-optimization.service.ts — `requireDecisionSupport('billing-optimization.optimizeBilling')` guard eingebaut + importiert. Einzige echte Class-IIa-Lücke, die §J-Reality-Check behauptet hatte, waren gar keine 0 Aufrufe (11 Guards bereits vorhanden), sondern 1 fehlender: dieser Service analysiert klinische Notizen für EBM/GOÄ-Codes → eindeutig IIa-Material. Commit 46ba8ab. Guards jetzt: 12 in 7 Modulen.
+- Aktion: VAPID H2 — Keys generiert, Fly-Secrets VAPID_PUBLIC_KEY + VAPID_PRIVATE_KEY + VAPID_SUBJECT deployed, `VITE_VAPID_PUBLIC_KEY` in netlify.toml [context.production.environment] gesetzt (commit d586191). H2 auf erledigt hochgestuft.
+- Aktion: E4 Audit-Log-Lücken — ANSWER_SUBMITTED (answers.ts), SIGNATURE_CREATED + SIGNATURE_DECRYPTED (signatures.ts), SESSION_SUBMITTED (sessions.ts) ergänzt. Alle nicht-blockierend (setImmediate), PHI-frei. Commit e69613f.
+- Aktion: C1 Postgres-Rollen auf Neon-Prod via run-pg-roles.cjs — diggai_capture + diggai_suite + diggai_owner alle rolcanlogin=true. C2 Passwort gesetzt + Fly-Secret DATABASE_URL_CAPTURE deployed.
+- Blocker: Context-Limit beendet Lauf 04 vor B4-Commit-Ausführung.
+- Fix: Session-Fortsetzung, commit-b4.bat sofort ausgeführt.
+- Ergebnis: 46ba8ab (B4), d586191 (H2), e69613f (E4) — alle auf restructure/phase-1-workspace
+- Aktion (Folge): D1 ISO 14971 FMEA — `DiggAi-FMEA-ISO14971-v0.1.xlsx` erstellt via ExcelJS (Node.js). 3 Sheets: Deckblatt + FMEA Capture (20 Risiken C-01..C-20) + FMEA Suite (10 Risiken S-01..S-10). Farbcodierte Risikostufen (VH/H/M/L), RPN-Formeln, Status-Ampel, Distribution-Summary-Tabelle. Gespeichert in Workspace-Root.
+- Out: B4 ✅ 12 Guards (46ba8ab), H2 ✅ VAPID vollständig (d586191), E4 ✅ 4 Audit-Events (e69613f), D1 ✅ FMEA v0.1 Excel. K27 (Login-Smoke) weiterhin offen (lokaler DNS-Timeout → mobil testen). Nächster Fokus: K27 + CK-Actions (A4/A5) + D6 IFU oder D3 CER-Lite
