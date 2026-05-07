@@ -337,16 +337,239 @@ Inhalt der Konformitätserklärung (MDR Anhang IV Pflichtangaben):
 
 ---
 
+---
+
+## §7 Mensch-System-Schnittstelle / Gebrauchstauglichkeit
+*(MDR Anhang II Nr. 6 + IEC 62366-1:2015)*
+
+### 7.1 Anwender-Personae
+
+DiggAi Capture richtet sich an drei Nutzergruppen mit unterschiedlichen Kompetenz-Profilen:
+
+| Persona | Beschreibung | Technische Kompetenz | Sprachkompetenz | Primäres Gerät |
+|---------|--------------|----------------------|-----------------|----------------|
+| **Patient (Neu)** | Kommt erstmalig in die Praxis, hat ggf. Link per SMS/QR-Code erhalten | Smartphone-Basis (WhatsApp-Niveau), kein medizinisches Fachwissen | Heimatsprache (10 Sprachen verfügbar), ggf. kein Deutsch | Smartphone (iOS/Android) |
+| **Patient (Stamm)** | Bekannte Praxis, hat schon Anmeldung gemacht | Leicht höher — kennt den Ablauf | Meist Deutsch oder Heimatsprache | Smartphone oder Praxis-Tablet |
+| **MFA / Empfang** | Medizinische Fachangestellte, betreut den Eingangsbereich | PC + Browser vertraut, kein Entwickler-Hintergrund | Deutsch | Praxis-PC (Desktop-Browser) |
+| **Arzt** | Liest strukturierte Anmeldedaten im Dashboard | Medizinische Fachkompetenz, PC-vertraut | Deutsch (ggf. Englisch für englischsprachige Patienten) | Praxis-PC oder Tablet |
+| **Admin/IT** | Pflegt Tenant-Einstellungen, verwaltet Benutzer | IT-Grundkenntnisse, kein Entwickler | Deutsch | Desktop-Browser |
+
+**Capture-Scope:** Nur Patient-Persona und teilweise MFA-Persona (Read-Only-View) sind in Capture relevant. Arzt-Dashboard und Admin gehören zu Suite.
+
+### 7.2 Kritische Use-Cases und Use-Error-Analyse
+
+IEC 62366-1 fordert eine Analyse von Use-Errors, die zu Patientenschaden führen könnten. Da Capture ein rein administratives System ist (kein klinischer Output), ist das Schadenspotenzial inhärent gering. Dennoch:
+
+| Use-Case | Potenzielle Use-Error | Mögliche Folge | Mitigation |
+|----------|----------------------|----------------|------------|
+| UC-1: Anliegen-Freitext eingeben | Patient beschreibt akute Notfall-Symptome als Freitext ohne erkannte Dringlichkeit | Praxis merkt Dringlichkeit nicht sofort | Pflichthinweis in UI: „Bei akuten Beschwerden wenden Sie sich sofort an das Praxispersonal oder wählen Sie 112" (MDR Anh. I §23.4m-konform) |
+| UC-2: Geburtsdatum eingeben | Tippfehler → falsches Geburtsdatum gespeichert | Mismatch mit Patientenakte | Pflichtfeld mit Datumsformat-Validierung + Bestätigung |
+| UC-3: Sprache wählen | Patient wählt falsche Sprache | Missverstehter Fragebogen | Sprache jederzeit wechselbar, Flag-Icons statt Textabkürzungen |
+| UC-4: Einwilligung (Consent) | Patient klickt durch ohne Lesen | DSGVO-Zweifel | Pflicht-Scroll bis zum Ende + explizite Checkbox, kein Pre-Check |
+| UC-5: Session-Timeout | Inactivity-Timer nach 15 Min → Session verloren | Patient muss neu starten | Warning-Modal 2 Min vorher mit „Weiter"-Button (C18 implementiert) |
+| UC-6: QR-Scan-Fehler (Kiosk) | Patient scannt falsche QR-Code-Variante | Falsche Praxis oder Session | QR-Codes haben Tenant-Prüfung; Fehlerseite mit klarer Handlungsanweisung |
+| UC-7: Barrierefreiheit | Sehbehinderte Patient kann Formular nicht nutzen | Ausgrenzung | RTL-Support, Schriftgröße-Einstellung, Kontrast AA (BITV 2.0-Audit steht aus, F5) |
+
+**Schweregrad-Einschätzung (IEC 62366-1 Anhang B):** Kein Use-Error in Capture kann zu ernstem Patientenschaden führen, da kein klinischer Output erzeugt wird. Klassifizierung: **Severity Level 1** (keine Verletzung) bis maximal **Severity Level 2** (umkehrbarer Schaden: verpasster Termin, Daten-Neueingabe). Das rechtfertigt IEC 62304 **Klasse A** (keine klinische Entscheidungsunterstützung).
+
+### 7.3 Anwender-Kompetenz-Annahmen
+
+Das System **darf nicht voraussetzen**, dass der Patient:
+- Deutsch lesen kann (→ 10 Sprachen, RTL-Support)
+- medizinische Fachbegriffe kennt (→ einfache Sprache B1-Niveau in allen Übersetzungen)
+- ein Smartphone besitzt (→ Fallback: Praxis stellt Tablet/Kiosk)
+- eine stabile Internetverbindung hat (→ Offline-PWA-Caching für statische Assets; Submit benötigt Online)
+- über 60 Jahre alt ist und Kleinstschrift lesen kann (→ Mindestschriftgröße 16 px, touch-Ziele ≥ 44 × 44 px nach WCAG 2.1)
+
+Das System **setzt voraus**, dass:
+- Patient ≥ 16 Jahre alt ist (Einwilligungsfähigkeit; Minderjährige nur mit Erziehungsberechtigten)
+- MFA Grundkenntnisse im Umgang mit einem Web-Browser hat
+- Die Praxis eine eigene Schulung des MFA-Personals für die Admin-Oberfläche durchführt (dokumentiert in IFU D6)
+
+### 7.4 Validierungsplan Gebrauchstauglichkeit (IEC 62366-1 §6)
+
+#### Summative Usability-Bewertung (Pilot-Phase)
+
+| Test-ID | Testmethode | Stichprobe | Ziel-Metrik | Akzeptanzkriterium | Status |
+|---------|------------|------------|-------------|-------------------|--------|
+| UT-01 | Think-Aloud-Formular-Durchlauf (Patient, unbegleitet) | 5 Teilnehmer, 3 Sprachen | Task-Completion-Rate | ≥ 90 % ohne Assistenz | offen — Pilot Klapproth-Praxis (G4) |
+| UT-02 | Time-on-Task (Patient → Submit) | 8 Teilnehmer | Median < 7 Min | ≤ 7 Min für Stammdaten + Anliegen | offen |
+| UT-03 | Error-Rate (falsche Felder) | 8 Teilnehmer | Fehler-Rate | < 2 Fehler / Session (korrigierbar) | offen |
+| UT-04 | MFA-Dashboard-Lesbarkeit (strukturierte Ausgabe) | 3 MFA-Mitarbeiter | Verstehbarkeit 1–5 | ≥ 4/5 Sterne | offen |
+| UT-05 | Barrierefreiheit (Screenreader NVDA/VoiceOver) | 2 Testläufe | WCAG 2.1 AA | 0 kritische Fehler | offen (F5) |
+
+**Formative Evaluation:** Laufend via Pilot-Praxis-Feedback (CK-Praxis, G4). Befunde werden in Risikomanagement-Akte (D1) eingetragen.
+
+### 7.5 Mehrsprachigkeit und Internationalisierung
+
+| Sprache | Code | RTL | Buchstaben | Status |
+|---------|------|-----|-----------|--------|
+| Deutsch | de | nein | Latein | ◼ Referenzsprache |
+| Englisch | en | nein | Latein | ◼ vollständig (K21) |
+| Türkisch | tr | nein | Latein | ◼ vollständig (K21) |
+| Arabisch | ar | **ja** | Arabisch | ◼ vollständig (K21), RTL-Layout aktiv |
+| Ukrainisch | uk | nein | Kyrillisch | ◼ vollständig (K21) |
+| Spanisch | es | nein | Latein | ◼ vollständig (K21) |
+| Farsi | fa | **ja** | Arabisch | ◼ vollständig (K21), RTL-Layout aktiv |
+| Italienisch | it | nein | Latein | ◼ vollständig (K21) |
+| Französisch | fr | nein | Latein | ◼ vollständig (K21) |
+| Polnisch | pl | nein | Latein | ◼ vollständig (K21) |
+
+Alle Übersetzungen sind Class-I-konform: keine klinischen Aussagen, keine Triage-Sprache, keine Diagnose-Begriffe. Verifiziert durch `marketing-audit.cjs` (0 Hits nach G1 2. Pass).
+
+**Technische Umsetzung:** i18next mit Namespaces in `public/locales/{lang}/translation.json`. Sprache wird im Frontend-State gehalten, kein Server-Side-Rendering. RTL per CSS `dir="rtl"` auf `<html>`-Ebene.
+
+### 7.6 Barrierefreiheit (BITV 2.0 / WCAG 2.1 AA)
+
+| Anforderung | Umsetzungsstand | Nachweis |
+|-------------|----------------|---------|
+| Kontrastverhältnis ≥ 4,5:1 (Normal-Text) | implementiert | Farb-System `CALM_TRUST_UI_GUIDE.md` |
+| Tastatur-Navigation vollständig | teilweise | Tab-Order geprüft; Modals haben focus-trap |
+| Screenreader-Labels (ARIA) | teilweise | `aria-hidden` auf Honeypot (C12), weitere ARIA-Labels im Fragebogen |
+| Schriftgröße skalierbar (200 % ohne Verlust) | nicht geprüft | BITV-Audit ausstehend (F5) |
+| Touch-Ziele ≥ 44 × 44 px | nicht verifiziert | BITV-Audit ausstehend (F5) |
+| Videos mit Untertiteln | nicht relevant | Kein Video-Content in Capture |
+| Sprachattribut `lang=` korrekt gesetzt | implementiert | i18next setzt `<html lang="{code}">` |
+
+**Offener Punkt:** BITV 2.0-Vollaudit durch externen Spezialisten steht aus (F5). Bis dahin gilt: Best-Effort-Konformität auf Basis interner UI-Review.
+
+---
+
+## §9 Kennzeichnung und Gebrauchsanweisung
+*(MDR Anhang II Nr. 9 + MDR Art. 10 + 27 + Anhang I Nr. 23)*
+
+### 9.1 Übersicht und Anforderungsgrundlage
+
+MDR Art. 10 Abs. 8 verpflichtet den Hersteller, die in Anhang I Nr. 23 (Kennzeichnung und Gebrauchsanweisung) genannten Informationen bereitzustellen. Für **reine Software-Produkte ohne physisches Gehäuse** entfallen die physischen Kennzeichnungs-Anforderungen (Etikettierung, Verpackungsaufdruck). Stattdessen gilt:
+
+- Die Kennzeichnungs-Informationen werden **in die Software eingebettet** (Impressum, Hilfe-Seite, „Über"-Seite) oder als **separate IFU-Datei** bereitgestellt
+- Die Gebrauchsanweisung (IFU) muss **vor oder beim Inverkehrbringen** verfügbar sein (MDR Art. 27 Abs. 1)
+- Für DiggAi Capture als **Klasse-I-Software**: IFU kann elektronisch bereitgestellt werden (IVDR/MDR erlauben E-IFU für nicht-implantierbare Klasse-I-Produkte)
+
+### 9.2 Pflichtangaben nach MDR Anhang I Nr. 23.2 und 23.4 (für Software)
+
+Die folgenden Informationen sind verpflichtend und werden in der IFU (`docs/IFU_DiggAi_Capture_v0.1.docx`, D6) und in der Software-Oberfläche bereitgestellt:
+
+| Nr. | MDR-Anforderung | DiggAi-Capture-Umsetzung | Ort | Status |
+|----|----------------|--------------------------|-----|--------|
+| 23.2(a) | Hersteller-Name und -Anschrift | DiggAi GmbH (i.Gr.), Hamburg | IFU §1 + Footer | ◼ in IFU v0.1 |
+| 23.2(b) | Datum der letzten Überarbeitung | Release-Datum aus `CHANGELOG.md` | Impressum / IFU-Versionstabelle | ◧ CHANGELOG noch nicht formalisiert |
+| 23.2(c) | Zweckbestimmung | Vollständig in `docs/INTENDED_USE.md` + IFU §2 | IFU §2 + Hilfe-Seite | ◼ in IFU v0.1 |
+| 23.2(d) | Produktbeschreibung und -funktion | IFU §3 + Tech-Doc §1 | IFU §3 | ◼ |
+| 23.2(e) | Anwender-Zielgruppe | IFU §4 (Patient, MFA, Arzt) | IFU §4 | ◼ |
+| 23.2(f) | Anwendungsumgebung | IFU §5 (Browser-Anforderungen, Betriebssystem) | IFU §5 | ◼ |
+| 23.4(a) | Kontraindikationen | Keine (administratives Tool) | IFU §6 | ◼ |
+| 23.4(b) | Sicherheitshinweise | „Bei akuten Beschwerden 112 rufen" | IFU §7 + UI-Pflichthinweis | ◼ (BGB §630e-konform) |
+| 23.4(c) | Informationen für Patienten | DSGVO-Hinweis Art. 13/14, Einwilligungstext | Consent-Modal + IFU §8 | ◼ |
+| 23.4(m) | Notfall-Weiterleitungshinweis | „Im Notfall 112" | In Fragebogen-Flow (C18-Modal) | ◼ |
+| 23.2(g) | UDI-DI | Ausstehend (D4 offen) | Footer + IFU Deckblatt | ⬛ |
+| 23.2(h) | CE-Kennzeichnung | Ausstehend (nach Class-I-Bestätigung) | Footer | ⬛ |
+| 23.2(i) | SRN (Single Registration Number) | Ausstehend (D5, EUDAMED) | IFU Deckblatt | ⬛ |
+
+### 9.3 IFU-Referenz
+
+Die vollständige Gebrauchsanweisung ist als separates Dokument verfasst:
+
+- **Datei:** `docs/IFU_DiggAi_Capture_v0.1.docx` (D6, Lauf 05, commit-Referenz)
+- **Version:** v0.1 (Entwurf — noch nicht für Markteinführung freigegeben)
+- **Sprachen:** DE (Vollversion) + EN (Summary)
+- **Sektionen:** 13 Sektionen (Zweckbestimmung, Anwenderkreis, Kontraindikationen, Tech-Anforderungen, DSGVO, Inbetriebnahme, Schulung, Bedienung, Fehlerbehebung, Sicherheitshinweise, Support, Wartung, Versionshistorie)
+- **Freigabe ausstehend:** CK-Review + Medizinrecht-Anwalt (A5)
+
+Die IFU wird bei Markteinführung auf `https://diggai.de/ifu` (elektronisch, E-IFU) und als Download (`/docs/IFU_DiggAi_Capture_current.pdf`) bereitgestellt.
+
+### 9.4 In-Software-Kennzeichnung (UI-Implementierung)
+
+Für Software-Produkte empfiehlt die MDR-Leitlinie MDCG 2021-6 eine **„Über"-Seite** oder **Impressum-Eintrag** mit folgenden Minimalangaben. Diese sind in `src/components/RegulatoryFooter.tsx` (noch zu implementieren) unterzubringen:
+
+```
+DiggAi Capture v{version}
+Hersteller: DiggAi GmbH (i.Gr.), {Adresse}, Hamburg
+UDI-DI: {pending — D4}
+CE {pending}   [Regulatorische Klasse I]
+Gebrauchsanweisung: https://diggai.de/ifu
+Kontakt: support@diggai.de
+```
+
+**Versionierungshinweis:** Bei jeder Deployment-Version wird `VITE_APP_VERSION` aus `package.json` (via `import.meta.env.VITE_APP_VERSION`) in den Footer eingeblendet. Damit ist Anhang I Nr. 23.2(b) erfüllt, sobald UDI-DI und CE-Mark vorliegen.
+
+### 9.5 Symbole nach ISO 15223-1
+
+Für die künftige CE-Kennzeichnung relevante Symbole (bei reiner Web-Software minimal):
+
+| Symbol | ISO 15223-1 Nr. | Bedeutung | Anwendung |
+|--------|----------------|-----------|-----------|
+| `CE` | — | CE-Konformitätszeichen (Annex IX / Art. 20) | Footer nach Zertifizierung |
+| `i` | 5.4.3 | „Gebrauchsanweisung beachten" | Link zu IFU in Footer |
+| Herstellersymbol | 5.1.1 | Hersteller-Identifikation | IFU Deckblatt |
+| Datum-Symbol | 5.1.3 | Herstellungsdatum / Release-Datum | IFU Versionstabelle |
+| REF-Symbol | 5.1.6 | Bestellnummer / Artikel-Nr. | IFU Deckblatt (= UDI-DI) |
+
+---
+
+## §11 Kennzeichnung und Verpackung (Software-spezifisch)
+*(MDR Anhang I Nr. 23.2 + 23.3)*
+
+Da DiggAi Capture ein reines Software-Produkt ohne physisches Gehäuse oder Verpackung ist, entfallen die Standard-Kennzeichnungsanforderungen für physische Medizinprodukte. Stattdessen gilt die Software-spezifische Minimalanforderung:
+
+### 11.1 In-Software-Pflichtangaben
+
+Die folgenden Informationen müssen **in der laufenden Anwendung** abrufbar sein (MDR Anhang I Nr. 23.2):
+
+| Pflichtangabe | Umsetzungsort | Implementierungsstatus |
+|--------------|---------------|----------------------|
+| Hersteller-Name + Adresse | Impressum (`/impressum`) | ◼ implementiert (Impressum vorhanden) |
+| Produkt-Name + Version | Footer + „Über"-Dialog | ◧ Version aus `package.json`; Footer-Komponente ausstehend |
+| Zweckbestimmung (Kurzfassung) | Hilfe-Seite (`/hilfe`) | ◧ vorhanden, noch nicht MDR-formalisiert |
+| IFU-Link | Footer | ⬛ `diggai.de/ifu` — wartet auf IFU-Veröffentlichung |
+| UDI-DI | Footer + „Über"-Dialog | ⬛ ausstehend (D4) |
+| CE-Kennzeichnung | Footer | ⬛ ausstehend (nach Class-I-Bestätigung) |
+
+### 11.2 RegulatoryFooter-Komponente (Implementierungsplan)
+
+Zu erstellen: `src/components/legal/RegulatoryFooter.tsx`
+
+```tsx
+// Minimal-Spec — CE + UDI werden nach D4/D5 ergänzt
+export function RegulatoryFooter() {
+  const version = import.meta.env.VITE_APP_VERSION ?? '3.x';
+  return (
+    <footer role="contentinfo" aria-label="Regulatorische Informationen">
+      <span>DiggAi Capture v{version}</span>
+      <span>Hersteller: DiggAi GmbH (i.Gr.), Hamburg</span>
+      <a href="/impressum">Impressum</a>
+      <a href="/ifu" aria-label="Gebrauchsanweisung (IFU)">IFU</a>
+      <a href="/datenschutz">Datenschutz</a>
+      {/* CE + UDI-DI: nach D4/D5 ergänzen */}
+    </footer>
+  );
+}
+```
+
+### 11.3 Update- und Versionierungs-Hinweise
+
+Bei einem **Major-Version-Update** (v3 → v4) gelten folgende MDR-Pflichten:
+- Neue UDI-DI bei GS1 Germany beantragen (D4)
+- EUDAMED-Eintrag aktualisieren (D5)
+- IFU neu-versionieren und auf `diggai.de/ifu` bereitstellen
+- Konformitätserklärung (D7) neu unterzeichnen
+
+Bei **Minor/Patch-Updates**: Kein Pflicht-Update der Regulatorik-Dokumente, sofern die Zweckbestimmung unverändert bleibt. Wesentliche Änderungen (MDR Art. 78) erfordern erneute Bewertung.
+
+---
+
 ## Dokumentenhistorie
 
 | Version | Datum | Änderung | Autor |
 |---------|-------|----------|-------|
 | 0.1 | 2026-05-07 | Erstfassung §1 + §3 + §5 (Inhaltsfüllung) auf Basis Outline v0.1 und Quell-Docs | ENG (Lauf claude-code-06) |
+| 0.2 | 2026-05-07 | §7 Usability (Personae, Use-Error-Analyse, Validierungsplan, i18n, BITV) + §9 Kennzeichnung/IFU (Pflichtangaben-Tabelle, In-Software-Kennzeichnung, Symbole) + §11 Software-Kennzeichnung (RegulatoryFooter-Spec) | ENG (Lauf claude-code-08) |
 
 ## Nächste Schritte
 
 1. **Anwalts-Review** (A5): Überprüfung der Klassifizierungsbegründung §5.1 durch Medizinrecht-Anwalt (Dierks+Bohle / Reuschlaw)
-2. **§7 Usability + §9 Labeling** füllen (nächster D2-Lauf)
-3. **DSFA-Integration:** Verweis auf `DSFA_DiggAi_Capture_v0.1.md` als §12-Grundlage
-4. **UDI-Beantragung** (D4): GS1 Germany Antrag stellen, UDI-DI in §1.1 nachtragen
-5. **Pilot-Validierungsplan** ausführen (§3.4.1 V01–V07)
+2. **DSFA-Integration:** Verweis auf `DSFA_DiggAi_Capture_v0.1.md` als §12-Grundlage
+3. **UDI-Beantragung** (D4): GS1 Germany Antrag stellen, UDI-DI in §1.1 + §9.2 + §11.1 nachtragen
+4. **Pilot-Validierungsplan ausführen** (§3.4.1 V01–V07 + §7.4 UT-01..UT-05 in Klapproth-Praxis)
+5. **RegulatoryFooter.tsx implementieren** (§11.2 Spec umsetzen)
+6. **BITV-Audit** beauftragen (F5) → Befunde in §7.6 + §7.4 UT-05 eintragen
