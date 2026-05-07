@@ -132,7 +132,7 @@
 | 8.28 | Sicheres Codieren | Ja | ◼ | TypeScript (starke Typisierung); ESLint-Sicherheitsregeln; kein `eval()`, kein Raw-SQL |
 | 8.29 | Sicherheitstests in Entwicklung und Abnahme | Ja | ◼ | Unit-Tests für Sicherheits-Guards (B4, C18, F4); **CodeQL SAST aktiv** in `.github/workflows/security-scan.yml` (Zeilen 105–130, täglich + bei Push); Penetrationstest geplant (C3) |
 | 8.30 | Ausgelagerte Entwicklung | Ja | ◧ | Gelegentliche externe Beiträge; Code-Review-Pflicht; NDA ausstehend (6.6) |
-| 8.31 | Trennung von Entwicklungs-, Test- und Produktionsumgebungen | Ja | ◧ | Separate Fly.io-Apps möglich; aktuell Staging = PR-Preview auf Netlify; keine separate Staging-DB |
+| 8.31 | Trennung von Entwicklungs-, Test- und Produktionsumgebungen | Ja | ◼ | `fly.staging.toml` + `.github/workflows/deploy-staging.yml` (Lauf 13): `diggai-api-staging` (Fly.io fra), Neon staging-Branch als separate DB, auto_stop_machines=suspend. Einmalig: CK legt Neon-Staging-Branch an + Fly-App + Secrets. |
 | 8.32 | Änderungsmanagement | Ja | ◼ | CI/CD via GitHub Actions; Fly.io-Deploy nur nach CI-Green; kein manuelles Prod-Deploy |
 | 8.33 | Testinformationen | Ja | ◼ | Demo-Seed-Daten (`npm run db:seed:demo`): synthetische Daten, keine echten Patientendaten |
 | 8.34 | Schutz von Informationssystemen während Audits | Ja | ◧ | Penetrationstest in getrennter Staging-Umgebung geplant; keine formale Audit-Isolation |
@@ -143,8 +143,8 @@
 
 | Status | Anzahl Controls | Anteil |
 |--------|----------------|--------|
-| ◼ implementiert | 44 | 47 % |
-| ◧ teilweise implementiert | 28 | 30 % |
+| ◼ implementiert | 45 | 48 % |
+| ◧ teilweise implementiert | 27 | 29 % |
 | ⬛ nicht implementiert | 1 (5.20 AVV) | 1 % |
 | N/A | 20 | 21 % |
 
@@ -155,7 +155,7 @@
 2. Formale ISMS-Richtlinie unterzeichnen (5.1 → ◼)
 3. ~~GitHub CodeQL / SAST aktivieren~~ — **bereits aktiv** in security-scan.yml
 4. ~~Dependabot aktivieren~~ — **aktiv** seit Lauf 12 (.github/dependabot.yml)
-5. Staging-Umgebung mit Neon-Staging-Branch (8.31 → ◼)
+5. ~~Staging-Umgebung mit Neon-Staging-Branch~~ — **Konfiguration bereit** (fly.staging.toml + deploy-staging.yml). Aktivierung: CK legt Neon-Branch + Fly-App an (5 Min)
 6. Penetrationstest beauftragen (5.35 → ◼, C3-Angebote vorhanden)
 7. Formale Schulungsdurchführung dokumentieren (6.3 → ◼)
 

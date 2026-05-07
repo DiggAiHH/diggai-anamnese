@@ -1,0 +1,63 @@
+# ─────────────────────────────────────────────────────────────
+#  DiggAi Backend — Fly.io STAGING-Config
+#  ISO 27001:2022 Control 8.31: Trennung Entwicklung/Test/Produktion
+#
+#  App-Name:  diggai-api-staging
+#  Region:    Frankfurt (fra) — DSGVO-konform
+#  DB:        Neon "staging" Branch (separater Connection-String)
+#
+#  Einmalig-Setup:
+#    flyctl apps create diggai-api-staging --org personal
+#    flyctl secrets set -a diggai-api-staging \
+#      DATABASE_URL="postgres://...neon.tech/anamnese?sslmode=require&branch=staging" \
+#      JWT_SECRET="staging-secret-min-32-chars-change" \
+#      ENCRYPTION_KEY="staging-enc-key-32-chars-change!" \
+#      NODE_ENV="staging"
+#    flyctl deploy -a diggai-api-staging --config fly.staging.toml
+#
+#  Neon Staging-Branch erstellen:
+#    Neon Console → Project → Branches → "Create Branch" → Name: "staging"
+#    → Connection String kopieren → Fly Secret oben setzen
+#
+#  Kosten: ~$0/Mon bei auto_stop_machines = "suspend" (Staging darf kalt sein)
+# ─────────────────────────────────────────────────────────────
+
+app = "diggai-api-staging"
+primary_region = "fra"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  NODE_ENV = "staging"
+  PORT = "3001"
+  DEPLOYMENT_MODE = "CLOUD"
+  # Staging-Frontend (Netlify Preview oder dedizierter Branch-Deploy)
+  CORS_ORIGIN = "https://diggai-staging.netlify.app,https://diggai-anamnese.netlify.app"
+  DISABLE_RABBITMQ = "1"
+  # Staging-Marker für Logs + Audit-Einträge
+  STAGING = "true"
+
+[http_service]
+  internal_port = 3001
+  force_https = true
+  # Staging darf kalt sein — Kosten sparen
+  auto_stop_machines = "suspend"
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+  [[http_service.checks]]
+    interval = "60s"
+    timeout = "10s"
+    grace_period = "30s"
+    method = "GET"
+    path = "/api/health"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
+  cpu_kind = "shared"
+  cpus = 1
+
+# Kein persistenter Mount für Staging — Uploads ephemer

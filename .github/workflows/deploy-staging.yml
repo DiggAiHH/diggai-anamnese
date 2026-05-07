@@ -1,0 +1,131 @@
+name: Deploy to Staging
+
+# ISO 27001:2022 Control 8.31: Separate Staging-Umgebung
+# Trigger: Push auf develop oder manuell
+# Ziel: diggai-api-staging (Fly.io fra) + Neon staging-Branch
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Grund für manuellen Staging-Deploy'
+        required: false
+        default: 'Manual trigger'
+
+jobs:
+  # ─────────────────────────────────────────────────────────────
+  # 1. Build + Type-Check + Class-I-Audit (gleiche Gate wie CI)
+  # ─────────────────────────────────────────────────────────────
+  build-check:
+    name: Build & Class-I Gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript check
+        run: npx tsc --noEmit
+
+      - name: Build frontend
+        run: npm run build
+        env:
+          VITE_API_URL: https://diggai-api-staging.fly.dev
+
+      - name: Marketing-Audit Class-I Hard-Gate
+        run: node scripts/marketing-audit.cjs
+
+      - name: Bundle Class-I Audit
+        run: node scripts/bundle-audit.cjs
+        continue-on-error: true
+
+  # ─────────────────────────────────────────────────────────────
+  # 2. Staging DB Migration (Neon staging-Branch)
+  # ─────────────────────────────────────────────────────────────
+  migrate-staging-db:
+    name: Migrate Staging DB
+    runs-on: ubuntu-latest
+    needs: build-check
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Prisma migrations (staging)
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+
+  # ─────────────────────────────────────────────────────────────
+  # 3. Deploy Backend auf Fly.io (diggai-api-staging)
+  # ─────────────────────────────────────────────────────────────
+  deploy-backend:
+    name: Deploy Backend (Fly Staging)
+    runs-on: ubuntu-latest
+    needs: migrate-staging-db
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Fly CLI
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy to staging
+        run: flyctl deploy --config fly.staging.toml --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+  # ─────────────────────────────────────────────────────────────
+  # 4. Smoke-Test gegen Staging-Backend
+  # ─────────────────────────────────────────────────────────────
+  smoke-test-staging:
+    name: Staging Smoke Test
+    runs-on: ubuntu-latest
+    needs: deploy-backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Wait for staging to warm up
+        run: sleep 30
+
+      - name: Health check
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://diggai-api-staging.fly.dev/api/health)
+          if [ "$STATUS" != "200" ]; then
+            echo "❌ Staging health check failed: HTTP $STATUS"
+            exit 1
+          fi
+          echo "✅ Staging healthy (HTTP $STATUS)"
+
+      - name: Security headers check (staging)
+        run: |
+          HEADERS=$(curl -s -I https://diggai-api-staging.fly.dev/api/health)
+          for header in "Strict-Transport-Security" "X-Content-Type-Options" "X-Frame-Options"; do
+            if echo "$HEADERS" | grep -qi "^$header:"; then
+              echo "✅ $header present"
+            else
+              echo "⚠️  $header missing on staging"
+            fi
+          done
+
+      - name: Notify staging deploy success
+        if: success()
+        run: |
+          echo "✅ Staging deploy complete: https://diggai-api-staging.fly.dev"
+          echo "   Branch: ${{ github.ref_name }}"
+          echo "   Commit: ${{ github.sha }}"
