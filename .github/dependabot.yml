@@ -1,0 +1,53 @@
+# Dependabot configuration
+# Adressiert ISO 27001 SoA Control 5.21 (IKT-Lieferkette) + E1 §4.6 (Dependency-Security)
+# Automatische PR-Erstellung für Dependency-Updates
+
+version: 2
+updates:
+  # npm — Frontend + Backend dependencies
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Europe/Berlin"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "security"
+    # Nur Security-Updates als Auto-Merge erlaubt (Patch-Level)
+    groups:
+      # Vite + React ecosystem — häufige Minor-Updates zusammenfassen
+      vite-ecosystem:
+        patterns:
+          - "vite"
+          - "@vitejs/*"
+          - "@tailwindcss/*"
+      react-ecosystem:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "react-router*"
+          - "@types/react*"
+      prisma:
+        patterns:
+          - "@prisma/*"
+          - "prisma"
+    # Security-only für Major-Updates (breaking changes)
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  # GitHub Actions — Workflow-Action-Updates
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Europe/Berlin"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "github-actions"
