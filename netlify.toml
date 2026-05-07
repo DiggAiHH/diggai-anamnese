@@ -25,6 +25,9 @@
   VITE_API_URL = "https://diggai-api.fly.dev/api"
   VITE_SOCKET_URL = "https://diggai-api.fly.dev"
   VITE_DISABLE_DEMO_MODE = "false"
+  # VAPID Public Key für PWA Push-Notifications (H2 — 2026-05-07)
+  # Der Public Key ist by-design öffentlich (RFC 8292). Private Key nur in Fly-Secrets.
+  VITE_VAPID_PUBLIC_KEY = "BBzHznh1uEwnaKQiG2ZgWPJ1MnCZwQ7FDcqxLpgn8VATZuAmNWhTRQfqcX9zJhZOy4IdJo84uOhUIPkVDAZ2Icw"
 
 # ─── Branch deploy context (disabled in Dashboard — defined here for safety) ─
 # To disable branch deploys: Netlify Dashboard > Site configuration >
