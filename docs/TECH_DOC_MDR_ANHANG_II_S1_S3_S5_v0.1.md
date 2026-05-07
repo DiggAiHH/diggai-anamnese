@@ -558,12 +558,98 @@ Bei **Minor/Patch-Updates**: Kein Pflicht-Update der Regulatorik-Dokumente, sofe
 
 ---
 
+## §8 Post-Market-Surveillance (MDR Anhang III)
+*(MDR Art. 83–86, Anhang III)*
+
+### 8.1 PMS-Plan (Übersicht)
+
+Die Post-Market-Surveillance von DiggAi Capture folgt MDR Art. 84 und Anhang III. Da Capture als **Klasse I** (Selbstverifizierung) eingestuft ist, gelten die vereinfachten Anforderungen nach MDR Art. 85 (PSUR statt vollständiger PMS-Bericht).
+
+**PMS-Ziele:**
+1. Proaktive Sammlung von Feedback aus dem Feld (Praxen, Patienten)
+2. Überwachung auf sicherheitsrelevante Probleme (Vigilanz nach MDR Art. 87)
+3. Aktualisierung der klinischen Bewertung (CER) bei neuen Erkenntnissen
+4. Identifikation von Verbesserungspotenzialen für künftige Versionen
+
+### 8.2 PMS-Datenquellen
+
+| Quelle | Typ | Frequenz | Verantwortlich |
+|--------|-----|---------|----------------|
+| Support-Anfragen (E-Mail) | Reaktiv | Kontinuierlich | CK |
+| Praxis-Feedback (Pilot-Validierung) | Reaktiv + Proaktiv | Quartalsweise | CK |
+| App-Store-Bewertungen / Nutzer-Kommentare | Proaktiv | Monatlich | ENG |
+| Fehlerberichte (GitHub Issues) | Reaktiv | Kontinuierlich | ENG |
+| Audit-Log-Anomalie-Analyse | Proaktiv | Monatlich | ENG |
+| Wissenschaftliche Literatur (PubMed / HTA-Berichte) | Proaktiv | Halbjährlich | CK + EXT |
+| EUDAMED-Vigilanzberichte vergleichbarer Systeme | Proaktiv | Jährlich | CK |
+| DiGA-Nutzenfeedback (nach BfArM-Aufnahme) | Proaktiv | Quartalsweise | CK |
+
+### 8.3 Vigilanz und Reaktivitätsschwellen
+
+Gemäß MDR Art. 87 sind **schwerwiegende Vorkommnisse** unverzüglich an die zuständige Behörde zu melden. Da Capture keine klinischen Entscheidungen trifft (rein administrativ, kein klinischer Output), ist das Risiko schwerwiegender Vorkommnisse inhärent gering.
+
+| Ereignistyp | Definition (Capture-spezifisch) | Reaktion | Meldefrist |
+|-------------|--------------------------------|---------|-----------|
+| Sicherheitslücke mit Patientendaten-Exposition | Unbefugter Zugriff auf PII / Art.-9-Daten | Sofortiger Service-Stopp + DSGVO Art. 33 + MDR Art. 87 | < 24h |
+| Fehlfunktion: Session-Verlust bei Submit | Patient verliert ausgefüllte Anmeldung ohne Speicherung | Hotfix + Nutzer-Benachrichtigung | < 72h |
+| Fehlfunktion: Consent nicht gespeichert | DSGVO-Einwilligung nicht persistiert | Sofortiger Bugfix + Validierung | < 24h |
+| Datenpanne (Art. 33 DSGVO) | Unbeabsichtigte Offenlegung von Patientendaten | DSGVO Art. 33 Meldung an HmbBfDI | < 72h |
+| Verfügbarkeitsausfall > 4h | Backend nicht erreichbar, Praxis-Betrieb gestört | Incident P2, Wiederherstellung, Root-Cause | < 4h |
+
+**Schwelle für MDR-Vigilanzmeldung:** Jedes Ereignis, das zu einem **unerwarteten unerwünschten medizinischen Ereignis** geführt hat oder hätte führen können, das auf Capture zurückzuführen ist. Für ein rein administratives Klasse-I-System ohne klinischen Output ist diese Schwelle praktisch identisch mit der DSGVO-Meldepflicht.
+
+### 8.4 PMCF (Post-Market Clinical Follow-up)
+
+**Begründung für entfallende PMCF-Studie:**
+
+Capture erzeugt keinen klinischen Output, trifft keine Diagnoseentscheidungen und beeinflusst keine Therapien. Das klinische Restrisiko wurde in der CER (D3) als vernachlässigbar eingestuft (äquivalent zu administrativer Patientenkommunikation). Damit entfällt nach MDCG 2020-7 die Pflicht zu einer formalisierten PMCF-Studie für Klasse I. Stattdessen:
+
+- Kontinuierliche Felddatenerhebung (§8.2)
+- Pilot-Usability-Tests (§7.4, UT-01..UT-05) als praxisnahe Bewertung
+- Jährliche CER-Aktualisierung auf Basis der PMS-Daten
+
+### 8.5 Periodischer Sicherheits- und Leistungsbericht (PSUR)
+
+Nach MDR Art. 85 ist für Klasse-I-Produkte ein **Periodischer Sicherheits- und Leistungsbericht (PSUR)** zu erstellen:
+
+| Parameter | Wert |
+|-----------|------|
+| Berichtsfrequenz | Jährlich (12 Monate nach CE-Erklärung) |
+| Format | MDR Anhang III §2 |
+| Inhalt | Zusammenfassung PMS-Daten, Risikonutzen-Analyse, CER-Update, Vigilanzmeldungen (falls vorhanden), Schlussfolgerungen zur Produktsicherheit |
+| Ablageort | `docs/PSUR_DiggAi_Capture_v1.0_YYYY.md` (jährlich zu erstellen) |
+| Verfasser | CK + ENG |
+| Review | Medizinrecht-Anwalt (A5) vor Finaliserung |
+
+**Erster PSUR:** Fällig 12 Monate nach Unterzeichnung der Konformitätserklärung (D7) + Aufnahme in EUDAMED (D5).
+
+### 8.6 Feedback-Kanäle und Eskalationsweg
+
+```
+Patient / Praxis
+       │
+       ▼
+   Support-E-Mail (CK)     ←→   GitHub Issues (ENG)
+       │                              │
+       ▼                              ▼
+  Klassifizierung (§8.3)    Bug-Tracking + Fix
+       │
+       ├── Vigilanz-Schwelle erreicht?
+       │       ├── JA → MDR Art. 87 Meldung + DSGVO Art. 33
+       │       └── NEIN → PMS-Datenbank (interne Tabelle)
+       │
+       └── Jährlich → PSUR (§8.5)
+```
+
+---
+
 ## Dokumentenhistorie
 
 | Version | Datum | Änderung | Autor |
 |---------|-------|----------|-------|
 | 0.1 | 2026-05-07 | Erstfassung §1 + §3 + §5 (Inhaltsfüllung) auf Basis Outline v0.1 und Quell-Docs | ENG (Lauf claude-code-06) |
 | 0.2 | 2026-05-07 | §7 Usability (Personae, Use-Error-Analyse, Validierungsplan, i18n, BITV) + §9 Kennzeichnung/IFU (Pflichtangaben-Tabelle, In-Software-Kennzeichnung, Symbole) + §11 Software-Kennzeichnung (RegulatoryFooter-Spec) | ENG (Lauf claude-code-08) |
+| 0.3 | 2026-05-07 | §8 Post-Market-Surveillance: PMS-Plan, 8 Datenquellen, Vigilanz-Reaktivitätsschwellen, PMCF-Begründung (entfällt), PSUR-Spezifikation, Feedback-Eskalationsweg | ENG (Lauf claude-code-10) |
 
 ## Nächste Schritte
 
