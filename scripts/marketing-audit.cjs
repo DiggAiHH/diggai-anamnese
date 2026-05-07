@@ -71,6 +71,40 @@ const ALLOWED_CONTEXTS = [
     // Audit-Kontexte
     'Bundle-Audit',
     'Audit-Log',
+    // G1 (2026-05-07): Pflicht-Sicherheitshinweise (BGB §630e / MDR Anhang I §23.4m)
+    // Diese Strings MÜSSEN erhalten bleiben — sie sind keine Class-IIa-Merkmale
+    // sondern gesetzlich vorgeschriebene Notfall-Weiterleitungen.
+    'Bitte wählen Sie 112',
+    'Bitte rufen Sie sofort 112',
+    'den Notruf 112',
+    'Notruf wählen',
+    'umgehend den Notruf',
+    'Telefonseelsorge',
+    'wenden Sie sich sofort an das Praxispersonal',
+    'call 112 immediately',
+    'call emergency services immediately',
+    // Anamnese-Historieerfassung (retrospektive Fragen — kein klinisches Assessment)
+    'Wann war der Herzinfarkt',
+    'ärztlich abklären',      // neutrale Empfehlung, keine Diagnose-Aussage
+    'seek medical evaluation', // same in EN
+    // Staff-interne UI-Labels (nicht patient-facing marketing)
+    'TriageEngine',
+    'triage.agent',
+    'Eingangs-Routing',
+    // DiggAI ist keine X-Plattform (Negativ-Aussage erlaubt das Wort)
+    'erkennt keine Notfälle',
+    'reine Anmelde-Plattform',
+    // G1 Redaktionelle Suite-Marker — Zeilen die explizit als Suite-Feature markiert wurden
+    'DECISION_SUPPORT_ENABLED',   // Feature-Flag-Referenz = korrekte Abgrenzung
+    '_(Suite)_',                  // Inline-Markdown-Marker für Suite-only Inhalte
+    '· Suite',                    // Tabellen-/Abschnitts-Marker
+    '| Suite',                    // Tabellen-Marker
+    // Triage-Regeln-Tabelle ist Suite-Dokumentation
+    'ACS (Herzinfarkt-Verdacht)',
+    'Klinische Triage-Regeln',
+    'Triage: Suite',              // Architektur-Tabelle mit Suite-Marker
+    'Dashboard, Triage)',         // Interne Verzeichnis-Struktur-Kommentar
+    'Fragebogen, Dashboard',      // Interne Verzeichnis-Struktur-Kommentar
 ];
 
 // ── Scope: welche Files wir scannen ──────────────────────────────

@@ -38,7 +38,7 @@ DSGVO-konforme administrative Praxis-Anmelde- und Anamnese-Erfassungs-Plattform 
 | Authentifizierung | JWT HS256, HttpOnly Cookies, bcrypt, RBAC (4 Rollen), WebAuthn |
 | VerschlÃ¼sselung | AES-256-GCM (PII), SHA-256 (E-Mail-Pseudonymisierung) |
 | KI / LLM | Ollama (lokal) oder OpenAI-kompatibel, runtime-konfigurierbar |
-| Agenten | DiggAI 5-Agenten-System (Orchestrator, Empfang, Triage, Dokumentation, Abrechnung) |
+| Agenten | DiggAI 5-Agenten-System (Orchestrator, Empfang, Routing, Dokumentation, Abrechnung) · _Klinische Triage: Suite_ |
 | PWA | Manueller Service Worker, Dexie IndexedDB (Offline), Web Push |
 | Hosting | Netlify (Frontend), Docker VPS (Backend) |
 | Testing | Playwright E2E (22 Specs), TypeScript strict type-checking |
@@ -52,7 +52,7 @@ DSGVO-konforme administrative Praxis-Anmelde- und Anamnese-Erfassungs-Plattform 
 | Feature | Status | Notes |
 |---------|--------|-------|
 | **Medical Questionnaire** | ✅ Production | 270+ questions, 10 languages |
-| **Triage Engine** | ✅ Production | 10 rules, real-time alerts |
+| **Triage Engine** | ✅ Production · _Suite_ | 10 rules, real-time alerts · DECISION_SUPPORT_ENABLED |
 | **AI Reporting** | ✅ Production | ICD-10 codes, SOAP summaries |
 | **White-Labeling** | ✅ Production | Custom colors, logos, domains |
 | **PVS Integration** | ✅ Production | Tomedo, medistar, CGM M1 |
@@ -197,7 +197,7 @@ Kardiologie, Pulmonologie, Neurologie, Gastroenterologie, Diabetologie,
 Dermatologie, Rheumatologie, Urologie, Ophthalmologie, GynÃ¤kologie,
 Psychiatrie, HNO, OrthopÃ¤die
 
-### Klinische Triage-Engine (10 Regeln)
+### Klinische Triage-Engine (10 Regeln) · Suite · `DECISION_SUPPORT_ENABLED=true`
 Echtzeit-Erkennung von 4 CRITICAL- und 6 WARNING-Szenarien:
 
 | Regel | Schweregrad | AuslÃ¶ser |
@@ -214,9 +214,10 @@ Echtzeit-Erkennung von 4 CRITICAL- und 6 WARNING-Szenarien:
 | Duale Antikoagulation | WARNING | 2+ Antikoagulanzien |
 
 CRITICAL-Events lÃ¶sen sofortige Socket.IO-Benachrichtigung am Arzt-Dashboard aus.
+> _Hinweis: Alle Triage-Regeln sind Suite-Features (DECISION_SUPPORT_ENABLED). Capture-Modus (Class I) löst keine klinischen Alerts aus._
 
 ### KI-Funktionen
-- TherapievorschlÃ¤ge mit ICD-10-GM Codes (Konfidenz-Score)
+- TherapievorschlÃ¤ge mit ICD-10-GM Codes (Konfidenz-Score) _(Suite)_
 - Klinische Sitzungszusammenfassung (SOAP-Format)
 - Echtzeit-Symptomanalyse wÃ¤hrend der Befragung
 - LLM-Provider runtime-konfigurierbar: Ollama | OpenAI-kompatibel | none
