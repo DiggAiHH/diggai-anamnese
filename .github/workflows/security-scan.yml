@@ -151,7 +151,7 @@ jobs:
       - name: Check security headers
         run: |
           echo "Checking security headers on production..."
-          HEADERS=$(curl -s -I "https://api.diggai.de/api/health" 2>/dev/null || echo "")
+          HEADERS=$(curl -s -I "https://diggai-api.fly.dev/api/health" 2>/dev/null || echo "")
           
           if [ -z "$HEADERS" ]; then
             echo "⚠️  Could not reach production API (expected in PR builds)"

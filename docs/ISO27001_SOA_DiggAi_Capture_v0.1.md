@@ -130,7 +130,7 @@
 | 8.26 | Anforderungen an die Anwendungssicherheit | Ja | ◼ | OWASP Top 10 im Design (E1 §4.4); Zod-Validierung; Prisma ORM; Helmet |
 | 8.27 | Sichere Systemarchitektur und technische Grundsätze | Ja | ◼ | E1 §2: Architektur-Diagramm; Defense-in-Depth; Least-Privilege-Prinzip |
 | 8.28 | Sicheres Codieren | Ja | ◼ | TypeScript (starke Typisierung); ESLint-Sicherheitsregeln; kein `eval()`, kein Raw-SQL |
-| 8.29 | Sicherheitstests in Entwicklung und Abnahme | Ja | ◧ | Unit-Tests für Sicherheits-Guards (B4, C18, F4); kein DAST; Penetrationstest geplant (C3) |
+| 8.29 | Sicherheitstests in Entwicklung und Abnahme | Ja | ◼ | Unit-Tests für Sicherheits-Guards (B4, C18, F4); **CodeQL SAST aktiv** in `.github/workflows/security-scan.yml` (Zeilen 105–130, täglich + bei Push); Penetrationstest geplant (C3) |
 | 8.30 | Ausgelagerte Entwicklung | Ja | ◧ | Gelegentliche externe Beiträge; Code-Review-Pflicht; NDA ausstehend (6.6) |
 | 8.31 | Trennung von Entwicklungs-, Test- und Produktionsumgebungen | Ja | ◧ | Separate Fly.io-Apps möglich; aktuell Staging = PR-Preview auf Netlify; keine separate Staging-DB |
 | 8.32 | Änderungsmanagement | Ja | ◼ | CI/CD via GitHub Actions; Fly.io-Deploy nur nach CI-Green; kein manuelles Prod-Deploy |
@@ -143,19 +143,19 @@
 
 | Status | Anzahl Controls | Anteil |
 |--------|----------------|--------|
-| ◼ implementiert | 42 | 45 % |
-| ◧ teilweise implementiert | 30 | 32 % |
+| ◼ implementiert | 43 | 46 % |
+| ◧ teilweise implementiert | 29 | 31 % |
 | ⬛ nicht implementiert | 1 (5.20 AVV) | 1 % |
 | N/A | 20 | 21 % |
 
 **Kritischste offene Lücke:** 5.20 / AVV-Verträge mit Fly.io, Neon, Netlify, GitHub (Owner: CK, Prio: sofort).
 
 **Nächste Prioritäten für vollständige ISO 27001 Zertifizierung:**
-1. AVV-Verträge alle 4 Anbieter (5.20 → ◼)
+1. AVV-Verträge alle 4 Anbieter (5.20 → ◼) — **kritisch, Owner CK**
 2. Formale ISMS-Richtlinie unterzeichnen (5.1 → ◼)
-3. GitHub CodeQL / SAST aktivieren (8.29 → ◧→◼)
+3. ~~GitHub CodeQL / SAST aktivieren~~ — **bereits aktiv** in security-scan.yml
 4. Staging-Umgebung mit Neon-Staging-Branch (8.31 → ◼)
-5. Penetrationstest beauftragen (5.35, 8.29 → ◼)
+5. Penetrationstest beauftragen (5.35 → ◼, C3-Angebote vorhanden)
 6. Formale Schulungsdurchführung dokumentieren (6.3 → ◼)
 
 ---
