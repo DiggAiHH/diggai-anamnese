@@ -42,7 +42,7 @@
 | 5.18 | Zugriffsrechte | Ja | ◼ | `diggai_capture` / `diggai_suite` / `diggai_owner` DB-Rollen; `allowedRoles[]` in Frontend |
 | 5.19 | Informationssicherheit in Lieferantenbeziehungen | Ja | ◧ | Anbieter: Fly.io, Neon, Netlify, GitHub. AVV ausstehend (E1 §9.2). |
 | 5.20 | Informationssicherheit in Lieferantenvereinbarungen | Ja | ⬛ | AVV-Verträge mit allen 4 Anbietern noch nicht abgeschlossen (Owner: CK) |
-| 5.21 | Steuerung der IKT-Lieferkette | Ja | ◧ | npm audit + bundle-audit in CI. Kein formales Lieferketten-Risikomanagement. |
+| 5.21 | Steuerung der IKT-Lieferkette | Ja | ◼ | npm audit + bundle-audit in CI (security-scan.yml). Dependabot wöchentliche npm-Updates + monatliche Actions-Updates aktiv (.github/dependabot.yml, Lauf 12). |
 | 5.22 | Überwachung, Überprüfung und Änderungsmanagement von Lieferantenleistungen | Ja | ◧ | Monatliche Prüfung Fly.io/Neon-Status; kein formaler SLA-Review. |
 | 5.23 | Informationssicherheit bei der Nutzung von Cloud-Diensten | Ja | ◧ | Cloud-only (Fly.io, Neon, Netlify). Shared-Responsibility-Model dokumentiert in E1 §6.1. AVV ausstehend. |
 | 5.24 | Planung und Vorbereitung des Informationssicherheitsvorfallmanagements | Ja | ◼ | E1 §10.1+§10.2: P1-P4-Klassifikation, 7-Schritt-Ablauf |
@@ -143,8 +143,8 @@
 
 | Status | Anzahl Controls | Anteil |
 |--------|----------------|--------|
-| ◼ implementiert | 43 | 46 % |
-| ◧ teilweise implementiert | 29 | 31 % |
+| ◼ implementiert | 44 | 47 % |
+| ◧ teilweise implementiert | 28 | 30 % |
 | ⬛ nicht implementiert | 1 (5.20 AVV) | 1 % |
 | N/A | 20 | 21 % |
 
@@ -154,9 +154,10 @@
 1. AVV-Verträge alle 4 Anbieter (5.20 → ◼) — **kritisch, Owner CK**
 2. Formale ISMS-Richtlinie unterzeichnen (5.1 → ◼)
 3. ~~GitHub CodeQL / SAST aktivieren~~ — **bereits aktiv** in security-scan.yml
-4. Staging-Umgebung mit Neon-Staging-Branch (8.31 → ◼)
-5. Penetrationstest beauftragen (5.35 → ◼, C3-Angebote vorhanden)
-6. Formale Schulungsdurchführung dokumentieren (6.3 → ◼)
+4. ~~Dependabot aktivieren~~ — **aktiv** seit Lauf 12 (.github/dependabot.yml)
+5. Staging-Umgebung mit Neon-Staging-Branch (8.31 → ◼)
+6. Penetrationstest beauftragen (5.35 → ◼, C3-Angebote vorhanden)
+7. Formale Schulungsdurchführung dokumentieren (6.3 → ◼)
 
 ---
 
