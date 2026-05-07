@@ -219,7 +219,8 @@
     "vite": "^8.0.3",
     "vite-plugin-pwa": "^1.2.0",
     "vitest": "^4.1.0",
-    "workbox-background-sync": "^7.4.0"
+    "workbox-background-sync": "^7.4.0",
+    "xlsx": "^0.18.5"
   },
   "overrides": {
     "vite": "^8.0.3",
