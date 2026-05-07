@@ -1,5 +1,6 @@
 import { getAiConfig, isAiAvailable } from './ai-config';
 import { callLlm } from './llm-client';
+import { requireDecisionSupport } from '../../config/featureFlags';
 
 export interface BillingSuggestion {
     code: string;
@@ -9,6 +10,9 @@ export interface BillingSuggestion {
 }
 
 export async function optimizeBilling(clinicalNotes: string): Promise<BillingSuggestion[]> {
+    // Class-IIa-Schutz: Abrechnungsoptimierung analysiert klinische Notizen —
+    // nur in Suite (DECISION_SUPPORT_ENABLED=true) erlaubt.
+    requireDecisionSupport('billing-optimization.optimizeBilling');
     const config = await getAiConfig();
     if (!isAiAvailable(config)) {
         console.warn('[BillingOptimization] AI not available. Returning empty suggestions.');
