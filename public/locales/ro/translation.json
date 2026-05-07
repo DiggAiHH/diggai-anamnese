@@ -1322,5 +1322,11 @@
   "consent.error_checkboxes": "Vă rugăm să bifați toate căsuțele.",
   "consent.error_signature": "Vă rugăm să semnați în câmpul de mai sus.",
   "consent.submit": "Confirmați consimțământul și continuați",
-  "consent.cancel": "Anulare"
+  "consent.cancel": "Anulare",
+  "regulatory.footer_aria": "Informații de reglementare obligatorii",
+  "regulatory.manufacturer": "Producător: DiggAi GmbH (în constituire), Hamburg",
+  "regulatory.manufacturer_link_aria": "Mențiuni legale ale producătorului",
+  "regulatory.ifu_link": "ⓘ Instrucțiuni de utilizare",
+  "regulatory.ifu_link_aria": "Deschide instrucțiunile de utilizare (IFU)",
+  "regulatory.privacy": "Confidențialitate"
 }

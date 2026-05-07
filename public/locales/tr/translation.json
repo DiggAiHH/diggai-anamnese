@@ -2728,5 +2728,11 @@
   "settings.security.devices.count": "{{count}} güvenilir cihaz",
   "settings.security.devices.manage": "Yönet",
   "common.active": "Aktif",
-  "common.inactive": "İnaktif"
+  "common.inactive": "İnaktif",
+  "regulatory.footer_aria": "Zorunlu yasal bilgiler",
+  "regulatory.manufacturer": "\"retici: DiggAi GmbH (kuruluş aşamasında), Hamburg",
+  "regulatory.manufacturer_link_aria": "Üretici künye sayfası",
+  "regulatory.ifu_link": "ⓘ Kullanım Kılavuzu",
+  "regulatory.ifu_link_aria": "Kullanım Kılavuzunu (IFU) aç",
+  "regulatory.privacy": "Gizlilik Politikası"
 }

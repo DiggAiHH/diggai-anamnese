@@ -993,5 +993,11 @@
   "consent.error_checkboxes": "Пожалуйста, отметьте все чекбоксы.",
   "consent.error_signature": "Пожалуйста, подпишите в поле выше.",
   "consent.submit": "Подтвердить согласие и продолжить",
-  "consent.cancel": "Отмена"
+  "consent.cancel": "Отмена",
+  "regulatory.footer_aria": "Obyazatel'nyye regulatornyye svedeniya",
+  "regulatory.manufacturer": "Proizvoditel': DiggAi GmbH (v stadii registratsii), Gamburg",
+  "regulatory.manufacturer_link_aria": "Impressum proizvoditelya",
+  "regulatory.ifu_link": "ⓘ Instruktsiya po primeneniyu",
+  "regulatory.ifu_link_aria": "Otkryt' instruksiyu po primeneniyu (IFU)",
+  "regulatory.privacy": "Konfidentsial'nost'"
 }

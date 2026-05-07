@@ -2730,5 +2730,11 @@
   "whyWeAsk.gerinnungsstoerung": "Zaburzenia krzepnięcia są ważne dla bezpiecznego przepisywania leków oraz przy zabiegach chirurgicznych.",
   "whyWeAsk.lungenerkrankung": "Stan zdrowia układu oddechowego wpływa na wybór znieczulenia i niektórych leków.",
   "whyWeAsk.vorerkrankungen": "Przebyte choroby pomagają lekarzowi lepiej ocenić ryzyko i wybrać najlepsze leczenie.",
-  "whyWeAsk.gesundheitsstoerungen": "Istniejące zaburzenia zdrowotne wpływają na diagnozę i terapię. Dane te pomagają lekarzowi unikać interakcji lekowych."
+  "whyWeAsk.gesundheitsstoerungen": "Istniejące zaburzenia zdrowotne wpływają na diagnozę i terapię. Dane te pomagają lekarzowi unikać interakcji lekowych.",
+  "regulatory.footer_aria": "Obowiązkowe informacje regulacyjne",
+  "regulatory.manufacturer": "Producent: DiggAi GmbH (w organizacji), Hamburg",
+  "regulatory.manufacturer_link_aria": "Stopka producenta",
+  "regulatory.ifu_link": "ⓘ Instrukcja użytkowania",
+  "regulatory.ifu_link_aria": "Otwórz instrukcję użytkowania (IFU)",
+  "regulatory.privacy": "Ochrona danych"
 }

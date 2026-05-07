@@ -2730,5 +2730,11 @@
   "whyWeAsk.gerinnungsstoerung": "اختلالات انعقادی برای تجویز ایمن دارو و مداخلات جراحی مهم هستند.",
   "whyWeAsk.lungenerkrankung": "سلامت تنفسی شما بر انتخاب بیهوشی و برخی داروها تأثیر می‌گذارد.",
   "whyWeAsk.vorerkrankungen": "بیماری‌های قبلی به پزشک شما کمک می‌کند تا خطرات را بهتر ارزیابی کرده و بهترین درمان را انتخاب کند.",
-  "whyWeAsk.gesundheitsstoerungen": "اختلالات سلامتی موجود بر تشخیص و درمان تأثیر می‌گذارند. این داده‌ها به پزشک شما کمک می‌کند تا از تداخلات دارویی جلوگیری کند."
+  "whyWeAsk.gesundheitsstoerungen": "اختلالات سلامتی موجود بر تشخیص و درمان تأثیر می‌گذارند. این داده‌ها به پزشک شما کمک می‌کند تا از تداخلات دارویی جلوگیری کند.",
+  "regulatory.footer_aria": "اطلاعات قانونی الزامی",
+  "regulatory.manufacturer": "سازنده: DiggAi GmbH (در حال تأسیس)، هامبورگ",
+  "regulatory.manufacturer_link_aria": "اطلاعات سازنده",
+  "regulatory.ifu_link": "ⓘ دستورالعمل استفاده",
+  "regulatory.ifu_link_aria": "باز کردن دستورالعمل استفاده (IFU)",
+  "regulatory.privacy": "حریم خصوصی"
 }

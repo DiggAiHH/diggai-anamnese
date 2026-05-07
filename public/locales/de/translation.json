@@ -2728,5 +2728,11 @@
   "service.error_title": "Verbindung zum Praxis-Server unterbrochen",
   "service.loading": "Sichere Verbindung wird aufgebaut…",
   "service.start_cta": "Anamnese jetzt starten",
-  "service.start_cta_short": "Jetzt starten"
+  "service.start_cta_short": "Jetzt starten",
+  "regulatory.footer_aria": "Regulatorische Pflichtangaben",
+  "regulatory.manufacturer": "Hersteller: DiggAi GmbH (i.Gr.), Hamburg",
+  "regulatory.manufacturer_link_aria": "Hersteller-Impressum",
+  "regulatory.ifu_link": "ⓘ Gebrauchsanweisung",
+  "regulatory.ifu_link_aria": "Gebrauchsanweisung (IFU) öffnen",
+  "regulatory.privacy": "Datenschutz"
 }

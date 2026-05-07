@@ -2728,5 +2728,11 @@
   "service.error_title": "Connection to practice server lost",
   "service.loading": "Establishing secure connection...",
   "service.start_cta": "Start anamnesis now",
-  "service.start_cta_short": "Start now"
+  "service.start_cta_short": "Start now",
+  "regulatory.footer_aria": "Regulatory mandatory information",
+  "regulatory.manufacturer": "Manufacturer: DiggAi GmbH (in formation), Hamburg",
+  "regulatory.manufacturer_link_aria": "Manufacturer imprint",
+  "regulatory.ifu_link": "ⓘ Instructions for Use",
+  "regulatory.ifu_link_aria": "Open Instructions for Use (IFU)",
+  "regulatory.privacy": "Privacy Policy"
 }

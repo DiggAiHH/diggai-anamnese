@@ -2817,5 +2817,11 @@
   "settings.security.devices.count": "{{count}} довірених пристроїв",
   "settings.security.devices.manage": "Керувати",
   "common.active": "Активно",
-  "common.inactive": "Неактивно"
+  "common.inactive": "Неактивно",
+  "regulatory.footer_aria": "Obov'yazkovі rehuliatornі vіdomosti",
+  "regulatory.manufacturer": "Vyrobnyk: DiggAi GmbH (u protsesi reyestratsiyi), Hamburh",
+  "regulatory.manufacturer_link_aria": "Impressum vyrobnyka",
+  "regulatory.ifu_link": "ⓘ Instruktsiya iz zastosuvannya",
+  "regulatory.ifu_link_aria": "Vіdkryty instruktsіyu iz zastosuvannya (IFU)",
+  "regulatory.privacy": "Zakhyst danykh"
 }

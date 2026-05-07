@@ -2737,5 +2737,11 @@
   "service.error_title": "انقطع الاتصال بخادم العيادة",
   "service.loading": "يتم إنشاء اتصال آمن...",
   "service.start_cta": "ابدأ الآن",
-  "service.start_cta_short": "ابدأ"
+  "service.start_cta_short": "ابدأ",
+  "regulatory.footer_aria": "المعلومات التنظيمية الإلزامية",
+  "regulatory.manufacturer": "الشركة المصنّعة: DiggAi GmbH (قيد التأسيس)، هامبورغ",
+  "regulatory.manufacturer_link_aria": "بيانات الشركة المصنّعة",
+  "regulatory.ifu_link": "ⓘ تعليمات الاستخدام",
+  "regulatory.ifu_link_aria": "فتح تعليمات الاستخدام (IFU)",
+  "regulatory.privacy": "سياسة الخصوصية"
 }

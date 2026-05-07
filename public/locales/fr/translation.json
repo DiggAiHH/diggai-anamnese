@@ -2730,5 +2730,11 @@
   "whyWeAsk.gerinnungsstoerung": "Les troubles de la coagulation sont importants pour la prescription sûre de médicaments et pour les interventions chirurgicales.",
   "whyWeAsk.lungenerkrankung": "Votre santé respiratoire influence le choix de l'anesthésie et de certains médicaments.",
   "whyWeAsk.vorerkrankungen": "Les antécédents médicaux aident votre médecin à mieux évaluer les risques et à choisir le meilleur traitement.",
-  "whyWeAsk.gesundheitsstoerungen": "Les troubles de santé existants influencent le diagnostic et la thérapie. Ces données aident votre médecin à éviter les interactions médicamenteuses."
+  "whyWeAsk.gesundheitsstoerungen": "Les troubles de santé existants influencent le diagnostic et la thérapie. Ces données aident votre médecin à éviter les interactions médicamenteuses.",
+  "regulatory.footer_aria": "Informations réglementaires obligatoires",
+  "regulatory.manufacturer": "Fabricant : DiggAi GmbH (en cours de constitution), Hambourg",
+  "regulatory.manufacturer_link_aria": "Mentions légales du fabricant",
+  "regulatory.ifu_link": "ⓘ Instructions d’utilisation",
+  "regulatory.ifu_link_aria": "Ouvrir les instructions d’utilisation (IFU)",
+  "regulatory.privacy": "Confidentialité"
 }

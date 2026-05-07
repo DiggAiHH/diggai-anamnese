@@ -22,6 +22,7 @@ import { InstallPrompt } from './components/InstallPrompt';
 import { UpdateNotification } from './components/UpdateNotification';
 import { preloadPatientFlow } from './lib/routePreloaders';
 import { ScrollToTop } from './components/ScrollToTop';
+import { RegulatoryFooter } from './components/legal/RegulatoryFooter';
 import { getPatientServiceById } from './lib/patientFlow';
 const HomeScreen = lazy(() => import('./components/HomeScreen').then(m => ({ default: m.HomeScreen })));
 const LandingPage = lazy(() => import('./components/LandingPage').then(m => ({ default: m.LandingPage })));
@@ -258,13 +259,17 @@ function PatientApp({ defaultLayout = 'default' }: { defaultLayout?: PatientLayo
 
   return (
     <Suspense fallback={<DashboardLoading />}>
-      <div className="min-h-screen transition-colors duration-500">
-        {flowStep === 'landing' ? (
-          <LandingPage forceClassic={isClassicLayout} />
-        ) : (
-          <Questionnaire />
-        )}
-        <SessionRecoveryDialog />
+      <div className="min-h-screen flex flex-col transition-colors duration-500">
+        <div className="flex-1">
+          {flowStep === 'landing' ? (
+            <LandingPage forceClassic={isClassicLayout} />
+          ) : (
+            <Questionnaire />
+          )}
+          <SessionRecoveryDialog />
+        </div>
+        {/* MDR Anhang I Nr. 23.2 + 23.4 Pflichtangaben — nur Capture-Patientenfluss */}
+        <RegulatoryFooter />
       </div>
     </Suspense>
   );

@@ -2,9 +2,15 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { visualizer } from 'rollup-plugin-visualizer';
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const pkg = require('./package.json') as { version: string };
 
 // https://vite.dev/config/
 export default defineConfig({
+  // Inject package.json version as VITE_APP_VERSION for RegulatoryFooter (MDR §11.2)
+  define: {
+    'import.meta.env.VITE_APP_VERSION': JSON.stringify(pkg.version),
+  },
   plugins: [
     react(),
     tailwindcss(),

@@ -850,5 +850,11 @@
   "consent.error_checkboxes": "Моля, отметнете всички квадратчета.",
   "consent.error_signature": "Моля, подпишете в полето по-горе.",
   "consent.submit": "Потвърдете съгласието и продължете",
-  "consent.cancel": "Отказ"
+  "consent.cancel": "Отказ",
+  "regulatory.footer_aria": "Zadulzhitelna regulatorna informatsiya",
+  "regulatory.manufacturer": "Proizvoditel: DiggAi GmbH (v protses na registratsiya), Khamburg",
+  "regulatory.manufacturer_link_aria": "Impressum na proizvoditelya",
+  "regulatory.ifu_link": "ⓘ Instruktsiya za upotreba",
+  "regulatory.ifu_link_aria": "Otvori instruktsiya za upotreba (IFU)",
+  "regulatory.privacy": "Poveritelnost"
 }
