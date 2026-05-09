@@ -31,6 +31,13 @@ primary_region = "fra"
   CORS_ORIGIN = "https://diggai.de,https://www.diggai.de,https://diggai-anamnese.netlify.app"
   # RabbitMQ optional — Agent-Core ist separater Service
   DISABLE_RABBITMQ = "1"
+  # 2026-05-08 — Memory-Diet: 10 von 14 Background-Jobs deaktiviert (siehe server/index.ts).
+  # Nur DSGVO/Security-Essentials laufen: cleanup, hardDelete, tokenCleanup, retention.
+  # Reaktivieren via Setting auf "0" und redeployen, sobald Praxen-Last es erfordert.
+  LOW_MEM_MODE = "1"
+  # V8-Heap-Decke: Auf 512-MB-Fly-Machine ~360 MB für Old-Space, Rest für native + Prisma + FS.
+  # Verhindert V8-Default-Heap (1500 MB+), der OOM-Killer triggert.
+  NODE_OPTIONS = "--max-old-space-size=384"
 
 [http_service]
   internal_port = 3001

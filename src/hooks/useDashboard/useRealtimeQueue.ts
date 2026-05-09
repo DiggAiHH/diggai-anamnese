@@ -67,8 +67,10 @@ export function useRealtimeQueue(options: UseRealtimeQueueOptions = {}): UseReal
         return engine.getQueueItems();
       }
       
-      // Produktion: API-Call
-      const response = await fetch('/api/queue');
+      // Produktion: API-Call (2026-05-08 — über API_BASE_URL statt relative Pfad,
+      // sonst geht der Call an den Frontend-Host und Netlify liefert SPA-Fallback statt JSON).
+      const apiBase = (import.meta.env.VITE_API_URL as string | undefined) || '';
+      const response = await fetch(`${apiBase}/queue`, { credentials: 'include' });
       if (!response.ok) {
         throw new Error('Failed to fetch queue data');
       }
@@ -165,13 +167,15 @@ export function useRealtimeQueue(options: UseRealtimeQueueOptions = {}): UseReal
           const engine = getMockDashboardEngine();
           engine.movePatient(patientId, newStatus);
         } else {
-          // Produktion: API-Call
-          const response = await fetch(`/api/queue/${patientId}/status`, {
+          // Produktion: API-Call (2026-05-08 — über API_BASE_URL).
+          const apiBase = (import.meta.env.VITE_API_URL as string | undefined) || '';
+          const response = await fetch(`${apiBase}/queue/${patientId}/status`, {
             method: 'PUT',
+            credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ status: newStatus }),
           });
-          
+
           if (!response.ok) {
             throw new Error('Failed to update patient status');
           }

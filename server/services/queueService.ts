@@ -21,7 +21,10 @@ interface QueueEntry {
   feedbackRating: number | null;
 }
 
-const db = (globalThis as any).__prisma as any;
+// 2026-05-08 — globalThis.__prisma war never set → db undefined → 500 auf jeden /api/queue/*-Call.
+// Fix: prisma direkt aus db importieren (wie alle anderen Services).
+import { prisma } from '../db';
+const db = prisma as any;
 
 // Priority sort order
 const PRIORITY_ORDER: Record<string, number> = { EMERGENCY: 0, URGENT: 1, NORMAL: 2 };

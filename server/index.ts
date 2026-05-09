@@ -216,13 +216,34 @@ const rateLimitStore = buildRateLimitStore();
 const getRequestPath = (req: express.Request) => req.originalUrl.split('?')[0] || req.originalUrl;
 const probePaths = new Set(['/api/live', '/api/system/live', '/api/system/metrics']);
 
+// 2026-05-08 — Patient-Anamnese-Pfade vom globalen Limit ausnehmen.
+// Bei normaler Beantwortung von 60+ Fragen mit ~3 API-Calls pro Frage hit der globale 200/15min-Limit.
+const patientFlowPathPrefixes = ['/api/queue/', '/api/sessions', '/api/answers', '/api/atoms'];
+
 const globalLimiter = rateLimit({
     windowMs: config.rateLimitWindowMs,
     max: config.rateLimitMax,
     standardHeaders: true,
     legacyHeaders: false,
     store: rateLimitStore, // undefined → in-memory (express-rate-limit default)
-    skip: (req) => probePaths.has(getRequestPath(req)),
+    skip: (req) => {
+        const path = getRequestPath(req);
+        if (probePaths.has(path)) return true;
+        // Patient-Anamnese-Endpoints haben eigene Limits weiter unten — global skippen.
+        for (const prefix of patientFlowPathPrefixes) {
+            if (path.startsWith(prefix)) return true;
+        }
+        return false;
+    },
+    message: { error: 'Zu viele Anfragen. Bitte warten Sie einen Moment.' },
+});
+
+// Patient-Flow-Limiter — großzügig genug für eine komplette Anamnese-Befragung.
+const patientFlowLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 2000, // 2000 requests per 15 min — reicht für eine vollständige Befragung
+    standardHeaders: true,
+    legacyHeaders: false,
     message: { error: 'Zu viele Anfragen. Bitte warten Sie einen Moment.' },
 });
 app.use(globalLimiter);
@@ -343,16 +364,16 @@ app.use('/api/health', healthRoutes);
 
 // ─── API Routes ─────────────────────────────────────────────
 
-mountRoute('practice', '/api/sessions', sessionRoutes);
-mountRoute('practice', '/api/answers', answerRoutes);
-mountRoute('practice', '/api/atoms', atomRoutes);
+mountRoute('practice', '/api/sessions', patientFlowLimiter, sessionRoutes);
+mountRoute('practice', '/api/answers', patientFlowLimiter, answerRoutes);
+mountRoute('practice', '/api/atoms', patientFlowLimiter, atomRoutes);
 mountRoute('shared', '/api/arzt', authLimiter, arztRoutes);
 mountRoute('shared', '/api/mfa', authLimiter, mfaRoutes); // H-04 FIX: authLimiter hinzugefügt
 mountRoute('shared', '/api/mfa/reception', authLimiter, mfaReceptionRoutes);
 mountRoute('practice', '/api/chats', chatRoutes);
 mountRoute('authority', '/api/export', exportRoutes);
 mountRoute('practice', '/api/upload', uploadLimiter, uploadRoutes);
-mountRoute('practice', '/api/queue', queueRoutes);
+mountRoute('practice', '/api/queue', patientFlowLimiter, queueRoutes);
 mountRoute('company', '/api/admin', authLimiter, adminRoutes);
 mountRoute('practice', '/api/patients', patientRoutes);
 mountRoute('company', '/api/content', contentRoutes);
@@ -476,20 +497,36 @@ import { startQueueAutoDispatch, stopQueueAutoDispatch } from './jobs/queueAutoD
 import { startBillingReconciler, stopBillingReconciler } from './jobs/billingReconciler';
 import { startTokenCleanupJob, stopTokenCleanupJob } from './jobs/token-cleanup.job';
 import { startRetentionCleanupJob } from './jobs/retentionCleanup';
+// LOW_MEM_MODE — 2026-05-08 (CK): Auf 256-512 MB Fly-Maschinen gate non-essential
+// background-jobs hinter ein Flag, damit V8 nicht ständig in Old-Space-GC läuft.
+// Essentials bleiben aktiv: Cleanup, Hard-Delete, Token-Cleanup, Retention (DSGVO/Security).
+// Alles andere kann via LOW_MEM_MODE=1 deaktiviert werden — durch `flyctl deploy` oder per Secret.
+const LOW_MEM_MODE = process.env.LOW_MEM_MODE === '1' || process.env.LOW_MEM_MODE === 'true';
+if (LOW_MEM_MODE) {
+    console.log('[Server] LOW_MEM_MODE active — running essentials only (cleanup/hardDelete/token/retention).');
+}
+
+// Essentials — DSGVO/Security, immer aktiv
 try { startDatabaseCleanupJob(); } catch (err) { console.error('[Server] Failed to start cleanup job:', err); }
-try { startROISnapshotJob(); } catch (err) { console.error('[Server] Failed to start ROI snapshot job:', err); }
-try { startReminderWorker(); } catch (err) { console.error('[Server] Failed to start reminder worker:', err); }
 try { startHardDeleteWorker(); } catch (err) { console.error('[Server] Failed to start hard-delete worker:', err); }
-try { startReceptionInboxCleanupJob(); } catch (err) { console.error('[Server] Failed to start reception inbox cleanup job:', err); }
-try { startAgentOrchestrator(); } catch (err) { console.error('[Server] Failed to start agent orchestrator:', err); }
-try { startBackupScheduler(); } catch (err) { console.error('[Server] Failed to start backup scheduler:', err); }
-try { startBackupMonitor(); } catch (err) { console.error('[Server] Failed to start backup monitor:', err); }
-try { startEscalationWorker(); } catch (err) { console.error('[Server] Failed to start escalation worker:', err); }
-try { startComplianceReporter(); } catch (err) { console.error('[Server] Failed to start compliance reporter:', err); }
-try { startQueueAutoDispatch(); } catch (err) { console.error('[Server] Failed to start queue auto-dispatch:', err); }
-try { startBillingReconciler(); } catch (err) { console.error('[Server] Failed to start billing reconciler:', err); }
 try { startTokenCleanupJob(); } catch (err) { console.error('[Server] Failed to start token cleanup job:', err); }
 try { startRetentionCleanupJob(); } catch (err) { console.error('[Server] Failed to start retention cleanup job:', err); }
+
+// Non-essential — abschaltbar im LOW_MEM_MODE
+if (!LOW_MEM_MODE) {
+    try { startROISnapshotJob(); } catch (err) { console.error('[Server] Failed to start ROI snapshot job:', err); }
+    try { startReminderWorker(); } catch (err) { console.error('[Server] Failed to start reminder worker:', err); }
+    try { startReceptionInboxCleanupJob(); } catch (err) { console.error('[Server] Failed to start reception inbox cleanup job:', err); }
+    try { startAgentOrchestrator(); } catch (err) { console.error('[Server] Failed to start agent orchestrator:', err); }
+    try { startBackupScheduler(); } catch (err) { console.error('[Server] Failed to start backup scheduler:', err); }
+    try { startBackupMonitor(); } catch (err) { console.error('[Server] Failed to start backup monitor:', err); }
+    try { startEscalationWorker(); } catch (err) { console.error('[Server] Failed to start escalation worker:', err); }
+    try { startComplianceReporter(); } catch (err) { console.error('[Server] Failed to start compliance reporter:', err); }
+    try { startQueueAutoDispatch(); } catch (err) { console.error('[Server] Failed to start queue auto-dispatch:', err); }
+    try { startBillingReconciler(); } catch (err) { console.error('[Server] Failed to start billing reconciler:', err); }
+} else {
+    console.log('[Server] Skipped: ROI, reminder, receptionInbox, agentOrchestrator, backup-{scheduler,monitor}, escalation, compliance, queueAutoDispatch, billingReconciler.');
+}
 
 // RabbitMQ — verbindet sich mit Agent-Core (non-blocking, graceful degradation)
 messageBroker.connect().catch(err =>
@@ -545,8 +582,13 @@ httpServer.listen(config.port, () => {
   `);
 
     // Start Billing Cron Jobs (nur im company domain)
-    if (shouldMountDomain('company')) {
+    // 2026-05-08 — LOW_MEM_MODE: BillingMonitor crashed alle 30s mit Stripe 401 wenn keine API-Keys gesetzt sind.
+    // Das spawnt Error-Stacks und füllt Memory. In LOW_MEM_MODE deshalb auch billingJobs aus.
+    const lowMemMode = process.env.LOW_MEM_MODE === '1' || process.env.LOW_MEM_MODE === 'true';
+    if (shouldMountDomain('company') && !lowMemMode) {
         billingJobs.start();
+    } else if (lowMemMode) {
+        console.log('[Server] Skipped: billingJobs.start() (LOW_MEM_MODE).');
     }
 });
 

@@ -40,9 +40,11 @@ export class TomedoConnectionPool extends EventEmitter {
     timeout: NodeJS.Timeout;
   }> = [];
 
+  // 2026-05-08 — LOW_MEM_MODE: Default-min runter von 2 auf 0, damit kein Pool spawnt
+  // bevor erste echte Anfrage kommt (Lazy-Pool).
   private readonly defaultOptions: PoolOptions = {
-    minConnections: 2,
-    maxConnections: 10,
+    minConnections: process.env.LOW_MEM_MODE === '1' ? 0 : 2,
+    maxConnections: process.env.LOW_MEM_MODE === '1' ? 3 : 10,
     maxIdleTimeMs: 300000, // 5 minutes
     connectionTimeoutMs: 10000,
     acquireTimeoutMs: 5000,

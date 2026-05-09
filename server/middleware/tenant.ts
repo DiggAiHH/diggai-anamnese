@@ -80,7 +80,18 @@ function extractTenantIdentifier(req: Request): string | null {
 function extractConcreteHostSubdomain(host: string): string | null {
     const cleanHost = host.split(':')[0].toLowerCase();
     const subdomain = cleanHost.split('.')[0];
-    if (!subdomain || ['localhost', '127', 'www', 'app', 'api', 'dev', 'test'].includes(subdomain)) {
+    // 2026-05-08 — API-Hosts (diggai-api.fly.dev, *.fly.dev) sind keine Tenant-Subdomains.
+    // Sie als "no-subdomain" zu behandeln verhindert TENANT_OVERRIDE_CONFLICT bei
+    // Frontend-Calls von diggai.de mit x-tenant-id Header.
+    const RESERVED_HOSTS = new Set([
+        'localhost', '127', 'www', 'app', 'api', 'dev', 'test',
+        'diggai-api', 'diggai-api-staging', 'staging',
+    ]);
+    if (!subdomain || RESERVED_HOSTS.has(subdomain)) {
+        return null;
+    }
+    // *.fly.dev / *.up.railway.app / *.onrender.com sind Hoster-Domains, keine Tenants
+    if (cleanHost.endsWith('.fly.dev') || cleanHost.endsWith('.up.railway.app') || cleanHost.endsWith('.onrender.com') || cleanHost.endsWith('.netlify.app')) {
         return null;
     }
     return subdomain;

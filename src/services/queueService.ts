@@ -104,8 +104,14 @@ class ApiQueueService implements QueueService {
     this.setupSocketListeners();
   }
 
+  // 2026-05-08 — Helper: API_BASE_URL aus VITE_API_URL.
+  // Vorher: relative Pfade gingen an Frontend-Host (Netlify) und bekamen SPA-Fallback statt JSON.
+  private get apiBase(): string {
+    return (import.meta.env.VITE_API_URL as string | undefined) || '';
+  }
+
   async getQueue(): Promise<PatientQueueItem[]> {
-    const response = await fetch('/api/queue');
+    const response = await fetch(`${this.apiBase}/queue`, { credentials: 'include' });
     if (!response.ok) throw new Error('Failed to fetch queue');
     const data: QueueApiResponse = await response.json();
     this.currentItems = data.items;
@@ -113,19 +119,20 @@ class ApiQueueService implements QueueService {
   }
 
   async getStats(): Promise<DashboardStats> {
-    const response = await fetch('/api/queue/stats');
+    const response = await fetch(`${this.apiBase}/queue/stats`, { credentials: 'include' });
     if (!response.ok) throw new Error('Failed to fetch stats');
     const data = await response.json();
     return data.stats as DashboardStats;
   }
 
   async updateStatus(patientId: string, newStatus: QueueStatus): Promise<void> {
-    const response = await fetch(`/api/queue/${patientId}/status`, {
+    const response = await fetch(`${this.apiBase}/queue/${patientId}/status`, {
       method: 'PUT',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: newStatus }),
     });
-    
+
     if (!response.ok) throw new Error('Failed to update status');
 
     const s = getSocket();
@@ -133,12 +140,13 @@ class ApiQueueService implements QueueService {
   }
 
   async assignDoctor(patientId: string, doctorId: string): Promise<void> {
-    const response = await fetch(`/api/queue/${patientId}/assign`, {
+    const response = await fetch(`${this.apiBase}/queue/${patientId}/assign`, {
       method: 'PUT',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ doctorId }),
     });
-    
+
     if (!response.ok) throw new Error('Failed to assign doctor');
   }
 

@@ -73,7 +73,9 @@ router.get('/', requireAuth, requireRole('arzt', 'admin', 'mfa'), async (_req, r
 });
 
 // ─── GET /api/queue/position/:sessionId ─────────────────────
-router.get('/position/:sessionId', requireAuth, async (req, res) => {
+// 2026-05-08 — Patient-facing endpoint: kein requireAuth.
+// Die sessionId ist das Capability-Token des Patienten (UUID, nicht erratbar).
+router.get('/position/:sessionId', async (req, res) => {
     try {
         const data = await queueService.getPositionBySession(req.params.sessionId as string);
         res.json(data);
@@ -84,7 +86,8 @@ router.get('/position/:sessionId', requireAuth, async (req, res) => {
 });
 
 // ─── GET /api/queue/flow-config/:sessionId ──────────────────
-router.get('/flow-config/:sessionId', requireAuth, async (req, res) => {
+// 2026-05-08 — Patient-facing endpoint: kein requireAuth.
+router.get('/flow-config/:sessionId', async (req, res) => {
     try {
         const config = await queueService.getFlowConfig(req.params.sessionId as string);
         res.json(config);
