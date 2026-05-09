@@ -31,6 +31,15 @@ echo Current branch: %BRANCH% >> "D:\Temp\fly-push.log"
 git push --no-verify --set-upstream origin %BRANCH% >> "D:\Temp\fly-push.log" 2>&1
 
 echo. >> "D:\Temp\fly-push.log"
+echo === Merge in master + push (Netlify deployt nur master) === >> "D:\Temp\fly-push.log"
+git fetch origin master >> "D:\Temp\fly-push.log" 2>&1
+git checkout master >> "D:\Temp\fly-push.log" 2>&1
+git pull origin master --no-verify >> "D:\Temp\fly-push.log" 2>&1
+git merge %BRANCH% --no-verify --no-edit -X theirs >> "D:\Temp\fly-push.log" 2>&1
+git push origin master --no-verify >> "D:\Temp\fly-push.log" 2>&1
+git checkout %BRANCH% >> "D:\Temp\fly-push.log" 2>&1
+
+echo. >> "D:\Temp\fly-push.log"
 echo === git log -3 === >> "D:\Temp\fly-push.log"
 git log -3 --oneline >> "D:\Temp\fly-push.log" 2>&1
 
