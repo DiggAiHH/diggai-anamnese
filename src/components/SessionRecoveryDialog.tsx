@@ -15,8 +15,12 @@ export function SessionRecoveryDialog() {
     const clearSession = useSessionStore(state => state.clearSession);
     const isHydrated = useSessionStore(state => state.isHydrated);
 
-    // Check once after hydration if there's an in-progress session
-    const shouldRecover = isHydrated && flowStep === 'questionnaire' && Object.keys(answers).length > 0;
+    // 2026-05-09 — UX-Fix B3: Dialog nur bei substantiellem Fortschritt zeigen.
+    // Vorher: Dialog erschien bei jedem Klick wenn 1 Antwort gespeichert war — nervig.
+    // Jetzt: nur bei >= 3 beantworteten Fragen.
+    const shouldRecover = isHydrated
+        && flowStep === 'questionnaire'
+        && Object.keys(answers).length >= 3;
 
     useEffect(() => {
         if (shouldRecover) {
