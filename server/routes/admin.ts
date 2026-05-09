@@ -862,6 +862,146 @@ router.patch('/tenants/:tenantId/configure-region', requireRole('admin'), async 
     }
 });
 
+// ─── PRAXIS-ONBOARDING ─────────────────────────────────────────────
+// 2026-05-09 — 1-Klick-Setup für neue Pilot-Praxen.
+// Erstellt Tenant + 3 Default-User (ARZT, MFA, ADMIN) + Random-Initial-Passwörter.
+// Returnt Welcome-Letter-Text den CK in Email kopieren kann.
+
+router.post('/onboard-praxis', requireAuth, requireRole('admin'), async (req: Request, res) => {
+    try {
+        const schema = z.object({
+            bsnr: z.string().regex(/^\d{9}$/, 'BSNR muss 9 Ziffern haben'),
+            praxisName: z.string().min(3),
+            subdomain: z.string().regex(/^[a-z0-9-]+$/).optional(),
+            primaryColor: z.string().regex(/^#[0-9a-f]{6}$/i).optional(),
+            welcomeMessage: z.string().optional(),
+            doctorDisplayName: z.string().optional(),
+        });
+        const data = schema.parse(req.body);
+        const subdomain = data.subdomain || data.praxisName.toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 32);
+
+        // Idempotenz: existing-Praxis-Check
+        const existing = await prisma.tenant.findFirst({
+            where: { OR: [{ bsnr: data.bsnr }, { subdomain }] },
+        });
+        if (existing) {
+            res.status(409).json({
+                error: 'Praxis existiert bereits',
+                code: 'TENANT_EXISTS',
+                tenantId: existing.id,
+            });
+            return;
+        }
+
+        // Generate random passwords
+        const crypto = await import('crypto');
+        const randomPwd = (): string => {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+            return Array.from(crypto.randomBytes(12), b => chars[b % chars.length]).join('') + '!';
+        };
+        const arztPwd = randomPwd();
+        const mfaPwd = randomPwd();
+        const adminPwd = randomPwd();
+
+        const tenant = await prisma.tenant.create({
+            data: {
+                bsnr: data.bsnr,
+                subdomain,
+                name: data.praxisName,
+                legalName: data.praxisName,
+                plan: 'STARTER',
+                status: 'ACTIVE',
+                visibility: 'PUBLIC',
+                primaryColor: data.primaryColor || '#3b82f6',
+                welcomeMessage: data.welcomeMessage || `Willkommen in der ${data.praxisName}`,
+                dsgvoAgreementSigned: true,
+                dsgvoAgreementSignedAt: new Date(),
+                maxUsers: 10,
+                maxPatientsPerMonth: 1000,
+                settings: {
+                    features: {
+                        nfc: false, telemedicine: false, pvs: true,
+                        gamification: false, showWaitingRoom: false,
+                    },
+                    defaults: { language: 'de', timezone: 'Europe/Berlin' },
+                    gdtSenderId: 'DIGGAI',
+                    gdtReceiverId: 'TOMEDO',
+                },
+            },
+        });
+
+        // 3 Default-User
+        const hashIt = (s: string) => bcrypt.hashSync(s, 10);
+        await prisma.arztUser.createMany({
+            data: [
+                { tenantId: tenant.id, username: 'arzt', displayName: data.doctorDisplayName || 'Dr.', passwordHash: hashIt(arztPwd), role: 'ARZT', isActive: true },
+                { tenantId: tenant.id, username: 'mfa', displayName: 'MFA', passwordHash: hashIt(mfaPwd), role: 'MFA', isActive: true },
+                { tenantId: tenant.id, username: 'admin', displayName: 'Administration', passwordHash: hashIt(adminPwd), role: 'ADMIN', isActive: true },
+            ],
+        });
+
+        const welcomeLetter = `
+Liebes Praxis-Team,
+
+willkommen bei DiggAi! Ihre Praxis ist erfolgreich angelegt.
+
+🔑 LOGIN-DATEN
+
+URL:        https://diggai.de/verwaltung/login
+Praxis-ID:  ${data.bsnr}
+
+Benutzer:   arzt          Passwort: ${arztPwd}
+            mfa           Passwort: ${mfaPwd}
+            admin         Passwort: ${adminPwd}
+
+⚠️  Bitte ändern Sie die Passwörter nach dem ersten Login.
+
+📲 PATIENTEN-ZUGANG
+
+Patienten erreichen Ihre Anmelde-Plattform unter:
+    https://diggai.de/${data.bsnr}
+
+QR-Code zum Aufkleben in der Praxis: bei mir anfordern.
+
+🩺 TOMEDO/PVS-INTEGRATION
+
+Die Anamnese-Daten werden als GDT-Datei (.gdt) bereitgestellt.
+Im Arzt-Dashboard finden Sie pro Patient den grünen "📄 GDT-Export"-Button.
+Datei in den Tomedo-Importordner legen → Tomedo importiert automatisch.
+
+📞 SUPPORT
+
+Bei Fragen: Christian Klaproth direkt anrufen.
+
+Viele Grüße
+DiggAi-Team
+`;
+
+        res.status(201).json({
+            ok: true,
+            tenantId: tenant.id,
+            bsnr: tenant.bsnr,
+            subdomain: tenant.subdomain,
+            patientUrl: `https://diggai.de/${tenant.bsnr}`,
+            adminUrl: 'https://diggai.de/verwaltung/login',
+            credentials: {
+                arzt: { username: 'arzt', password: arztPwd },
+                mfa: { username: 'mfa', password: mfaPwd },
+                admin: { username: 'admin', password: adminPwd },
+            },
+            welcomeLetter,
+        });
+    } catch (err: unknown) {
+        if (err instanceof z.ZodError) {
+            res.status(400).json({ error: 'Validierungsfehler', details: err.issues });
+            return;
+        }
+        const message = err instanceof Error ? err.message : String(err);
+        console.error('[Admin] onboard-praxis-Fehler:', message);
+        res.status(500).json({ error: 'Onboarding fehlgeschlagen', detail: message });
+    }
+});
+
 // ─── DEMO-PATIENT-GENERATOR ────────────────────────────────────────
 // 2026-05-09 — Befüllt Arzt-Dashboard mit fiktiven Patienten-Sessions
 // für Pilot-Demos. Erstellt vollständige Anamnese inkl. 16 Antworten.
