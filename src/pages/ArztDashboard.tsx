@@ -231,12 +231,26 @@ const PatientDetailView = React.memo(function PatientDetailView({
             </div>
             
             {/* Aktionen */}
-            <div className="flex gap-3">
+            <div className="flex gap-3 flex-wrap">
                 <button className="flex-1 bg-purple-600 hover:bg-purple-500 text-white font-semibold py-3 rounded-xl transition-all">
                     {t('arzt.callPatient', 'Patient aufrufen')}
                 </button>
                 <button className="flex-1 bg-white/10 hover:bg-white/20 text-white font-semibold py-3 rounded-xl transition-all">
                     {t('arzt.viewAnamnese', 'Anamnese ansehen')}
+                </button>
+                {/* 2026-05-09 — GDT-Export-Button für Tomedo (und alle GDT-fähigen PVS).
+                   Lädt die Anamnese als .gdt-Datei. Praxis kann sie in Tomedo importieren. */}
+                <button
+                    onClick={() => {
+                        const apiBase = (import.meta.env.VITE_API_URL as string | undefined) || '';
+                        const url = `${apiBase}/sessions/${patient.id}/export/gdt?receiverId=TOMEDO`;
+                        // Cookie-basierte Auth via Browser → Direkt-Download
+                        window.open(url, '_blank');
+                    }}
+                    className="px-4 bg-emerald-600/80 hover:bg-emerald-500 text-white font-semibold py-3 rounded-xl transition-all flex items-center gap-2"
+                    title={t('arzt.exportGdtTitle', 'GDT-Datei für Tomedo / PVS-Import herunterladen')}
+                >
+                    📄 {t('arzt.exportGdt', 'GDT-Export')}
                 </button>
                 {patient.triageLevel !== 'NORMAL' && (
                     <button className="px-4 bg-red-500/20 hover:bg-red-500/30 text-red-400 font-semibold py-3 rounded-xl transition-all">

@@ -467,6 +467,18 @@ setupSocketIO(httpServer);
 
 import { ZodError } from 'zod';
 
+// 2026-05-09 — JSON-404-Catchall für /api/*. Vorher: Express-Default lieferte HTML
+// für unbekannte API-Endpoints, was Axios-Klients in Confusion brachte. Jetzt: JSON.
+app.use('/api', (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (res.headersSent) return next();
+    res.status(404).json({
+        error: 'Endpoint nicht gefunden',
+        code: 'NOT_FOUND',
+        path: req.originalUrl,
+        method: req.method,
+    });
+});
+
 // Sentry Error Handler (before our custom error handler)
 setupSentryErrorHandler(app);
 

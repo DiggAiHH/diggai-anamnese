@@ -862,4 +862,144 @@ router.patch('/tenants/:tenantId/configure-region', requireRole('admin'), async 
     }
 });
 
+// ─── DEMO-PATIENT-GENERATOR ────────────────────────────────────────
+// 2026-05-09 — Befüllt Arzt-Dashboard mit fiktiven Patienten-Sessions
+// für Pilot-Demos. Erstellt vollständige Anamnese inkl. 16 Antworten.
+
+const DEMO_PATIENTS: Array<{
+    firstName: string;
+    lastName: string;
+    gender: 'male' | 'female';
+    birthDate: string;
+    versichertenNr: string;
+    kassenname: string;
+    service: string;
+    answers: Array<{ atomId: string; value: string }>;
+}> = [
+    {
+        firstName: 'Maria', lastName: 'Schmidt', gender: 'female', birthDate: '1972-04-12',
+        versichertenNr: 'A123456789', kassenname: 'AOK Hamburg',
+        service: 'Termin / Anamnese',
+        answers: [
+            { atomId: '1001', value: '"existing"' },
+            { atomId: '2001', value: '"Schmidt"' },
+            { atomId: '2002', value: '"Maria"' },
+            { atomId: '2003', value: '"female"' },
+            { atomId: '2004', value: '"1972-04-12"' },
+            { atomId: '3001', value: '"gesetzlich"' },
+            { atomId: '3002', value: '"A123456789"' },
+            { atomId: '3003', value: '"maria.schmidt@example.de"' },
+            { atomId: '5001', value: '"Schmerzen im rechten Knie seit 2 Wochen"' },
+            { atomId: '5002', value: '6' },
+            { atomId: '5003', value: '"intermittierend"' },
+        ],
+    },
+    {
+        firstName: 'Heinrich', lastName: 'Müller', gender: 'male', birthDate: '1955-09-03',
+        versichertenNr: 'B987654321', kassenname: 'Techniker Krankenkasse',
+        service: 'Medikamente / Rezepte',
+        answers: [
+            { atomId: '1001', value: '"existing"' },
+            { atomId: '2001', value: '"Müller"' },
+            { atomId: '2002', value: '"Heinrich"' },
+            { atomId: '2003', value: '"male"' },
+            { atomId: '2004', value: '"1955-09-03"' },
+            { atomId: '3001', value: '"gesetzlich"' },
+            { atomId: '5001', value: '"Folgerezept Ramipril 5mg"' },
+        ],
+    },
+    {
+        firstName: 'Aisha', lastName: 'Hassan', gender: 'female', birthDate: '1988-12-22',
+        versichertenNr: 'C555444333', kassenname: 'Barmer',
+        service: 'AU (Krankschreibung)',
+        answers: [
+            { atomId: '1001', value: '"new"' },
+            { atomId: '2001', value: '"Hassan"' },
+            { atomId: '2002', value: '"Aisha"' },
+            { atomId: '2003', value: '"female"' },
+            { atomId: '2004', value: '"1988-12-22"' },
+            { atomId: '3001', value: '"gesetzlich"' },
+            { atomId: '5001', value: '"Erkältung mit Fieber, kann nicht arbeiten"' },
+            { atomId: '5004', value: '"3"' },
+        ],
+    },
+];
+
+router.post('/demo-patient', requireAuth, requireRole('arzt', 'admin'), async (req: Request, res) => {
+    try {
+        const tenantCheck = resolveEffectiveTenant(req);
+        if (!tenantCheck.ok) {
+            res.status(tenantCheck.status).json(tenantCheck.body);
+            return;
+        }
+        const tenantId = tenantCheck.tenantId;
+
+        const which = (req.body?.index as number | undefined) ?? Math.floor(Math.random() * DEMO_PATIENTS.length);
+        const demo = DEMO_PATIENTS[which % DEMO_PATIENTS.length];
+
+        // 1. Patient erzeugen
+        const { hashEmail, encrypt } = await import('../services/encryption');
+        const fakeEmail = `demo.${demo.lastName.toLowerCase()}.${Date.now()}@example.de`;
+        const patient = await prisma.patient.create({
+            data: {
+                tenantId,
+                hashedEmail: hashEmail(fakeEmail),
+                gender: demo.gender,
+                birthDate: new Date(demo.birthDate),
+                encryptedName: encrypt(`${demo.firstName} ${demo.lastName}`),
+                versichertenNr: demo.versichertenNr,
+                kassenname: demo.kassenname,
+                versichertenArt: 'gesetzlich',
+                patientNumber: `DEMO-${Math.floor(Math.random() * 90000) + 10000}`,
+            },
+        });
+
+        // 2. Session erzeugen
+        const session = await prisma.patientSession.create({
+            data: {
+                tenantId,
+                patientId: patient.id,
+                isNewPatient: false,
+                gender: demo.gender,
+                birthDate: new Date(demo.birthDate),
+                selectedService: demo.service,
+                insuranceType: 'gesetzlich',
+                encryptedName: encrypt(`${demo.firstName} ${demo.lastName}`),
+                status: 'COMPLETED',
+                completedAt: new Date(),
+            },
+        });
+
+        // 3. Antworten erzeugen
+        for (const a of demo.answers) {
+            try {
+                await prisma.answer.create({
+                    data: {
+                        sessionId: session.id,
+                        atomId: a.atomId,
+                        value: a.value,
+                    },
+                });
+            } catch {
+                // Atom existiert nicht → skip diese Antwort, andere noch erzeugen
+            }
+        }
+
+        res.status(201).json({
+            ok: true,
+            sessionId: session.id,
+            patientId: patient.id,
+            patientNumber: patient.patientNumber,
+            name: `${demo.firstName} ${demo.lastName}`,
+            service: demo.service,
+            answersCreated: demo.answers.length,
+            gdtExportUrl: `/api/sessions/${session.id}/export/gdt?receiverId=TOMEDO`,
+        });
+    } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error('[Admin] Demo-Patient-Generator-Fehler:', message);
+        res.status(500).json({ error: 'Demo-Patient konnte nicht erzeugt werden', detail: message });
+    }
+});
+
 export default router;
