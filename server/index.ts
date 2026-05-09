@@ -63,8 +63,11 @@ import usageRoutes from './routes/usage';
 import healthRoutes from './routes/health';
 import aiRoutes from './routes/ai';
 import authRoutes from './routes/auth';
-import tomedoBridgeRoutes from './routes/tomedo-bridge.routes';
-import tomedoBatchRoutes from './routes/tomedo-batch.routes';
+// 2026-05-09 — Tomedo-Bridge entfernt. Tomedo importiert Daten via GDT-Export
+// (siehe `/api/sessions/:id/export/gdt`). Kein in-app-Bridge mehr → weniger Memory,
+// weniger Fehleranfälligkeit, klare Trennung Anamnese-Erfassung ⇄ Praxis-Software.
+// import tomedoBridgeRoutes from './routes/tomedo-bridge.routes';
+// import tomedoBatchRoutes from './routes/tomedo-batch.routes';
 import fhirWebhookRoutes from './routes/fhir-webhook.routes';
 import fhirSubscriptionRoutes from './routes/fhir-subscription.routes';
 import episodeRoutes from './routes/episodes';
@@ -408,8 +411,9 @@ mountRoute('practice', '/api/wearables', authLimiter, wearablesRoutes);
 mountRoute('company', '/api/usage', authLimiter, usageRoutes);
 mountRoute('practice', '/api/ai', aiRoutes);
 mountRoute('shared', '/api/auth', authLimiter, authRoutes);
-mountRoute('authority', '/api/tomedo-bridge', authLimiter, tomedoBridgeRoutes);
-mountRoute('authority', '/api/tomedo-bridge', authLimiter, tomedoBatchRoutes);
+// 2026-05-09 — Tomedo-Bridge-Routes entfernt; siehe Kommentar oben.
+// mountRoute('authority', '/api/tomedo-bridge', authLimiter, tomedoBridgeRoutes);
+// mountRoute('authority', '/api/tomedo-bridge', authLimiter, tomedoBatchRoutes);
 mountRoute('authority', '/api/tomedo-bridge', authLimiter, fhirSubscriptionRoutes);
 mountRoute('authority', '/api/webhooks/fhir', fhirWebhookRoutes);
 mountRoute('company', '/api', themeRoutes);

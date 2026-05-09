@@ -148,8 +148,16 @@ export function registerTomedoBridgeAgent(): void {
     logger.info('[TomedoBridge] Agent registered');
 }
 
-// Auto-register on import
-registerTomedoBridgeAgent();
+// 2026-05-09 — Tomedo-Bridge dauerhaft entfernt (CK-Entscheidung).
+// Tomedo importiert Daten via GDT-Datei-Export (siehe `/api/sessions/:id/export/gdt`).
+// Kein in-app-Bridge mehr → weniger Memory, klare Service-Trennung.
+// Die alte Auto-Registrierung ist deaktiviert; der Agent wird NICHT mehr beim Boot
+// registriert. Falls jemand den Agent doch noch braucht, manueller Aufruf von
+// registerTomedoBridgeAgent() ist möglich (Export bleibt erhalten für Tests).
+//
+// if (process.env.LOW_MEM_MODE !== '1' && process.env.LOW_MEM_MODE !== 'true') {
+//     registerTomedoBridgeAgent();
+// }
 
 // Export types for consumers
 export type { BridgeInput, BridgeExecutionResult } from './tomedo-bridge/types.js';

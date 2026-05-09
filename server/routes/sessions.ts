@@ -203,8 +203,61 @@ router.post('/', async (req: Request, res: Response) => {
 });
 
 /**
+ * GET /api/sessions/:id/export/gdt
+ *
+ * 2026-05-09 — Anamnese-Daten als GDT-3.0-Datei (Satzart 6310) exportieren.
+ * Tomedo (und alle anderen GDT-fähigen PVS) können die Datei direkt importieren.
+ * Ersetzt die alte in-app Tomedo-Bridge.
+ *
+ * Auth: requireAuth (Patient mit Session-JWT, Arzt oder MFA).
+ * Response: text/plain; charset=ISO-8859-15, Content-Disposition: attachment.
+ */
+router.get('/:id/export/gdt', requireAuth, requireSessionOwner, async (req: Request, res: Response) => {
+    try {
+        const sessionId = req.params.id as string;
+        const session = await prisma.patientSession.findUnique({
+            where: { id: sessionId },
+            include: {
+                patient: true,
+                answers: { include: { atom: true } },
+                triageEvents: true,
+            } as never,
+        }) as unknown as Parameters<typeof import('../services/pvs/gdt/gdt-writer').buildAnamneseResult>[0] | null;
+
+        if (!session) {
+            res.status(404).json({ error: 'Session nicht gefunden' });
+            return;
+        }
+
+        // Lazy-import GDT-writer (vermeidet ungenutzten Memory-Footprint im Hot-Path).
+        const { buildAnamneseResult } = await import('../services/pvs/gdt/gdt-writer');
+
+        const senderId = (req.tenant?.settings?.gdtSenderId as string | undefined) || 'DIGGAI';
+        const receiverId = (req.query.receiverId as string | undefined)
+            || (req.tenant?.settings?.gdtReceiverId as string | undefined)
+            || 'TOMEDO';
+
+        const gdtContent = buildAnamneseResult(session, {
+            satzart: '6310',
+            senderId,
+            receiverId,
+            encoding: 'ISO-8859-15',
+        });
+
+        const filename = `DIGGAI_${session.patient?.patientNumber || sessionId}.gdt`;
+        res.setHeader('Content-Type', 'text/plain; charset=ISO-8859-15');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.status(200).send(gdtContent);
+    } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error('[Sessions] GDT-Export-Fehler:', message);
+        res.status(500).json({ error: 'GDT-Export fehlgeschlagen', detail: message });
+    }
+});
+
+/**
  * GET /api/sessions/:id/state
- * 
+ *
  * OPTIMIZED: Combined query with include to prevent N+1 queries
  * Previously: 3 separate queries (session, answers, triageEvents)
  * Now: 1 query with included relations
