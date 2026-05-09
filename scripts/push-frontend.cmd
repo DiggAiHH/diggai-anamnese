@@ -25,8 +25,10 @@ echo === git commit --no-verify === >> "D:\Temp\fly-push.log"
 git commit --no-verify -m "fix: backend bug-pass + frontend queue-URL via VITE_API_URL" >> "D:\Temp\fly-push.log" 2>&1
 
 echo. >> "D:\Temp\fly-push.log"
-echo === git push --no-verify === >> "D:\Temp\fly-push.log"
-git push --no-verify >> "D:\Temp\fly-push.log" 2>&1
+echo === git push --no-verify --set-upstream === >> "D:\Temp\fly-push.log"
+for /f "delims=" %%b in ('git symbolic-ref --short HEAD') do set "BRANCH=%%b"
+echo Current branch: %BRANCH% >> "D:\Temp\fly-push.log"
+git push --no-verify --set-upstream origin %BRANCH% >> "D:\Temp\fly-push.log" 2>&1
 
 echo. >> "D:\Temp\fly-push.log"
 echo === git log -3 === >> "D:\Temp\fly-push.log"
