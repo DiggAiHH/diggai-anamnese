@@ -345,7 +345,13 @@ apiClient.interceptors.response.use(
                 setAuthToken(null);
                 localStorage.removeItem('anamnese_session_id');
                 useSessionStore.getState().clearSession();
-                if (window.location.pathname !== '/' && window.location.pathname !== '/arzt' && window.location.pathname !== '/mfa') {
+                // 2026-05-09 — Patient-Flow nicht unterbrechen.
+                // Patient hat session-id-basiertes Capability-Token, keinen JWT.
+                // 401 auf Patient-API-Endpoints darf KEINEN Redirect auslösen — sonst
+                // bricht Anamnese mitten in der Befragung ab und springt zur Homepage.
+                const path = window.location.pathname;
+                const isPatientFlow = path.startsWith('/patient') || path.startsWith('/anamnese') || path.startsWith('/wunsch') || path.startsWith('/au');
+                if (!isPatientFlow && path !== '/' && path !== '/arzt' && path !== '/mfa' && path !== '/verwaltung/login') {
                     window.location.href = '/';
                 }
                 return Promise.reject(error);
@@ -388,7 +394,13 @@ apiClient.interceptors.response.use(
                 setAuthToken(null);
                 localStorage.removeItem('anamnese_session_id');
                 useSessionStore.getState().clearSession();
-                if (window.location.pathname !== '/' && window.location.pathname !== '/arzt' && window.location.pathname !== '/mfa') {
+                // 2026-05-09 — Patient-Flow nicht unterbrechen.
+                // Patient hat session-id-basiertes Capability-Token, keinen JWT.
+                // 401 auf Patient-API-Endpoints darf KEINEN Redirect auslösen — sonst
+                // bricht Anamnese mitten in der Befragung ab und springt zur Homepage.
+                const path = window.location.pathname;
+                const isPatientFlow = path.startsWith('/patient') || path.startsWith('/anamnese') || path.startsWith('/wunsch') || path.startsWith('/au');
+                if (!isPatientFlow && path !== '/' && path !== '/arzt' && path !== '/mfa' && path !== '/verwaltung/login') {
                     window.location.href = '/';
                 }
                 return Promise.reject(refreshError);
