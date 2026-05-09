@@ -494,7 +494,11 @@ export function Questionnaire() {
     const activePathIds = getActivePath(allQuestions, state.answers, context);
     const estimatedPath = estimateFullPath(allQuestions, state.answers, context);
     const totalAnswered = activePathIds.filter(id => state.answers[id]).length;
-    const totalEstimated = Math.max(estimatedPath.length, activePathIds.length, 1);
+    // 2026-05-09 — B4-Fix: Total stabilisieren via Aufrundung auf nächste Stelle ×10.
+    // Sonst springt der Counter 16 → 64 → 68 weil estimatedPath mit Antworten wächst.
+    // Stabile Anzeige: ungefähre Anzahl, immer mit etwas Puffer nach oben.
+    const rawEstimate = Math.max(estimatedPath.length, activePathIds.length, totalAnswered + 1, 1);
+    const totalEstimated = Math.max(80, Math.ceil(rawEstimate / 10) * 10);
     const progress = Math.min((totalAnswered / totalEstimated) * 100, 98);
 
     const theme = (state.selectedReason && SERVICE_THEMES[state.selectedReason]) || SERVICE_THEMES['Termin / Anamnese'];
